@@ -1,4 +1,10 @@
-import { DataArrayTexture, RGBAFormat, UnsignedByteType, NearestFilter } from 'three';
+import {
+  DataArrayTexture,
+  RGBAFormat,
+  UnsignedByteType,
+  NearestFilter,
+  RepeatWrapping,
+} from 'three';
 import { TEXTURE_LAYER_COUNT, TextureLayer } from '../blocks/blocks';
 import { mulberry32 } from '../core/math';
 
@@ -40,6 +46,8 @@ export function createTextureArray(): DataArrayTexture {
   tex.type = UnsignedByteType;
   tex.magFilter = NearestFilter;
   tex.minFilter = NearestFilter;
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
   tex.needsUpdate = true;
   return tex;
 }

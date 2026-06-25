@@ -6,7 +6,7 @@ export class Renderer {
   readonly scene = new Scene();
   readonly camera: PerspectiveCamera;
   private readonly renderer: WebGLRenderer;
-  private readonly controls: OrbitControls;
+  readonly controls: OrbitControls;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene.background = new Color(0x87b9e8);
@@ -29,8 +29,13 @@ export class Renderer {
     this.scene.add(object);
   }
 
-  start(): void {
+  start(onFrame?: (dtSeconds: number) => void): void {
+    let last = performance.now();
     const tick = (): void => {
+      const now = performance.now();
+      const dt = (now - last) / 1000;
+      last = now;
+      if (onFrame) onFrame(dt);
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
       requestAnimationFrame(tick);
