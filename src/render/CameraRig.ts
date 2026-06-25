@@ -23,7 +23,11 @@ export class CameraRig {
     canvas: HTMLCanvasElement,
     private readonly overlay?: HTMLElement,
   ) {
-    canvas.addEventListener('click', () => canvas.requestPointerLock());
+    // Listen on document, not the canvas: the fullscreen overlay sits on top of the
+    // canvas and would otherwise swallow the click before it reaches requestPointerLock.
+    document.addEventListener('click', () => {
+      if (!this.locked) void canvas.requestPointerLock();
+    });
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
