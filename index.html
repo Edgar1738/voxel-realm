@@ -17,10 +17,38 @@
         height: 100vh;
         display: block;
       }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 16px system-ui, sans-serif;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.35);
+        text-align: center;
+        cursor: pointer;
+      }
+      #crosshair {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 6px;
+        height: 6px;
+        margin: -3px 0 0 -3px;
+        background: #fff;
+        border-radius: 50%;
+        opacity: 0.8;
+        pointer-events: none;
+      }
     </style>
   </head>
   <body>
     <canvas id="app"></canvas>
+    <div id="crosshair"></div>
+    <div id="overlay">
+      Click to play — WASD move, mouse look, Space/Shift up·down, F toggle fly
+    </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>
 </html>

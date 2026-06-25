@@ -20,7 +20,7 @@ export class CameraRig {
 
   constructor(
     private readonly camera: PerspectiveCamera,
-    private readonly canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement,
     private readonly overlay?: HTMLElement,
   ) {
     canvas.addEventListener('click', () => canvas.requestPointerLock());

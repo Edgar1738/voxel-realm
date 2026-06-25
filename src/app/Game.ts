@@ -2,19 +2,22 @@ import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
 import { createChunkMaterial } from '../render/ChunkMaterial';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
+import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
 import { HeightmapGenerator } from '../worldgen/HeightmapGenerator';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
+import { PlayerController } from '../player/PlayerController';
 import { worldToChunkCoord } from '../core/coords';
-import { setupTempPan } from './TempPan';
 import type { Overlay } from '../worldgen/Generator';
-import type { WorldSeed } from '../core/types';
+import type { Vec3, WorldSeed } from '../core/types';
 
 const SEED: WorldSeed = 1337;
 const OVERLAYS: Overlay[] = []; // M1: empty (castle is a P4 overlay)
+const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
+const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
 
-/** Composition root: stream chunks around a (temporarily WASD-panned) camera. */
+/** Composition root: a player flying/walking through the streamed voxel world. */
 export class Game {
   static boot(canvas: HTMLCanvasElement): void {
     const registry = new BlockRegistry();
@@ -26,18 +29,26 @@ export class Game {
     const manager = new ChunkManager(
       new HeightmapGenerator(),
       new GreedyMesher(registry),
+      registry,
       sink,
       SEED,
       OVERLAYS,
     );
 
-    const pan = setupTempPan(renderer.camera, renderer.controls);
+    const overlay = document.getElementById('overlay') ?? undefined;
+    const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
+    const player = new PlayerController(SPAWN, true);
+    const sampler = { isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z) };
 
     renderer.start((dt) => {
-      pan(dt);
-      const cx = worldToChunkCoord(Math.floor(renderer.camera.position.x));
-      const cz = worldToChunkCoord(Math.floor(renderer.camera.position.z));
-      manager.update(cx, cz);
+      const cdt = Math.min(dt, MAX_DT);
+      player.update(cdt, rig.getInput(), rig.yaw, sampler);
+      const eye = player.eye();
+      rig.applyEye(eye.x, eye.y, eye.z);
+      manager.update(
+        worldToChunkCoord(Math.floor(player.position.x)),
+        worldToChunkCoord(Math.floor(player.position.z)),
+      );
     });
   }
 }
