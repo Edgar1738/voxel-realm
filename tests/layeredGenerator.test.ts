@@ -3,7 +3,7 @@ import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { applyOverlays } from '../src/worldgen/Generator';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../src/core/constants';
-import { AIR, GRASS, DIRT, STONE } from '../src/blocks/blocks';
+import { AIR, GRASS, STONE } from '../src/blocks/blocks';
 
 const SEED = 1337;
 
@@ -29,16 +29,17 @@ describe('LayeredGenerator', () => {
     );
   });
 
-  it('lays grass on top, dirt band beneath, stone below, air above', () => {
+  it('keeps a grass surface cap, a solid floor, and air above the surface', () => {
+    // Caves (a later stage) may remove sub-surface blocks, so the dirt-band / deep-stone
+    // invariants are SurfacePainter's job (tested in surfacePainter.test.ts). Here we
+    // assert only what survives carving: the grass cap, the world floor, and open sky.
     const c = gen.generateBaseChunk(SEED, 0, 0);
     for (let x = 0; x < CHUNK_SIZE_X; x++) {
       for (let z = 0; z < CHUNK_SIZE_Z; z++) {
         const top = columnTop(c, x, z);
         expect(top).toBeGreaterThan(0);
-        expect(c.get(x, top, z)).toBe(GRASS);
-        expect(c.get(x, top - 1, z)).toBe(DIRT);
-        expect(c.get(x, top - 4, z)).toBe(STONE);
-        expect(c.get(x, 0, z)).toBe(STONE);
+        expect(c.get(x, top, z)).toBe(GRASS); // surface cap intact (never carved)
+        expect(c.get(x, 0, z)).toBe(STONE); // world floor intact (below carve margin)
         if (top + 1 < WORLD_HEIGHT) expect(c.get(x, top + 1, z)).toBe(AIR);
       }
     }
