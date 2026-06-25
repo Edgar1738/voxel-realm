@@ -6,6 +6,8 @@ import {
   inChunkBounds,
   worldToChunkCoord,
   worldToLocal,
+  chunkKey,
+  parseChunkKey,
 } from '../src/core/coords';
 
 describe('constants', () => {
@@ -68,5 +70,23 @@ describe('world <-> chunk/local', () => {
     expect(worldToLocal(16)).toBe(0);
     expect(worldToLocal(-1)).toBe(15);
     expect(worldToLocal(-16)).toBe(0);
+  });
+});
+
+describe('chunkKey', () => {
+  it('round-trips chunk coords including negatives', () => {
+    const cases: Array<[number, number]> = [
+      [0, 0],
+      [1, -1],
+      [-5, 9],
+      [-128, 256],
+    ];
+    for (const [cx, cz] of cases) {
+      expect(parseChunkKey(chunkKey(cx, cz))).toEqual({ cx, cz });
+    }
+  });
+
+  it('produces distinct keys for distinct coords', () => {
+    expect(chunkKey(1, 2)).not.toBe(chunkKey(2, 1));
   });
 });

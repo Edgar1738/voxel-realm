@@ -31,3 +31,13 @@ export function worldToChunkCoord(world: number): number {
 export function worldToLocal(world: number): number {
   return ((world % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
 }
+
+/** Stable string key for a chunk column. */
+export function chunkKey(cx: number, cz: number): string {
+  return `${cx},${cz}`;
+}
+
+export function parseChunkKey(key: string): { cx: number; cz: number } {
+  const comma = key.indexOf(',');
+  return { cx: Number(key.slice(0, comma)), cz: Number(key.slice(comma + 1)) };
+}
