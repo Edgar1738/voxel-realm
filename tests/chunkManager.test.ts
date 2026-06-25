@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ChunkManager, type ChunkSink } from '../src/world/ChunkManager';
-import { HeightmapGenerator } from '../src/worldgen/HeightmapGenerator';
+import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
@@ -22,7 +22,7 @@ class FakeSink implements ChunkSink {
 function makeManager(sink: ChunkSink, viewDistance: number, genBudget: number, meshBudget: number) {
   const registry = new BlockRegistry();
   return new ChunkManager(
-    new HeightmapGenerator(),
+    createWorldGenerator(),
     new GreedyMesher(registry),
     registry,
     sink,

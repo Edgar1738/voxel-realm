@@ -4,7 +4,7 @@ import { createChunkMaterial } from '../render/ChunkMaterial';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
-import { HeightmapGenerator } from '../worldgen/HeightmapGenerator';
+import { createWorldGenerator } from '../worldgen/LayeredGenerator';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
@@ -27,7 +27,7 @@ export class Game {
 
     const sink = new ChunkMeshRegistry(renderer.scene, material);
     const manager = new ChunkManager(
-      new HeightmapGenerator(),
+      createWorldGenerator(),
       new GreedyMesher(registry),
       registry,
       sink,
