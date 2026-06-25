@@ -1,5 +1,5 @@
-import { VIEW_DISTANCE, GEN_BUDGET, MESH_BUDGET } from '../core/constants';
-import { chunkKey, parseChunkKey } from '../core/coords';
+import { VIEW_DISTANCE, GEN_BUDGET, MESH_BUDGET, WORLD_HEIGHT } from '../core/constants';
+import { chunkKey, parseChunkKey, worldToChunkCoord, worldToLocal } from '../core/coords';
 import { ChunkStore, ChunkState } from './ChunkStore';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
@@ -8,6 +8,7 @@ import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { MeshData } from '../mesh/MeshTypes';
 import type { WorldSeed } from '../core/types';
 import type { ChunkData } from './ChunkData';
+import type { BlockRegistry } from '../blocks/BlockRegistry';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
@@ -41,6 +42,7 @@ export class ChunkManager {
   constructor(
     private readonly generator: Generator,
     private readonly mesher: GreedyMesher,
+    private readonly registry: BlockRegistry,
     private readonly sink: ChunkSink,
     private readonly seed: WorldSeed,
     private readonly overlays: Overlay[],
@@ -98,6 +100,19 @@ export class ChunkManager {
         if (nb && nb.state === ChunkState.Meshed) this.meshChunk(cx + dx, cz + dz);
       }
     }
+  }
+
+  /**
+   * Whether the voxel at world coords blocks the player. Below the world is solid (so
+   * the player never falls out); above it is air; a not-yet-loaded chunk is solid (so
+   * the player never falls through unstreamed terrain); otherwise sample the block.
+   */
+  isSolid(wx: number, wy: number, wz: number): boolean {
+    if (wy < 0) return true;
+    if (wy >= WORLD_HEIGHT) return false;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return true;
+    return this.registry.isOpaque(entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)));
   }
 
   private desiredSet(centerCx: number, centerCz: number): Map<string, { cx: number; cz: number }> {

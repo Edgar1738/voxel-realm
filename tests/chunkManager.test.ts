@@ -3,6 +3,7 @@ import { ChunkManager, type ChunkSink } from '../src/world/ChunkManager';
 import { HeightmapGenerator } from '../src/worldgen/HeightmapGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
+import { WORLD_HEIGHT } from '../src/core/constants';
 import type { MeshData } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -19,9 +20,11 @@ class FakeSink implements ChunkSink {
 }
 
 function makeManager(sink: ChunkSink, viewDistance: number, genBudget: number, meshBudget: number) {
+  const registry = new BlockRegistry();
   return new ChunkManager(
     new HeightmapGenerator(),
-    new GreedyMesher(new BlockRegistry()),
+    new GreedyMesher(registry),
+    registry,
     sink,
     SEED,
     [],
@@ -70,5 +73,24 @@ describe('ChunkManager', () => {
     // The center chunk is meshed first (with missing neighbors), then re-meshed as
     // each neighbor loads, so it is uploaded more than once.
     expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(1);
+  });
+});
+
+describe('ChunkManager.isSolid', () => {
+  it('reports solid terrain, open sky, missing chunks, and the world floor', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 1, 64, 64);
+    settle(mgr, 0, 0);
+
+    // y=0 is stone in the generated terrain.
+    expect(mgr.isSolid(0, 0, 0)).toBe(true);
+    // High above terrain is air.
+    expect(mgr.isSolid(0, WORLD_HEIGHT - 1, 0)).toBe(false);
+    // Below the world is solid (floor) so the player can't fall out.
+    expect(mgr.isSolid(0, -1, 0)).toBe(true);
+    // Above the world ceiling is air.
+    expect(mgr.isSolid(0, WORLD_HEIGHT, 0)).toBe(false);
+    // A far, unloaded chunk counts as solid.
+    expect(mgr.isSolid(10000, 50, 10000)).toBe(true);
   });
 });
