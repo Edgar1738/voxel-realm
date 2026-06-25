@@ -10,3 +10,10 @@ export interface LocalCoord {
   y: number;
   z: number;
 }
+
+/** A mutable 3D vector / point in world space. */
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
