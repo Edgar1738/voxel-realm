@@ -5,5 +5,7 @@ export interface MeshData {
   uvs: Float32Array;
   /** Texture array layer index per vertex. */
   layers: Float32Array;
+  /** Baked ambient-occlusion brightness multiplier per vertex (0..1). */
+  ao: Float32Array;
   indices: Uint32Array;
 }
