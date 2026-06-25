@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ChunkData } from '../src/world/ChunkData';
-import { VoxelView } from '../src/world/VoxelView';
+import { VoxelView, type NeighborLookup } from '../src/world/VoxelView';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../src/core/constants';
@@ -13,7 +13,7 @@ function faceCount(mesh: { indices: Uint32Array }): number {
   return mesh.indices.length / 6;
 }
 
-function viewOf(center: ChunkData, neighbor = () => undefined as ChunkData | undefined) {
+function viewOf(center: ChunkData, neighbor: NeighborLookup = () => undefined) {
   return new VoxelView(center, neighbor);
 }
 

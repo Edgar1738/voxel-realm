@@ -16,9 +16,7 @@ describe('VoxelView', () => {
     const center = new ChunkData(0, 0);
     const east = new ChunkData(1, 0);
     east.set(0, 10, 5, GRASS); // local (0,..) of east == world x = 16
-    const view = new VoxelView(center, (dcx, dcz) =>
-      dcx === 1 && dcz === 0 ? east : undefined,
-    );
+    const view = new VoxelView(center, (dcx, dcz) => (dcx === 1 && dcz === 0 ? east : undefined));
     expect(view.get(CHUNK_SIZE_X, 10, 5)).toBe(GRASS);
   });
 
@@ -26,9 +24,7 @@ describe('VoxelView', () => {
     const center = new ChunkData(0, 0);
     const west = new ChunkData(-1, 0);
     west.set(CHUNK_SIZE_X - 1, 10, 5, GRASS); // world x = -1
-    const view = new VoxelView(center, (dcx, dcz) =>
-      dcx === -1 && dcz === 0 ? west : undefined,
-    );
+    const view = new VoxelView(center, (dcx, dcz) => (dcx === -1 && dcz === 0 ? west : undefined));
     expect(view.get(-1, 10, 5)).toBe(GRASS);
   });
 

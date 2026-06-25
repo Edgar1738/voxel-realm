@@ -100,10 +100,7 @@ export class ChunkManager {
     }
   }
 
-  private desiredSet(
-    centerCx: number,
-    centerCz: number,
-  ): Map<string, { cx: number; cz: number }> {
+  private desiredSet(centerCx: number, centerCz: number): Map<string, { cx: number; cz: number }> {
     const vd = this.opts.viewDistance;
     const desired = new Map<string, { cx: number; cz: number }>();
     for (let dz = -vd; dz <= vd; dz++) {
@@ -119,9 +116,7 @@ export class ChunkManager {
   private meshChunk(cx: number, cz: number): void {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
-    const view = new VoxelView(entry.data, (dcx, dcz) =>
-      this.neighborData(cx + dcx, cz + dcz),
-    );
+    const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
     const mesh = this.mesher.mesh(view);
     this.sink.upload(chunkKey(cx, cz), mesh);
     this.store.setState(cx, cz, ChunkState.Meshed);

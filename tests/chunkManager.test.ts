@@ -18,12 +18,7 @@ class FakeSink implements ChunkSink {
   }
 }
 
-function makeManager(
-  sink: ChunkSink,
-  viewDistance: number,
-  genBudget: number,
-  meshBudget: number,
-) {
+function makeManager(sink: ChunkSink, viewDistance: number, genBudget: number, meshBudget: number) {
   return new ChunkManager(
     new HeightmapGenerator(),
     new GreedyMesher(new BlockRegistry()),
