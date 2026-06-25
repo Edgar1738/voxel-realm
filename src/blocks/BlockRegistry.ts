@@ -1,0 +1,31 @@
+import type { BlockId } from '../core/types';
+import { BLOCK_DEFS, TEXTURE_LAYER_COUNT, type BlockDef, type Face } from './blocks';
+
+/** Single source of truth for block lookups. Built from the stable BLOCK_DEFS table. */
+export class BlockRegistry {
+  private readonly byId = new Map<BlockId, BlockDef>();
+
+  constructor() {
+    for (const def of BLOCK_DEFS) this.byId.set(def.id, def);
+  }
+
+  get(id: BlockId): BlockDef {
+    const def = this.byId.get(id);
+    if (!def) throw new Error(`Unknown block id: ${id}`);
+    return def;
+  }
+
+  isOpaque(id: BlockId): boolean {
+    return this.get(id).opaque;
+  }
+
+  /** Texture layer index for a given block face. */
+  faceLayer(id: BlockId, face: Face): number {
+    return this.get(id).faces[face];
+  }
+
+  /** Number of DataArrayTexture layers the renderer must allocate. */
+  get layerCount(): number {
+    return TEXTURE_LAYER_COUNT;
+  }
+}
