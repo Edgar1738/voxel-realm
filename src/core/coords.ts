@@ -1,0 +1,33 @@
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from './constants';
+import type { LocalCoord } from './types';
+
+/**
+ * THE voxel-index convention. Flat layout, x fastest then z then y:
+ *   index = x + CHUNK_SIZE_X * (z + CHUNK_SIZE_Z * y)
+ * Used everywhere; never duplicate this formula elsewhere.
+ */
+export function voxelIndex(x: number, y: number, z: number): number {
+  return x + CHUNK_SIZE_X * (z + CHUNK_SIZE_Z * y);
+}
+
+export function indexToLocal(index: number): LocalCoord {
+  const x = index % CHUNK_SIZE_X;
+  const rest = (index - x) / CHUNK_SIZE_X;
+  const z = rest % CHUNK_SIZE_Z;
+  const y = (rest - z) / CHUNK_SIZE_Z;
+  return { x, y, z };
+}
+
+export function inChunkBounds(x: number, y: number, z: number): boolean {
+  return x >= 0 && x < CHUNK_SIZE_X && y >= 0 && y < WORLD_HEIGHT && z >= 0 && z < CHUNK_SIZE_Z;
+}
+
+/** Floor-divide a world coordinate to its chunk coordinate (handles negatives). */
+export function worldToChunkCoord(world: number): number {
+  return Math.floor(world / CHUNK_SIZE_X);
+}
+
+/** Map a world coordinate to its non-negative local coordinate (handles negatives). */
+export function worldToLocal(world: number): number {
+  return ((world % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
+}
