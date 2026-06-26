@@ -3,6 +3,7 @@ import { ChunkData } from '../world/ChunkData';
 import { HeightField } from './HeightField';
 import { SurfacePainter } from './SurfacePainter';
 import { CaveCarver } from './CaveCarver';
+import { WaterFiller } from './WaterFiller';
 import type { Generator } from './Generator';
 import type { GenContext, TerrainStage } from './TerrainStage';
 import type { WorldSeed } from '../core/types';
@@ -28,10 +29,10 @@ export class LayeredGenerator implements Generator {
   }
 }
 
-/** The default world generator: heightmap, surface painting, then cave carving. */
+/** The default world generator: heightmap, surface, caves, then water. */
 export function createWorldGenerator(): LayeredGenerator {
   return new LayeredGenerator(
-    [new HeightField(), new SurfacePainter(), new CaveCarver()],
+    [new HeightField(), new SurfacePainter(), new CaveCarver(), new WaterFiller()],
     SEA_LEVEL,
   );
 }
