@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TextureLayer, Face } from '../src/blocks/blocks';
+import {
+  AIR,
+  GRASS,
+  DIRT,
+  STONE,
+  WOOD,
+  LEAVES,
+  SAND,
+  WATER,
+  TextureLayer,
+  Face,
+} from '../src/blocks/blocks';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 
 describe('block ids are stable and append-only', () => {
@@ -13,6 +24,11 @@ describe('block ids are stable and append-only', () => {
   it('appends wood and leaves at the reserved ids', () => {
     expect(WOOD).toBe(5);
     expect(LEAVES).toBe(6);
+  });
+
+  it('has sand at id 4 and water at id 8', () => {
+    expect(SAND).toBe(4);
+    expect(WATER).toBe(8);
   });
 });
 
@@ -54,7 +70,13 @@ describe('BlockRegistry', () => {
     }
   });
 
+  it('treats sand as opaque and water as non-opaque/transparent', () => {
+    expect(reg.isOpaque(SAND)).toBe(true);
+    expect(reg.isOpaque(WATER)).toBe(false);
+    expect(reg.get(WATER).transparent).toBe(true);
+  });
+
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(7);
+    expect(reg.layerCount).toBe(9);
   });
 });

@@ -5,8 +5,10 @@ export const AIR: BlockId = 0;
 export const GRASS: BlockId = 1;
 export const DIRT: BlockId = 2;
 export const STONE: BlockId = 3;
+export const SAND: BlockId = 4;
 export const WOOD: BlockId = 5;
 export const LEAVES: BlockId = 6;
+export const WATER: BlockId = 8;
 
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
@@ -27,9 +29,11 @@ export const TextureLayer = {
   WoodTop: 4,
   WoodSide: 5,
   Leaves: 6,
+  Sand: 7,
+  Water: 8,
 } as const;
 
-export const TEXTURE_LAYER_COUNT = 7;
+export const TEXTURE_LAYER_COUNT = 9;
 
 /** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
 export interface BlockDef {
@@ -93,5 +97,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     faces: uniform(TextureLayer.Leaves),
+  },
+  { id: SAND, name: 'sand', opaque: true, transparent: false, faces: uniform(TextureLayer.Sand) },
+  {
+    id: WATER,
+    name: 'water',
+    opaque: false,
+    transparent: true,
+    faces: uniform(TextureLayer.Water),
   },
 ];
