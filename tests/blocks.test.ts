@@ -9,6 +9,7 @@ import {
   SAND,
   WATER,
   SNOW,
+  CACTUS,
   TextureLayer,
   Face,
 } from '../src/blocks/blocks';
@@ -34,6 +35,10 @@ describe('block ids are stable and append-only', () => {
 
   it('has snow at id 9', () => {
     expect(SNOW).toBe(9);
+  });
+
+  it('has cactus at id 10', () => {
+    expect(CACTUS).toBe(10);
   });
 });
 
@@ -85,7 +90,11 @@ describe('BlockRegistry', () => {
     expect(reg.isOpaque(SNOW)).toBe(true);
   });
 
+  it('treats cactus as opaque', () => {
+    expect(reg.isOpaque(CACTUS)).toBe(true);
+  });
+
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(10);
+    expect(reg.layerCount).toBe(11);
   });
 });

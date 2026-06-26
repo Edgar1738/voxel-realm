@@ -46,6 +46,7 @@ export function createTextureArray(): DataArrayTexture {
   paintLayer(data, TextureLayer.Sand, [206, 190, 140], 12); // pale beach sand
   paintLayer(data, TextureLayer.Water, [50, 110, 200], 10); // blue (alpha from material)
   paintLayer(data, TextureLayer.Snow, [236, 240, 245], 6); // near-white snow
+  paintLayer(data, TextureLayer.Cactus, [60, 110, 60], 16); // cactus green
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
