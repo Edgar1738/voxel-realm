@@ -1,6 +1,6 @@
 import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
-import { createChunkMaterial } from '../render/ChunkMaterial';
+import { createChunkMaterial, createWaterMaterial } from '../render/ChunkMaterial';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
@@ -25,8 +25,9 @@ export class Game {
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
     const material = createChunkMaterial(texture);
+    const waterMaterial = createWaterMaterial(texture);
 
-    const sink = new ChunkMeshRegistry(renderer.scene, material);
+    const sink = new ChunkMeshRegistry(renderer.scene, material, waterMaterial);
     const manager = new ChunkManager(
       createWorldGenerator(),
       new GreedyMesher(registry),

@@ -3,24 +3,41 @@ import { buildChunkMesh } from './buildChunkMesh';
 import { parseChunkKey } from '../core/coords';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../core/constants';
 import type { ChunkSink } from '../world/ChunkManager';
-import type { MeshData } from '../mesh/MeshTypes';
+import type { ChunkMeshes } from '../mesh/MeshTypes';
 
-/** Owns chunk THREE.Meshes; positions them at their world origin; disposes geometry. */
+interface Entry {
+  opaque: Mesh;
+  water?: Mesh;
+}
+
+/** Owns each chunk's opaque + (optional) water THREE.Meshes; positions and disposes them. */
 export class ChunkMeshRegistry implements ChunkSink {
-  private readonly meshes = new Map<string, Mesh>();
+  private readonly entries = new Map<string, Entry>();
 
   constructor(
     private readonly scene: Scene,
-    private readonly material: Material,
+    private readonly opaqueMaterial: Material,
+    private readonly waterMaterial: Material,
   ) {}
 
-  upload(key: string, mesh: MeshData): void {
-    this.remove(key); // replace any prior mesh for this chunk
-    const obj = buildChunkMesh(mesh, this.material);
+  upload(key: string, meshes: ChunkMeshes): void {
+    this.remove(key);
     const { cx, cz } = parseChunkKey(key);
-    obj.position.set(cx * CHUNK_SIZE_X, 0, cz * CHUNK_SIZE_Z);
-    this.meshes.set(key, obj);
-    this.scene.add(obj);
+    const ox = cx * CHUNK_SIZE_X;
+    const oz = cz * CHUNK_SIZE_Z;
+
+    const opaque = buildChunkMesh(meshes.opaque, this.opaqueMaterial);
+    opaque.position.set(ox, 0, oz);
+    this.scene.add(opaque);
+
+    const entry: Entry = { opaque };
+    if (meshes.water.indices.length > 0) {
+      const water = buildChunkMesh(meshes.water, this.waterMaterial);
+      water.position.set(ox, 0, oz);
+      this.scene.add(water);
+      entry.water = water;
+    }
+    this.entries.set(key, entry);
   }
 
   dispose(key: string): void {
@@ -28,10 +45,14 @@ export class ChunkMeshRegistry implements ChunkSink {
   }
 
   private remove(key: string): void {
-    const existing = this.meshes.get(key);
-    if (!existing) return;
-    this.scene.remove(existing);
-    existing.geometry.dispose();
-    this.meshes.delete(key);
+    const entry = this.entries.get(key);
+    if (!entry) return;
+    this.scene.remove(entry.opaque);
+    entry.opaque.geometry.dispose();
+    if (entry.water) {
+      this.scene.remove(entry.water);
+      entry.water.geometry.dispose();
+    }
+    this.entries.delete(key);
   }
 }

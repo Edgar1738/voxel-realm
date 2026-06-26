@@ -43,6 +43,8 @@ export function createTextureArray(): DataArrayTexture {
   paintLayer(data, TextureLayer.WoodTop, [160, 130, 85], 14); // ring face
   paintLayer(data, TextureLayer.WoodSide, [105, 78, 46], 16); // bark
   paintLayer(data, TextureLayer.Leaves, [54, 120, 44], 26); // foliage
+  paintLayer(data, TextureLayer.Sand, [206, 190, 140], 12); // pale beach sand
+  paintLayer(data, TextureLayer.Water, [50, 110, 200], 10); // blue (alpha from material)
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
