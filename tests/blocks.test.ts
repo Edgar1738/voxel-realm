@@ -8,6 +8,7 @@ import {
   LEAVES,
   SAND,
   WATER,
+  SNOW,
   TextureLayer,
   Face,
 } from '../src/blocks/blocks';
@@ -29,6 +30,10 @@ describe('block ids are stable and append-only', () => {
   it('has sand at id 4 and water at id 8', () => {
     expect(SAND).toBe(4);
     expect(WATER).toBe(8);
+  });
+
+  it('has snow at id 9', () => {
+    expect(SNOW).toBe(9);
   });
 });
 
@@ -76,7 +81,11 @@ describe('BlockRegistry', () => {
     expect(reg.get(WATER).transparent).toBe(true);
   });
 
+  it('treats snow as opaque', () => {
+    expect(reg.isOpaque(SNOW)).toBe(true);
+  });
+
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(9);
+    expect(reg.layerCount).toBe(10);
   });
 });
