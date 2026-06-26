@@ -4,9 +4,15 @@ import { SurfacePainter } from '../src/worldgen/SurfacePainter';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, CHUNK_AREA, SEA_LEVEL } from '../src/core/constants';
 import { AIR } from '../src/blocks/blocks';
+import { Biome, type BiomeSource } from '../src/worldgen/BiomeMap';
 import type { GenContext } from '../src/worldgen/TerrainStage';
 
 const FLAT = 80;
+
+const PLAINS: BiomeSource = {
+  biomeAt: () => Biome.Plains,
+  blendedTerrain: () => ({ amplitude: 8, baseOffset: 0 }),
+};
 
 function paintedChunk(cx: number, cz: number): { chunk: ChunkData; ctx: GenContext } {
   const ctx: GenContext = {
@@ -15,6 +21,7 @@ function paintedChunk(cx: number, cz: number): { chunk: ChunkData; ctx: GenConte
     cz,
     heights: new Int16Array(CHUNK_AREA).fill(FLAT),
     seaLevel: SEA_LEVEL,
+    biomes: PLAINS,
   };
   const chunk = new ChunkData(cx, cz);
   new SurfacePainter().apply(chunk, ctx);

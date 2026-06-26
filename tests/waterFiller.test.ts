@@ -4,7 +4,13 @@ import { SurfacePainter } from '../src/worldgen/SurfacePainter';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_AREA, SEA_LEVEL } from '../src/core/constants';
 import { AIR, WATER } from '../src/blocks/blocks';
+import { Biome, type BiomeSource } from '../src/worldgen/BiomeMap';
 import type { GenContext } from '../src/worldgen/TerrainStage';
+
+const PLAINS: BiomeSource = {
+  biomeAt: () => Biome.Plains,
+  blendedTerrain: () => ({ amplitude: 8, baseOffset: 0 }),
+};
 
 function ctx(height: number): GenContext {
   return {
@@ -13,6 +19,7 @@ function ctx(height: number): GenContext {
     cz: 0,
     heights: new Int16Array(CHUNK_AREA).fill(height),
     seaLevel: SEA_LEVEL,
+    biomes: PLAINS,
   };
 }
 

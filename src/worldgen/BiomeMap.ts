@@ -17,6 +17,12 @@ export interface BiomeDef {
   baseOffset: number;
 }
 
+/** What stages need from the biome system: classification + blended terrain params. */
+export interface BiomeSource {
+  biomeAt(worldX: number, worldZ: number): Biome;
+  blendedTerrain(worldX: number, worldZ: number): { amplitude: number; baseOffset: number };
+}
+
 const DEFS: Record<Biome, BiomeDef> = {
   [Biome.Plains]: { biome: Biome.Plains, amplitude: 8, baseOffset: 0 },
   [Biome.Forest]: { biome: Biome.Forest, amplitude: 12, baseOffset: 0 },
@@ -49,7 +55,7 @@ interface Channels {
 }
 
 /** Classifies columns into biomes and supplies (blended) terrain parameters. */
-export class BiomeMap {
+export class BiomeMap implements BiomeSource {
   private readonly ch: Channels;
 
   constructor(seed: WorldSeed) {

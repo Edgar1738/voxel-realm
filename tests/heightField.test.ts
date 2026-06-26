@@ -12,7 +12,14 @@ import {
 import type { GenContext } from '../src/worldgen/TerrainStage';
 
 function ctx(seed: number, cx: number, cz: number): GenContext {
-  return { seed, cx, cz, heights: new Int16Array(CHUNK_AREA), seaLevel: SEA_LEVEL };
+  return {
+    seed,
+    cx,
+    cz,
+    heights: new Int16Array(CHUNK_AREA),
+    seaLevel: SEA_LEVEL,
+    biomes: new BiomeMap(seed),
+  };
 }
 
 describe('HeightField', () => {
