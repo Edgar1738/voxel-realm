@@ -4,6 +4,7 @@ import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
+import { WATER } from '../src/blocks/blocks';
 import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -92,5 +93,41 @@ describe('ChunkManager.isSolid', () => {
     expect(mgr.isSolid(0, WORLD_HEIGHT, 0)).toBe(false);
     // A far, unloaded chunk counts as solid.
     expect(mgr.isSolid(10000, 50, 10000)).toBe(true);
+  });
+});
+
+/** Locate a water voxel deterministically from the same generator the manager uses. */
+function findWater(): { cx: number; cz: number; wx: number; wy: number; wz: number } {
+  const gen = createWorldGenerator();
+  for (let cx = -3; cx <= 3; cx++) {
+    for (let cz = -3; cz <= 3; cz++) {
+      const c = gen.generateBaseChunk(SEED, cx, cz);
+      for (let y = 0; y < WORLD_HEIGHT; y++)
+        for (let z = 0; z < 16; z++)
+          for (let x = 0; x < 16; x++)
+            if (c.get(x, y, z) === WATER)
+              return { cx, cz, wx: cx * 16 + x, wy: y, wz: cz * 16 + z };
+    }
+  }
+  throw new Error('expected the generated world to contain water');
+}
+
+describe('ChunkManager.isWater', () => {
+  it('reports loaded water voxels as water', () => {
+    const { cx, cz, wx, wy, wz } = findWater();
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64); // load just the target chunk
+    settle(mgr, cx, cz, 3);
+    expect(mgr.isWater(wx, wy, wz)).toBe(true);
+  });
+
+  it('reports sky, floor, out-of-range, and unloaded chunks as non-water', () => {
+    const mgr = makeManager(new FakeSink(), 1, 64, 64);
+    settle(mgr, 0, 0);
+    expect(mgr.isWater(0, WORLD_HEIGHT - 1, 0)).toBe(false); // open sky
+    expect(mgr.isWater(0, 0, 0)).toBe(false); // stone floor
+    expect(mgr.isWater(0, -1, 0)).toBe(false); // below world
+    expect(mgr.isWater(0, WORLD_HEIGHT, 0)).toBe(false); // above world
+    expect(mgr.isWater(100000, 50, 0)).toBe(false); // unloaded chunk
   });
 });

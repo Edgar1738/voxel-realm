@@ -4,6 +4,7 @@ import { ChunkStore, ChunkState } from './ChunkStore';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
 import { opaquePass, waterPass, type MeshPass } from '../mesh/MeshPass';
+import { WATER } from '../blocks/blocks';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { ChunkMeshes } from '../mesh/MeshTypes';
@@ -118,6 +119,14 @@ export class ChunkManager {
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
     if (!entry) return true;
     return this.registry.isOpaque(entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)));
+  }
+
+  /** Whether the voxel at world coords is water (true only for loaded water voxels). */
+  isWater(wx: number, wy: number, wz: number): boolean {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return false;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return false;
+    return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)) === WATER;
   }
 
   private desiredSet(centerCx: number, centerCz: number): Map<string, { cx: number; cz: number }> {
