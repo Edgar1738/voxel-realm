@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AIR, GRASS, DIRT, STONE, TextureLayer, Face } from '../src/blocks/blocks';
+import { AIR, GRASS, DIRT, STONE, WOOD, LEAVES, TextureLayer, Face } from '../src/blocks/blocks';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 
 describe('block ids are stable and append-only', () => {
@@ -8,6 +8,11 @@ describe('block ids are stable and append-only', () => {
     expect(GRASS).toBe(1);
     expect(DIRT).toBe(2);
     expect(STONE).toBe(3);
+  });
+
+  it('appends wood and leaves at the reserved ids', () => {
+    expect(WOOD).toBe(5);
+    expect(LEAVES).toBe(6);
   });
 });
 
@@ -35,7 +40,21 @@ describe('BlockRegistry', () => {
     }
   });
 
+  it('treats wood and leaves as opaque', () => {
+    expect(reg.isOpaque(WOOD)).toBe(true);
+    expect(reg.isOpaque(LEAVES)).toBe(true);
+  });
+
+  it('maps wood: rings on top/bottom, bark on the sides; leaves uniform', () => {
+    expect(reg.faceLayer(WOOD, Face.PosY)).toBe(TextureLayer.WoodTop);
+    expect(reg.faceLayer(WOOD, Face.NegY)).toBe(TextureLayer.WoodTop);
+    expect(reg.faceLayer(WOOD, Face.PosX)).toBe(TextureLayer.WoodSide);
+    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
+      expect(reg.faceLayer(LEAVES, f)).toBe(TextureLayer.Leaves);
+    }
+  });
+
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(4);
+    expect(reg.layerCount).toBe(7);
   });
 });
