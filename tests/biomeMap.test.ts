@@ -48,13 +48,9 @@ describe('BiomeMap', () => {
 
   it('keeps blended amplitude within the min/max of biome amplitudes', () => {
     const map = new BiomeMap(SEED);
-    const amps = [
-      Biome.Plains,
-      Biome.Forest,
-      Biome.Desert,
-      Biome.Mountains,
-      Biome.Tundra,
-    ].map((b) => map.defForBiome(b).amplitude);
+    const amps = [Biome.Plains, Biome.Forest, Biome.Desert, Biome.Mountains, Biome.Tundra].map(
+      (b) => map.defForBiome(b).amplitude,
+    );
     const lo = Math.min(...amps);
     const hi = Math.max(...amps);
     for (let x = 0; x < 1000; x += 10) {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { HeightField } from '../src/worldgen/HeightField';
+import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
 import { ChunkData } from '../src/world/ChunkData';
 import {
   CHUNK_SIZE_X,
@@ -49,24 +50,48 @@ describe('HeightField', () => {
   });
 });
 
-describe('HeightField relief variety', () => {
-  it('produces a wide spread of heights across a large area (plains to mountains)', () => {
+describe('HeightField biome relief', () => {
+  it('makes mountain columns taller than desert columns on average', () => {
     const stage = new HeightField();
-    let min = Infinity;
-    let max = -Infinity;
-    // Sample a 12x12 chunk region.
-    for (let cx = -6; cx < 6; cx++) {
-      for (let cz = -6; cz < 6; cz++) {
+    const map = new BiomeMap(1337);
+    let mountainSum = 0;
+    let mountainCount = 0;
+    let desertSum = 0;
+    let desertCount = 0;
+
+    // Wide, strided sample so the fBm shape averages out and biome base/amplitude dominates.
+    for (let cx = -40; cx < 40; cx += 4) {
+      for (let cz = -40; cz < 40; cz += 4) {
         const c = ctx(1337, cx, cz);
         stage.apply(new ChunkData(cx, cz), c);
-        for (let i = 0; i < c.heights.length; i++) {
-          min = Math.min(min, c.heights[i]);
-          max = Math.max(max, c.heights[i]);
+        for (let x = 0; x < CHUNK_SIZE_X; x++) {
+          for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+            const biome = map.biomeAt(cx * CHUNK_SIZE_X + x, cz * CHUNK_SIZE_Z + z);
+            const h = c.heights[x + CHUNK_SIZE_X * z];
+            if (biome === Biome.Mountains) {
+              mountainSum += h;
+              mountainCount++;
+            } else if (biome === Biome.Desert) {
+              desertSum += h;
+              desertCount++;
+            }
+          }
         }
       }
     }
-    expect(max - min).toBeGreaterThan(30); // meaningful relief, not a near-flat plane
-    expect(min).toBeGreaterThanOrEqual(1);
-    expect(max).toBeLessThanOrEqual(WORLD_HEIGHT - 1);
+
+    expect(mountainCount).toBeGreaterThan(0);
+    expect(desertCount).toBeGreaterThan(0);
+    expect(mountainSum / mountainCount).toBeGreaterThan(desertSum / desertCount);
+  });
+
+  it('keeps all heights within world bounds', () => {
+    const stage = new HeightField();
+    const c = ctx(1337, 3, -4);
+    stage.apply(new ChunkData(3, -4), c);
+    for (const h of c.heights) {
+      expect(h).toBeGreaterThanOrEqual(1);
+      expect(h).toBeLessThanOrEqual(WORLD_HEIGHT - 1);
+    }
   });
 });
