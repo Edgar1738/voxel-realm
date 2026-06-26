@@ -1,9 +1,10 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../core/constants';
-import { AIR, Face } from '../blocks/blocks';
+import { Face } from '../blocks/blocks';
 import { vertexAO, aoBrightness } from './Ao';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
+import type { MeshPass } from './MeshPass';
 
 const DIMS = [CHUNK_SIZE_X, WORLD_HEIGHT, CHUNK_SIZE_Z];
 
@@ -41,7 +42,7 @@ interface Buffers {
 export class GreedyMesher {
   constructor(private readonly registry: BlockRegistry) {}
 
-  mesh(view: VoxelView): MeshData {
+  mesh(view: VoxelView, pass: MeshPass): MeshData {
     const buf: Buffers = {
       positions: [],
       normals: [],
@@ -55,8 +56,8 @@ export class GreedyMesher {
     for (let axis = 0; axis < 3; axis++) {
       const u = (axis + 1) % 3;
       const v = (axis + 2) % 3;
-      this.meshDirection(view, axis, u, v, 1, buf);
-      this.meshDirection(view, axis, u, v, -1, buf);
+      this.meshDirection(view, axis, u, v, 1, pass, buf);
+      this.meshDirection(view, axis, u, v, -1, pass, buf);
     }
 
     return {
@@ -115,6 +116,7 @@ export class GreedyMesher {
     u: number,
     v: number,
     sign: number,
+    pass: MeshPass,
     buf: Buffers,
   ): void {
     const du = DIMS[u];
@@ -132,11 +134,12 @@ export class GreedyMesher {
           solid[v] = b;
 
           const id = view.get(solid[0], solid[1], solid[2]);
-          if (id === AIR || !this.registry.isOpaque(id)) continue;
+          if (!pass.includes(id)) continue;
 
           const neighbor = [...solid];
           neighbor[axis] += sign;
-          if (this.opaqueAt(view, neighbor)) continue; // face hidden
+          const neighborId = view.get(neighbor[0], neighbor[1], neighbor[2]);
+          if (!pass.faceVisible(id, neighborId)) continue; // face hidden
 
           const layer = this.registry.faceLayer(id, faceFor(axis, sign));
           const ao = this.cornerAO(view, solid, axis, sign, u, v);
