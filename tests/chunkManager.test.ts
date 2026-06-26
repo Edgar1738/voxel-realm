@@ -4,14 +4,14 @@ import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
-import type { MeshData } from '../src/mesh/MeshTypes';
+import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
 
 class FakeSink implements ChunkSink {
   uploads = new Map<string, number>();
   disposed: string[] = [];
-  upload(key: string, _mesh: MeshData): void {
+  upload(key: string, _meshes: ChunkMeshes): void {
     this.uploads.set(key, (this.uploads.get(key) ?? 0) + 1);
   }
   dispose(key: string): void {

@@ -9,3 +9,9 @@ export interface MeshData {
   ao: Float32Array;
   indices: Uint32Array;
 }
+
+/** The opaque + water meshes produced for one chunk. */
+export interface ChunkMeshes {
+  opaque: MeshData;
+  water: MeshData;
+}

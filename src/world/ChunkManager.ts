@@ -3,16 +3,17 @@ import { chunkKey, parseChunkKey, worldToChunkCoord, worldToLocal } from '../cor
 import { ChunkStore, ChunkState } from './ChunkStore';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
+import { opaquePass, waterPass, type MeshPass } from '../mesh/MeshPass';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
-import type { MeshData } from '../mesh/MeshTypes';
+import type { ChunkMeshes } from '../mesh/MeshTypes';
 import type { WorldSeed } from '../core/types';
 import type { ChunkData } from './ChunkData';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
-  upload(key: string, mesh: MeshData): void;
+  upload(key: string, meshes: ChunkMeshes): void;
   dispose(key: string): void;
 }
 
@@ -38,6 +39,8 @@ const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
 export class ChunkManager {
   private readonly store = new ChunkStore();
   private readonly opts: ChunkManagerOptions;
+  private readonly opaquePass: MeshPass;
+  private readonly waterPass: MeshPass;
 
   constructor(
     private readonly generator: Generator,
@@ -53,6 +56,8 @@ export class ChunkManager {
       genBudget: options?.genBudget ?? GEN_BUDGET,
       meshBudget: options?.meshBudget ?? MESH_BUDGET,
     };
+    this.opaquePass = opaquePass(this.registry);
+    this.waterPass = waterPass();
   }
 
   update(centerCx: number, centerCz: number): void {
@@ -132,8 +137,11 @@ export class ChunkManager {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
-    const mesh = this.mesher.mesh(view);
-    this.sink.upload(chunkKey(cx, cz), mesh);
+    const meshes: ChunkMeshes = {
+      opaque: this.mesher.mesh(view, this.opaquePass),
+      water: this.mesher.mesh(view, this.waterPass),
+    };
+    this.sink.upload(chunkKey(cx, cz), meshes);
     this.store.setState(cx, cz, ChunkState.Meshed);
   }
 
