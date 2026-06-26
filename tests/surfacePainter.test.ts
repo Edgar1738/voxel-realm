@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { SurfacePainter } from '../src/worldgen/SurfacePainter';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, CHUNK_AREA, SEA_LEVEL } from '../src/core/constants';
-import { AIR, GRASS, DIRT, STONE } from '../src/blocks/blocks';
+import { AIR, GRASS, DIRT, STONE, SAND } from '../src/blocks/blocks';
 import type { GenContext } from '../src/worldgen/TerrainStage';
 
 /** Build a context whose heights are a constant value. */
@@ -28,5 +28,17 @@ describe('SurfacePainter', () => {
         expect(chunk.get(x, top + 1, z)).toBe(AIR);
       }
     }
+  });
+});
+
+describe('SurfacePainter beaches', () => {
+  it('caps columns at/below sea level with sand instead of grass/dirt', () => {
+    const stage = new SurfacePainter();
+    const top = SEA_LEVEL; // a shoreline column
+    const chunk = new ChunkData(0, 0);
+    stage.apply(chunk, flatCtx(top));
+    expect(chunk.get(0, top, 0)).toBe(SAND);
+    expect(chunk.get(0, top - 1, 0)).toBe(SAND); // sand band, not dirt
+    expect(chunk.get(0, 0, 0)).toBe(STONE); // floor still stone
   });
 });
