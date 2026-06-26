@@ -40,7 +40,10 @@ export class Game {
     const overlay = document.getElementById('overlay') ?? undefined;
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
     const player = new PlayerController(SPAWN, true);
-    const sampler = { isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z) };
+    const sampler = {
+      isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z),
+      isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
+    };
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);

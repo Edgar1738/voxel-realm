@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { PlayerController, type InputState } from '../src/player/PlayerController';
-import type { SoliditySampler } from '../src/player/Collision';
+import {
+  PlayerController,
+  type InputState,
+  type PlayerWorld,
+} from '../src/player/PlayerController';
 
-const NEVER: SoliditySampler = { isSolid: () => false };
-const FLOOR: SoliditySampler = { isSolid: (_x, y) => y < 0 };
+const NEVER: PlayerWorld = { isSolid: () => false, isWater: () => false };
+const FLOOR: PlayerWorld = { isSolid: (_x, y) => y < 0, isWater: () => false };
+const WATER: PlayerWorld = { isSolid: () => false, isWater: () => true };
 
 function input(partial: Partial<InputState> = {}): InputState {
   return {
@@ -75,5 +79,42 @@ describe('PlayerController eye', () => {
     expect(eye.x).toBe(1);
     expect(eye.z).toBe(2);
     expect(eye.y).toBeGreaterThan(50);
+  });
+});
+
+describe('PlayerController (swimming)', () => {
+  it('swims up with Space while submerged', () => {
+    const p = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    p.update(0.1, input({ up: true }), 0, WATER);
+    expect(p.position.y).toBeGreaterThan(50);
+    expect(p.grounded).toBe(false);
+  });
+
+  it('sinks gently with no input while submerged', () => {
+    const p = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    p.update(0.1, input(), 0, WATER);
+    expect(p.position.y).toBeLessThan(50);
+  });
+
+  it('sinks faster holding Shift than drifting', () => {
+    const drift = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    const sink = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    drift.update(0.1, input(), 0, WATER);
+    sink.update(0.1, input({ down: true }), 0, WATER);
+    expect(sink.position.y).toBeLessThan(drift.position.y);
+  });
+
+  it('moves slower horizontally in water than walking on land', () => {
+    const inWater = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    const onLand = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    inWater.update(0.1, input({ forward: true }), 0, WATER);
+    onLand.update(0.1, input({ forward: true }), 0, FLOOR);
+    expect(Math.abs(inWater.position.z)).toBeLessThan(Math.abs(onLand.position.z));
+  });
+
+  it('ignores water while flying', () => {
+    const p = new PlayerController({ x: 0, y: 50, z: 0 }, true);
+    p.update(0.1, input(), 0, WATER);
+    expect(p.position.y).toBeCloseTo(50, 5); // no buoyancy/gravity while flying
   });
 });
