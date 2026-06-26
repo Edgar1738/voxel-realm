@@ -8,12 +8,13 @@ import { createWorldGenerator } from '../worldgen/LayeredGenerator';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
+import { scatterTrees } from '../worldgen/TreeScatterer';
 import { worldToChunkCoord } from '../core/coords';
 import type { Overlay } from '../worldgen/Generator';
 import type { Vec3, WorldSeed } from '../core/types';
 
 const SEED: WorldSeed = 1337;
-const OVERLAYS: Overlay[] = []; // M1: empty (castle is a P4 overlay)
+const OVERLAYS: Overlay[] = [scatterTrees]; // trees; castle is a later P4 overlay
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
 
