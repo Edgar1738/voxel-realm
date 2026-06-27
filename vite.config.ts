@@ -13,11 +13,23 @@ import {
   safeWorldName,
 } from './server/worldDiskStore';
 
+const MAX_BODY_BYTES = 8 * 1024 * 1024; // reject request bodies larger than this (dev guard)
+
 function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((res) => {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => res(body));
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error('payload too large'));
+        req.destroy();
+        return;
+      }
+      body += chunk;
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
   });
 }
 
@@ -52,34 +64,44 @@ function devDisk(): Plugin {
           res.statusCode = 405;
           return res.end('POST only');
         }
-        void readBody(req).then((body) => {
-          try {
-            const { name, dataUrl } = JSON.parse(body) as { name?: string; dataUrl: string };
-            const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-            const file = resolve(dir('.captures'), `${safeName(name, 'frame')}.jpg`);
-            writeFileSync(file, Buffer.from(base64, 'base64'));
-            sendJson(res, { path: file });
-          } catch (err) {
-            res.statusCode = 500;
-            res.end(String(err));
-          }
-        });
-      });
-
-      server.middlewares.use('/__blueprint', (req, res) => {
-        const blueprintDir = dir('.blueprints');
-        if (req.method === 'POST') {
-          void readBody(req).then((body) => {
+        void readBody(req)
+          .then((body) => {
             try {
-              const { name, blueprint } = JSON.parse(body) as { name?: string; blueprint: unknown };
-              const file = resolve(blueprintDir, `${safeName(name, 'blueprint')}.json`);
-              writeFileSync(file, JSON.stringify(blueprint));
+              const { name, dataUrl } = JSON.parse(body) as { name?: string; dataUrl: string };
+              const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+              const file = resolve(dir('.captures'), `${safeName(name, 'frame')}.jpg`);
+              writeFileSync(file, Buffer.from(base64, 'base64'));
               sendJson(res, { path: file });
             } catch (err) {
               res.statusCode = 500;
               res.end(String(err));
             }
+          })
+          .catch(() => {
+            res.statusCode = 413;
+            res.end('payload too large');
           });
+      });
+
+      server.middlewares.use('/__blueprint', (req, res) => {
+        const blueprintDir = dir('.blueprints');
+        if (req.method === 'POST') {
+          void readBody(req)
+            .then((body) => {
+              try {
+                const { name, blueprint } = JSON.parse(body) as { name?: string; blueprint: unknown };
+                const file = resolve(blueprintDir, `${safeName(name, 'blueprint')}.json`);
+                writeFileSync(file, JSON.stringify(blueprint));
+                sendJson(res, { path: file });
+              } catch (err) {
+                res.statusCode = 500;
+                res.end(String(err));
+              }
+            })
+            .catch(() => {
+              res.statusCode = 413;
+              res.end('payload too large');
+            });
           return;
         }
         // GET ?name=foo -> the stored blueprint JSON
@@ -92,8 +114,6 @@ function devDisk(): Plugin {
         res.setHeader('content-type', 'application/json');
         res.end(readFileSync(file, 'utf8'));
       });
-
-      const MAX_WORLD_BODY = 8 * 1024 * 1024; // 8 MB per request guard
 
       server.middlewares.use('/__world', (req, res) => {
         const root = dir('.saves');
@@ -125,40 +145,41 @@ function devDisk(): Plugin {
           return sendJson(res, { ok: true });
         }
 
-        void readBody(req).then((body) => {
-          try {
-            if (body.length > MAX_WORLD_BODY) {
-              res.statusCode = 413;
-              return res.end('payload too large');
+        void readBody(req)
+          .then((body) => {
+            try {
+              const payload = JSON.parse(body || '{}') as {
+                meta?: { seed: number; version: number; preset?: string };
+                entries?: Array<[number, number]>;
+              };
+              if (url.searchParams.has('meta')) {
+                writeMeta(root, name, payload.meta);
+                return sendJson(res, { ok: true });
+              }
+              const chunk = url.searchParams.get('chunk');
+              if (chunk && /^-?\d+,-?\d+$/.test(chunk)) {
+                const entries = Array.isArray(payload.entries) ? payload.entries : [];
+                const clean = entries.filter(
+                  (e) =>
+                    Array.isArray(e) &&
+                    e.length === 2 &&
+                    Number.isInteger(e[0]) &&
+                    Number.isInteger(e[1]),
+                );
+                writeChunk(root, name, chunk, clean);
+                return sendJson(res, { ok: true });
+              }
+              res.statusCode = 400;
+              res.end('bad request');
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(String(err));
             }
-            const payload = JSON.parse(body || '{}') as {
-              meta?: { seed: number; version: number; preset?: string };
-              entries?: Array<[number, number]>;
-            };
-            if (url.searchParams.has('meta')) {
-              writeMeta(root, name, payload.meta);
-              return sendJson(res, { ok: true });
-            }
-            const chunk = url.searchParams.get('chunk');
-            if (chunk && /^-?\d+,-?\d+$/.test(chunk)) {
-              const entries = Array.isArray(payload.entries) ? payload.entries : [];
-              const clean = entries.filter(
-                (e) =>
-                  Array.isArray(e) &&
-                  e.length === 2 &&
-                  Number.isInteger(e[0]) &&
-                  Number.isInteger(e[1]),
-              );
-              writeChunk(root, name, chunk, clean);
-              return sendJson(res, { ok: true });
-            }
-            res.statusCode = 400;
-            res.end('bad request');
-          } catch (err) {
-            res.statusCode = 500;
-            res.end(String(err));
-          }
-        });
+          })
+          .catch(() => {
+            res.statusCode = 413;
+            res.end('payload too large');
+          });
       });
     },
   };

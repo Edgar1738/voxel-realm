@@ -63,5 +63,6 @@ describe('worldDiskStore', () => {
     expect(safeWorldName('a/b c.json')).toBe('a_b_c_json');
     expect(safeWorldName('')).toBe('default');
     expect(safeWorldName(undefined)).toBe('default');
+    expect(safeWorldName('../../etc/passwd')).toBe('______etc_passwd');
   });
 });
