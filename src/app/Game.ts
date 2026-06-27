@@ -2,6 +2,7 @@ import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
 import { createChunkMaterial, createTransparentMaterial } from '../render/ChunkMaterial';
 import { DayNight } from '../render/DayNight';
+import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
@@ -57,6 +58,7 @@ export class Game {
     const material = createChunkMaterial(texture);
     const transparentMaterial = createTransparentMaterial(texture);
     const daynight = new DayNight(renderer.scene, [material, transparentMaterial]);
+    const celestial = new CelestialSky(renderer.scene);
 
     // Pick the world environment (?world=flat|void|arena|default).
     const requested = new URLSearchParams(window.location.search).get('world');
@@ -271,6 +273,7 @@ export class Game {
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
       daynight.advance(cdt);
+      celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
       const eye = player.eye();
       rig.applyEye(eye.x, eye.y, eye.z);
