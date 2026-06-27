@@ -118,14 +118,7 @@ export class ChunkManager {
     let gen = 0;
     for (const { cx, cz } of ordered) {
       if (gen >= this.opts.genBudget) break;
-      if (this.store.has(cx, cz)) continue;
-      const data = this.generator.generateBaseChunk(this.seed, cx, cz);
-      applyOverlays(data, cx, cz, this.seed, this.overlays);
-      const key = chunkKey(cx, cz);
-      this.baseChunks.set(key, cloneChunk(data));
-      this.applySavedDeltas(data, key);
-      this.store.set(cx, cz, data, ChunkState.Generated);
-      gen++;
+      if (this.ensureGenerated(cx, cz)) gen++;
     }
 
     // Mesh pass.
@@ -223,6 +216,41 @@ export class ChunkManager {
     return this.applyEdits([{ x: wx, y: wy, z: wz, id }]).length > 0;
   }
 
+  /** Whether the chunk covering world column (wx,wz) is loaded (so it can be edited/scanned). */
+  isLoaded(wx: number, wz: number): boolean {
+    return this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz)) !== undefined;
+  }
+
+  /**
+   * Synchronously generates + meshes every chunk within `radius` chunks of (centerCx,centerCz),
+   * bypassing the per-frame budget so scripted edits/scans don't have to wait on the (often
+   * throttled) render loop. Chunks outside the player's view distance are still disposed by the
+   * next `update`, so call this after teleporting near the area. Returns how many chunks loaded.
+   */
+  preload(
+    centerCx: number,
+    centerCz: number,
+    radius: number,
+  ): { generated: number; meshed: number } {
+    let generated = 0;
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (this.ensureGenerated(centerCx + dx, centerCz + dz)) generated++;
+      }
+    }
+    let meshed = 0;
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const entry = this.store.get(centerCx + dx, centerCz + dz);
+        if (entry && entry.state === ChunkState.Generated) {
+          this.meshChunk(centerCx + dx, centerCz + dz);
+          meshed++;
+        }
+      }
+    }
+    return { generated, meshed };
+  }
+
   /** Whether every voxel lies in a loaded, in-range chunk, so an edit/undo can actually apply. */
   canApply(voxels: readonly WorldVoxel[]): boolean {
     return voxels.every(
@@ -283,6 +311,18 @@ export class ChunkManager {
       }
     }
     return desired;
+  }
+
+  /** Generates, stores, and applies saved deltas to a chunk if absent. Returns whether it was new. */
+  private ensureGenerated(cx: number, cz: number): boolean {
+    if (this.store.has(cx, cz)) return false;
+    const data = this.generator.generateBaseChunk(this.seed, cx, cz);
+    applyOverlays(data, cx, cz, this.seed, this.overlays);
+    const key = chunkKey(cx, cz);
+    this.baseChunks.set(key, cloneChunk(data));
+    this.applySavedDeltas(data, key);
+    this.store.set(cx, cz, data, ChunkState.Generated);
+    return true;
   }
 
   private meshChunk(cx: number, cz: number): void {

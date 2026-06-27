@@ -249,3 +249,33 @@ describe('ChunkManager editing', () => {
     ).toBe(false); // any unloaded voxel blocks the batch
   });
 });
+
+describe('ChunkManager.preload / isLoaded', () => {
+  it('isLoaded reflects whether the covering chunk is streamed in', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3); // viewDistance 0: loads the center chunk only
+    expect(mgr.isLoaded(8, 8)).toBe(true);
+    expect(mgr.isLoaded(100000, 0)).toBe(false);
+  });
+
+  it('preload generates + meshes a region on demand, bypassing view distance and budget', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64); // viewDistance 0: update alone never loads neighbors
+    const result = mgr.preload(0, 0, 1); // 3x3 chunks around (0,0)
+    expect(result.generated).toBe(9);
+    expect(result.meshed).toBe(9);
+    expect(sink.uploads.has('1,0')).toBe(true);
+    // A chunk update() (with viewDistance 0) would never reach is now loaded + editable.
+    expect(mgr.isLoaded(20, 5)).toBe(true); // world (20,5) -> chunk (1,0)
+    expect(mgr.getBlock(20, 0, 5)).toBe(STONE); // world floor
+    const cur = mgr.getBlock(20, 70, 5);
+    const next = cur === STONE ? AIR : STONE;
+    expect(mgr.applyEdits([{ x: 20, y: 70, z: 5, id: next }])).toHaveLength(1);
+  });
+
+  it('preload skips already-loaded chunks', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    expect(mgr.preload(0, 0, 0).generated).toBe(1); // chunk (0,0)
+    expect(mgr.preload(0, 0, 0).generated).toBe(0); // already present
+  });
+});

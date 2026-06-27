@@ -11,6 +11,7 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
+import { worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 
@@ -36,6 +37,18 @@ export interface DevControlsContext {
 export interface Blueprint {
   dims: [number, number, number];
   blocks: Array<[number, number, number, BlockId]>;
+}
+
+/** Outcome of a build edit so scripts can tell why voxels didn't all change. */
+export interface EditResult {
+  requested: number;
+  applied: number;
+  /** y outside [0, WORLD_HEIGHT). */
+  outOfWorld: number;
+  /** Target chunk not loaded — preloadArea or teleport nearer first. */
+  unloaded: number;
+  /** In a loaded chunk but the block was already there. */
+  noChange: number;
 }
 
 type Html2Canvas = (
@@ -124,11 +137,19 @@ export function installDevControls(ctx: DevControlsContext): void {
   };
 
   const MAX_BUILD = 50000;
-  const applyEdits = (voxels: SetVoxel[]): number => {
+  const applyEdits = (voxels: SetVoxel[]): EditResult => {
     if (voxels.length > MAX_BUILD)
       throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
+    let outOfWorld = 0;
+    let unloaded = 0;
+    for (const v of voxels) {
+      if (v.y < 0 || v.y >= WORLD_HEIGHT) outOfWorld++;
+      else if (!manager.isLoaded(v.x, v.z)) unloaded++;
+    }
     const batch = edit.apply(voxels);
-    return batch ? batch.changes.length : 0;
+    const applied = batch ? batch.changes.length : 0;
+    const noChange = Math.max(0, voxels.length - applied - outOfWorld - unloaded);
+    return { requested: voxels.length, applied, outOfWorld, unloaded, noChange };
   };
 
   // ---- primitive voxel builders ----
@@ -282,7 +303,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     save,
 
     // --- build (via the real EditService, so undo/redo + persistence apply) ---
-    place: (x: number, y: number, z: number, id: BlockId): number => applyEdits([{ x, y, z, id }]),
+    place: (x: number, y: number, z: number, id: BlockId): EditResult =>
+      applyEdits([{ x, y, z, id }]),
     fill: (
       x1: number,
       y1: number,
@@ -291,15 +313,22 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
       id: BlockId,
-    ): number =>
+    ): EditResult =>
       applyEdits(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id })),
       ),
-    clearBox: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): number =>
+    clearBox: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+    ): EditResult =>
       applyEdits(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
-    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): number =>
+    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): EditResult =>
       applyEdits(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
     tunnel: (
       x: number,
@@ -309,7 +338,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       length: number,
       radius: number,
       id: BlockId,
-    ): number =>
+    ): EditResult =>
       applyEdits(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
     copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
@@ -328,7 +357,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
-    paste: (bp: Blueprint, ox: number, oy: number, oz: number): number =>
+    paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
       applyEdits(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
     line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
       applyEdits(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
@@ -349,7 +378,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
-    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<number> => {
+    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<EditResult> => {
       const bp = await loadBlueprint(name);
       return applyEdits(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
@@ -357,6 +386,11 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     undo: (): string => edit.undo(),
     redo: (): string => edit.redo(),
+    /** Force-generate + mesh chunks within `radius` chunks of world (x,z) so edits/scans work now. */
+    preloadArea: (x: number, z: number, radius = 2): { generated: number; meshed: number } =>
+      manager.preload(worldToChunkCoord(x), worldToChunkCoord(z), Math.max(0, Math.floor(radius))),
+    /** Whether the chunk at world (x,z) is loaded (editable/scannable). */
+    isLoaded: (x: number, z: number): boolean => manager.isLoaded(x, z),
 
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
