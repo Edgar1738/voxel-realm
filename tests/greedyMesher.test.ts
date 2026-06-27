@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ChunkData } from '../src/world/ChunkData';
 import { VoxelView, type NeighborLookup } from '../src/world/VoxelView';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
-import { opaquePass, waterPass } from '../src/mesh/MeshPass';
+import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../src/core/constants';
 import { GRASS, STONE, WATER, TextureLayer, AIR } from '../src/blocks/blocks';
@@ -137,7 +137,7 @@ describe('GreedyMesher water pass', () => {
         c.set(x, 10, z, WATER);
         c.set(x, 11, z, WATER);
       }
-    const mesh = mesher.mesh(viewOf(c), waterPass());
+    const mesh = mesher.mesh(viewOf(c), transparentPass(reg));
     // Top faces (against air) are present; the underwater +Y faces are hidden.
     expect(countFacesWithNormal(mesh, [0, 1, 0])).toBeGreaterThan(0);
     // The opaque pass emits nothing for a water-only chunk.

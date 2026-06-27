@@ -93,7 +93,7 @@ export function createChunkMaterial(tex: DataArrayTexture): RawShaderMaterial {
   return buildMaterial(tex, 1.0, false);
 }
 
-/** Translucent material for the water pass (drawn after opaque, no depth write). */
-export function createWaterMaterial(tex: DataArrayTexture): RawShaderMaterial {
+/** Translucent material for the transparent pass (water/glass; drawn after opaque, no depth write). */
+export function createTransparentMaterial(tex: DataArrayTexture): RawShaderMaterial {
   return buildMaterial(tex, 0.72, true);
 }

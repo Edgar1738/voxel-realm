@@ -1,6 +1,6 @@
 import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
-import { createChunkMaterial, createWaterMaterial } from '../render/ChunkMaterial';
+import { createChunkMaterial, createTransparentMaterial } from '../render/ChunkMaterial';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
@@ -50,7 +50,7 @@ export class Game {
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
     const material = createChunkMaterial(texture);
-    const waterMaterial = createWaterMaterial(texture);
+    const transparentMaterial = createTransparentMaterial(texture);
 
     // Load the durable save (or start fresh / discard an incompatible one).
     const store = new IndexedDbSaveStore();
@@ -66,7 +66,7 @@ export class Game {
       savedDeltas = await store.loadDeltas();
     }
 
-    const sink = new ChunkMeshRegistry(renderer.scene, material, waterMaterial);
+    const sink = new ChunkMeshRegistry(renderer.scene, material, transparentMaterial);
     const manager = new ChunkManager(
       createWorldGenerator(),
       new GreedyMesher(registry),

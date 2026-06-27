@@ -7,17 +7,17 @@ import type { ChunkMeshes } from '../mesh/MeshTypes';
 
 interface Entry {
   opaque: Mesh;
-  water?: Mesh;
+  transparent?: Mesh;
 }
 
-/** Owns each chunk's opaque + (optional) water THREE.Meshes; positions and disposes them. */
+/** Owns each chunk's opaque + (optional) transparent THREE.Meshes; positions and disposes them. */
 export class ChunkMeshRegistry implements ChunkSink {
   private readonly entries = new Map<string, Entry>();
 
   constructor(
     private readonly scene: Scene,
     private readonly opaqueMaterial: Material,
-    private readonly waterMaterial: Material,
+    private readonly transparentMaterial: Material,
   ) {}
 
   upload(key: string, meshes: ChunkMeshes): void {
@@ -31,11 +31,11 @@ export class ChunkMeshRegistry implements ChunkSink {
     this.scene.add(opaque);
 
     const entry: Entry = { opaque };
-    if (meshes.water.indices.length > 0) {
-      const water = buildChunkMesh(meshes.water, this.waterMaterial);
-      water.position.set(ox, 0, oz);
-      this.scene.add(water);
-      entry.water = water;
+    if (meshes.transparent.indices.length > 0) {
+      const transparent = buildChunkMesh(meshes.transparent, this.transparentMaterial);
+      transparent.position.set(ox, 0, oz);
+      this.scene.add(transparent);
+      entry.transparent = transparent;
     }
     this.entries.set(key, entry);
   }
@@ -49,9 +49,9 @@ export class ChunkMeshRegistry implements ChunkSink {
     if (!entry) return;
     this.scene.remove(entry.opaque);
     entry.opaque.geometry.dispose();
-    if (entry.water) {
-      this.scene.remove(entry.water);
-      entry.water.geometry.dispose();
+    if (entry.transparent) {
+      this.scene.remove(entry.transparent);
+      entry.transparent.geometry.dispose();
     }
     this.entries.delete(key);
   }

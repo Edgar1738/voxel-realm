@@ -18,7 +18,7 @@ import { ChunkStore, ChunkState } from './ChunkStore';
 import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
-import { opaquePass, waterPass, type MeshPass } from '../mesh/MeshPass';
+import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { WATER, AIR } from '../blocks/blocks';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
@@ -66,7 +66,7 @@ export class ChunkManager {
   private readonly deltas: WorldDeltas;
   private readonly opts: ChunkManagerOptions;
   private readonly opaquePass: MeshPass;
-  private readonly waterPass: MeshPass;
+  private readonly transparentPass: MeshPass;
 
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
   onChunkDeltaChanged?: (key: string, entries: ReadonlyArray<[number, BlockId]>) => void;
@@ -90,7 +90,7 @@ export class ChunkManager {
       meshBudget: options?.meshBudget ?? MESH_BUDGET,
     };
     this.opaquePass = opaquePass(this.registry);
-    this.waterPass = waterPass();
+    this.transparentPass = transparentPass(this.registry);
   }
 
   update(centerCx: number, centerCz: number): void {
@@ -228,7 +228,14 @@ export class ChunkManager {
     return [...(this.deltas.get(key)?.entries() ?? [])].sort((a, b) => a[0] - b[0]);
   }
 
-  private updateDelta(cx: number, cz: number, lx: number, y: number, lz: number, id: BlockId): void {
+  private updateDelta(
+    cx: number,
+    cz: number,
+    lx: number,
+    y: number,
+    lz: number,
+    id: BlockId,
+  ): void {
     const key = chunkKey(cx, cz);
     const index = voxelIndex(lx, y, lz);
     const baseId = this.baseChunks.get(key)?.get(lx, y, lz);
@@ -274,7 +281,7 @@ export class ChunkManager {
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
     const meshes: ChunkMeshes = {
       opaque: this.mesher.mesh(view, this.opaquePass),
-      water: this.mesher.mesh(view, this.waterPass),
+      transparent: this.mesher.mesh(view, this.transparentPass),
     };
     this.sink.upload(chunkKey(cx, cz), meshes);
     this.store.setState(cx, cz, ChunkState.Meshed);

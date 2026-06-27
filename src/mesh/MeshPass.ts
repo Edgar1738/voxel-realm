@@ -1,4 +1,4 @@
-import { AIR, WATER } from '../blocks/blocks';
+import { AIR } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { BlockId } from '../core/types';
 
@@ -16,10 +16,13 @@ export function opaquePass(registry: BlockRegistry): MeshPass {
   };
 }
 
-/** Water surface: only water blocks; a face shows only against air. */
-export function waterPass(): MeshPass {
+/**
+ * Translucent blocks (water, glass, ...) share one pass: a face shows only against air, so
+ * water↔water / glass↔glass / glass↔solid internal faces are culled.
+ */
+export function transparentPass(registry: BlockRegistry): MeshPass {
   return {
-    includes: (id) => id === WATER,
+    includes: (id) => id !== AIR && registry.get(id).transparent,
     faceVisible: (_self, neighbor) => neighbor === AIR,
   };
 }
