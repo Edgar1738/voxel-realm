@@ -126,6 +126,101 @@ export function installDevControls(ctx: DevControlsContext): void {
     return batch ? batch.changes.length : 0;
   };
 
+  // ---- primitive voxel builders ----
+  const lineVoxels = (
+    x1: number,
+    y1: number,
+    z1: number,
+    x2: number,
+    y2: number,
+    z2: number,
+    id: BlockId,
+  ): SetVoxel[] => {
+    const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), Math.abs(z2 - z1));
+    const out: SetVoxel[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps;
+      const x = Math.round(x1 + (x2 - x1) * t);
+      const y = Math.round(y1 + (y2 - y1) * t);
+      const z = Math.round(z1 + (z2 - z1) * t);
+      const key = `${x},${y},${z}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ x, y, z, id });
+    }
+    return out;
+  };
+
+  const cylinderVoxels = (
+    cx: number,
+    cy: number,
+    cz: number,
+    radius: number,
+    height: number,
+    id: BlockId,
+  ): SetVoxel[] => {
+    const out: SetVoxel[] = [];
+    const r2 = radius * radius;
+    for (let h = 0; h < height; h++)
+      for (let dz = -radius; dz <= radius; dz++)
+        for (let dx = -radius; dx <= radius; dx++)
+          if (dx * dx + dz * dz <= r2) out.push({ x: cx + dx, y: cy + h, z: cz + dz, id });
+    return out;
+  };
+
+  const pyramidVoxels = (
+    cx: number,
+    cy: number,
+    cz: number,
+    baseRadius: number,
+    id: BlockId,
+  ): SetVoxel[] => {
+    const out: SetVoxel[] = [];
+    for (let level = 0; level <= baseRadius; level++) {
+      const r = baseRadius - level;
+      for (let dz = -r; dz <= r; dz++)
+        for (let dx = -r; dx <= r; dx++) out.push({ x: cx + dx, y: cy + level, z: cz + dz, id });
+    }
+    return out;
+  };
+
+  const hollowBoxVoxels = (
+    x1: number,
+    y1: number,
+    z1: number,
+    x2: number,
+    y2: number,
+    z2: number,
+    id: BlockId,
+  ): SetVoxel[] => {
+    const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
+    const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
+    const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
+    const out: SetVoxel[] = [];
+    for (let y = ay; y <= by; y++)
+      for (let z = az; z <= bz; z++)
+        for (let x = ax; x <= bx; x++)
+          if (x === ax || x === bx || y === ay || y === by || z === az || z === bz)
+            out.push({ x, y, z, id });
+    return out;
+  };
+
+  // ---- blueprint library (persisted to .blueprints/ via the dev server) ----
+  const saveBlueprint = async (name: string, bp: Blueprint): Promise<string> => {
+    const res = await fetch('/__blueprint', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, blueprint: bp }),
+    });
+    return ((await res.json()) as { path: string }).path;
+  };
+  const loadBlueprint = async (name: string): Promise<Blueprint> => {
+    const res = await fetch(`/__blueprint?name=${encodeURIComponent(name)}`);
+    if (!res.ok) throw new Error(`blueprint not found: ${name}`);
+    return (await res.json()) as Blueprint;
+  };
+
   const api = {
     // --- roam ---
     pos: (): Vec3 => ({ ...player.position }),
@@ -230,6 +325,31 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): number =>
       applyEdits(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+    line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
+      applyEdits(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
+    cylinder: (cx: number, cy: number, cz: number, radius: number, height: number, id: BlockId) =>
+      applyEdits(cylinderVoxels(cx, cy, cz, radius, height, id)),
+    pyramid: (cx: number, cy: number, cz: number, baseRadius: number, id: BlockId) =>
+      applyEdits(pyramidVoxels(cx, cy, cz, baseRadius, id)),
+    hollowBox: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      id: BlockId,
+    ) => applyEdits(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
+    /** Persist a blueprint to .blueprints/<name>.json (reusable across sessions). */
+    saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
+    loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
+    /** Load a named blueprint and stamp it at (ox,oy,oz). */
+    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<number> => {
+      const bp = await loadBlueprint(name);
+      return applyEdits(
+        bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
+      );
+    },
     undo: (): string => edit.undo(),
     redo: (): string => edit.redo(),
 
