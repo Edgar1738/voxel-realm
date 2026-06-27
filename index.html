@@ -23,7 +23,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font: 16px system-ui, sans-serif;
+        font:
+          16px system-ui,
+          sans-serif;
         color: #fff;
         background: rgba(0, 0, 0, 0.35);
         text-align: center;
@@ -43,61 +45,198 @@
       }
       #creative-ui {
         position: fixed;
-        inset: 12px 12px auto 12px;
+        inset: 0;
         z-index: 5;
-        display: grid;
-        gap: 8px;
-        font: 13px system-ui, sans-serif;
-        color: #fff;
+        font:
+          13px system-ui,
+          sans-serif;
+        color: #eef2f6;
         pointer-events: none;
       }
-      #creative-ui button,
-      #creative-ui select {
+      #creative-ui button {
         pointer-events: auto;
-        border: 1px solid rgba(255, 255, 255, 0.26);
-        border-radius: 6px;
-        background: rgba(18, 24, 30, 0.76);
-        color: #fff;
-        padding: 6px 8px;
         font: inherit;
         cursor: pointer;
       }
-      #creative-ui button:hover,
-      #creative-ui select:hover {
-        background: rgba(42, 72, 88, 0.86);
+
+      /* ---- Tool dock (top-left) ---- */
+      .creative-dock {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        max-width: calc(100vw - 24px);
       }
-      .creative-top,
-      .creative-hotbar,
-      .creative-picker {
+      .creative-tools {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
+        padding: 8px;
+        border-radius: 14px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       }
+      .tool-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border: 1px solid transparent;
+        border-radius: 9px;
+        background: transparent;
+        color: rgba(238, 242, 246, 0.62);
+        transition:
+          color 120ms ease,
+          background-color 140ms ease,
+          box-shadow 160ms ease;
+      }
+      .tool-btn svg {
+        flex: none;
+        display: block;
+      }
+      .tool-btn:hover {
+        color: #eef2f6;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .tool-btn.active {
+        color: #fff;
+        background: rgba(255, 211, 77, 0.16);
+        box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.55);
+      }
+      .reset-btn {
+        padding: 7px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        background: rgba(18, 22, 28, 0.6);
+        color: #eef2f6;
+        transition:
+          background-color 140ms ease,
+          border-color 140ms ease;
+      }
+      .reset-btn:hover {
+        background: rgba(150, 70, 58, 0.28);
+        border-color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* ---- Status toast (centered, above hotbar) ---- */
+      .creative-status {
+        position: fixed;
+        left: 50%;
+        bottom: 92px;
+        transform: translateX(-50%);
+        max-width: 70vw;
+        width: max-content;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: rgba(12, 15, 20, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #eef2f6;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+        opacity: 0;
+        transition: opacity 200ms ease;
+        pointer-events: none;
+      }
+      .creative-status.is-visible {
+        opacity: 1;
+      }
+
+      /* ---- Hotbar (bottom-center hero) ---- */
       .creative-hotbar {
         position: fixed;
         left: 50%;
-        bottom: 18px;
-        max-width: 92vw;
-        justify-content: center;
+        bottom: 16px;
         transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        max-width: 96vw;
+        padding: 8px;
+        border-radius: 14px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       }
-      .creative-hotbar button {
-        min-width: 78px;
+      .creative-hotbar .slot {
+        position: relative;
+        width: 52px;
+        height: 52px;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 10px;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -6px 10px rgba(0, 0, 0, 0.22);
+        transition:
+          transform 120ms ease,
+          box-shadow 160ms ease,
+          border-color 140ms ease;
       }
-      .creative-hotbar button.selected {
-        outline: 2px solid #fff;
-        background: rgba(78, 116, 148, 0.88);
+      .creative-hotbar .slot:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.35);
       }
+      .creative-hotbar .slot.selected {
+        transform: translateY(-3px);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          inset 0 -6px 10px rgba(0, 0, 0, 0.22),
+          0 0 0 2px #ffd34d,
+          0 0 14px 2px rgba(255, 211, 77, 0.45);
+      }
+      .slot-badge {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        padding: 0 4px;
+        border-radius: 5px;
+        background: rgba(0, 0, 0, 0.35);
+        color: #eef2f6;
+        font-family: ui-monospace, 'Courier New', monospace;
+        font-size: 11px;
+        line-height: 16px;
+        text-shadow: 0 1px 2px #000;
+      }
+
+      /* ---- Block picker (behavior unchanged; minimal matching touch) ---- */
       .creative-picker {
+        position: fixed;
+        top: 64px;
+        left: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
         max-width: 520px;
+        padding: 8px;
+        border-radius: 14px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       }
-      .creative-status {
-        width: max-content;
-        max-width: 70vw;
+      .creative-picker button {
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(18, 22, 28, 0.6);
+        color: #eef2f6;
         padding: 6px 8px;
-        border-radius: 6px;
-        background: rgba(18, 24, 30, 0.76);
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+      }
+      .creative-picker button:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.35);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .tool-btn,
+        .reset-btn,
+        .creative-hotbar .slot {
+          transition: none;
+        }
+        .creative-hotbar .slot:hover,
+        .creative-hotbar .slot.selected {
+          transform: none;
+        }
       }
     </style>
   </head>
@@ -105,9 +244,9 @@
     <canvas id="app"></canvas>
     <div id="crosshair"></div>
     <div id="overlay">
-      Click to play — WASD move, mouse look, Space/Shift up·down, F toggle fly · LMB use tool,
-      RMB place, MMB pick · 1-9 hotbar slot, E picker, T cycle tool (box tools: click two
-      corners) · Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
+      Click to play — WASD move, mouse look, Space/Shift up·down, F toggle fly · LMB use tool, RMB
+      place, MMB pick · 1-9 hotbar slot, E picker, T cycle tool (box tools: click two corners) ·
+      Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
     </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>

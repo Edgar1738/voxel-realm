@@ -122,22 +122,21 @@ export class Game {
 
     const edit = new EditService(manager);
     const inventory = new CreativeInventory();
-    const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel);
     let tool: Tool = 'single';
     let anchor: WorldVoxel | undefined;
 
+    const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
     const setStatus = (text: string): void => {
-      ui.status.textContent = text;
+      ui.setStatus(text);
     };
     const setTool = (next: Tool): void => {
       tool = next;
       anchor = undefined;
-      ui.toolSelect.value = next;
+      ui.setActiveTool(next);
       setStatus(`Tool: ${toolLabel(next)}`);
     };
     setTool('single');
 
-    ui.toolSelect.addEventListener('change', () => setTool(ui.toolSelect.value as Tool));
     ui.picker.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
       if (!btn) return;
