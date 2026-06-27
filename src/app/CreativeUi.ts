@@ -132,6 +132,8 @@ export interface CreativeUi {
   /** The grid container holding the block tiles; Game delegates tile clicks off this node. */
   picker: HTMLDivElement;
   reset: HTMLButtonElement;
+  /** Dev world menu: a button labeled with the current world (click handled by Game). */
+  worldButton: HTMLButtonElement;
   /** Highlights the button for `tool` and dims the rest. */
   setActiveTool(tool: string): void;
   /** Shows `text` as a transient toast that fades out on its own. */
@@ -198,7 +200,10 @@ export function createCreativeUi(
   const reset = button('Reset world');
   reset.className = 'reset-btn';
 
-  dock.append(toolRow, reset);
+  const worldButton = button('World: default');
+  worldButton.className = 'world-btn';
+
+  dock.append(toolRow, worldButton, reset);
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
   const scrim = document.createElement('div');
@@ -309,6 +314,7 @@ export function createCreativeUi(
     hotbar,
     picker,
     reset,
+    worldButton,
     setActiveTool,
     setStatus,
     renderHotbar,

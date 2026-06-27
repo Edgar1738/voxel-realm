@@ -123,3 +123,11 @@ describe('BlockRegistry', () => {
     expect(reg.layerCount).toBe(15);
   });
 });
+
+describe('BlockRegistry.has', () => {
+  it('reports known and unknown block ids', () => {
+    const reg = new BlockRegistry();
+    expect(reg.has(AIR)).toBe(true);
+    expect(reg.has(9999)).toBe(false);
+  });
+});

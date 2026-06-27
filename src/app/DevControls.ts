@@ -14,6 +14,8 @@ import { WORLD_HEIGHT } from '../core/constants';
 import { worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
+import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
+import { worldNameFromSearch } from '../persistence/worldName';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -61,6 +63,13 @@ const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_
 
 export function installDevControls(ctx: DevControlsContext): void {
   const { renderer, player, rig, manager, edit, inventory, registry, daynight, celestial } = ctx;
+
+  const currentWorld = worldNameFromSearch(window.location.search);
+  const gotoWorld = (name: string): void => {
+    const u = new URL(window.location.href);
+    u.searchParams.set('save', name);
+    window.location.href = u.toString();
+  };
 
   // Push the current player eye + look into the camera so a teleport/aim is reflected
   // immediately on the next capture, independent of the rAF render loop's timing.
@@ -391,6 +400,20 @@ export function installDevControls(ctx: DevControlsContext): void {
       manager.preload(worldToChunkCoord(x), worldToChunkCoord(z), Math.max(0, Math.floor(radius))),
     /** Whether the chunk at world (x,z) is loaded (editable/scannable). */
     isLoaded: (x: number, z: number): boolean => manager.isLoaded(x, z),
+
+    // --- named worlds (shared storage) ---
+    world: {
+      list: (): Promise<string[]> => listWorlds(),
+      current: (): string => currentWorld,
+      /** Copy the current world to `name` (does not switch). Returns the new name. */
+      saveAs: async (name: string): Promise<string> => {
+        await copyWorld(currentWorld, name);
+        return name;
+      },
+      /** Reload into world `name` (creates it on first edit if absent). */
+      load: (name: string): void => gotoWorld(name),
+      delete: (name: string): Promise<void> => deleteWorld(name),
+    },
 
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>

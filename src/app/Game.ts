@@ -16,6 +16,9 @@ import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
+import { ServerSaveStore } from '../persistence/ServerSaveStore';
+import { worldNameFromSearch } from '../persistence/worldName';
+import type { SaveStore } from '../persistence/SaveStore';
 import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
@@ -66,7 +69,11 @@ export class Game {
     const { generator, overlays } = createGenerator(preset);
 
     // Load the durable save (or start fresh / discard an incompatible one).
-    const store = new IndexedDbSaveStore();
+    // Shared storage in dev (server-owned, named worlds via ?save=); IndexedDB in production.
+    const worldName = worldNameFromSearch(window.location.search);
+    const store: SaveStore = import.meta.env.DEV
+      ? new ServerSaveStore(worldName, (id) => registry.has(id as BlockId))
+      : new IndexedDbSaveStore();
     let savedDeltas: WorldDeltas = new Map();
     const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION, preset);
     if (action.kind === 'load') {
@@ -132,6 +139,35 @@ export class Game {
     let anchor: WorldVoxel | undefined;
 
     const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
+
+    if (import.meta.env.DEV) {
+      const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');
+      ui.worldButton.textContent = `World: ${worldName}`;
+      ui.worldButton.addEventListener('click', () => {
+        void (async () => {
+          const worlds = await listWorlds();
+          const choice = window.prompt(
+            `Worlds: ${worlds.join(', ') || '(none yet)'}\n` +
+              `Type a name to switch/create, or "save:NEW" to copy "${worldName}" to NEW:`,
+            worldName,
+          );
+          if (!choice) return;
+          const u = new URL(window.location.href);
+          if (choice.startsWith('save:')) {
+            const target = choice.slice('save:'.length).trim();
+            if (!target) return;
+            await copyWorld(worldName, target);
+            u.searchParams.set('save', target);
+          } else {
+            u.searchParams.set('save', choice.trim());
+          }
+          window.location.href = u.toString();
+        })();
+      });
+    } else {
+      ui.worldButton.style.display = 'none';
+    }
+
     const setStatus = (text: string): void => {
       ui.setStatus(text);
     };
