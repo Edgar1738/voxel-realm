@@ -6,8 +6,9 @@ import type { EditService } from '../edit/EditService';
 import type { CreativeInventory } from './CreativeInventory';
 import { CREATIVE_BLOCKS } from './CreativeInventory';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
-import { boxVoxels } from '../edit/Brushes';
+import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
+import { WORLD_HEIGHT } from '../core/constants';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 
@@ -25,6 +26,12 @@ export interface DevControlsContext {
   edit: EditService;
   inventory: CreativeInventory;
   registry: BlockRegistry;
+}
+
+/** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
+export interface Blueprint {
+  dims: [number, number, number];
+  blocks: Array<[number, number, number, BlockId]>;
 }
 
 type Html2Canvas = (
@@ -109,7 +116,10 @@ export function installDevControls(ctx: DevControlsContext): void {
     rig.pitch = clampPitch(Math.atan2(dy, horizontal));
   };
 
+  const MAX_BUILD = 50000;
   const applyEdits = (voxels: SetVoxel[]): number => {
+    if (voxels.length > MAX_BUILD)
+      throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
     const batch = edit.apply(voxels);
     return batch ? batch.changes.length : 0;
   };
@@ -180,12 +190,109 @@ export function installDevControls(ctx: DevControlsContext): void {
       applyEdits(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
+    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): number =>
+      applyEdits(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
+    tunnel: (
+      x: number,
+      y: number,
+      z: number,
+      dir: Vec3,
+      length: number,
+      radius: number,
+      id: BlockId,
+    ): number =>
+      applyEdits(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
+    /** Copy a region into a portable blueprint (relative coords, non-air only). */
+    copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
+      const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
+      const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
+      const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
+      if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
+        throw new Error('copy region too large (>200k)');
+      const blocks: Array<[number, number, number, BlockId]> = [];
+      for (let y = ay; y <= by; y++)
+        for (let z = az; z <= bz; z++)
+          for (let x = ax; x <= bx; x++) {
+            const id = manager.getBlock(x, y, z);
+            if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
+          }
+      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
+    },
+    /** Stamp a blueprint with its min corner at (ox,oy,oz). */
+    paste: (bp: Blueprint, ox: number, oy: number, oz: number): number =>
+      applyEdits(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
     undo: (): string => edit.undo(),
     redo: (): string => edit.redo(),
 
-    // --- introspect ---
+    // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
       registry.get(manager.getBlock(x, y, z)).name,
+    /** Highest non-air voxel in the (x,z) column: {y, block}, or y=null if all air/unloaded. */
+    surface: (x: number, z: number): { y: number | null; block: string } => {
+      for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+        const id = manager.getBlock(x, y, z);
+        if (id !== AIR) return { y, block: registry.get(id).name };
+      }
+      return { y: null, block: 'air' };
+    },
+    /** Block histogram over a box (capped at 200k voxels): { dims, nonAir, counts }. */
+    scan: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+    ): { dims: [number, number, number]; nonAir: number; counts: Record<string, number> } => {
+      const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
+      const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
+      const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
+      const dims: [number, number, number] = [bx - ax + 1, by - ay + 1, bz - az + 1];
+      if (dims[0] * dims[1] * dims[2] > 200000) throw new Error('scan region too large (>200k)');
+      const counts: Record<string, number> = {};
+      let nonAir = 0;
+      for (let y = ay; y <= by; y++)
+        for (let z = az; z <= bz; z++)
+          for (let x = ax; x <= bx; x++) {
+            const id = manager.getBlock(x, y, z);
+            if (id === AIR) continue;
+            nonAir++;
+            const name = registry.get(id).name;
+            counts[name] = (counts[name] ?? 0) + 1;
+          }
+      return { dims, nonAir, counts };
+    },
+    /** ASCII top-down floor plan of one y-layer (area capped at 80x80): { y, legend, rows }. */
+    slice: (
+      y: number,
+      x1: number,
+      z1: number,
+      x2: number,
+      z2: number,
+    ): { y: number; legend: Record<string, string>; rows: string[] } => {
+      const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
+      const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
+      if ((bx - ax + 1) * (bz - az + 1) > 6400) throw new Error('slice area too large (>80x80)');
+      const palette = '#@%&*+=oxOXNHBW';
+      const chars = new Map<BlockId, string>();
+      const rows: string[] = [];
+      for (let z = az; z <= bz; z++) {
+        let row = '';
+        for (let x = ax; x <= bx; x++) {
+          const id = manager.getBlock(x, y, z);
+          if (id === AIR) {
+            row += ' ';
+            continue;
+          }
+          if (!chars.has(id)) chars.set(id, palette[chars.size % palette.length]);
+          row += chars.get(id);
+        }
+        rows.push(row);
+      }
+      const legend: Record<string, string> = {};
+      for (const [id, ch] of chars) legend[ch] = registry.get(id).name;
+      return { y, legend, rows };
+    },
     blocks: (): Array<{ id: BlockId; name: string }> =>
       CREATIVE_BLOCKS.map((id) => ({ id, name: registry.get(id).name })),
     state: (): Record<string, unknown> => ({
