@@ -1,14 +1,21 @@
-import { VIEW_DISTANCE, GEN_BUDGET, MESH_BUDGET, WORLD_HEIGHT } from '../core/constants';
+import {
+  VIEW_DISTANCE,
+  GEN_BUDGET,
+  MESH_BUDGET,
+  WORLD_HEIGHT,
+  CHUNK_SIZE_X,
+  CHUNK_SIZE_Z,
+} from '../core/constants';
 import { chunkKey, parseChunkKey, worldToChunkCoord, worldToLocal } from '../core/coords';
 import { ChunkStore, ChunkState } from './ChunkStore';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
 import { opaquePass, waterPass, type MeshPass } from '../mesh/MeshPass';
-import { WATER } from '../blocks/blocks';
+import { WATER, AIR } from '../blocks/blocks';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { ChunkMeshes } from '../mesh/MeshTypes';
-import type { WorldSeed } from '../core/types';
+import type { WorldSeed, BlockId } from '../core/types';
 import type { ChunkData } from './ChunkData';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 
@@ -16,6 +23,12 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 export interface ChunkSink {
   upload(key: string, meshes: ChunkMeshes): void;
   dispose(key: string): void;
+}
+
+/** Read/write voxels by world coords (implemented by ChunkManager for the editor). */
+export interface WorldEditor {
+  getBlock(x: number, y: number, z: number): BlockId;
+  setBlock(x: number, y: number, z: number, id: BlockId): void;
 }
 
 export interface ChunkManagerOptions {
@@ -127,6 +140,34 @@ export class ChunkManager {
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
     if (!entry) return false;
     return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)) === WATER;
+  }
+
+  getBlock(wx: number, wy: number, wz: number): BlockId {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return AIR;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return AIR;
+    return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz));
+  }
+
+  /** Edits a voxel and re-meshes its chunk plus any touched border neighbor. */
+  setBlock(wx: number, wy: number, wz: number, id: BlockId): void {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return;
+    const cx = worldToChunkCoord(wx);
+    const cz = worldToChunkCoord(wz);
+    const entry = this.store.get(cx, cz);
+    if (!entry) return;
+    const lx = worldToLocal(wx);
+    const lz = worldToLocal(wz);
+    entry.data.set(lx, wy, lz, id);
+    this.meshChunk(cx, cz);
+    if (lx === 0) this.remeshIfLoaded(cx - 1, cz);
+    if (lx === CHUNK_SIZE_X - 1) this.remeshIfLoaded(cx + 1, cz);
+    if (lz === 0) this.remeshIfLoaded(cx, cz - 1);
+    if (lz === CHUNK_SIZE_Z - 1) this.remeshIfLoaded(cx, cz + 1);
+  }
+
+  private remeshIfLoaded(cx: number, cz: number): void {
+    if (this.store.get(cx, cz)) this.meshChunk(cx, cz);
   }
 
   private desiredSet(centerCx: number, centerCz: number): Map<string, { cx: number; cz: number }> {

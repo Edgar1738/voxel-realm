@@ -4,7 +4,7 @@ import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
-import { WATER } from '../src/blocks/blocks';
+import { WATER, AIR, STONE } from '../src/blocks/blocks';
 import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -129,5 +129,34 @@ describe('ChunkManager.isWater', () => {
     expect(mgr.isWater(0, -1, 0)).toBe(false); // below world
     expect(mgr.isWater(0, WORLD_HEIGHT, 0)).toBe(false); // above world
     expect(mgr.isWater(100000, 50, 0)).toBe(false); // unloaded chunk
+  });
+});
+
+describe('ChunkManager editing', () => {
+  it('getBlock returns terrain and AIR for unloaded/out-of-range', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    expect(mgr.getBlock(0, 0, 0)).toBe(STONE); // world floor
+    expect(mgr.getBlock(0, -1, 0)).toBe(AIR); // out of range
+    expect(mgr.getBlock(100000, 50, 0)).toBe(AIR); // unloaded
+  });
+
+  it('setBlock mutates the voxel and re-meshes the chunk', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    const before = sink.uploads.get('0,0') ?? 0;
+    mgr.setBlock(0, 0, 0, AIR); // break the floor block at (0,0,0)
+    expect(mgr.getBlock(0, 0, 0)).toBe(AIR);
+    expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(before); // re-meshed
+  });
+
+  it('setBlock on a chunk border re-meshes the touched neighbor', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 1, 64, 64); // load a 3x3 so neighbors exist
+    settle(mgr, 0, 0);
+    const beforeWest = sink.uploads.get('-1,0') ?? 0;
+    mgr.setBlock(0, 0, 0, AIR); // local x=0 in chunk (0,0) -> west border
+    expect(sink.uploads.get('-1,0') ?? 0).toBeGreaterThan(beforeWest);
   });
 });
