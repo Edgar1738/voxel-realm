@@ -299,6 +299,7 @@ export class Game {
           inventory,
           registry,
           daynight,
+          celestial,
         }),
       );
     }

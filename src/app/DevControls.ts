@@ -3,6 +3,7 @@ import type { CameraRig } from '../render/CameraRig';
 import type { PlayerController } from '../player/PlayerController';
 import type { ChunkManager } from '../world/ChunkManager';
 import type { DayNight } from '../render/DayNight';
+import type { CelestialSky } from '../render/CelestialSky';
 import type { EditService } from '../edit/EditService';
 import type { CreativeInventory } from './CreativeInventory';
 import { CREATIVE_BLOCKS } from './CreativeInventory';
@@ -28,6 +29,7 @@ export interface DevControlsContext {
   inventory: CreativeInventory;
   registry: BlockRegistry;
   daynight: DayNight;
+  celestial: CelestialSky;
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
@@ -45,7 +47,7 @@ const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
 
 export function installDevControls(ctx: DevControlsContext): void {
-  const { renderer, player, rig, manager, edit, inventory, registry, daynight } = ctx;
+  const { renderer, player, rig, manager, edit, inventory, registry, daynight, celestial } = ctx;
 
   // Push the current player eye + look into the camera so a teleport/aim is reflected
   // immediately on the next capture, independent of the rAF render loop's timing.
@@ -65,6 +67,9 @@ export function installDevControls(ctx: DevControlsContext): void {
 
   const renderToCanvas = (maxWidth: number): HTMLCanvasElement => {
     syncCamera();
+    // Re-place the sun/moon/stars for the (possibly just-moved) camera before this one-off render,
+    // since the rAF loop's update may be throttled in a headless/background tab.
+    celestial.update(daynight.time, renderer.camera.position);
     renderer.renderOnce();
     return downscale(renderer.domElement, maxWidth);
   };
