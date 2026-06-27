@@ -20,7 +20,7 @@ import { worldToChunkCoord } from '../core/coords';
 import { AIR } from '../blocks/blocks';
 import type { Overlay } from '../worldgen/Generator';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
-import type { WorldVoxel, SetVoxel } from '../edit/EditTypes';
+import type { WorldVoxel, SetVoxel, EditOutcome } from '../edit/EditTypes';
 
 const REACH = 6; // block-edit reach in world units
 const SAVE_DEBOUNCE_MS = 250; // coalesce rapid edits into one write per chunk
@@ -41,6 +41,12 @@ function toolLabel(tool: string): string {
     .split('-')
     .map((w) => w[0].toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function editMessage(action: 'undo' | 'redo', outcome: EditOutcome): string {
+  if (outcome === 'ok') return action === 'undo' ? 'Undid' : 'Redid';
+  if (outcome === 'blocked') return `Can't ${action} here — return to that area`;
+  return `Nothing to ${action}`;
 }
 
 /** Composition root: a player flying/walking and sculpting the streamed voxel world. */
@@ -182,10 +188,10 @@ export class Game {
       if (!e.ctrlKey) return;
       if (e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
-        setStatus(edit.undo() ? 'Undo' : 'Nothing to undo');
+        setStatus(editMessage('undo', edit.undo()));
       } else if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) {
         e.preventDefault();
-        setStatus(edit.redo() ? 'Redo' : 'Nothing to redo');
+        setStatus(editMessage('redo', edit.redo()));
       }
     });
 

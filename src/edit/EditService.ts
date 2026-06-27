@@ -1,4 +1,4 @@
-import type { EditableWorld, EditBatch, SetVoxel } from './EditTypes';
+import type { EditableWorld, EditBatch, EditOutcome, SetVoxel } from './EditTypes';
 
 /** Pure batch undo/redo engine. Delegates mutations to an injected EditableWorld. */
 export class EditService {
@@ -31,13 +31,16 @@ export class EditService {
   }
 
   /**
-   * Pops the most recent batch and replays it with BEFORE values.
-   * Pushes the batch onto the redo stack. Returns undefined if there is nothing to undo.
+   * Replays the most recent batch with BEFORE values and moves it to the redo stack.
+   * Returns 'empty' if there is nothing to undo, or 'blocked' (leaving history intact) if any
+   * affected voxel is no longer in a loaded chunk — so history never claims a no-op succeeded.
    */
-  undo(): EditBatch | undefined {
-    const batch = this.undoStack.pop();
-    if (!batch) return undefined;
+  undo(): EditOutcome {
+    const batch = this.undoStack[this.undoStack.length - 1];
+    if (!batch) return 'empty';
+    if (!this.world.canApply(batch.changes)) return 'blocked';
 
+    this.undoStack.pop();
     // Replay in reverse so repeated edits to the same voxel within one batch undo correctly.
     const reverseEdits: SetVoxel[] = [...batch.changes].reverse().map((c) => ({
       x: c.x,
@@ -48,17 +51,20 @@ export class EditService {
     this.world.applyEdits(reverseEdits);
     this.redoStack.push(batch);
 
-    return batch;
+    return 'ok';
   }
 
   /**
-   * Pops from the redo stack and replays it with AFTER values.
-   * Pushes the batch back onto the undo stack. Returns undefined if there is nothing to redo.
+   * Replays the next redo batch with AFTER values and moves it back to the undo stack.
+   * Returns 'empty' when there is nothing to redo, or 'blocked' (leaving history intact) if any
+   * affected voxel is no longer in a loaded chunk.
    */
-  redo(): EditBatch | undefined {
-    const batch = this.redoStack.pop();
-    if (!batch) return undefined;
+  redo(): EditOutcome {
+    const batch = this.redoStack[this.redoStack.length - 1];
+    if (!batch) return 'empty';
+    if (!this.world.canApply(batch.changes)) return 'blocked';
 
+    this.redoStack.pop();
     const forwardEdits: SetVoxel[] = batch.changes.map((c) => ({
       x: c.x,
       y: c.y,
@@ -68,6 +74,6 @@ export class EditService {
     this.world.applyEdits(forwardEdits);
     this.undoStack.push(batch);
 
-    return batch;
+    return 'ok';
   }
 }

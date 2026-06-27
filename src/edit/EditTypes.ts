@@ -19,7 +19,12 @@ export interface EditBatch {
   changes: VoxelChange[];
 }
 
+/** Result of an undo/redo attempt: applied, nothing to do, or blocked by an unloaded chunk. */
+export type EditOutcome = 'ok' | 'empty' | 'blocked';
+
 /** A world that can apply a batch of voxel edits and report what actually changed. */
 export interface EditableWorld {
   applyEdits(edits: SetVoxel[]): VoxelChange[];
+  /** Whether every voxel currently lies in a loaded, editable chunk. */
+  canApply(voxels: readonly WorldVoxel[]): boolean;
 }

@@ -25,7 +25,7 @@ import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { ChunkMeshes } from '../mesh/MeshTypes';
 import type { WorldSeed, BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
-import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
+import type { SetVoxel, VoxelChange, WorldVoxel } from '../edit/EditTypes';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
@@ -221,6 +221,16 @@ export class ChunkManager {
   /** Convenience single-voxel edit; returns whether the voxel changed. */
   setBlock(wx: number, wy: number, wz: number, id: BlockId): boolean {
     return this.applyEdits([{ x: wx, y: wy, z: wz, id }]).length > 0;
+  }
+
+  /** Whether every voxel lies in a loaded, in-range chunk, so an edit/undo can actually apply. */
+  canApply(voxels: readonly WorldVoxel[]): boolean {
+    return voxels.every(
+      (v) =>
+        v.y >= 0 &&
+        v.y < WORLD_HEIGHT &&
+        this.store.get(worldToChunkCoord(v.x), worldToChunkCoord(v.z)) !== undefined,
+    );
   }
 
   /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] entries (for persistence). */

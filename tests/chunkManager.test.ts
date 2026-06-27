@@ -234,4 +234,18 @@ describe('ChunkManager editing', () => {
     settle(mgr, 0, 0, 3);
     expect(mgr.applyEdits([{ x: 100000, y: 70, z: 100000, id: STONE }])).toEqual([]);
   });
+
+  it('canApply is true for loaded in-range voxels and false otherwise', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    expect(mgr.canApply([{ x: 1, y: 70, z: 1 }])).toBe(true);
+    expect(mgr.canApply([{ x: 100000, y: 70, z: 100000 }])).toBe(false); // unloaded chunk
+    expect(mgr.canApply([{ x: 1, y: -1, z: 1 }])).toBe(false); // out of world
+    expect(
+      mgr.canApply([
+        { x: 1, y: 70, z: 1 },
+        { x: 100000, y: 70, z: 100000 },
+      ]),
+    ).toBe(false); // any unloaded voxel blocks the batch
+  });
 });

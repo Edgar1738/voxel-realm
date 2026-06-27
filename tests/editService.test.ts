@@ -6,8 +6,10 @@ import { AIR, STONE, GRASS } from '../src/blocks/blocks';
 /** A Map-backed fake world implementing EditableWorld. */
 function makeFakeWorld(initial: Record<string, number> = {}): EditableWorld & {
   store: Map<string, number>;
+  unloaded: Set<string>;
 } {
   const store = new Map<string, number>(Object.entries(initial).map(([k, v]) => [k, v]));
+  const unloaded = new Set<string>(); // coords whose chunk is "unloaded"
 
   function key(x: number, y: number, z: number): string {
     return `${x},${y},${z}`;
@@ -15,6 +17,7 @@ function makeFakeWorld(initial: Record<string, number> = {}): EditableWorld & {
 
   return {
     store,
+    unloaded,
     applyEdits(edits: SetVoxel[]): VoxelChange[] {
       const changes: VoxelChange[] = [];
       for (const edit of edits) {
@@ -24,6 +27,9 @@ function makeFakeWorld(initial: Record<string, number> = {}): EditableWorld & {
         changes.push({ x: edit.x, y: edit.y, z: edit.z, before, after: edit.id });
       }
       return changes;
+    },
+    canApply(voxels): boolean {
+      return voxels.every((v) => !unloaded.has(key(v.x, v.y, v.z)));
     },
   };
 }
@@ -65,8 +71,8 @@ describe('EditService', () => {
     const batch = service.apply([{ x: 1, y: 0, z: 0, id: STONE }]);
 
     expect(batch).toBeUndefined();
-    // No undo history recorded — subsequent undo() returns undefined
-    expect(service.undo()).toBeUndefined();
+    // No undo history recorded — subsequent undo() reports nothing to do.
+    expect(service.undo()).toBe('empty');
   });
 
   it('undo() restores before-values; redo() restores after-values', () => {
@@ -78,15 +84,28 @@ describe('EditService', () => {
       { x: 1, y: 0, z: 0, id: GRASS },
     ]);
 
-    const undoBatch = service.undo();
-    expect(undoBatch).not.toBeUndefined();
+    expect(service.undo()).toBe('ok');
     expect(world.store.get('0,0,0')).toBe(AIR);
     expect(world.store.get('1,0,0')).toBe(AIR);
 
-    const redoBatch = service.redo();
-    expect(redoBatch).not.toBeUndefined();
+    expect(service.redo()).toBe('ok');
     expect(world.store.get('0,0,0')).toBe(STONE);
     expect(world.store.get('1,0,0')).toBe(GRASS);
+  });
+
+  it('refuses to undo when a changed voxel is no longer loaded, keeping history intact', () => {
+    const world = makeFakeWorld();
+    const service = new EditService(world);
+
+    service.apply([{ x: 0, y: 0, z: 0, id: STONE }]);
+    world.unloaded.add('0,0,0'); // its chunk streamed out
+
+    expect(service.undo()).toBe('blocked');
+    expect(world.store.get('0,0,0')).toBe(STONE); // unchanged
+
+    world.unloaded.delete('0,0,0'); // streamed back in
+    expect(service.undo()).toBe('ok'); // now it applies
+    expect(world.store.get('0,0,0')).toBe(AIR);
   });
 
   it('a new apply() after an undo clears the redo stack', () => {
@@ -97,7 +116,7 @@ describe('EditService', () => {
     service.undo();
     service.apply([{ x: 5, y: 0, z: 0, id: GRASS }]);
 
-    expect(service.redo()).toBeUndefined();
+    expect(service.redo()).toBe('empty');
   });
 
   it('undoes a batch that edits the same voxel twice back to the original', () => {
