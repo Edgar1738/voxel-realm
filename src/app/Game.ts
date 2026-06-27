@@ -12,10 +12,12 @@ import { scatterTrees } from '../worldgen/TreeScatterer';
 import { EditService } from '../edit/EditService';
 import { raycastVoxels } from '../edit/VoxelRaycast';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
+import { CreativeInventory } from './CreativeInventory';
+import { createCreativeUi } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
-import { AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW } from '../blocks/blocks';
+import { AIR } from '../blocks/blocks';
 import type { Overlay } from '../worldgen/Generator';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { WorldVoxel, SetVoxel } from '../edit/EditTypes';
@@ -34,7 +36,7 @@ const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
 type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
 const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
 
-function toolLabel(tool: Tool): string {
+function toolLabel(tool: string): string {
   return tool
     .split('-')
     .map((w) => w[0].toUpperCase() + w.slice(1))
@@ -102,38 +104,56 @@ export class Game {
     };
 
     const edit = new EditService(manager);
-    const palette = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
-    let current = STONE;
+    const inventory = new CreativeInventory();
+    const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel);
     let tool: Tool = 'single';
     let anchor: WorldVoxel | undefined;
 
-    const hud = document.getElementById('hud');
-    const setHud = (note?: string): void => {
-      if (hud) {
-        hud.textContent = `${toolLabel(tool)} · ${registry.get(current).name}${note ? ` — ${note}` : ''}`;
-      }
+    const setStatus = (text: string): void => {
+      ui.status.textContent = text;
     };
-    setHud();
+    const setTool = (next: Tool): void => {
+      tool = next;
+      anchor = undefined;
+      ui.toolSelect.value = next;
+      setStatus(`Tool: ${toolLabel(next)}`);
+    };
+    setTool('single');
 
-    /** Applies an edit set (capped), reports the result, and resets any pending selection. */
+    ui.toolSelect.addEventListener('change', () => setTool(ui.toolSelect.value as Tool));
+    ui.picker.addEventListener('click', (event) => {
+      const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
+      if (!btn) return;
+      inventory.pickBlock(Number(btn.dataset.block) as BlockId);
+      ui.renderHotbar();
+      setStatus(`Selected ${registry.get(inventory.selectedBlock).name}`);
+    });
+    ui.hotbar.addEventListener('click', (event) => {
+      const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
+      if (!btn) return;
+      inventory.selectSlot(Number(btn.dataset.slot));
+      ui.renderHotbar();
+    });
+
+    /** Applies an edit set (capped), reports the result, and clears any pending selection. */
     const run = (voxels: SetVoxel[], verb: string): void => {
       if (voxels.length > MAX_EDIT_VOXELS) {
-        setHud(`too large (${voxels.length} > ${MAX_EDIT_VOXELS})`);
+        setStatus(`Selection too large (${voxels.length} > ${MAX_EDIT_VOXELS})`);
         return;
       }
       const batch = edit.apply(voxels);
-      setHud(batch ? `${verb} ${batch.changes.length}` : 'no change');
+      setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
     window.addEventListener('keydown', (e) => {
       const n = Number(e.key);
-      if (n >= 1 && n <= palette.length) {
-        current = palette[n - 1];
-        setHud();
+      if (n >= 1 && n <= inventory.hotbar.length) {
+        inventory.selectSlot(n - 1);
+        ui.renderHotbar();
       } else if (e.code === 'KeyT') {
-        tool = TOOLS[(TOOLS.indexOf(tool) + 1) % TOOLS.length];
-        anchor = undefined;
-        setHud();
+        setTool(TOOLS[(TOOLS.indexOf(tool) + 1) % TOOLS.length]);
+      } else if (e.code === 'KeyE') {
+        ui.picker.hidden = !ui.picker.hidden;
       }
     });
 
@@ -141,10 +161,10 @@ export class Game {
       if (!e.ctrlKey) return;
       if (e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
-        setHud(edit.undo() ? 'undo' : 'nothing to undo');
+        setStatus(edit.undo() ? 'Undo' : 'Nothing to undo');
       } else if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) {
         e.preventDefault();
-        setHud(edit.redo() ? 'redo' : 'nothing to redo');
+        setStatus(edit.redo() ? 'Redo' : 'Nothing to redo');
       }
     });
 
@@ -158,48 +178,47 @@ export class Game {
         REACH,
       );
       if (!hit) return;
+      const selected = inventory.selectedBlock;
 
       if (e.button === 1) {
-        if (hit.id !== AIR) current = hit.id; // pick
-        setHud();
+        if (hit.id !== AIR) inventory.pickBlock(hit.id); // pick into the selected slot
+        ui.renderHotbar();
         return;
       }
       if (e.button === 2) {
-        run([{ ...hit.adjacent, id: current }], 'placed'); // right-click always places one block
+        run([{ ...hit.adjacent, id: selected }], 'Placed'); // right-click always places one block
         return;
       }
       if (e.button !== 0) return;
 
-      // Left-click: the active tool.
       if (tool === 'single') {
-        run([{ ...hit.block, id: AIR }], 'broke');
+        run([{ ...hit.block, id: AIR }], 'Broke');
       } else if (tool === 'tunnel') {
         const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
-        run(asAir(tunnelVoxels(hit.adjacent, dir, TUNNEL_LENGTH, 1)), 'tunneled');
+        run(asAir(tunnelVoxels(hit.adjacent, dir, TUNNEL_LENGTH, 1)), 'Tunneled');
       } else if (tool === 'sphere') {
-        run(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'dug');
+        run(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');
       } else {
-        handleSelection(hit.block);
+        handleSelection(hit.block, selected);
       }
     });
 
-    function handleSelection(target: WorldVoxel): void {
+    function handleSelection(target: WorldVoxel, selected: BlockId): void {
       if (!anchor) {
         anchor = target;
-        setHud('select opposite corner');
+        setStatus('Selection started — click the opposite corner');
         return;
       }
       const region = boxVoxels(anchor, target);
       anchor = undefined;
       if (tool === 'box-clear') {
-        run(asAir(region), 'cleared');
+        run(asAir(region), 'Cleared');
       } else if (tool === 'fill') {
-        run(asId(region, current), 'filled');
+        run(asId(region, selected), 'Filled');
       } else {
-        // replace: swap the block the player clicked for the current block within the box.
         const replaceId = manager.getBlock(target.x, target.y, target.z);
         const matches = region.filter((v) => manager.getBlock(v.x, v.y, v.z) === replaceId);
-        run(asId(matches, current), `replaced ${registry.get(replaceId).name}`);
+        run(asId(matches, selected), `Replaced ${registry.get(replaceId).name}`);
       }
     }
 
