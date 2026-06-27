@@ -139,6 +139,35 @@ export class Game {
     let anchor: WorldVoxel | undefined;
 
     const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
+
+    if (import.meta.env.DEV) {
+      const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');
+      ui.worldButton.textContent = `World: ${worldName}`;
+      ui.worldButton.addEventListener('click', () => {
+        void (async () => {
+          const worlds = await listWorlds();
+          const choice = window.prompt(
+            `Worlds: ${worlds.join(', ') || '(none yet)'}\n` +
+              `Type a name to switch/create, or "save:NEW" to copy "${worldName}" to NEW:`,
+            worldName,
+          );
+          if (!choice) return;
+          const u = new URL(window.location.href);
+          if (choice.startsWith('save:')) {
+            const target = choice.slice('save:'.length).trim();
+            if (!target) return;
+            await copyWorld(worldName, target);
+            u.searchParams.set('save', target);
+          } else {
+            u.searchParams.set('save', choice.trim());
+          }
+          window.location.href = u.toString();
+        })();
+      });
+    } else {
+      ui.worldButton.style.display = 'none';
+    }
+
     const setStatus = (text: string): void => {
       ui.setStatus(text);
     };
