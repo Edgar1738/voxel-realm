@@ -11,20 +11,35 @@ import { PlayerController } from '../player/PlayerController';
 import { scatterTrees } from '../worldgen/TreeScatterer';
 import { EditService } from '../edit/EditService';
 import { raycastVoxels } from '../edit/VoxelRaycast';
+import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
 import { AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW } from '../blocks/blocks';
 import type { Overlay } from '../worldgen/Generator';
-import type { Vec3, WorldSeed } from '../core/types';
+import type { Vec3, WorldSeed, BlockId } from '../core/types';
+import type { WorldVoxel, SetVoxel } from '../edit/EditTypes';
 
 const REACH = 6; // block-edit reach in world units
 const SAVE_DEBOUNCE_MS = 250; // coalesce rapid edits into one write per chunk
+const MAX_EDIT_VOXELS = 8192; // guard against runaway box selections
+const TUNNEL_LENGTH = 8;
+const SPHERE_RADIUS = 4;
 
 const SEED: WorldSeed = 1337;
 const OVERLAYS: Overlay[] = [scatterTrees]; // trees; castle is a later P4 overlay
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
+
+type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
+const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
+
+function toolLabel(tool: Tool): string {
+  return tool
+    .split('-')
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(' ');
+}
 
 /** Composition root: a player flying/walking and sculpting the streamed voxel world. */
 export class Game {
@@ -89,26 +104,47 @@ export class Game {
     const edit = new EditService(manager);
     const palette = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
     let current = STONE;
+    let tool: Tool = 'single';
+    let anchor: WorldVoxel | undefined;
+
     const hud = document.getElementById('hud');
-    const setCurrent = (id: number): void => {
-      current = id;
-      if (hud) hud.textContent = registry.get(id).name;
+    const setHud = (note?: string): void => {
+      if (hud) {
+        hud.textContent = `${toolLabel(tool)} · ${registry.get(current).name}${note ? ` — ${note}` : ''}`;
+      }
     };
-    setCurrent(current);
+    setHud();
+
+    /** Applies an edit set (capped), reports the result, and resets any pending selection. */
+    const run = (voxels: SetVoxel[], verb: string): void => {
+      if (voxels.length > MAX_EDIT_VOXELS) {
+        setHud(`too large (${voxels.length} > ${MAX_EDIT_VOXELS})`);
+        return;
+      }
+      const batch = edit.apply(voxels);
+      setHud(batch ? `${verb} ${batch.changes.length}` : 'no change');
+    };
 
     window.addEventListener('keydown', (e) => {
       const n = Number(e.key);
-      if (n >= 1 && n <= palette.length) setCurrent(palette[n - 1]);
+      if (n >= 1 && n <= palette.length) {
+        current = palette[n - 1];
+        setHud();
+      } else if (e.code === 'KeyT') {
+        tool = TOOLS[(TOOLS.indexOf(tool) + 1) % TOOLS.length];
+        anchor = undefined;
+        setHud();
+      }
     });
 
     window.addEventListener('keydown', (e) => {
       if (!e.ctrlKey) return;
       if (e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
-        edit.undo();
+        setHud(edit.undo() ? 'undo' : 'nothing to undo');
       } else if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) {
         e.preventDefault();
-        edit.redo();
+        setHud(edit.redo() ? 'redo' : 'nothing to redo');
       }
     });
 
@@ -122,12 +158,50 @@ export class Game {
         REACH,
       );
       if (!hit) return;
-      if (e.button === 0)
-        edit.apply([{ ...hit.block, id: AIR }]); // break
-      else if (e.button === 2)
-        edit.apply([{ ...hit.adjacent, id: current }]); // place
-      else if (e.button === 1 && hit.id !== AIR) setCurrent(hit.id); // pick
+
+      if (e.button === 1) {
+        if (hit.id !== AIR) current = hit.id; // pick
+        setHud();
+        return;
+      }
+      if (e.button === 2) {
+        run([{ ...hit.adjacent, id: current }], 'placed'); // right-click always places one block
+        return;
+      }
+      if (e.button !== 0) return;
+
+      // Left-click: the active tool.
+      if (tool === 'single') {
+        run([{ ...hit.block, id: AIR }], 'broke');
+      } else if (tool === 'tunnel') {
+        const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
+        run(asAir(tunnelVoxels(hit.adjacent, dir, TUNNEL_LENGTH, 1)), 'tunneled');
+      } else if (tool === 'sphere') {
+        run(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'dug');
+      } else {
+        handleSelection(hit.block);
+      }
     });
+
+    function handleSelection(target: WorldVoxel): void {
+      if (!anchor) {
+        anchor = target;
+        setHud('select opposite corner');
+        return;
+      }
+      const region = boxVoxels(anchor, target);
+      anchor = undefined;
+      if (tool === 'box-clear') {
+        run(asAir(region), 'cleared');
+      } else if (tool === 'fill') {
+        run(asId(region, current), 'filled');
+      } else {
+        // replace: swap the block the player clicked for the current block within the box.
+        const replaceId = manager.getBlock(target.x, target.y, target.z);
+        const matches = region.filter((v) => manager.getBlock(v.x, v.y, v.z) === replaceId);
+        run(asId(matches, current), `replaced ${registry.get(replaceId).name}`);
+      }
+    }
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
@@ -140,4 +214,12 @@ export class Game {
       );
     });
   }
+}
+
+function asAir(voxels: WorldVoxel[]): SetVoxel[] {
+  return voxels.map((v) => ({ ...v, id: AIR }));
+}
+
+function asId(voxels: WorldVoxel[], id: BlockId): SetVoxel[] {
+  return voxels.map((v) => ({ ...v, id }));
 }
