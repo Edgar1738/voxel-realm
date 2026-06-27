@@ -1,4 +1,4 @@
-import { Euler, type PerspectiveCamera } from 'three';
+import { Euler, Vector3, type PerspectiveCamera } from 'three';
 import type { InputState } from '../player/PlayerController';
 
 const SENSITIVITY = 0.0025;
@@ -61,6 +61,13 @@ export class CameraRig {
     };
     this.toggleFlyQueued = false;
     return state;
+  }
+
+  /** Current look direction as a plain vector. */
+  forward(): { x: number; y: number; z: number } {
+    const v = new Vector3();
+    this.camera.getWorldDirection(v);
+    return { x: v.x, y: v.y, z: v.z };
   }
 
   /** Writes the eye position + look orientation to the camera. */

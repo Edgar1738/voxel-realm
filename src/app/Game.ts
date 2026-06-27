@@ -9,9 +9,13 @@ import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
 import { scatterTrees } from '../worldgen/TreeScatterer';
+import { EditService } from '../edit/EditService';
 import { worldToChunkCoord } from '../core/coords';
+import { AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW } from '../blocks/blocks';
 import type { Overlay } from '../worldgen/Generator';
 import type { Vec3, WorldSeed } from '../core/types';
+
+const REACH = 6; // block-edit reach in world units
 
 const SEED: WorldSeed = 1337;
 const OVERLAYS: Overlay[] = [scatterTrees]; // trees; castle is a later P4 overlay
@@ -44,6 +48,34 @@ export class Game {
       isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
     };
+
+    const edit = new EditService(manager, registry, REACH);
+    const palette = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
+    let current = STONE;
+    const hud = document.getElementById('hud');
+    const setCurrent = (id: number): void => {
+      current = id;
+      if (hud) hud.textContent = registry.get(id).name;
+    };
+    setCurrent(current);
+
+    window.addEventListener('keydown', (e) => {
+      const n = Number(e.key);
+      if (n >= 1 && n <= palette.length) setCurrent(palette[n - 1]);
+    });
+
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+    document.addEventListener('mousedown', (e) => {
+      if (!rig.locked) return;
+      const origin = player.eye();
+      const dir = rig.forward();
+      if (e.button === 0) edit.break(origin, dir);
+      else if (e.button === 2) edit.place(origin, dir, current);
+      else if (e.button === 1) {
+        const id = edit.pick(origin, dir);
+        if (id !== null && id !== AIR) setCurrent(id);
+      }
+    });
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
