@@ -19,6 +19,7 @@ import {
   type TerrainPathPoint,
 } from './DevBuildTools';
 import { collectDevState, type DevState } from './DevState';
+import { frameBox } from './studioFraming';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
@@ -131,6 +132,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     return frame.toDataURL('image/jpeg', quality);
   };
 
+  let lastSavedPath = '';
   /** Capture and write the JPEG to .captures/<name>.jpg via the dev server; returns the path. */
   const save = async (
     name = 'frame',
@@ -145,6 +147,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       body: JSON.stringify({ name, dataUrl }),
     });
     const { path } = (await res.json()) as { path: string };
+    lastSavedPath = path;
     return path;
   };
 
@@ -332,6 +335,29 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Place the camera on a circle of `radius` around (cx,cy,cz) at `angle` rad, looking in. */
     orbit: (cx: number, cy: number, cz: number, radius: number, angle = 0, height?: number): void =>
       orbitCamera(cx, cy, cz, radius, angle, height),
+    /**
+     * Position the camera to frame an axis-aligned box (corners need not be ordered).
+     * Sizes the distance to fit the box for the current fov/aspect; returns the eye/target used.
+     * `dir` optionally overrides the viewing direction from the box center toward the eye.
+     */
+    frame: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      dir?: Vec3,
+    ): { eye: Vec3; target: Vec3 } => {
+      const min = { x: Math.min(x1, x2), y: Math.min(y1, y2), z: Math.min(z1, z2) };
+      const max = { x: Math.max(x1, x2), y: Math.max(y1, y2), z: Math.max(z1, z2) };
+      const { eye, target } = frameBox(min, max, renderer.camera.fov, renderer.camera.aspect, dir);
+      player.position.x = eye.x;
+      player.position.y = eye.y;
+      player.position.z = eye.z;
+      lookAt(target.x, target.y, target.z);
+      return { eye, target };
+    },
     /** Move along the current look direction by `dist` blocks (fly roaming). */
     forward: (dist: number): void => {
       const { yaw, pitch } = rig;
@@ -354,6 +380,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     view,
     shot,
     save,
+    /** Path of the most recent save()/capture write (synchronous; '' before the first capture). */
+    lastCapturePath: (): string => lastSavedPath,
     capture: {
       overview: async (
         name: string,
@@ -405,7 +433,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       );
     },
     place: (x: number, y: number, z: number, id: BlockId): EditResult =>
-      applyBatch([{ x, y, z, id }]),
+      applyAny([{ x, y, z, id }]),
     fill: (
       x1: number,
       y1: number,
@@ -415,7 +443,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       z2: number,
       id: BlockId,
     ): EditResult =>
-      applyBatch(
+      applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id })),
       ),
     clearBox: (
@@ -426,11 +454,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
     ): EditResult =>
-      applyBatch(
+      applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
     sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): EditResult =>
-      applyBatch(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
+      applyAny(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
     tunnel: (
       x: number,
       y: number,
@@ -440,7 +468,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       radius: number,
       id: BlockId,
     ): EditResult =>
-      applyBatch(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
+      applyAny(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
     copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
@@ -459,13 +487,13 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
-      applyBatch(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+      applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
     line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
-      applyBatch(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
+      applyAny(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
     cylinder: (cx: number, cy: number, cz: number, radius: number, height: number, id: BlockId) =>
-      applyBatch(cylinderVoxels(cx, cy, cz, radius, height, id)),
+      applyAny(cylinderVoxels(cx, cy, cz, radius, height, id)),
     pyramid: (cx: number, cy: number, cz: number, baseRadius: number, id: BlockId) =>
-      applyBatch(pyramidVoxels(cx, cy, cz, baseRadius, id)),
+      applyAny(pyramidVoxels(cx, cy, cz, baseRadius, id)),
     hollowBox: (
       x1: number,
       y1: number,
@@ -474,14 +502,14 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
       id: BlockId,
-    ) => applyBatch(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
+    ) => applyAny(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
     /** Persist a blueprint to .blueprints/<name>.json (reusable across sessions). */
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
     stamp: async (name: string, ox: number, oy: number, oz: number): Promise<EditResult> => {
       const bp = await loadBlueprint(name);
-      return applyBatch(
+      return applyAny(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
       );
     },
