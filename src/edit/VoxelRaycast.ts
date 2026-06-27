@@ -1,29 +1,27 @@
+import { AIR } from '../blocks/blocks';
 import type { Vec3, BlockId } from '../core/types';
 
-export interface RayHit {
-  /** Integer coords of the solid voxel that was hit. */
-  voxel: Vec3;
-  /** Unit face normal of the face the ray entered through. */
-  normal: Vec3;
-  blockId: BlockId;
+export interface BlockSampler {
+  getBlock(x: number, y: number, z: number): BlockId;
 }
 
-/**
- * Amanatides–Woo voxel DDA. Steps from `origin` along `dir` up to `maxDistance` world units,
- * returning the first voxel where `isSolid(getBlock(...))` plus the entry-face normal.
- */
-export function raycastVoxel(
+export interface VoxelRaycastHit {
+  block: { x: number; y: number; z: number };
+  adjacent: { x: number; y: number; z: number };
+  normal: { x: number; y: number; z: number };
+  id: BlockId;
+}
+
+export function raycastVoxels(
+  sampler: BlockSampler,
   origin: Vec3,
-  dir: Vec3,
+  direction: Vec3,
   maxDistance: number,
-  getBlock: (x: number, y: number, z: number) => BlockId,
-  isSolid: (id: BlockId) => boolean,
-): RayHit | null {
-  const len = Math.hypot(dir.x, dir.y, dir.z);
-  if (len === 0) return null;
-  const dx = dir.x / len;
-  const dy = dir.y / len;
-  const dz = dir.z / len;
+): VoxelRaycastHit | undefined {
+  const len = Math.hypot(direction.x, direction.y, direction.z);
+  const dx = len === 0 ? 0 : direction.x / len;
+  const dy = len === 0 ? 0 : direction.y / len;
+  const dz = len === 0 ? -1 : direction.z / len;
 
   let vx = Math.floor(origin.x);
   let vy = Math.floor(origin.y);
@@ -37,34 +35,42 @@ export function raycastVoxel(
   const tDeltaY = dy !== 0 ? Math.abs(1 / dy) : Infinity;
   const tDeltaZ = dz !== 0 ? Math.abs(1 / dz) : Infinity;
 
-  const boundary = (o: number, v: number, step: number): number => (step > 0 ? v + 1 - o : o - v);
-  let tMaxX = dx !== 0 ? boundary(origin.x, vx, stepX) / Math.abs(dx) : Infinity;
-  let tMaxY = dy !== 0 ? boundary(origin.y, vy, stepY) / Math.abs(dy) : Infinity;
-  let tMaxZ = dz !== 0 ? boundary(origin.z, vz, stepZ) / Math.abs(dz) : Infinity;
+  // Distance to first voxel boundary along each axis (always positive — boundary is ahead).
+  let tMaxX = dx !== 0 ? ((stepX > 0 ? vx + 1 : vx) - origin.x) / dx : Infinity;
+  let tMaxY = dy !== 0 ? ((stepY > 0 ? vy + 1 : vy) - origin.y) / dy : Infinity;
+  let tMaxZ = dz !== 0 ? ((stepZ > 0 ? vz + 1 : vz) - origin.z) / dz : Infinity;
 
-  let normal: Vec3 = { x: 0, y: 0, z: 0 };
-  let t = 0;
+  let adjacent = { x: vx, y: vy, z: vz };
+  let normal = { x: 0, y: 0, z: 0 };
+  let traveled = 0;
 
-  while (t <= maxDistance) {
-    const id = getBlock(vx, vy, vz);
-    if (isSolid(id)) return { voxel: { x: vx, y: vy, z: vz }, normal, blockId: id };
+  while (traveled <= maxDistance) {
+    const id = sampler.getBlock(vx, vy, vz);
+    if (id !== AIR) {
+      return { block: { x: vx, y: vy, z: vz }, adjacent, normal, id };
+    }
 
+    // Record last empty cell before stepping.
+    adjacent = { x: vx, y: vy, z: vz };
+
+    // Advance along the axis with the smallest tMax (x beats y beats z on ties).
     if (tMaxX <= tMaxY && tMaxX <= tMaxZ) {
       vx += stepX;
-      t = tMaxX;
+      traveled = tMaxX;
       tMaxX += tDeltaX;
       normal = { x: -stepX, y: 0, z: 0 };
     } else if (tMaxY <= tMaxZ) {
       vy += stepY;
-      t = tMaxY;
+      traveled = tMaxY;
       tMaxY += tDeltaY;
       normal = { x: 0, y: -stepY, z: 0 };
     } else {
       vz += stepZ;
-      t = tMaxZ;
+      traveled = tMaxZ;
       tMaxZ += tDeltaZ;
       normal = { x: 0, y: 0, z: -stepZ };
     }
   }
-  return null;
+
+  return undefined;
 }
