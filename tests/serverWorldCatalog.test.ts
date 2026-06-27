@@ -17,7 +17,8 @@ describe('ServerWorldCatalog', () => {
     const fetchMock = vi.fn(async () => ok({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
     await copyWorld('a', 'b');
-    const [url, init] = fetchMock.mock.calls[0];
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    const [url, init] = calls[0];
     expect(url).toContain('name=a');
     expect(url).toContain('copyTo=b');
     expect(init.method).toBe('POST');
@@ -27,6 +28,7 @@ describe('ServerWorldCatalog', () => {
     const fetchMock = vi.fn(async () => ok({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
     await deleteWorld('a');
-    expect(fetchMock.mock.calls[0][1].method).toBe('DELETE');
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(calls[0][1].method).toBe('DELETE');
   });
 });

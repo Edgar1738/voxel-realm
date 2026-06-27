@@ -21,7 +21,8 @@ describe('ServerSaveStore', () => {
     const store = new ServerSaveStore('settlement', isValidBlockId);
     const deltas = await store.loadDeltas();
 
-    expect(fetchMock.mock.calls[0][0]).toContain('/__world?name=settlement');
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(calls[0][0]).toContain('/__world?name=settlement');
     expect(deltas.get('0,0')).toEqual(new Map([[5, 13]]));
     expect(deltas.has('1,0')).toBe(false); // unknown block id dropped
   });
@@ -33,11 +34,12 @@ describe('ServerSaveStore', () => {
     const store = new ServerSaveStore('settlement', isValidBlockId);
     await store.saveChunkDelta('2,3', [[7, 5]]);
 
-    const [url, init] = fetchMock.mock.calls[0];
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    const [url, init] = calls[0];
     expect(url).toContain('name=settlement');
     expect(url).toContain('chunk=2%2C3');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({ entries: [[7, 5]] });
+    expect(JSON.parse(init.body as string)).toEqual({ entries: [[7, 5]] });
   });
 
   it('loadDeltas degrades to empty when the fetch fails', async () => {

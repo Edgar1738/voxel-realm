@@ -40,11 +40,12 @@ export class ServerSaveStore implements SaveStore {
 
   private async post(url: string, body: unknown): Promise<void> {
     try {
-      await fetch(url, {
-        method: 'POST',
-        headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
+      const init: RequestInit = { method: 'POST' };
+      if (body !== undefined) {
+        init.headers = { 'content-type': 'application/json' };
+        init.body = JSON.stringify(body);
+      }
+      await fetch(url, init);
     } catch (err) {
       console.error('Voxel Realm: world save failed', err);
     }
