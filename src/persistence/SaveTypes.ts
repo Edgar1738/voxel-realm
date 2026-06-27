@@ -8,8 +8,8 @@ export interface WorldMeta {
   version: number;
 }
 
-/** A chunk's edits: voxelIndex -> blockId. */
-export type ChunkDeltaRecord = Record<number, BlockId>;
+/** A chunk's edits as stable [voxelIndex, blockId] entries. */
+export type ChunkDeltaEntries = ReadonlyArray<[number, BlockId]>;
 
-/** All chunks' edits, keyed by chunk key ("cx,cz"). */
-export type SerializedDeltas = Record<string, ChunkDeltaRecord>;
+/** All chunks' edits: chunk key ("cx,cz") -> (voxelIndex -> blockId). */
+export type WorldDeltas = Map<string, Map<number, BlockId>>;
