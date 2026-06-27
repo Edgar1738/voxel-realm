@@ -129,6 +129,7 @@ function buildToolIcon(tool: string): SVGSVGElement {
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
   hotbar: HTMLDivElement;
+  /** The grid container holding the block tiles; Game delegates tile clicks off this node. */
   picker: HTMLDivElement;
   reset: HTMLButtonElement;
   /** Highlights the button for `tool` and dims the rest. */
@@ -136,6 +137,10 @@ export interface CreativeUi {
   /** Shows `text` as a transient toast that fades out on its own. */
   setStatus(text: string): void;
   renderHotbar(): void;
+  /** Opens or closes the inventory modal (fade/scale; inert when closed). */
+  setInventoryOpen(open: boolean): void;
+  /** Whether the inventory modal is currently open. */
+  isInventoryOpen(): boolean;
 }
 
 const STATUS_VISIBLE_MS = 1600;
@@ -148,7 +153,7 @@ function button(text: string): HTMLButtonElement {
 }
 
 /**
- * Builds the creative hotbar, block picker, tool dock, and status toast, appending them to the
+ * Builds the creative hotbar, inventory modal, tool dock, and status toast, appending them to the
  * document body. Stops UI pointer events from reaching the document so clicking the HUD never
  * triggers pointer-lock or an edit.
  *
@@ -195,14 +200,47 @@ export function createCreativeUi(
 
   dock.append(toolRow, reset);
 
+  // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
+  const scrim = document.createElement('div');
+  scrim.className = 'inventory-scrim';
+  scrim.setAttribute('aria-hidden', 'true');
+
+  const panel = document.createElement('div');
+  panel.className = 'inventory-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-label', 'Blocks');
+
+  const title = document.createElement('div');
+  title.className = 'inventory-title';
+  title.textContent = 'Blocks';
+
   const picker = document.createElement('div');
-  picker.className = 'creative-picker';
-  picker.hidden = true;
+  picker.className = 'inventory-grid';
   for (const id of CREATIVE_BLOCKS) {
-    const item = button(registry.get(id).name);
-    item.dataset.block = String(id);
-    picker.append(item);
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'inventory-tile';
+    tile.dataset.block = String(id);
+    const name = registry.get(id).name;
+    tile.title = name;
+    tile.setAttribute('aria-label', name);
+
+    const swatch = document.createElement('span');
+    swatch.className = 'inventory-swatch';
+    swatch.style.background = swatchBackground(id);
+    swatch.setAttribute('aria-hidden', 'true');
+
+    const caption = document.createElement('span');
+    caption.className = 'inventory-name';
+    caption.textContent = name;
+
+    tile.append(swatch, caption);
+    picker.append(tile);
   }
+
+  panel.append(title, picker);
+  scrim.append(panel);
 
   const hotbar = document.createElement('div');
   hotbar.className = 'creative-hotbar';
@@ -212,8 +250,20 @@ export function createCreativeUi(
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
-  root.append(dock, picker, status, hotbar);
+  root.append(dock, scrim, status, hotbar);
   document.body.append(root);
+
+  let inventoryOpen = false;
+  const isInventoryOpen = (): boolean => inventoryOpen;
+  const setInventoryOpen = (open: boolean): void => {
+    inventoryOpen = open;
+    scrim.classList.toggle('is-open', open);
+    scrim.setAttribute('aria-hidden', String(!open));
+  };
+  // Clicking the backdrop (but not the panel) closes the modal.
+  scrim.addEventListener('click', (e) => {
+    if (e.target === scrim) setInventoryOpen(false);
+  });
 
   const setActiveTool = (tool: string): void => {
     for (const [id, btn] of toolButtons) {
@@ -255,5 +305,14 @@ export function createCreativeUi(
   };
   renderHotbar();
 
-  return { hotbar, picker, reset, setActiveTool, setStatus, renderHotbar };
+  return {
+    hotbar,
+    picker,
+    reset,
+    setActiveTool,
+    setStatus,
+    renderHotbar,
+    setInventoryOpen,
+    isInventoryOpen,
+  };
 }

@@ -143,6 +143,7 @@ export class Game {
       inventory.pickBlock(Number(btn.dataset.block) as BlockId);
       ui.renderHotbar();
       setStatus(`Selected ${registry.get(inventory.selectedBlock).name}`);
+      ui.setInventoryOpen(false);
     });
     ui.hotbar.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
@@ -179,7 +180,12 @@ export class Game {
       } else if (e.code === 'KeyT') {
         setTool(TOOLS[(TOOLS.indexOf(tool) + 1) % TOOLS.length]);
       } else if (e.code === 'KeyE') {
-        ui.picker.hidden = !ui.picker.hidden;
+        const open = !ui.isInventoryOpen();
+        // Free the cursor on open so the tiles are clickable; the click-to-play overlay re-locks.
+        if (open && rig.locked) document.exitPointerLock();
+        ui.setInventoryOpen(open);
+      } else if (e.code === 'Escape' && ui.isInventoryOpen()) {
+        ui.setInventoryOpen(false);
       }
     });
 
