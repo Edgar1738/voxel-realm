@@ -4,8 +4,8 @@ import { createWorldGenerator } from '../src/worldgen/LayeredGenerator';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
+import { voxelIndex } from '../src/core/coords';
 import { WATER, AIR, STONE } from '../src/blocks/blocks';
-import { ChunkDeltas } from '../src/persistence/ChunkDeltas';
 import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -30,7 +30,6 @@ function makeManager(sink: ChunkSink, viewDistance: number, genBudget: number, m
     sink,
     SEED,
     [],
-    new ChunkDeltas(),
     { viewDistance, genBudget, meshBudget },
   );
 }
@@ -143,22 +142,82 @@ describe('ChunkManager editing', () => {
     expect(mgr.getBlock(100000, 50, 0)).toBe(AIR); // unloaded
   });
 
-  it('setBlock mutates the voxel and re-meshes the chunk', () => {
+  it('applyEdits mutates the voxel, re-meshes the chunk, and records a delta from terrain', () => {
     const sink = new FakeSink();
     const mgr = makeManager(sink, 0, 64, 64);
     settle(mgr, 0, 0, 3);
-    const before = sink.uploads.get('0,0') ?? 0;
-    mgr.setBlock(0, 0, 0, AIR); // break the floor block at (0,0,0)
-    expect(mgr.getBlock(0, 0, 0)).toBe(AIR);
-    expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(before); // re-meshed
+    const beforeUploads = sink.uploads.get('0,0') ?? 0;
+
+    const terrain = mgr.getBlock(1, 70, 1);
+    const next = terrain === STONE ? AIR : STONE;
+    const changes = mgr.applyEdits([{ x: 1, y: 70, z: 1, id: next }]);
+
+    expect(changes).toEqual([{ x: 1, y: 70, z: 1, before: terrain, after: next }]);
+    expect(mgr.getBlock(1, 70, 1)).toBe(next);
+    expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(beforeUploads); // re-meshed
+    expect(mgr.getChunkDelta('0,0')).toEqual([[voxelIndex(1, 70, 1), next]]);
   });
 
-  it('setBlock on a chunk border re-meshes the touched neighbor', () => {
+  it('re-meshes a touched chunk exactly once per batch (no per-voxel storm)', () => {
     const sink = new FakeSink();
-    const mgr = makeManager(sink, 1, 64, 64); // load a 3x3 so neighbors exist
+    const mgr = makeManager(sink, 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    const beforeUploads = sink.uploads.get('0,0') ?? 0;
+
+    // Several interior voxels in chunk (0,0); none on a border.
+    mgr.applyEdits([
+      { x: 5, y: 70, z: 5, id: STONE },
+      { x: 6, y: 70, z: 5, id: STONE },
+      { x: 7, y: 71, z: 6, id: STONE },
+      { x: 8, y: 72, z: 7, id: STONE },
+    ]);
+
+    expect((sink.uploads.get('0,0') ?? 0) - beforeUploads).toBe(1); // one remesh for the batch
+  });
+
+  it('clears a delta when a voxel is reverted to its terrain value', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    const terrain = mgr.getBlock(1, 70, 1);
+    const next = terrain === STONE ? AIR : STONE;
+
+    mgr.applyEdits([{ x: 1, y: 70, z: 1, id: next }]);
+    expect(mgr.getChunkDelta('0,0')).toHaveLength(1);
+
+    mgr.applyEdits([{ x: 1, y: 70, z: 1, id: terrain }]); // back to terrain
+    expect(mgr.getChunkDelta('0,0')).toHaveLength(0);
+  });
+
+  it('re-meshes the touched border neighbor exactly once', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 1, 64, 64); // 3x3 so neighbors exist
     settle(mgr, 0, 0);
     const beforeWest = sink.uploads.get('-1,0') ?? 0;
-    mgr.setBlock(0, 0, 0, AIR); // local x=0 in chunk (0,0) -> west border
-    expect(sink.uploads.get('-1,0') ?? 0).toBeGreaterThan(beforeWest);
+    mgr.applyEdits([{ x: 0, y: 70, z: 1, id: STONE }]); // local x=0 -> west border
+    expect((sink.uploads.get('-1,0') ?? 0) - beforeWest).toBe(1);
+  });
+
+  it('applies saved deltas when a chunk is generated', () => {
+    const sink = new FakeSink();
+    const registry = new BlockRegistry();
+    const mgr = new ChunkManager(
+      createWorldGenerator(),
+      new GreedyMesher(registry),
+      registry,
+      sink,
+      SEED,
+      [],
+      { viewDistance: 0, genBudget: 64, meshBudget: 64 },
+      new Map([['0,0', new Map([[voxelIndex(1, 70, 1), STONE]])]]),
+    );
+    settle(mgr, 0, 0, 3);
+    expect(mgr.getBlock(1, 70, 1)).toBe(STONE);
+    expect(mgr.getChunkDelta('0,0')).toEqual([[voxelIndex(1, 70, 1), STONE]]);
+  });
+
+  it('refuses edits into unloaded chunks', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    expect(mgr.applyEdits([{ x: 100000, y: 70, z: 100000, id: STONE }])).toEqual([]);
   });
 });

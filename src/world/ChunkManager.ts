@@ -6,8 +6,16 @@ import {
   CHUNK_SIZE_X,
   CHUNK_SIZE_Z,
 } from '../core/constants';
-import { chunkKey, parseChunkKey, worldToChunkCoord, worldToLocal } from '../core/coords';
+import {
+  chunkKey,
+  parseChunkKey,
+  voxelIndex,
+  indexToLocal,
+  worldToChunkCoord,
+  worldToLocal,
+} from '../core/coords';
 import { ChunkStore, ChunkState } from './ChunkStore';
+import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
 import { opaquePass, waterPass, type MeshPass } from '../mesh/MeshPass';
@@ -16,9 +24,8 @@ import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { ChunkMeshes } from '../mesh/MeshTypes';
 import type { WorldSeed, BlockId } from '../core/types';
-import type { ChunkData } from './ChunkData';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
-import type { ChunkDeltas } from '../persistence/ChunkDeltas';
+import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
@@ -26,17 +33,14 @@ export interface ChunkSink {
   dispose(key: string): void;
 }
 
-/** Read/write voxels by world coords (implemented by ChunkManager for the editor). */
-export interface WorldEditor {
-  getBlock(x: number, y: number, z: number): BlockId;
-  setBlock(x: number, y: number, z: number, id: BlockId): void;
-}
-
 export interface ChunkManagerOptions {
   viewDistance: number;
   genBudget: number;
   meshBudget: number;
 }
+
+/** In-memory edit deltas: chunk key -> (voxelIndex -> blockId), each a diff from base terrain. */
+export type WorldDeltas = Map<string, Map<number, BlockId>>;
 
 const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
   [1, 0],
@@ -50,12 +54,22 @@ const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
  * loaded set each update: disposes chunks that left range, then generates and meshes
  * newly desired chunks under a per-frame budget, nearest first. When a chunk meshes,
  * its already-meshed edge neighbors re-mesh so border seams resolve.
+ *
+ * Edits are batched: `applyEdits` mutates all voxels, then re-meshes each touched chunk (and
+ * any touched border neighbor) exactly once and notifies persistence once per touched chunk.
+ * Deltas are stored as diffs from generated terrain, so reverting a voxel to its terrain
+ * value removes the delta.
  */
 export class ChunkManager {
   private readonly store = new ChunkStore();
+  private readonly baseChunks = new Map<string, ChunkData>();
+  private readonly deltas: WorldDeltas;
   private readonly opts: ChunkManagerOptions;
   private readonly opaquePass: MeshPass;
   private readonly waterPass: MeshPass;
+
+  /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
+  onChunkDeltaChanged?: (key: string, entries: ReadonlyArray<[number, BlockId]>) => void;
 
   constructor(
     private readonly generator: Generator,
@@ -64,9 +78,12 @@ export class ChunkManager {
     private readonly sink: ChunkSink,
     private readonly seed: WorldSeed,
     private readonly overlays: Overlay[],
-    private readonly deltas: ChunkDeltas,
     options?: Partial<ChunkManagerOptions>,
+    savedDeltas?: WorldDeltas,
   ) {
+    this.deltas = new Map(
+      [...(savedDeltas ?? new Map()).entries()].map(([key, value]) => [key, new Map(value)]),
+    );
     this.opts = {
       viewDistance: options?.viewDistance ?? VIEW_DISTANCE,
       genBudget: options?.genBudget ?? GEN_BUDGET,
@@ -85,6 +102,7 @@ export class ChunkManager {
         const { cx, cz } = parseChunkKey(key);
         this.sink.dispose(key);
         this.store.delete(cx, cz);
+        this.baseChunks.delete(key);
       }
     }
 
@@ -103,7 +121,9 @@ export class ChunkManager {
       if (this.store.has(cx, cz)) continue;
       const data = this.generator.generateBaseChunk(this.seed, cx, cz);
       applyOverlays(data, cx, cz, this.seed, this.overlays);
-      this.deltas.applyTo(data);
+      const key = chunkKey(cx, cz);
+      this.baseChunks.set(key, cloneChunk(data));
+      this.applySavedDeltas(data, key);
       this.store.set(cx, cz, data, ChunkState.Generated);
       gen++;
     }
@@ -145,6 +165,7 @@ export class ChunkManager {
     return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)) === WATER;
   }
 
+  /** Reads a loaded voxel; AIR for out-of-world or unloaded chunks. */
   getBlock(wx: number, wy: number, wz: number): BlockId {
     if (wy < 0 || wy >= WORLD_HEIGHT) return AIR;
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
@@ -152,25 +173,86 @@ export class ChunkManager {
     return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz));
   }
 
-  /** Edits a voxel and re-meshes its chunk plus any touched border neighbor. */
-  setBlock(wx: number, wy: number, wz: number, id: BlockId): void {
-    if (wy < 0 || wy >= WORLD_HEIGHT) return;
-    const cx = worldToChunkCoord(wx);
-    const cz = worldToChunkCoord(wz);
-    const entry = this.store.get(cx, cz);
-    if (!entry) return;
-    const lx = worldToLocal(wx);
-    const lz = worldToLocal(wz);
-    entry.data.set(lx, wy, lz, id);
-    this.meshChunk(cx, cz);
-    if (lx === 0) this.remeshIfLoaded(cx - 1, cz);
-    if (lx === CHUNK_SIZE_X - 1) this.remeshIfLoaded(cx + 1, cz);
-    if (lz === 0) this.remeshIfLoaded(cx, cz - 1);
-    if (lz === CHUNK_SIZE_Z - 1) this.remeshIfLoaded(cx, cz + 1);
+  /**
+   * Applies a batch of voxel edits: mutates all loaded, in-range voxels, then re-meshes each
+   * touched chunk (and any touched border neighbor) exactly once and notifies persistence
+   * once per touched chunk. Returns only the voxels that actually changed (with before/after).
+   */
+  applyEdits(edits: SetVoxel[]): VoxelChange[] {
+    const changes: VoxelChange[] = [];
+    const editedChunks = new Set<string>();
+    const remeshKeys = new Set<string>();
+
+    for (const edit of edits) {
+      if (edit.y < 0 || edit.y >= WORLD_HEIGHT) continue;
+      const cx = worldToChunkCoord(edit.x);
+      const cz = worldToChunkCoord(edit.z);
+      const entry = this.store.get(cx, cz);
+      if (!entry) continue; // can only edit loaded chunks
+
+      const lx = worldToLocal(edit.x);
+      const lz = worldToLocal(edit.z);
+      const before = entry.data.get(lx, edit.y, lz);
+      if (before === edit.id) continue;
+
+      entry.data.set(lx, edit.y, lz, edit.id);
+      this.updateDelta(cx, cz, lx, edit.y, lz, edit.id);
+      changes.push({ x: edit.x, y: edit.y, z: edit.z, before, after: edit.id });
+
+      const key = chunkKey(cx, cz);
+      editedChunks.add(key);
+      remeshKeys.add(key);
+      if (lx === 0) remeshKeys.add(chunkKey(cx - 1, cz));
+      if (lx === CHUNK_SIZE_X - 1) remeshKeys.add(chunkKey(cx + 1, cz));
+      if (lz === 0) remeshKeys.add(chunkKey(cx, cz - 1));
+      if (lz === CHUNK_SIZE_Z - 1) remeshKeys.add(chunkKey(cx, cz + 1));
+    }
+
+    for (const key of remeshKeys) {
+      const { cx, cz } = parseChunkKey(key);
+      if (this.store.get(cx, cz)) this.meshChunk(cx, cz);
+    }
+    for (const key of editedChunks) {
+      this.onChunkDeltaChanged?.(key, this.getChunkDelta(key));
+    }
+    return changes;
   }
 
-  private remeshIfLoaded(cx: number, cz: number): void {
-    if (this.store.get(cx, cz)) this.meshChunk(cx, cz);
+  /** Convenience single-voxel edit; returns whether the voxel changed. */
+  setBlock(wx: number, wy: number, wz: number, id: BlockId): boolean {
+    return this.applyEdits([{ x: wx, y: wy, z: wz, id }]).length > 0;
+  }
+
+  /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] entries (for persistence). */
+  getChunkDelta(key: string): ReadonlyArray<[number, BlockId]> {
+    return [...(this.deltas.get(key)?.entries() ?? [])].sort((a, b) => a[0] - b[0]);
+  }
+
+  private updateDelta(cx: number, cz: number, lx: number, y: number, lz: number, id: BlockId): void {
+    const key = chunkKey(cx, cz);
+    const index = voxelIndex(lx, y, lz);
+    const baseId = this.baseChunks.get(key)?.get(lx, y, lz);
+    let delta = this.deltas.get(key);
+    if (baseId === id) {
+      // Reverted to generated terrain: drop the delta entry.
+      delta?.delete(index);
+    } else {
+      if (!delta) {
+        delta = new Map();
+        this.deltas.set(key, delta);
+      }
+      delta.set(index, id);
+    }
+    if (delta && delta.size === 0) this.deltas.delete(key);
+  }
+
+  private applySavedDeltas(chunk: ChunkData, key: string): void {
+    const delta = this.deltas.get(key);
+    if (!delta) return;
+    for (const [index, id] of delta) {
+      const { x, y, z } = indexToLocal(index);
+      chunk.set(x, y, z, id);
+    }
   }
 
   private desiredSet(centerCx: number, centerCz: number): Map<string, { cx: number; cz: number }> {
@@ -201,4 +283,8 @@ export class ChunkManager {
   private neighborData(cx: number, cz: number): ChunkData | undefined {
     return this.store.get(cx, cz)?.data;
   }
+}
+
+function cloneChunk(chunk: ChunkData): ChunkData {
+  return new ChunkData(chunk.cx, chunk.cz, new Uint8Array(chunk.data));
 }
