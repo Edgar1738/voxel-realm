@@ -13,10 +13,9 @@ export async function listWorlds(): Promise<string[]> {
 }
 
 export async function copyWorld(from: string, to: string): Promise<void> {
-  await fetch(
-    `${ENDPOINT}?name=${encodeURIComponent(from)}&copyTo=${encodeURIComponent(to)}`,
-    { method: 'POST' },
-  );
+  await fetch(`${ENDPOINT}?name=${encodeURIComponent(from)}&copyTo=${encodeURIComponent(to)}`, {
+    method: 'POST',
+  });
 }
 
 export async function deleteWorld(name: string): Promise<void> {

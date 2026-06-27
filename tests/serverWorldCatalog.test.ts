@@ -9,7 +9,10 @@ beforeEach(() => vi.restoreAllMocks());
 
 describe('ServerWorldCatalog', () => {
   it('listWorlds returns the worlds array', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ok({ worlds: ['a', 'b'] })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ok({ worlds: ['a', 'b'] })),
+    );
     expect(await listWorlds()).toEqual(['a', 'b']);
   });
 
