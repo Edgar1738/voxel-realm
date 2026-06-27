@@ -2,6 +2,7 @@ import type { Renderer } from '../render/Renderer';
 import type { CameraRig } from '../render/CameraRig';
 import type { PlayerController } from '../player/PlayerController';
 import type { ChunkManager } from '../world/ChunkManager';
+import type { DayNight } from '../render/DayNight';
 import type { EditService } from '../edit/EditService';
 import type { CreativeInventory } from './CreativeInventory';
 import { CREATIVE_BLOCKS } from './CreativeInventory';
@@ -26,6 +27,7 @@ export interface DevControlsContext {
   edit: EditService;
   inventory: CreativeInventory;
   registry: BlockRegistry;
+  daynight: DayNight;
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
@@ -43,7 +45,7 @@ const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
 
 export function installDevControls(ctx: DevControlsContext): void {
-  const { renderer, player, rig, manager, edit, inventory, registry } = ctx;
+  const { renderer, player, rig, manager, edit, inventory, registry, daynight } = ctx;
 
   // Push the current player eye + look into the camera so a teleport/aim is reflected
   // immediately on the next capture, independent of the rAF render loop's timing.
@@ -165,6 +167,13 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     fly: (on = true): void => {
       player.flying = on;
+    },
+    /** Set time of day (0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset). */
+    time: (t: number): void => daynight.set(t),
+    timeOfDay: (): number => daynight.time,
+    /** Real seconds for a full day/night cycle (default 600). */
+    dayLength: (seconds: number): void => {
+      daynight.dayLengthSec = Math.max(1, seconds);
     },
 
     // --- see ---

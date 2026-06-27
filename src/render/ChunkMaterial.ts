@@ -42,6 +42,7 @@ uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform float uAlpha;
+uniform float uDayLight;
 
 in vec2 vUv;
 in float vLayer;
@@ -55,7 +56,7 @@ void main() {
   vec3 base = texture(uTex, vec3(vUv, vLayer)).rgb;
   float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   float light = (0.45 + 0.55 * diff) * vAo;
-  vec3 color = base * light;
+  vec3 color = base * light * uDayLight;
   float dist = length(vViewPos);
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
@@ -77,6 +78,7 @@ function buildMaterial(
       uFogNear: { value: 40 },
       uFogFar: { value: 220 },
       uAlpha: { value: alpha },
+      uDayLight: { value: 1.0 },
     },
     vertexShader,
     fragmentShader,
