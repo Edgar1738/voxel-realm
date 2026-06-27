@@ -134,6 +134,12 @@ export class Game {
       inventory.selectSlot(Number(btn.dataset.slot));
       ui.renderHotbar();
     });
+    ui.reset.addEventListener('click', () => {
+      if (!window.confirm('Reset the world back to generated terrain? Your edits will be lost.')) {
+        return;
+      }
+      void store.clearDeltas().then(() => window.location.reload());
+    });
 
     /** Applies an edit set (capped), reports the result, and clears any pending selection. */
     const run = (voxels: SetVoxel[], verb: string): void => {

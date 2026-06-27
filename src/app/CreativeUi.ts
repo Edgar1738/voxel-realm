@@ -6,6 +6,7 @@ export interface CreativeUi {
   hotbar: HTMLDivElement;
   picker: HTMLDivElement;
   toolSelect: HTMLSelectElement;
+  reset: HTMLButtonElement;
   status: HTMLDivElement;
   renderHotbar(): void;
 }
@@ -42,7 +43,8 @@ export function createCreativeUi(
     option.textContent = toolLabel(t);
     toolSelect.append(option);
   }
-  top.append(toolSelect);
+  const reset = button('Reset world');
+  top.append(toolSelect, reset);
 
   const picker = document.createElement('div');
   picker.className = 'creative-picker';
@@ -73,5 +75,5 @@ export function createCreativeUi(
   };
   renderHotbar();
 
-  return { hotbar, picker, toolSelect, status, renderHotbar };
+  return { hotbar, picker, toolSelect, reset, status, renderHotbar };
 }
