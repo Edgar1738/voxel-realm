@@ -70,6 +70,7 @@ export class CelestialSky {
   private readonly moon: Sprite;
   private readonly stars: Points;
   private readonly sunMat: SpriteMaterial;
+  private readonly moonMat: SpriteMaterial;
   private readonly starMat: PointsMaterial;
   private readonly sunDir = new Vector3();
 
@@ -86,15 +87,14 @@ export class CelestialSky {
     this.sun.scale.setScalar(SUN_SIZE);
     this.sun.renderOrder = -8;
 
-    this.moon = new Sprite(
-      new SpriteMaterial({
-        map: discTexture('rgba(235,238,245,1)', 'rgba(200,210,230,0)'),
-        color: new Color(0xdfe4ef),
-        depthTest: false,
-        depthWrite: false,
-        transparent: true,
-      }),
-    );
+    this.moonMat = new SpriteMaterial({
+      map: discTexture('rgba(235,238,245,1)', 'rgba(200,210,230,0)'),
+      color: new Color(0xdfe4ef),
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+    });
+    this.moon = new Sprite(this.moonMat);
     this.moon.scale.setScalar(MOON_SIZE);
     this.moon.renderOrder = -9;
 
@@ -130,13 +130,19 @@ export class CelestialSky {
     // Moon rides the opposite point of the arc.
     this.moon.position.copy(this.sunDir).multiplyScalar(-SKY_RADIUS).add(cameraPos);
 
-    // Dim the sun a touch as it nears the horizon so it doesn't blaze at sunrise/sunset.
-    const elevation = Math.max(0, this.sunDir.y);
-    this.sunMat.opacity = 0.6 + 0.4 * elevation;
+    // The sky model keeps the sun's elevation constant (only azimuth rotates), so drive the
+    // sun/moon visibility from daylight instead: sun blazes by day, moon takes over at night.
+    const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
+    const sunOpacity = clamp01((state.daylight - 0.35) / 0.45);
+    const moonOpacity = clamp01((0.78 - state.daylight) / 0.5);
+    this.sunMat.opacity = sunOpacity;
+    this.sun.visible = sunOpacity > 0.001;
+    this.moonMat.opacity = moonOpacity;
+    this.moon.visible = moonOpacity > 0.001;
 
-    const opacity = starOpacity(state.daylight);
-    this.starMat.opacity = opacity;
-    this.stars.visible = opacity > 0.001;
+    const stars = starOpacity(state.daylight);
+    this.starMat.opacity = stars;
+    this.stars.visible = stars > 0.001;
     this.stars.position.copy(cameraPos);
   }
 }
