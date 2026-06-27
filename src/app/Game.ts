@@ -4,11 +4,10 @@ import { createChunkMaterial, createTransparentMaterial } from '../render/ChunkM
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
-import { createWorldGenerator } from '../worldgen/LayeredGenerator';
+import { createGenerator, isWorldPreset, type WorldPreset } from '../worldgen/Presets';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
-import { scatterTrees } from '../worldgen/TreeScatterer';
 import { EditService } from '../edit/EditService';
 import { raycastVoxels } from '../edit/VoxelRaycast';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
@@ -19,7 +18,6 @@ import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
 import { AIR } from '../blocks/blocks';
-import type { Overlay } from '../worldgen/Generator';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { WorldVoxel, SetVoxel, EditOutcome } from '../edit/EditTypes';
 
@@ -30,7 +28,6 @@ const TUNNEL_LENGTH = 8;
 const SPHERE_RADIUS = 4;
 
 const SEED: WorldSeed = 1337;
-const OVERLAYS: Overlay[] = [scatterTrees]; // trees; castle is a later P4 overlay
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
 
@@ -59,10 +56,15 @@ export class Game {
     const material = createChunkMaterial(texture);
     const transparentMaterial = createTransparentMaterial(texture);
 
+    // Pick the world environment (?world=flat|void|arena|default).
+    const requested = new URLSearchParams(window.location.search).get('world');
+    const preset: WorldPreset = isWorldPreset(requested) ? requested : 'default';
+    const { generator, overlays } = createGenerator(preset);
+
     // Load the durable save (or start fresh / discard an incompatible one).
     const store = new IndexedDbSaveStore();
     let savedDeltas: WorldDeltas = new Map();
-    const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION);
+    const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION, preset);
     if (action.kind === 'load') {
       savedDeltas = await store.loadDeltas();
     } else {
@@ -70,17 +72,17 @@ export class Game {
         console.warn('Voxel Realm: incompatible save — discarding stored edits.');
       }
       await store.clearDeltas(); // mismatch or no meta => stored deltas are orphans
-      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
+      await store.saveMeta({ seed: SEED, version: SAVE_VERSION, preset });
     }
 
     const sink = new ChunkMeshRegistry(renderer.scene, material, transparentMaterial);
     const manager = new ChunkManager(
-      createWorldGenerator(),
+      generator,
       new GreedyMesher(registry),
       registry,
       sink,
       SEED,
-      OVERLAYS,
+      overlays,
       undefined,
       savedDeltas,
     );

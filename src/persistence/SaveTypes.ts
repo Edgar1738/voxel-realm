@@ -6,6 +6,8 @@ export const SAVE_VERSION = 1;
 export interface WorldMeta {
   seed: number;
   version: number;
+  /** Which world preset the saved edits belong to; a change discards them. */
+  preset?: string;
 }
 
 /** A chunk's edits as stable [voxelIndex, blockId] entries. */

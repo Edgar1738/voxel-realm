@@ -13,9 +13,10 @@ export function resolveSaveAction(
   meta: WorldMeta | undefined,
   seed: number,
   version: number,
+  preset: string,
 ): SaveAction {
   if (!meta) return { kind: 'reset', reason: 'no-meta' };
-  if (meta.seed !== seed || meta.version !== version) {
+  if (meta.seed !== seed || meta.version !== version || (meta.preset ?? 'default') !== preset) {
     return { kind: 'reset', reason: 'incompatible' };
   }
   return { kind: 'load' };
