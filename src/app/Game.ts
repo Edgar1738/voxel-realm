@@ -281,7 +281,9 @@ export class Game {
     // Dev-only roam/capture controls (window.__vr). Dynamically imported so the whole module —
     // and its html2canvas dependency — is excluded from production builds.
     if (import.meta.env.DEV) {
-      void import('./DevControls').then((m) => m.installDevControls(renderer, player, rig));
+      void import('./DevControls').then((m) =>
+        m.installDevControls({ renderer, player, rig, manager, edit, inventory, registry }),
+      );
     }
   }
 }
