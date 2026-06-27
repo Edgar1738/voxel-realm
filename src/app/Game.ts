@@ -94,6 +94,11 @@ export class Game {
       dirty.add(key);
       if (flushTimer === undefined) flushTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
     };
+    // Best-effort flush of any pending edits when the tab is hidden/closed.
+    window.addEventListener('pagehide', () => {
+      if (flushTimer !== undefined) window.clearTimeout(flushTimer);
+      flush();
+    });
 
     const overlay = document.getElementById('overlay') ?? undefined;
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
@@ -213,6 +218,16 @@ export class Game {
       if (!anchor) {
         anchor = target;
         setStatus('Selection started — click the opposite corner');
+        return;
+      }
+      // Reject oversized selections BEFORE generating the (potentially huge) voxel array.
+      const volume =
+        (Math.abs(target.x - anchor.x) + 1) *
+        (Math.abs(target.y - anchor.y) + 1) *
+        (Math.abs(target.z - anchor.z) + 1);
+      if (volume > MAX_EDIT_VOXELS) {
+        anchor = undefined;
+        setStatus(`Selection too large (${volume} > ${MAX_EDIT_VOXELS})`);
         return;
       }
       const region = boxVoxels(anchor, target);

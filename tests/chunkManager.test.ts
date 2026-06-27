@@ -197,6 +197,20 @@ describe('ChunkManager editing', () => {
     expect((sink.uploads.get('-1,0') ?? 0) - beforeWest).toBe(1);
   });
 
+  it('re-applies in-memory deltas after a chunk unloads and reloads', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    settle(mgr, 0, 0, 3);
+    const terrain = mgr.getBlock(1, 70, 1);
+    const next = terrain === STONE ? AIR : STONE;
+    mgr.applyEdits([{ x: 1, y: 70, z: 1, id: next }]);
+
+    settle(mgr, 1000, 1000, 3); // unload chunk (0,0)
+    expect(mgr.getBlock(1, 70, 1)).toBe(AIR); // unloaded reads as air
+
+    settle(mgr, 0, 0, 3); // reload chunk (0,0)
+    expect(mgr.getBlock(1, 70, 1)).toBe(next); // delta re-applied on regeneration
+  });
+
   it('applies saved deltas when a chunk is generated', () => {
     const sink = new FakeSink();
     const registry = new BlockRegistry();
