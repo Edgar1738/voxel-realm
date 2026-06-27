@@ -18,6 +18,7 @@ import type { ChunkMeshes } from '../mesh/MeshTypes';
 import type { WorldSeed, BlockId } from '../core/types';
 import type { ChunkData } from './ChunkData';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
+import type { ChunkDeltas } from '../persistence/ChunkDeltas';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
@@ -63,6 +64,7 @@ export class ChunkManager {
     private readonly sink: ChunkSink,
     private readonly seed: WorldSeed,
     private readonly overlays: Overlay[],
+    private readonly deltas: ChunkDeltas,
     options?: Partial<ChunkManagerOptions>,
   ) {
     this.opts = {
@@ -101,6 +103,7 @@ export class ChunkManager {
       if (this.store.has(cx, cz)) continue;
       const data = this.generator.generateBaseChunk(this.seed, cx, cz);
       applyOverlays(data, cx, cz, this.seed, this.overlays);
+      this.deltas.applyTo(data);
       this.store.set(cx, cz, data, ChunkState.Generated);
       gen++;
     }

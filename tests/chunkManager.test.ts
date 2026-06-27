@@ -5,6 +5,7 @@ import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
 import { WATER, AIR, STONE } from '../src/blocks/blocks';
+import { ChunkDeltas } from '../src/persistence/ChunkDeltas';
 import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -29,6 +30,7 @@ function makeManager(sink: ChunkSink, viewDistance: number, genBudget: number, m
     sink,
     SEED,
     [],
+    new ChunkDeltas(),
     { viewDistance, genBudget, meshBudget },
   );
 }
