@@ -10,6 +10,10 @@ import {
   WATER,
   SNOW,
   CACTUS,
+  GLASS,
+  PLANKS,
+  COBBLESTONE,
+  BRICK,
   TextureLayer,
   Face,
 } from '../src/blocks/blocks';
@@ -39,6 +43,16 @@ describe('block ids are stable and append-only', () => {
 
   it('has cactus at id 10', () => {
     expect(CACTUS).toBe(10);
+  });
+
+  it('has glass at id 7', () => {
+    expect(GLASS).toBe(7);
+  });
+
+  it('has planks at id 11, cobblestone at 12, brick at 13', () => {
+    expect(PLANKS).toBe(11);
+    expect(COBBLESTONE).toBe(12);
+    expect(BRICK).toBe(13);
   });
 });
 
@@ -94,7 +108,18 @@ describe('BlockRegistry', () => {
     expect(reg.isOpaque(CACTUS)).toBe(true);
   });
 
+  it('treats glass as non-opaque and transparent', () => {
+    expect(reg.isOpaque(GLASS)).toBe(false);
+    expect(reg.get(GLASS).transparent).toBe(true);
+  });
+
+  it('treats planks, cobblestone, and brick as opaque', () => {
+    expect(reg.isOpaque(PLANKS)).toBe(true);
+    expect(reg.isOpaque(COBBLESTONE)).toBe(true);
+    expect(reg.isOpaque(BRICK)).toBe(true);
+  });
+
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(11);
+    expect(reg.layerCount).toBe(15);
   });
 });

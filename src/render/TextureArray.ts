@@ -47,6 +47,10 @@ export function createTextureArray(): DataArrayTexture {
   paintLayer(data, TextureLayer.Water, [50, 110, 200], 10); // blue (alpha from material)
   paintLayer(data, TextureLayer.Snow, [236, 240, 245], 6); // near-white snow
   paintLayer(data, TextureLayer.Cactus, [60, 110, 60], 16); // cactus green
+  paintLayer(data, TextureLayer.Glass, [205, 232, 240], 4); // pale glassy tint (alpha comes from the material)
+  paintLayer(data, TextureLayer.Planks, [165, 130, 80], 12);
+  paintLayer(data, TextureLayer.Cobblestone, [110, 110, 114], 26);
+  paintLayer(data, TextureLayer.Brick, [150, 70, 58], 14);
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;

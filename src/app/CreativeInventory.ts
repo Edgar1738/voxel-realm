@@ -1,8 +1,34 @@
-import { GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW, CACTUS } from '../blocks/blocks';
+import {
+  GRASS,
+  DIRT,
+  STONE,
+  SAND,
+  WOOD,
+  LEAVES,
+  SNOW,
+  CACTUS,
+  GLASS,
+  PLANKS,
+  COBBLESTONE,
+  BRICK,
+} from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 
 /** The blocks offered in the creative picker. (Extended as more blocks are added.) */
-export const CREATIVE_BLOCKS: BlockId[] = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW, CACTUS];
+export const CREATIVE_BLOCKS: BlockId[] = [
+  GRASS,
+  DIRT,
+  STONE,
+  SAND,
+  WOOD,
+  LEAVES,
+  SNOW,
+  CACTUS,
+  GLASS,
+  PLANKS,
+  COBBLESTONE,
+  BRICK,
+];
 
 /** A creative hotbar: a fixed list of slots, one selected, each holding a block id. */
 export class CreativeInventory {

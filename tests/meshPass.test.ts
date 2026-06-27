@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
-import { AIR, GRASS, STONE, WATER } from '../src/blocks/blocks';
+import { AIR, GRASS, STONE, WATER, GLASS } from '../src/blocks/blocks';
 
 const reg = new BlockRegistry();
 
@@ -25,6 +25,10 @@ describe('transparentPass', () => {
     expect(pass.includes(WATER)).toBe(true);
     expect(pass.includes(STONE)).toBe(false);
     expect(pass.includes(AIR)).toBe(false);
+  });
+
+  it('includes GLASS in the transparent pass', () => {
+    expect(pass.includes(GLASS)).toBe(true);
   });
   it('shows a transparent face only against air', () => {
     expect(pass.faceVisible(WATER, AIR)).toBe(true);

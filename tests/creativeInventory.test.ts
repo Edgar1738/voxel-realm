@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreativeInventory, CREATIVE_BLOCKS } from '../src/app/CreativeInventory';
-import { GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW, CACTUS } from '../src/blocks/blocks';
+import {
+  GRASS,
+  DIRT,
+  STONE,
+  SAND,
+  WOOD,
+  LEAVES,
+  SNOW,
+  CACTUS,
+  GLASS,
+  PLANKS,
+  COBBLESTONE,
+  BRICK,
+} from '../src/blocks/blocks';
 
 describe('CreativeInventory', () => {
   let inv: CreativeInventory;
@@ -24,7 +37,20 @@ describe('CreativeInventory', () => {
     });
 
     it('CREATIVE_BLOCKS contains the expected solids in order', () => {
-      expect(CREATIVE_BLOCKS).toEqual([GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW, CACTUS]);
+      expect(CREATIVE_BLOCKS).toEqual([
+        GRASS,
+        DIRT,
+        STONE,
+        SAND,
+        WOOD,
+        LEAVES,
+        SNOW,
+        CACTUS,
+        GLASS,
+        PLANKS,
+        COBBLESTONE,
+        BRICK,
+      ]);
     });
   });
 

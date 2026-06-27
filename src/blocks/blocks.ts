@@ -8,9 +8,13 @@ export const STONE: BlockId = 3;
 export const SAND: BlockId = 4;
 export const WOOD: BlockId = 5;
 export const LEAVES: BlockId = 6;
+export const GLASS: BlockId = 7;
 export const WATER: BlockId = 8;
 export const SNOW: BlockId = 9;
 export const CACTUS: BlockId = 10;
+export const PLANKS: BlockId = 11;
+export const COBBLESTONE: BlockId = 12;
+export const BRICK: BlockId = 13;
 
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
@@ -35,9 +39,13 @@ export const TextureLayer = {
   Water: 8,
   Snow: 9,
   Cactus: 10,
+  Glass: 11,
+  Planks: 12,
+  Cobblestone: 13,
+  Brick: 14,
 } as const;
 
-export const TEXTURE_LAYER_COUNT = 11;
+export const TEXTURE_LAYER_COUNT = 15;
 
 /** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
 export interface BlockDef {
@@ -117,5 +125,33 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     faces: uniform(TextureLayer.Cactus),
+  },
+  {
+    id: GLASS,
+    name: 'glass',
+    opaque: false,
+    transparent: true,
+    faces: uniform(TextureLayer.Glass),
+  },
+  {
+    id: PLANKS,
+    name: 'planks',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.Planks),
+  },
+  {
+    id: COBBLESTONE,
+    name: 'cobblestone',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.Cobblestone),
+  },
+  {
+    id: BRICK,
+    name: 'brick',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.Brick),
   },
 ];
