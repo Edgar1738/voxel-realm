@@ -4,4 +4,4 @@ const canvas = document.getElementById('app');
 if (!(canvas instanceof HTMLCanvasElement)) {
   throw new Error('Missing #app canvas element');
 }
-Game.boot(canvas);
+void Game.boot(canvas);

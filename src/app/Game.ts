@@ -10,6 +10,11 @@ import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
 import { scatterTrees } from '../worldgen/TreeScatterer';
 import { EditService } from '../edit/EditService';
+import { ChunkDeltas } from '../persistence/ChunkDeltas';
+import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
+import { SAVE_VERSION } from '../persistence/SaveTypes';
+import { UndoRedo } from '../edit/UndoRedo';
+import { WorldEdits } from '../edit/WorldEdits';
 import { worldToChunkCoord } from '../core/coords';
 import { AIR, GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW } from '../blocks/blocks';
 import type { Overlay } from '../worldgen/Generator';
@@ -24,12 +29,26 @@ const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
 
 /** Composition root: a player flying/walking through the streamed voxel world. */
 export class Game {
-  static boot(canvas: HTMLCanvasElement): void {
+  static async boot(canvas: HTMLCanvasElement): Promise<void> {
     const registry = new BlockRegistry();
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
     const material = createChunkMaterial(texture);
     const waterMaterial = createWaterMaterial(texture);
+
+    // Load the durable save (or start fresh / discard an incompatible one).
+    const store = new IndexedDbSaveStore();
+    const deltas = new ChunkDeltas();
+    const meta = await store.loadMeta();
+    if (!meta) {
+      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
+    } else if (meta.seed !== SEED || meta.version !== SAVE_VERSION) {
+      console.warn('Voxel Realm: incompatible save — discarding stored edits.');
+      await store.clearDeltas();
+      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
+    } else {
+      deltas.load(await store.loadDeltas());
+    }
 
     const sink = new ChunkMeshRegistry(renderer.scene, material, waterMaterial);
     const manager = new ChunkManager(
@@ -39,6 +58,7 @@ export class Game {
       sink,
       SEED,
       OVERLAYS,
+      deltas,
     );
 
     const overlay = document.getElementById('overlay') ?? undefined;
@@ -49,7 +69,8 @@ export class Game {
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
     };
 
-    const edit = new EditService(manager, registry, REACH);
+    const worldEdits = new WorldEdits(manager, deltas, store, new UndoRedo());
+    const edit = new EditService(worldEdits, registry, REACH);
     const palette = [GRASS, DIRT, STONE, SAND, WOOD, LEAVES, SNOW];
     let current = STONE;
     const hud = document.getElementById('hud');
@@ -62,6 +83,17 @@ export class Game {
     window.addEventListener('keydown', (e) => {
       const n = Number(e.key);
       if (n >= 1 && n <= palette.length) setCurrent(palette[n - 1]);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (!e.ctrlKey) return;
+      if (e.code === 'KeyZ' && !e.shiftKey) {
+        e.preventDefault();
+        worldEdits.undoEdit();
+      } else if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) {
+        e.preventDefault();
+        worldEdits.redoEdit();
+      }
     });
 
     document.addEventListener('contextmenu', (e) => e.preventDefault());
