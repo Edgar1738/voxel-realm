@@ -1,51 +1,72 @@
-import { raycastVoxel, type RayHit } from './VoxelRaycast';
-import { AIR } from '../blocks/blocks';
-import type { BlockRegistry } from '../blocks/BlockRegistry';
-import type { WorldEditor } from '../world/ChunkManager';
-import type { BlockId, Vec3 } from '../core/types';
+import type { EditableWorld, EditBatch, SetVoxel } from './EditTypes';
 
-/** Turns look-rays into break/place/pick edits against a WorldEditor. */
+/** Pure batch undo/redo engine. Delegates mutations to an injected EditableWorld. */
 export class EditService {
+  private readonly undoStack: EditBatch[] = [];
+  private readonly redoStack: EditBatch[] = [];
+
   constructor(
-    private readonly world: WorldEditor,
-    private readonly registry: BlockRegistry,
-    private readonly reach: number,
+    private readonly world: EditableWorld,
+    private readonly historyLimit: number = 128,
   ) {}
 
-  private cast(origin: Vec3, dir: Vec3): RayHit | null {
-    return raycastVoxel(
-      origin,
-      dir,
-      this.reach,
-      (x, y, z) => this.world.getBlock(x, y, z),
-      (id) => this.registry.isOpaque(id),
-    );
-  }
+  /**
+   * Applies `edits` to the world. If any voxels actually changed, wraps them
+   * in an EditBatch, pushes it onto the undo stack (capped at historyLimit),
+   * clears the redo stack, and returns the batch. Returns undefined if nothing changed.
+   */
+  apply(edits: SetVoxel[]): EditBatch | undefined {
+    const changes = this.world.applyEdits(edits);
+    if (changes.length === 0) return undefined;
 
-  /** Removes the targeted block. Returns the hit (or null on a miss). */
-  break(origin: Vec3, dir: Vec3): RayHit | null {
-    const hit = this.cast(origin, dir);
-    if (hit) this.world.setBlock(hit.voxel.x, hit.voxel.y, hit.voxel.z, AIR);
-    return hit;
-  }
+    const batch: EditBatch = { changes };
 
-  /** Places `blockId` against the hit face. Returns the hit (or null on a miss). */
-  place(origin: Vec3, dir: Vec3, blockId: BlockId): RayHit | null {
-    const hit = this.cast(origin, dir);
-    if (hit) {
-      this.world.setBlock(
-        hit.voxel.x + hit.normal.x,
-        hit.voxel.y + hit.normal.y,
-        hit.voxel.z + hit.normal.z,
-        blockId,
-      );
+    if (this.undoStack.length >= this.historyLimit) {
+      this.undoStack.shift();
     }
-    return hit;
+    this.undoStack.push(batch);
+    this.redoStack.length = 0;
+
+    return batch;
   }
 
-  /** Returns the targeted block id, or null on a miss. */
-  pick(origin: Vec3, dir: Vec3): BlockId | null {
-    const hit = this.cast(origin, dir);
-    return hit ? hit.blockId : null;
+  /**
+   * Pops the most recent batch and replays it with BEFORE values.
+   * Pushes the batch onto the redo stack. Returns undefined if there is nothing to undo.
+   */
+  undo(): EditBatch | undefined {
+    const batch = this.undoStack.pop();
+    if (!batch) return undefined;
+
+    const reverseEdits: SetVoxel[] = batch.changes.map((c) => ({
+      x: c.x,
+      y: c.y,
+      z: c.z,
+      id: c.before,
+    }));
+    this.world.applyEdits(reverseEdits);
+    this.redoStack.push(batch);
+
+    return batch;
+  }
+
+  /**
+   * Pops from the redo stack and replays it with AFTER values.
+   * Pushes the batch back onto the undo stack. Returns undefined if there is nothing to redo.
+   */
+  redo(): EditBatch | undefined {
+    const batch = this.redoStack.pop();
+    if (!batch) return undefined;
+
+    const forwardEdits: SetVoxel[] = batch.changes.map((c) => ({
+      x: c.x,
+      y: c.y,
+      z: c.z,
+      id: c.after,
+    }));
+    this.world.applyEdits(forwardEdits);
+    this.undoStack.push(batch);
+
+    return batch;
   }
 }
