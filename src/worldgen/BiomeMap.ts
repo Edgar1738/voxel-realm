@@ -54,9 +54,16 @@ interface Channels {
   mountain: NoiseFunction2D;
 }
 
+// Cap on the biome classification cache; cleared wholesale when exceeded (bursty chunk gen
+// reuses points within a burst, so a simple cap bounds memory without hurting locality much).
+const CACHE_CAP = 1 << 17; // 131072 entries
+
 /** Classifies columns into biomes and supplies (blended) terrain parameters. */
 export class BiomeMap implements BiomeSource {
   private readonly ch: Channels;
+  // Memoizes classification per (worldX,worldZ): the 5x5 blend kernel samples points that
+  // overlap heavily across a chunk's columns, so this cuts noise evaluations several-fold.
+  private readonly cache = new Map<string, Biome>();
 
   constructor(seed: WorldSeed) {
     this.ch = {
@@ -67,6 +74,17 @@ export class BiomeMap implements BiomeSource {
   }
 
   biomeAt(worldX: number, worldZ: number): Biome {
+    const key = `${worldX},${worldZ}`;
+    const cached = this.cache.get(key);
+    if (cached !== undefined) return cached;
+
+    const biome = this.classify(worldX, worldZ);
+    if (this.cache.size >= CACHE_CAP) this.cache.clear();
+    this.cache.set(key, biome);
+    return biome;
+  }
+
+  private classify(worldX: number, worldZ: number): Biome {
     const t = this.ch.temperature(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ);
     const h = this.ch.humidity(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ);
     const m = this.ch.mountain(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ);
