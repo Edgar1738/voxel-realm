@@ -3,7 +3,10 @@ import type { SaveStore } from './SaveStore';
 import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 
 const DB_NAME = 'voxel-realm';
-const DB_VERSION = 1;
+// v2 replaced the v1 per-voxel 'deltas' store with the per-chunk 'chunks' store. Bumping the
+// version ensures onupgradeneeded fires for returning players so the new store exists.
+const DB_VERSION = 2;
+const LEGACY_DELTA_STORE = 'deltas';
 const META_STORE = 'meta';
 const CHUNK_STORE = 'chunks';
 const META_KEY = 'world';
@@ -18,6 +21,9 @@ function openDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
+      // Drop the incompatible v1 delta store (its per-voxel format can't be migrated cleanly).
+      if (db.objectStoreNames.contains(LEGACY_DELTA_STORE))
+        db.deleteObjectStore(LEGACY_DELTA_STORE);
       if (!db.objectStoreNames.contains(META_STORE)) db.createObjectStore(META_STORE);
       if (!db.objectStoreNames.contains(CHUNK_STORE))
         db.createObjectStore(CHUNK_STORE, { keyPath: 'chunkKey' });

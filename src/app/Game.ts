@@ -57,6 +57,7 @@ export class Game {
     let savedDeltas: WorldDeltas = new Map();
     const meta = await store.loadMeta();
     if (!meta) {
+      await store.clearDeltas(); // no meta => any stored deltas are orphans
       await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
     } else if (meta.seed !== SEED || meta.version !== SAVE_VERSION) {
       console.warn('Voxel Realm: incompatible save — discarding stored edits.');
@@ -81,8 +82,13 @@ export class Game {
     // Debounced per-chunk persistence: a touched chunk is flushed once after a short idle.
     const dirty = new Set<string>();
     let flushTimer: number | undefined;
+    let savesSuppressed = false; // set during reset so pending edits aren't re-written
     const flush = (): void => {
       flushTimer = undefined;
+      if (savesSuppressed) {
+        dirty.clear();
+        return;
+      }
       for (const key of dirty) {
         void store
           .saveChunkDelta(key, manager.getChunkDelta(key))
@@ -143,6 +149,10 @@ export class Game {
       if (!window.confirm('Reset the world back to generated terrain? Your edits will be lost.')) {
         return;
       }
+      // Drop any pending writes so the pagehide flush can't resurrect them after the clear.
+      savesSuppressed = true;
+      if (flushTimer !== undefined) window.clearTimeout(flushTimer);
+      dirty.clear();
       void store.clearDeltas().then(() => window.location.reload());
     });
 

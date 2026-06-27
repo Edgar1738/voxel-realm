@@ -38,7 +38,8 @@ export class EditService {
     const batch = this.undoStack.pop();
     if (!batch) return undefined;
 
-    const reverseEdits: SetVoxel[] = batch.changes.map((c) => ({
+    // Replay in reverse so repeated edits to the same voxel within one batch undo correctly.
+    const reverseEdits: SetVoxel[] = [...batch.changes].reverse().map((c) => ({
       x: c.x,
       y: c.y,
       z: c.z,

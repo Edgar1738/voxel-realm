@@ -99,4 +99,22 @@ describe('EditService', () => {
 
     expect(service.redo()).toBeUndefined();
   });
+
+  it('undoes a batch that edits the same voxel twice back to the original', () => {
+    const world = makeFakeWorld(); // (0,0,0) starts AIR
+    const service = new EditService(world);
+
+    // AIR -> STONE -> GRASS within one batch.
+    service.apply([
+      { x: 0, y: 0, z: 0, id: STONE },
+      { x: 0, y: 0, z: 0, id: GRASS },
+    ]);
+    expect(world.store.get('0,0,0')).toBe(GRASS);
+
+    service.undo();
+    expect(world.store.get('0,0,0')).toBe(AIR); // reverse replay restores the original
+
+    service.redo();
+    expect(world.store.get('0,0,0')).toBe(GRASS);
+  });
 });
