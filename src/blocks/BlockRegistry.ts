@@ -15,6 +15,11 @@ export class BlockRegistry {
     return def;
   }
 
+  /** Whether a block id exists in the registry (for validating untrusted saves). */
+  has(id: BlockId): boolean {
+    return this.byId.has(id);
+  }
+
   isOpaque(id: BlockId): boolean {
     return this.get(id).opaque;
   }
