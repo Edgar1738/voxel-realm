@@ -16,6 +16,9 @@ import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
+import { ServerSaveStore } from '../persistence/ServerSaveStore';
+import { worldNameFromSearch } from '../persistence/worldName';
+import type { SaveStore } from '../persistence/SaveStore';
 import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
@@ -66,7 +69,11 @@ export class Game {
     const { generator, overlays } = createGenerator(preset);
 
     // Load the durable save (or start fresh / discard an incompatible one).
-    const store = new IndexedDbSaveStore();
+    // Shared storage in dev (server-owned, named worlds via ?save=); IndexedDB in production.
+    const worldName = worldNameFromSearch(window.location.search);
+    const store: SaveStore = import.meta.env.DEV
+      ? new ServerSaveStore(worldName, (id) => registry.has(id as BlockId))
+      : new IndexedDbSaveStore();
     let savedDeltas: WorldDeltas = new Map();
     const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION, preset);
     if (action.kind === 'load') {
