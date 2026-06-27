@@ -30,9 +30,15 @@ describe('transparentPass', () => {
   it('includes GLASS in the transparent pass', () => {
     expect(pass.includes(GLASS)).toBe(true);
   });
-  it('shows a transparent face only against air', () => {
+  it('shows a transparent face against air, culls same-type and solid neighbors', () => {
     expect(pass.faceVisible(WATER, AIR)).toBe(true);
     expect(pass.faceVisible(WATER, WATER)).toBe(false);
     expect(pass.faceVisible(WATER, STONE)).toBe(false);
+  });
+
+  it('shows a face at a water<->glass boundary from both sides', () => {
+    expect(pass.faceVisible(WATER, GLASS)).toBe(true);
+    expect(pass.faceVisible(GLASS, WATER)).toBe(true);
+    expect(pass.faceVisible(GLASS, GLASS)).toBe(false); // same type still culled
   });
 });

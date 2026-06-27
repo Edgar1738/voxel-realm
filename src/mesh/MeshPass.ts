@@ -17,12 +17,15 @@ export function opaquePass(registry: BlockRegistry): MeshPass {
 }
 
 /**
- * Translucent blocks (water, glass, ...) share one pass: a face shows only against air, so
- * water↔water / glass↔glass / glass↔solid internal faces are culled.
+ * Translucent blocks (water, glass, ...) share one pass. A face shows against air or against a
+ * *different* transparent block, so a water↔glass boundary stays visible (each side renders its
+ * own face under backface culling), while same-type (water↔water, glass↔glass) and transparent↔
+ * solid internal faces are culled.
  */
 export function transparentPass(registry: BlockRegistry): MeshPass {
   return {
     includes: (id) => id !== AIR && registry.get(id).transparent,
-    faceVisible: (_self, neighbor) => neighbor === AIR,
+    faceVisible: (self, neighbor) =>
+      neighbor === AIR || (neighbor !== self && registry.get(neighbor).transparent),
   };
 }
