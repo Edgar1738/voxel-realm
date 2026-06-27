@@ -251,6 +251,12 @@ describe('ChunkManager editing', () => {
 });
 
 describe('ChunkManager.preload / isLoaded', () => {
+  it('loadedChunkCount includes generated chunks even before they are meshed', () => {
+    const mgr = makeManager(new FakeSink(), 1, 64, 0); // generate all 3x3 chunks, mesh none
+    mgr.update(0, 0);
+    expect(mgr.loadedChunkCount()).toBe(9);
+  });
+
   it('isLoaded reflects whether the covering chunk is streamed in', () => {
     const mgr = makeManager(new FakeSink(), 0, 64, 64);
     settle(mgr, 0, 0, 3); // viewDistance 0: loads the center chunk only

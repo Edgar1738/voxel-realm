@@ -221,6 +221,11 @@ export class ChunkManager {
     return this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz)) !== undefined;
   }
 
+  /** Number of streamed/generated chunks currently held by the manager, regardless of mesh state. */
+  loadedChunkCount(): number {
+    return [...this.store.keys()].length;
+  }
+
   /**
    * Synchronously generates + meshes every chunk within `radius` chunks of (centerCx,centerCz),
    * bypassing the per-frame budget so scripted edits/scans don't have to wait on the (often

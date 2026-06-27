@@ -8,6 +8,17 @@ import type { EditService } from '../edit/EditService';
 import type { CreativeInventory } from './CreativeInventory';
 import { CREATIVE_BLOCKS } from './CreativeInventory';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
+import {
+  applyVoxelsInBatches,
+  buildTerrainPathVoxels,
+  createMemoryBookmarks,
+  type BatchedEditResult,
+  type EditResult,
+  type Pose,
+  type TerrainPathOptions,
+  type TerrainPathPoint,
+} from './DevBuildTools';
+import { collectDevState, type DevState } from './DevState';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
@@ -15,7 +26,7 @@ import { worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
-import { worldNameFromSearch } from '../persistence/worldName';
+import type { WorldPreset } from '../worldgen/Presets';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -33,24 +44,14 @@ export interface DevControlsContext {
   registry: BlockRegistry;
   daynight: DayNight;
   celestial: CelestialSky;
+  preset: WorldPreset;
+  worldName: string;
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
 export interface Blueprint {
   dims: [number, number, number];
   blocks: Array<[number, number, number, BlockId]>;
-}
-
-/** Outcome of a build edit so scripts can tell why voxels didn't all change. */
-export interface EditResult {
-  requested: number;
-  applied: number;
-  /** y outside [0, WORLD_HEIGHT). */
-  outOfWorld: number;
-  /** Target chunk not loaded — preloadArea or teleport nearer first. */
-  unloaded: number;
-  /** In a loaded chunk but the block was already there. */
-  noChange: number;
 }
 
 type Html2Canvas = (
@@ -62,9 +63,21 @@ const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
 
 export function installDevControls(ctx: DevControlsContext): void {
-  const { renderer, player, rig, manager, edit, inventory, registry, daynight, celestial } = ctx;
+  const {
+    renderer,
+    player,
+    rig,
+    manager,
+    edit,
+    inventory,
+    registry,
+    daynight,
+    celestial,
+    preset,
+    worldName,
+  } = ctx;
 
-  const currentWorld = worldNameFromSearch(window.location.search);
+  const currentWorld = worldName;
   const gotoWorld = (name: string): void => {
     const u = new URL(window.location.href);
     u.searchParams.set('save', name);
@@ -146,7 +159,7 @@ export function installDevControls(ctx: DevControlsContext): void {
   };
 
   const MAX_BUILD = 50000;
-  const applyEdits = (voxels: SetVoxel[]): EditResult => {
+  const applyBatch = (voxels: SetVoxel[]): EditResult => {
     if (voxels.length > MAX_BUILD)
       throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
     let outOfWorld = 0;
@@ -160,6 +173,48 @@ export function installDevControls(ctx: DevControlsContext): void {
     const noChange = Math.max(0, voxels.length - applied - outOfWorld - unloaded);
     return { requested: voxels.length, applied, outOfWorld, unloaded, noChange };
   };
+  const applyAny = (
+    voxels: SetVoxel[],
+    opts: { label?: string; maxBatchSize?: number } = {},
+  ): BatchedEditResult => {
+    const maxBatchSize = Math.min(
+      MAX_BUILD,
+      Math.max(1, Math.floor(opts.maxBatchSize ?? MAX_BUILD)),
+    );
+    const result = applyVoxelsInBatches(voxels, applyBatch, maxBatchSize);
+    if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
+    return result;
+  };
+
+  const orbitCamera = (
+    cx: number,
+    cy: number,
+    cz: number,
+    radius: number,
+    angle = 0,
+    height?: number,
+  ): void => {
+    player.position.x = cx + radius * Math.cos(angle);
+    player.position.z = cz + radius * Math.sin(angle);
+    player.position.y = height ?? cy + radius * 0.6;
+    lookAt(cx, cy, cz);
+  };
+
+  const bookmarks = createMemoryBookmarks(
+    (): Pose => ({
+      pos: { ...player.position },
+      yaw: rig.yaw,
+      pitch: rig.pitch,
+    }),
+    (pose) => {
+      player.position.x = pose.pos.x;
+      player.position.y = pose.pos.y;
+      player.position.z = pose.pos.z;
+      rig.yaw = pose.yaw;
+      rig.pitch = clampPitch(pose.pitch);
+      syncCamera();
+    },
+  );
 
   // ---- primitive voxel builders ----
   const lineVoxels = (
@@ -275,19 +330,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     lookAt,
     /** Place the camera on a circle of `radius` around (cx,cy,cz) at `angle` rad, looking in. */
-    orbit: (
-      cx: number,
-      cy: number,
-      cz: number,
-      radius: number,
-      angle = 0,
-      height?: number,
-    ): void => {
-      player.position.x = cx + radius * Math.cos(angle);
-      player.position.z = cz + radius * Math.sin(angle);
-      player.position.y = height ?? cy + radius * 0.6;
-      lookAt(cx, cy, cz);
-    },
+    orbit: (cx: number, cy: number, cz: number, radius: number, angle = 0, height?: number): void =>
+      orbitCamera(cx, cy, cz, radius, angle, height),
     /** Move along the current look direction by `dist` blocks (fly roaming). */
     forward: (dist: number): void => {
       const { yaw, pitch } = rig;
@@ -310,10 +354,58 @@ export function installDevControls(ctx: DevControlsContext): void {
     view,
     shot,
     save,
+    capture: {
+      overview: async (
+        name: string,
+        target: Vec3,
+        opts: {
+          radius?: number;
+          angle?: number;
+          height?: number;
+          hud?: boolean;
+          maxWidth?: number;
+          quality?: number;
+        } = {},
+      ): Promise<string> => {
+        orbitCamera(
+          target.x,
+          target.y,
+          target.z,
+          opts.radius ?? 60,
+          opts.angle ?? Math.PI / 4,
+          opts.height,
+        );
+        const saveOpts: { hud?: boolean; maxWidth?: number; quality?: number } = {
+          hud: opts.hud ?? true,
+        };
+        if (opts.maxWidth !== undefined) saveOpts.maxWidth = opts.maxWidth;
+        if (opts.quality !== undefined) saveOpts.quality = opts.quality;
+        return save(name, saveOpts);
+      },
+    },
 
     // --- build (via the real EditService, so undo/redo + persistence apply) ---
+    apply: (
+      voxels: SetVoxel[],
+      opts: { label?: string; maxBatchSize?: number } = {},
+    ): BatchedEditResult => applyAny(voxels, opts),
+    path: (
+      points: TerrainPathPoint[],
+      opts: Partial<TerrainPathOptions> & { label?: string } = {},
+    ): BatchedEditResult => {
+      const block = opts.block ?? inventory.selectedBlock;
+      const pathOpts: TerrainPathOptions = { block };
+      if (opts.width !== undefined) pathOpts.width = opts.width;
+      if (opts.supportBlock !== undefined) pathOpts.supportBlock = opts.supportBlock;
+      if (opts.markerEvery !== undefined) pathOpts.markerEvery = opts.markerEvery;
+      if (opts.markerBlock !== undefined) pathOpts.markerBlock = opts.markerBlock;
+      return applyAny(
+        buildTerrainPathVoxels(points, pathOpts, (x, z) => api.surface(x, z).y ?? 0),
+        { label: opts.label ?? 'path' },
+      );
+    },
     place: (x: number, y: number, z: number, id: BlockId): EditResult =>
-      applyEdits([{ x, y, z, id }]),
+      applyBatch([{ x, y, z, id }]),
     fill: (
       x1: number,
       y1: number,
@@ -323,7 +415,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       z2: number,
       id: BlockId,
     ): EditResult =>
-      applyEdits(
+      applyBatch(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id })),
       ),
     clearBox: (
@@ -334,11 +426,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
     ): EditResult =>
-      applyEdits(
+      applyBatch(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
     sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): EditResult =>
-      applyEdits(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
+      applyBatch(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
     tunnel: (
       x: number,
       y: number,
@@ -348,7 +440,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       radius: number,
       id: BlockId,
     ): EditResult =>
-      applyEdits(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
+      applyBatch(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
     copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
@@ -367,13 +459,13 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
-      applyEdits(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+      applyBatch(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
     line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
-      applyEdits(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
+      applyBatch(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
     cylinder: (cx: number, cy: number, cz: number, radius: number, height: number, id: BlockId) =>
-      applyEdits(cylinderVoxels(cx, cy, cz, radius, height, id)),
+      applyBatch(cylinderVoxels(cx, cy, cz, radius, height, id)),
     pyramid: (cx: number, cy: number, cz: number, baseRadius: number, id: BlockId) =>
-      applyEdits(pyramidVoxels(cx, cy, cz, baseRadius, id)),
+      applyBatch(pyramidVoxels(cx, cy, cz, baseRadius, id)),
     hollowBox: (
       x1: number,
       y1: number,
@@ -382,14 +474,14 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
       id: BlockId,
-    ) => applyEdits(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
+    ) => applyBatch(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
     /** Persist a blueprint to .blueprints/<name>.json (reusable across sessions). */
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
     stamp: async (name: string, ox: number, oy: number, oz: number): Promise<EditResult> => {
       const bp = await loadBlueprint(name);
-      return applyEdits(
+      return applyBatch(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
       );
     },
@@ -414,6 +506,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       load: (name: string): void => gotoWorld(name),
       delete: (name: string): Promise<void> => deleteWorld(name),
     },
+    bookmark: bookmarks,
 
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
@@ -486,12 +579,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     blocks: (): Array<{ id: BlockId; name: string }> =>
       CREATIVE_BLOCKS.map((id) => ({ id, name: registry.get(id).name })),
-    state: (): Record<string, unknown> => ({
-      pos: { ...player.position },
-      look: { yaw: rig.yaw, pitch: rig.pitch },
-      flying: player.flying,
-      selectedBlock: registry.get(inventory.selectedBlock).name,
-    }),
+    state: (): DevState =>
+      collectDevState({ player, rig, manager, inventory, registry, preset, worldName }),
     /** Lists the available methods (so a fresh session can discover the API). */
     help: (): string[] => Object.keys(api),
   };
