@@ -274,6 +274,29 @@ export class Game {
         worldToChunkCoord(Math.floor(player.position.z)),
       );
     });
+
+    // Dev-only frame capture: the live WebGL surface hangs CDP/Playwright screenshots, so expose
+    // a hook that renders one frame and returns a downscaled JPEG data URL (read in-tick, so no
+    // preserveDrawingBuffer needed). Tree-shaken out of production builds.
+    if (import.meta.env.DEV) {
+      const w = window as typeof window & {
+        __captureFrame?: (maxWidth?: number, quality?: number) => string;
+        __renderer?: Renderer;
+        __player?: PlayerController;
+      };
+      w.__captureFrame = (maxWidth = 640, quality = 0.6): string => {
+        renderer.renderOnce();
+        const src = renderer.domElement;
+        const scale = Math.min(1, maxWidth / src.width);
+        const off = document.createElement('canvas');
+        off.width = Math.max(1, Math.round(src.width * scale));
+        off.height = Math.max(1, Math.round(src.height * scale));
+        off.getContext('2d')?.drawImage(src, 0, 0, off.width, off.height);
+        return off.toDataURL('image/jpeg', quality);
+      };
+      w.__renderer = renderer; // exposes .camera/.scene for posing dev screenshots
+      w.__player = player;
+    }
   }
 }
 

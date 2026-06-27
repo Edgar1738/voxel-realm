@@ -22,6 +22,16 @@ export class Renderer {
     this.scene.add(object);
   }
 
+  /** Renders a single frame immediately. Used by the dev-only frame-capture hook. */
+  renderOnce(): void {
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /** The backing canvas (for dev capture; reading it is only valid in-tick after a render). */
+  get domElement(): HTMLCanvasElement {
+    return this.renderer.domElement;
+  }
+
   start(onFrame?: (dtSeconds: number) => void): void {
     let last = performance.now();
     const tick = (): void => {
