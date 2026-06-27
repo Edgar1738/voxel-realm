@@ -15,6 +15,7 @@ import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
+import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
 import { AIR } from '../blocks/blocks';
@@ -61,16 +62,15 @@ export class Game {
     // Load the durable save (or start fresh / discard an incompatible one).
     const store = new IndexedDbSaveStore();
     let savedDeltas: WorldDeltas = new Map();
-    const meta = await store.loadMeta();
-    if (!meta) {
-      await store.clearDeltas(); // no meta => any stored deltas are orphans
-      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
-    } else if (meta.seed !== SEED || meta.version !== SAVE_VERSION) {
-      console.warn('Voxel Realm: incompatible save — discarding stored edits.');
-      await store.clearDeltas();
-      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
-    } else {
+    const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION);
+    if (action.kind === 'load') {
       savedDeltas = await store.loadDeltas();
+    } else {
+      if (action.reason === 'incompatible') {
+        console.warn('Voxel Realm: incompatible save — discarding stored edits.');
+      }
+      await store.clearDeltas(); // mismatch or no meta => stored deltas are orphans
+      await store.saveMeta({ seed: SEED, version: SAVE_VERSION });
     }
 
     const sink = new ChunkMeshRegistry(renderer.scene, material, transparentMaterial);
