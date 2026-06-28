@@ -151,6 +151,12 @@ const lantern =
     return onFrame ? shade(frame, (rng() - 0.5) * 8) : shade(glow, (rng() - 0.5) * 18);
   };
 
+/** Stone speckled with clustered ore flecks of `spot`. */
+const ore =
+  (spot: RGB): Pixel =>
+  (_px, _py, rng) =>
+    rng() < 0.18 ? shade(spot, (rng() - 0.5) * 26) : shade([128, 128, 132], (rng() - 0.5) * 18);
+
 /** Builds the procedural block-face texture array (one layer per TextureLayer). */
 export function createTextureArray(): DataArrayTexture {
   const data = new Uint8Array(TILE * TILE * 4 * TEXTURE_LAYER_COUNT);
@@ -170,6 +176,10 @@ export function createTextureArray(): DataArrayTexture {
   paint(data, TextureLayer.Cobblestone, cobble([118, 118, 122], [70, 70, 74]));
   paint(data, TextureLayer.Brick, brick([150, 70, 58], [198, 182, 162]));
   paint(data, TextureLayer.Lantern, lantern([60, 52, 40], [255, 226, 140]));
+  paint(data, TextureLayer.CoalOre, ore([40, 40, 44]));
+  paint(data, TextureLayer.IronOre, ore([196, 150, 110]));
+  paint(data, TextureLayer.GoldOre, ore([235, 205, 70]));
+  paint(data, TextureLayer.Crystal, ore([120, 220, 235]));
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
