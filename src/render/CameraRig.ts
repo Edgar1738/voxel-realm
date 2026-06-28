@@ -17,35 +17,59 @@ export class CameraRig {
   private readonly pressed = new Set<string>();
   private toggleFlyQueued = false;
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
+  private readonly inputController = new AbortController();
 
   constructor(
     private readonly camera: PerspectiveCamera,
     canvas: HTMLCanvasElement,
     private readonly overlay?: HTMLElement,
   ) {
+    const signal = this.inputController.signal;
+
     // Listen on document, not the canvas: the fullscreen overlay sits on top of the
     // canvas and would otherwise swallow the click before it reaches requestPointerLock.
-    document.addEventListener('click', () => {
-      if (!this.locked) void canvas.requestPointerLock();
-    });
+    document.addEventListener(
+      'click',
+      () => {
+        if (!this.locked) void canvas.requestPointerLock();
+      },
+      { signal },
+    );
 
-    document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === canvas;
-      if (this.overlay) this.overlay.style.display = this.locked ? 'none' : 'flex';
-    });
+    document.addEventListener(
+      'pointerlockchange',
+      () => {
+        this.locked = document.pointerLockElement === canvas;
+        if (this.overlay) this.overlay.style.display = this.locked ? 'none' : 'flex';
+      },
+      { signal },
+    );
 
-    document.addEventListener('mousemove', (e) => {
-      if (!this.locked) return;
-      this.yaw -= e.movementX * SENSITIVITY;
-      this.pitch -= e.movementY * SENSITIVITY;
-      this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
-    });
+    document.addEventListener(
+      'mousemove',
+      (e) => {
+        if (!this.locked) return;
+        this.yaw -= e.movementX * SENSITIVITY;
+        this.pitch -= e.movementY * SENSITIVITY;
+        this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
+      },
+      { signal },
+    );
 
-    window.addEventListener('keydown', (e) => {
-      this.pressed.add(e.code);
-      if (e.code === 'KeyF') this.toggleFlyQueued = true;
-    });
-    window.addEventListener('keyup', (e) => this.pressed.delete(e.code));
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        this.pressed.add(e.code);
+        if (e.code === 'KeyF') this.toggleFlyQueued = true;
+      },
+      { signal },
+    );
+    window.addEventListener('keyup', (e) => this.pressed.delete(e.code), { signal });
+  }
+
+  /** Removes all event listeners registered by this rig. */
+  dispose(): void {
+    this.inputController.abort();
   }
 
   /** Snapshot of input intents; consumes the one-frame fly-toggle edge. */

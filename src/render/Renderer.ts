@@ -5,6 +5,8 @@ export class Renderer {
   readonly scene = new Scene();
   readonly camera: PerspectiveCamera;
   private readonly renderer: WebGLRenderer;
+  private rafId: number | undefined;
+  private readonly resizeController = new AbortController();
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene.background = new Color(0x87b9e8);
@@ -15,7 +17,9 @@ export class Renderer {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-    window.addEventListener('resize', () => this.onResize());
+    window.addEventListener('resize', () => this.onResize(), {
+      signal: this.resizeController.signal,
+    });
   }
 
   add(object: Object3D): void {
@@ -40,9 +44,24 @@ export class Renderer {
       last = now;
       if (onFrame) onFrame(dt);
       this.renderer.render(this.scene, this.camera);
-      requestAnimationFrame(tick);
+      this.rafId = requestAnimationFrame(tick);
     };
-    requestAnimationFrame(tick);
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  /** Cancels the running animation frame loop. Safe to call if loop was never started. */
+  stop(): void {
+    if (this.rafId !== undefined) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = undefined;
+    }
+  }
+
+  /** Stops the loop, removes the resize listener, and releases the WebGL context. */
+  dispose(): void {
+    this.stop();
+    this.resizeController.abort();
+    this.renderer.dispose();
   }
 
   private onResize(): void {
