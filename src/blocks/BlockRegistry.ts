@@ -24,6 +24,11 @@ export class BlockRegistry {
     return this.get(id).opaque;
   }
 
+  /** A block's self-emitted light level (0..15); 0 for non-emitters. */
+  emission(id: BlockId): number {
+    return this.get(id).light ?? 0;
+  }
+
   /** Texture layer index for a given block face. */
   faceLayer(id: BlockId, face: Face): number {
     return this.get(id).faces[face];

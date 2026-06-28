@@ -13,6 +13,7 @@ import {
   PLANKS,
   COBBLESTONE,
   BRICK,
+  LANTERN,
 } from '../src/blocks/blocks';
 
 describe('CreativeInventory', () => {
@@ -50,6 +51,7 @@ describe('CreativeInventory', () => {
         PLANKS,
         COBBLESTONE,
         BRICK,
+        LANTERN,
       ]);
     });
   });

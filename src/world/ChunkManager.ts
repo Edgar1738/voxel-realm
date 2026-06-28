@@ -18,6 +18,7 @@ import { ChunkStore, ChunkState } from './ChunkStore';
 import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
+import { computeChunkLight } from './Lighting';
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { WATER, AIR } from '../blocks/blocks';
 import type { Generator, Overlay } from '../worldgen/Generator';
@@ -203,7 +204,11 @@ export class ChunkManager {
 
     for (const key of remeshKeys) {
       const { cx, cz } = parseChunkKey(key);
-      if (this.store.get(cx, cz)) this.meshChunk(cx, cz);
+      const entry = this.store.get(cx, cz);
+      if (entry) {
+        this.recomputeLight(entry.data);
+        this.meshChunk(cx, cz);
+      }
     }
     for (const key of editedChunks) {
       this.onChunkDeltaChanged?.(key, this.getChunkDelta(key));
@@ -326,8 +331,19 @@ export class ChunkManager {
     const key = chunkKey(cx, cz);
     this.baseChunks.set(key, cloneChunk(data));
     this.applySavedDeltas(data, key);
+    this.recomputeLight(data);
     this.store.set(cx, cz, data, ChunkState.Generated);
     return true;
+  }
+
+  /** Recomputes a chunk's baked sky + block light from its voxels (run before meshing). */
+  private recomputeLight(data: ChunkData): void {
+    const field = computeChunkLight({
+      isOpaque: (x, y, z) => this.registry.isOpaque(data.get(x, y, z)),
+      emission: (x, y, z) => this.registry.emission(data.get(x, y, z)),
+    });
+    data.skyLight.set(field.sky);
+    data.blockLight.set(field.block);
   }
 
   private meshChunk(cx: number, cz: number): void {

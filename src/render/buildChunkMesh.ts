@@ -9,6 +9,7 @@ export function buildChunkMesh(mesh: MeshData, material: Material): Mesh {
   geometry.setAttribute('uv', new BufferAttribute(mesh.uvs, 2));
   geometry.setAttribute('layer', new BufferAttribute(mesh.layers, 1));
   geometry.setAttribute('ao', new BufferAttribute(mesh.ao, 1));
+  geometry.setAttribute('light', new BufferAttribute(mesh.light, 1));
   geometry.setIndex(new BufferAttribute(mesh.indices, 1));
   return new Mesh(geometry, material);
 }

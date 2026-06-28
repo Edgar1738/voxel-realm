@@ -30,4 +30,31 @@ export class VoxelView {
     const nb = this.neighbor(dcx, dcz);
     return nb ? nb.get(lx, y, lz) : AIR;
   }
+
+  /** Baked skylight at a (possibly neighbor/out-of-range) voxel. Open sky above world / at
+   * unloaded borders reads 15 so surfaces never darken at a seam; below the world reads 0. */
+  skyLight(x: number, y: number, z: number): number {
+    if (y >= WORLD_HEIGHT) return 15;
+    if (y < 0) return 0;
+    const dcx = Math.floor(x / CHUNK_SIZE_X);
+    const dcz = Math.floor(z / CHUNK_SIZE_Z);
+    const lx = x - dcx * CHUNK_SIZE_X;
+    const lz = z - dcz * CHUNK_SIZE_Z;
+    if (dcx === 0 && dcz === 0) return this.center.getSkyLight(lx, y, lz);
+    const nb = this.neighbor(dcx, dcz);
+    return nb ? nb.getSkyLight(lx, y, lz) : 15;
+  }
+
+  /** Baked block light at a (possibly neighbor/out-of-range) voxel; 0 outside the world or at
+   * unloaded borders. */
+  blockLight(x: number, y: number, z: number): number {
+    if (y < 0 || y >= WORLD_HEIGHT) return 0;
+    const dcx = Math.floor(x / CHUNK_SIZE_X);
+    const dcz = Math.floor(z / CHUNK_SIZE_Z);
+    const lx = x - dcx * CHUNK_SIZE_X;
+    const lz = z - dcz * CHUNK_SIZE_Z;
+    if (dcx === 0 && dcz === 0) return this.center.getBlockLight(lx, y, lz);
+    const nb = this.neighbor(dcx, dcz);
+    return nb ? nb.getBlockLight(lx, y, lz) : 0;
+  }
 }

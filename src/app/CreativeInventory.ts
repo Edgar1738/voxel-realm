@@ -11,6 +11,7 @@ import {
   PLANKS,
   COBBLESTONE,
   BRICK,
+  LANTERN,
 } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 
@@ -28,6 +29,7 @@ export const CREATIVE_BLOCKS: BlockId[] = [
   PLANKS,
   COBBLESTONE,
   BRICK,
+  LANTERN,
 ];
 
 /** A creative hotbar: a fixed list of slots, one selected, each holding a block id. */
