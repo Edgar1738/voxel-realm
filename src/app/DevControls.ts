@@ -24,7 +24,7 @@ import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './De
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
-import { worldToChunkCoord } from '../core/coords';
+import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
@@ -166,14 +166,25 @@ export function installDevControls(ctx: DevControlsContext): void {
       throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
     let outOfWorld = 0;
     let unloaded = 0;
+    const unloadedChunkSet = new Set<string>();
     for (const v of voxels) {
       if (v.y < 0 || v.y >= WORLD_HEIGHT) outOfWorld++;
-      else if (!manager.isLoaded(v.x, v.z)) unloaded++;
+      else if (!manager.isLoaded(v.x, v.z)) {
+        unloaded++;
+        unloadedChunkSet.add(chunkKey(worldToChunkCoord(v.x), worldToChunkCoord(v.z)));
+      }
     }
     const batch = edit.apply(voxels);
     const applied = batch ? batch.changes.length : 0;
     const noChange = Math.max(0, voxels.length - applied - outOfWorld - unloaded);
-    return { requested: voxels.length, applied, outOfWorld, unloaded, noChange };
+    return {
+      requested: voxels.length,
+      applied,
+      outOfWorld,
+      unloaded,
+      noChange,
+      unloadedChunks: [...unloadedChunkSet],
+    };
   };
   const applyAny = (
     voxels: SetVoxel[],

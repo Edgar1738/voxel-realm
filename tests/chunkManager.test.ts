@@ -287,6 +287,29 @@ describe('ChunkManager.preload / isLoaded', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ChunkManager.preloadBox
+// ---------------------------------------------------------------------------
+
+describe('ChunkManager.preloadBox', () => {
+  it('preloadBox loads every chunk overlapping the box', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    const res = mgr.preloadBox(0, 0, 40, 40); // spans ~3 chunks per axis at CHUNK_SIZE 16
+    expect(res.generated + res.meshed).toBeGreaterThan(0);
+    // all four corners are now loaded
+    expect(mgr.isLoaded(0, 0)).toBe(true);
+    expect(mgr.isLoaded(40, 40)).toBe(true);
+    expect(mgr.isLoaded(0, 40)).toBe(true);
+    expect(mgr.isLoaded(40, 0)).toBe(true);
+  });
+
+  it('throws when the region exceeds 256 chunks', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    // 17×17 = 289 chunks > 256
+    expect(() => mgr.preloadBox(0, 0, 16 * 16, 16 * 16)).toThrow('preloadBox region too large');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Cross-chunk block light propagation
 // ---------------------------------------------------------------------------
 

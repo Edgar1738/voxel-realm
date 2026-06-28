@@ -20,6 +20,7 @@ describe('applyVoxelsInBatches', () => {
         unloaded: batch.length === 1 ? 1 : 0,
         outOfWorld: 0,
         noChange: batch.length > 1 ? 1 : 0,
+        unloadedChunks: [],
       };
     };
 
@@ -32,12 +33,50 @@ describe('applyVoxelsInBatches', () => {
       unloaded: 1,
       outOfWorld: 0,
       noChange: 2,
+      unloadedChunks: [],
       batches: [
-        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1 },
-        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1 },
-        { requested: 1, applied: 0, unloaded: 1, outOfWorld: 0, noChange: 0 },
+        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1, unloadedChunks: [] },
+        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1, unloadedChunks: [] },
+        { requested: 1, applied: 0, unloaded: 1, outOfWorld: 0, noChange: 0, unloadedChunks: [] },
       ],
     });
+  });
+
+  it('dedupes unloadedChunks across batches', () => {
+    const voxels: SetVoxel[] = [
+      { x: 0, y: 70, z: 0, id: STONE },
+      { x: 1, y: 70, z: 0, id: STONE },
+    ];
+    const applyBatch = (batch: SetVoxel[]): EditResult => {
+      if (batch.length === 1 && batch[0].x === 0) {
+        // First batch: chunks '0,1' and '2,3'
+        return {
+          requested: 1,
+          applied: 1,
+          unloaded: 0,
+          outOfWorld: 0,
+          noChange: 0,
+          unloadedChunks: ['0,1', '2,3'],
+        };
+      } else {
+        // Second batch: only chunk '0,1'
+        return {
+          requested: 1,
+          applied: 1,
+          unloaded: 0,
+          outOfWorld: 0,
+          noChange: 0,
+          unloadedChunks: ['0,1'],
+        };
+      }
+    };
+
+    const result = applyVoxelsInBatches(voxels, applyBatch, 1);
+
+    // Combined result should have deduped unloadedChunks: exactly 2 unique keys
+    expect(result.unloadedChunks).toHaveLength(2);
+    expect(result.unloadedChunks).toContain('0,1');
+    expect(result.unloadedChunks).toContain('2,3');
   });
 });
 

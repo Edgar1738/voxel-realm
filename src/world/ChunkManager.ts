@@ -358,6 +358,33 @@ export class ChunkManager {
     return { generated, meshed };
   }
 
+  /** Preload every chunk overlapping the world-space XZ box [minX..maxX] x [minZ..maxZ]. */
+  preloadBox(
+    minX: number,
+    minZ: number,
+    maxX: number,
+    maxZ: number,
+  ): { generated: number; meshed: number } {
+    const cx0 = worldToChunkCoord(Math.min(minX, maxX));
+    const cx1 = worldToChunkCoord(Math.max(minX, maxX));
+    const cz0 = worldToChunkCoord(Math.min(minZ, maxZ));
+    const cz1 = worldToChunkCoord(Math.max(minZ, maxZ));
+    const MAX_CHUNKS = 256; // guard against a pathological AABB
+    if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) > MAX_CHUNKS) {
+      throw new Error('preloadBox region too large (>256 chunks)');
+    }
+    let generated = 0;
+    let meshed = 0;
+    for (let cz = cz0; cz <= cz1; cz++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const r = this.preload(cx, cz, 0); // radius 0 = just this chunk
+        generated += r.generated;
+        meshed += r.meshed;
+      }
+    }
+    return { generated, meshed };
+  }
+
   /** Whether every voxel lies in a loaded, in-range chunk, so an edit/undo can actually apply. */
   canApply(voxels: readonly WorldVoxel[]): boolean {
     return voxels.every(
