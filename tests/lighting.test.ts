@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../src/core/constants';
 import { voxelIndex } from '../src/core/coords';
-import { computeChunkLight, type LightInput } from '../src/world/Lighting';
+import {
+  computeChunkLight,
+  applyBorderBlockLight,
+  borderLightExport,
+  type LightInput,
+  type NeighborBlockLight,
+} from '../src/world/Lighting';
 
 /** Build a LightInput from a set of opaque "x,y,z" keys and a map of emission levels. */
 function makeInput(opaque: Set<string>, emission: Map<string, number> = new Map()): LightInput {
@@ -151,5 +157,159 @@ describe('computeChunkLight', () => {
     expect(field.block[voxelIndex(8, ey, 8)]).toBe(14);
     // Adjacent air gets level - 1.
     expect(field.block[voxelIndex(9, ey, 8)]).toBe(13);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyBorderBlockLight — cross-chunk border-seed pass
+// ---------------------------------------------------------------------------
+
+/** Build a zero block-light array seeded from an all-air chunk, then return it. */
+function emptyBlockLight(): Uint8Array {
+  return new Uint8Array(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
+}
+
+/** All-air (non-opaque), zero emission — used as the local LightInput for neighbor tests. */
+const airInput: LightInput = {
+  isOpaque: () => false,
+  emission: () => 0,
+};
+
+describe('applyBorderBlockLight', () => {
+  it('seeds light arriving from the west neighbor and propagates inward', () => {
+    // The west neighbor has block light 10 at its east face (x=CHUNK_SIZE_X-1) column y=64, z=0.
+    // applyBorderBlockLight should seed our x=0, y=64, z=0 with value 9 and propagate.
+    const block = emptyBlockLight();
+    const y = 64;
+    const getNeighborLight: NeighborBlockLight = (dcx, _dcz, _lx, ly, _lz) => {
+      if (dcx === -1 && ly === y) return 10;
+      return 0;
+    };
+    applyBorderBlockLight(block, airInput, getNeighborLight);
+
+    // Border cell (x=0) should get 9, one step in gets 8, etc.
+    expect(block[voxelIndex(0, y, 0)]).toBe(9);
+    expect(block[voxelIndex(1, y, 0)]).toBe(8);
+    expect(block[voxelIndex(2, y, 0)]).toBe(7);
+  });
+
+  it('seeds light arriving from the east neighbor', () => {
+    const block = emptyBlockLight();
+    const y = 64;
+    const getNeighborLight: NeighborBlockLight = (dcx, _dcz, _lx, ly, _lz) => {
+      if (dcx === 1 && ly === y) return 8;
+      return 0;
+    };
+    applyBorderBlockLight(block, airInput, getNeighborLight);
+
+    const eastFace = CHUNK_SIZE_X - 1;
+    expect(block[voxelIndex(eastFace, y, 0)]).toBe(7);
+    expect(block[voxelIndex(eastFace - 1, y, 0)]).toBe(6);
+  });
+
+  it('seeds light arriving from the south neighbor (dcz=+1)', () => {
+    const block = emptyBlockLight();
+    const y = 64;
+    const getNeighborLight: NeighborBlockLight = (_dcx, dcz, _lx, ly, _lz) => {
+      if (dcz === 1 && ly === y) return 6;
+      return 0;
+    };
+    applyBorderBlockLight(block, airInput, getNeighborLight);
+
+    const southFace = CHUNK_SIZE_Z - 1;
+    expect(block[voxelIndex(0, y, southFace)]).toBe(5);
+    expect(block[voxelIndex(0, y, southFace - 1)]).toBe(4);
+  });
+
+  it('does not overwrite a locally-higher value with a lower border seed', () => {
+    const block = emptyBlockLight();
+    const y = 64;
+    // Pre-set a local value of 12 at the border cell.
+    block[voxelIndex(0, y, 0)] = 12;
+    const getNeighborLight: NeighborBlockLight = (dcx, _dcz, _lx, ly, _lz) => {
+      if (dcx === -1 && ly === y) return 8; // would arrive as 7 — less than 12
+      return 0;
+    };
+    applyBorderBlockLight(block, airInput, getNeighborLight);
+
+    // Local value should be unchanged.
+    expect(block[voxelIndex(0, y, 0)]).toBe(12);
+  });
+
+  it('respects opaque voxels — border seed does not penetrate an opaque wall', () => {
+    const block = emptyBlockLight();
+    const y = 64;
+    // An opaque column at x=0 (the border itself).
+    const opaqueInput: LightInput = {
+      isOpaque: (x, _y, _z) => x === 0,
+      emission: () => 0,
+    };
+    const getNeighborLight: NeighborBlockLight = (dcx, _dcz, _lx, ly, _lz) => {
+      if (dcx === -1 && ly === y) return 14;
+      return 0;
+    };
+    applyBorderBlockLight(block, opaqueInput, getNeighborLight);
+
+    // The opaque border cell stays 0; the cell behind it (x=1) also stays 0.
+    expect(block[voxelIndex(0, y, 0)]).toBe(0);
+    expect(block[voxelIndex(1, y, 0)]).toBe(0);
+  });
+
+  it('returns true when at least one cell was raised, false when nothing changed', () => {
+    const block = emptyBlockLight();
+    const y = 64;
+    const noLight: NeighborBlockLight = () => 0;
+    expect(applyBorderBlockLight(block, airInput, noLight)).toBe(false);
+
+    const withLight: NeighborBlockLight = (dcx, _dcz, _lx, ly, _lz) =>
+      dcx === -1 && ly === y ? 10 : 0;
+    expect(applyBorderBlockLight(block, airInput, withLight)).toBe(true);
+  });
+
+  it('returns false when neighbor light is ≤1 (would arrive as 0 — nothing to seed)', () => {
+    const block = emptyBlockLight();
+    // Neighbor light of 1 would arrive as 0 — should not seed anything.
+    const getNeighborLight: NeighborBlockLight = (dcx) => (dcx === -1 ? 1 : 0);
+    expect(applyBorderBlockLight(block, airInput, getNeighborLight)).toBe(false);
+    // No cell should have been raised.
+    for (let i = 0; i < block.length; i++) {
+      expect(block[i]).toBe(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// borderLightExport
+// ---------------------------------------------------------------------------
+
+describe('borderLightExport', () => {
+  it('returns all zeros for a zero block-light array', () => {
+    const block = new Uint8Array(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
+    expect(borderLightExport(block)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('detects a lit west face (x=0)', () => {
+    const block = new Uint8Array(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
+    // Use z=8 (interior, not on north or south border) to isolate the west-face reading.
+    block[voxelIndex(0, 64, 8)] = 12;
+    const exp = borderLightExport(block);
+    expect(exp[0]).toBe(12); // west
+    expect(exp[1]).toBe(0); // east
+    expect(exp[2]).toBe(0); // north (z=0 column is 0; the lit cell is at z=8)
+    expect(exp[3]).toBe(0); // south
+  });
+
+  it('detects a lit east face (x=CHUNK_SIZE_X-1)', () => {
+    const block = new Uint8Array(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
+    block[voxelIndex(CHUNK_SIZE_X - 1, 64, 0)] = 7;
+    const exp = borderLightExport(block);
+    expect(exp[1]).toBe(7); // east
+  });
+
+  it('detects a lit south face (z=CHUNK_SIZE_Z-1)', () => {
+    const block = new Uint8Array(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
+    block[voxelIndex(0, 64, CHUNK_SIZE_Z - 1)] = 5;
+    const exp = borderLightExport(block);
+    expect(exp[3]).toBe(5); // south
   });
 });

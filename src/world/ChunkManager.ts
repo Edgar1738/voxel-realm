@@ -18,7 +18,7 @@ import { ChunkStore, ChunkState } from './ChunkStore';
 import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
-import { computeChunkLight } from './Lighting';
+import { computeChunkLight, applyBorderBlockLight, borderLightExport } from './Lighting';
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { WATER, AIR } from '../blocks/blocks';
 import type { Generator, Overlay } from '../worldgen/Generator';
@@ -65,6 +65,13 @@ export class ChunkManager {
   private readonly store = new ChunkStore();
   private readonly baseChunks = new Map<string, ChunkData>();
   private readonly deltas: WorldDeltas;
+  /**
+   * Tracks the last-computed border block-light export for each chunk key.
+   * Shape: [west_max, east_max, north_max, south_max] — the maximum block-light
+   * values on the four border face columns. Used to detect when a chunk's outgoing
+   * light changes so adjacent chunks can be re-lit (without infinite ping-pong).
+   */
+  private readonly borderExports = new Map<string, readonly [number, number, number, number]>();
   private readonly opts: ChunkManagerOptions;
   private readonly opaquePass: MeshPass;
   private readonly transparentPass: MeshPass;
@@ -104,6 +111,7 @@ export class ChunkManager {
         this.sink.dispose(key);
         this.store.delete(cx, cz);
         this.baseChunks.delete(key);
+        this.borderExports.delete(key);
       }
     }
 
@@ -130,10 +138,14 @@ export class ChunkManager {
       if (!entry || entry.state !== ChunkState.Generated) continue;
       this.meshChunk(cx, cz);
       meshed++;
-      // Re-mesh meshed neighbors so the shared border resolves.
+      // Re-light and re-mesh already-meshed neighbors so cross-chunk block light
+      // and geometry seams both resolve when this chunk first appears.
       for (const [dx, dz] of EDGE_NEIGHBORS) {
         const nb = this.store.get(cx + dx, cz + dz);
-        if (nb && nb.state === ChunkState.Meshed) this.meshChunk(cx + dx, cz + dz);
+        if (nb && nb.state === ChunkState.Meshed) {
+          this.recomputeLight(nb.data);
+          this.meshChunk(cx + dx, cz + dz);
+        }
       }
     }
   }
@@ -165,6 +177,17 @@ export class ChunkManager {
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
     if (!entry) return AIR;
     return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz));
+  }
+
+  /**
+   * Reads the baked block-light level at a world coordinate; 0 for unloaded chunks or
+   * out-of-world positions. Used primarily by tests to verify cross-chunk propagation.
+   */
+  getBlockLight(wx: number, wy: number, wz: number): number {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return 0;
+    return entry.data.getBlockLight(worldToLocal(wx), wy, worldToLocal(wz));
   }
 
   /**
@@ -202,14 +225,88 @@ export class ChunkManager {
       if (lz === CHUNK_SIZE_Z - 1) remeshKeys.add(chunkKey(cx, cz + 1));
     }
 
-    for (const key of remeshKeys) {
+    // Re-light in two passes to avoid circular stale-read artefacts when multiple
+    // chunks in the same batch exchange border light:
+    //
+    // Pass 1 — base light only: recompute each chunk's local emitter + sky light
+    //           WITHOUT reading any neighbor's blockLight (border seed reads 0 for
+    //           all chunks in the current batch). This gives every chunk a correct
+    //           locally-sourced light value before anyone reads their neighbor.
+    //
+    // Pass 2 — border seed: now that every chunk in the batch has correct local
+    //           light, run the full border-seed pass (which reads neighbor blockLight).
+    //           Chunks outside the batch already have stable values from previous frames.
+    //
+    // After both passes, re-mesh all affected chunks and propagate export changes
+    // to their outer-ring neighbors (which were NOT in the batch).
+
+    // Build set of chunk coords in the batch for the stale-read guard.
+    const batchKeys = remeshKeys;
+
+    // Pass 1: local light only — border seed skips neighbors in the batch.
+    for (const key of batchKeys) {
       const { cx, cz } = parseChunkKey(key);
       const entry = this.store.get(cx, cz);
-      if (entry) {
-        this.recomputeLight(entry.data);
-        this.meshChunk(cx, cz);
+      if (!entry) continue;
+      const input = {
+        isOpaque: (x: number, y: number, z: number) =>
+          this.registry.isOpaque(entry.data.get(x, y, z)),
+        emission: (x: number, y: number, z: number) =>
+          this.registry.emission(entry.data.get(x, y, z)),
+      };
+      const field = computeChunkLight(input);
+      entry.data.skyLight.set(field.sky);
+      entry.data.blockLight.set(field.block);
+    }
+
+    // Pass 2: border seed — safe to read all neighbors since local light is stable.
+    const borderChangedKeys = new Set<string>();
+    for (const key of batchKeys) {
+      const { cx, cz } = parseChunkKey(key);
+      const entry = this.store.get(cx, cz);
+      if (!entry) continue;
+      const input = {
+        isOpaque: (x: number, y: number, z: number) =>
+          this.registry.isOpaque(entry.data.get(x, y, z)),
+        emission: (x: number, y: number, z: number) =>
+          this.registry.emission(entry.data.get(x, y, z)),
+      };
+      // Re-apply border seed from neighbors (now all locally stable).
+      applyBorderBlockLight(entry.data.blockLight, input, (dcx, dcz, lx, y, lz) => {
+        const nb = this.store.get(cx + dcx, cz + dcz)?.data;
+        return nb ? nb.getBlockLight(lx, y, lz) : 0;
+      });
+      // Update the border export and check for changes.
+      const newExport = borderLightExport(entry.data.blockLight);
+      const old = this.borderExports.get(key);
+      const exportChanged =
+        old === undefined ||
+        old[0] !== newExport[0] ||
+        old[1] !== newExport[1] ||
+        old[2] !== newExport[2] ||
+        old[3] !== newExport[3];
+      this.borderExports.set(key, newExport);
+      this.meshChunk(cx, cz);
+      if (exportChanged) borderChangedKeys.add(key);
+    }
+
+    // Propagate export changes to outer-ring neighbors (not in the batch).
+    for (const key of borderChangedKeys) {
+      const { cx, cz } = parseChunkKey(key);
+      for (const [dx, dz] of EDGE_NEIGHBORS) {
+        const nbKey = chunkKey(cx + dx, cz + dz);
+        if (batchKeys.has(nbKey)) continue; // already handled in batch
+        const nb = this.store.get(cx + dx, cz + dz);
+        if (nb) {
+          const nbExportChanged = this.recomputeLight(nb.data);
+          this.meshChunk(cx + dx, cz + dz);
+          if (nbExportChanged) {
+            this.relightNeighbors(cx + dx, cz + dz);
+          }
+        }
       }
     }
+
     for (const key of editedChunks) {
       this.onChunkDeltaChanged?.(key, this.getChunkDelta(key));
     }
@@ -336,14 +433,64 @@ export class ChunkManager {
     return true;
   }
 
-  /** Recomputes a chunk's baked sky + block light from its voxels (run before meshing). */
-  private recomputeLight(data: ChunkData): void {
-    const field = computeChunkLight({
-      isOpaque: (x, y, z) => this.registry.isOpaque(data.get(x, y, z)),
-      emission: (x, y, z) => this.registry.emission(data.get(x, y, z)),
-    });
+  /**
+   * Recomputes a chunk's baked sky + block light from its voxels (run before meshing).
+   * Also applies the border-seed pass to propagate block light arriving from already-lit
+   * horizontal neighbors, then updates the stored border export for change detection.
+   * Returns true if the chunk's border export changed (so the caller can re-light
+   * adjacent chunks that may receive more or less light from this chunk).
+   */
+  private recomputeLight(data: ChunkData): boolean {
+    const input = {
+      isOpaque: (x: number, y: number, z: number) => this.registry.isOpaque(data.get(x, y, z)),
+      emission: (x: number, y: number, z: number) => this.registry.emission(data.get(x, y, z)),
+    };
+    const field = computeChunkLight(input);
     data.skyLight.set(field.sky);
     data.blockLight.set(field.block);
+
+    // Border-seed pass: pull light arriving from each already-computed neighbor.
+    applyBorderBlockLight(data.blockLight, input, (dcx, dcz, lx, y, lz) => {
+      const nb = this.store.get(data.cx + dcx, data.cz + dcz)?.data;
+      return nb ? nb.getBlockLight(lx, y, lz) : 0;
+    });
+
+    // Check whether the outgoing border export changed.
+    const key = `${data.cx},${data.cz}`;
+    const newExport = borderLightExport(data.blockLight);
+    const old = this.borderExports.get(key);
+    const exportChanged =
+      old === undefined ||
+      old[0] !== newExport[0] ||
+      old[1] !== newExport[1] ||
+      old[2] !== newExport[2] ||
+      old[3] !== newExport[3];
+    this.borderExports.set(key, newExport);
+    return exportChanged;
+  }
+
+  /**
+   * Neighbor re-lighting: for each of the 4 horizontal neighbors of (cx,cz), if the
+   * neighbor is already lit (Generated or Meshed), re-light it and re-mesh it so it
+   * can pick up the updated border contribution from (cx,cz). Guards against infinite
+   * ping-pong by only triggering when the neighbor's own border export actually changes
+   * (recomputeLight returns true).
+   *
+   * Only called when THIS chunk's export changed, and only propagates ONE level out
+   * (the re-lit neighbor's own export change is handled in its own recomputeLight call,
+   * which will trigger its own round for its neighbors if needed — but since block light
+   * attenuates by 1 per step, the cascade naturally terminates within 15 chunks).
+   */
+  private relightNeighbors(cx: number, cz: number): void {
+    for (const [dx, dz] of EDGE_NEIGHBORS) {
+      const nb = this.store.get(cx + dx, cz + dz);
+      if (!nb) continue;
+      // Re-light and only re-mesh if the neighbor's border export actually changed.
+      const exportChanged = this.recomputeLight(nb.data);
+      if (exportChanged) {
+        this.meshChunk(cx + dx, cz + dz);
+      }
+    }
   }
 
   private meshChunk(cx: number, cz: number): void {
