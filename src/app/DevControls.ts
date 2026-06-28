@@ -186,15 +186,42 @@ export function installDevControls(ctx: DevControlsContext): void {
       unloadedChunks: [...unloadedChunkSet],
     };
   };
+  const voxelBounds = (voxels: SetVoxel[]) => {
+    let minX = Infinity,
+      minZ = Infinity,
+      maxX = -Infinity,
+      maxZ = -Infinity;
+    for (const v of voxels) {
+      if (v.x < minX) minX = v.x;
+      if (v.z < minZ) minZ = v.z;
+      if (v.x > maxX) maxX = v.x;
+      if (v.z > maxZ) maxZ = v.z;
+    }
+    return { minX, minZ, maxX, maxZ };
+  };
+
   const applyAny = (
     voxels: SetVoxel[],
-    opts: { label?: string; maxBatchSize?: number } = {},
+    opts: { label?: string; maxBatchSize?: number; preload?: boolean } = {},
   ): BatchedEditResult => {
+    if (voxels.length > 0 && opts.preload !== false) {
+      const b = voxelBounds(voxels);
+      try {
+        manager.preloadBox(b.minX, b.minZ, b.maxX, b.maxZ);
+      } catch {
+        /* region too large to auto-preload; fall through and report unloaded honestly */
+      }
+    }
     const maxBatchSize = Math.min(
       MAX_BUILD,
       Math.max(1, Math.floor(opts.maxBatchSize ?? MAX_BUILD)),
     );
-    const result = applyVoxelsInBatches(voxels, applyBatch, maxBatchSize);
+    const result = edit.group(() => applyVoxelsInBatches(voxels, applyBatch, maxBatchSize));
+    if (result.unloaded > 0) {
+      console.warn(
+        `Voxel Realm build: ${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
+      );
+    }
     if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
     return result;
   };
@@ -364,7 +391,7 @@ export function installDevControls(ctx: DevControlsContext): void {
         { label: opts.label ?? 'path' },
       );
     },
-    place: (x: number, y: number, z: number, id: BlockId): EditResult =>
+    place: (x: number, y: number, z: number, id: BlockId): BatchedEditResult =>
       applyAny([{ x, y, z, id }]),
     fill: (
       x1: number,
@@ -374,7 +401,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
       id: BlockId,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id })),
       ),
@@ -385,11 +412,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       x2: number,
       y2: number,
       z2: number,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
-    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): EditResult =>
+    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): BatchedEditResult =>
       applyAny(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
     tunnel: (
       x: number,
@@ -399,7 +426,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       length: number,
       radius: number,
       id: BlockId,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
     copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
