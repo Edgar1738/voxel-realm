@@ -80,8 +80,8 @@ export function parseWorldSnapshot(
 function parseMeta(value: unknown): WorldMeta | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const m = value as Record<string, unknown>;
-  if (typeof m.seed !== 'number' || typeof m.version !== 'number') return undefined;
-  const meta: WorldMeta = { seed: m.seed, version: m.version };
+  if (!Number.isInteger(m.seed) || !Number.isInteger(m.version)) return undefined;
+  const meta: WorldMeta = { seed: m.seed as number, version: m.version as number };
   if (typeof m.preset === 'string') meta.preset = m.preset;
   return meta;
 }

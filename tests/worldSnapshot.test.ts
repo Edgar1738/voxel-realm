@@ -63,3 +63,53 @@ describe('WorldSnapshot', () => {
     expect(dropped).toBe(0);
   });
 });
+
+describe('parseMeta – reject corrupt numeric meta', () => {
+  it('returns undefined meta when seed is NaN', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: NaN, version: 1 }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toBeUndefined();
+  });
+
+  it('returns undefined meta when version is Infinity', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 1, version: Infinity }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toBeUndefined();
+  });
+
+  it('returns undefined meta when seed is a float', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 1.5, version: 1 }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toBeUndefined();
+  });
+
+  it('returns undefined meta when version is a float', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 42, version: 1.9 }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toBeUndefined();
+  });
+
+  it('still parses valid integer meta correctly', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 1337, version: 1, preset: 'caverns' }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toEqual({ seed: 1337, version: 1, preset: 'caverns' });
+  });
+
+  it('returns undefined meta when version is -Infinity', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 0, version: -Infinity }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toBeUndefined();
+  });
+});
