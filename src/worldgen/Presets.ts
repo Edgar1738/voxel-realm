@@ -11,6 +11,7 @@ import { scatterStructures } from './Structures';
 import { cottage, well, ruinedTower, brokenWall, lampPost } from './prefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
+import type { WorldMeta } from '../persistence/SaveTypes';
 
 /** Selectable world environments, chosen via the `?world=` query param. */
 export type WorldPreset =
@@ -38,6 +39,22 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
   return value !== null && (WORLD_PRESETS as readonly string[]).includes(value);
+}
+
+/**
+ * Choose the world preset at boot. An explicit, valid `?world=` param wins; otherwise an existing
+ * save keeps its own stored preset — so a bare `?save=<name>` never mismatches the generator and
+ * wipes the world. A brand-new world (no meta, or meta without a stored preset) falls back to
+ * 'default'.
+ */
+export function resolveBootPreset(
+  requested: string | null,
+  meta: WorldMeta | undefined,
+): WorldPreset {
+  if (isWorldPreset(requested)) return requested;
+  const stored = meta?.preset ?? null;
+  if (isWorldPreset(stored)) return stored;
+  return 'default';
 }
 
 /** Builds a per-y column (index = y) of a uniform layered terrain up to `surface`. */
