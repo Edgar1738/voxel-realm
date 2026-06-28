@@ -4,6 +4,7 @@ import { HeightField } from './HeightField';
 import { SurfacePainter } from './SurfacePainter';
 import { CaveCarver } from './CaveCarver';
 import { WaterFiller } from './WaterFiller';
+import { OreScatterer } from './OreScatterer';
 import { CaveTorcher } from './CaveTorcher';
 import { BiomeMap } from './BiomeMap';
 import type { Generator } from './Generator';
@@ -39,7 +40,7 @@ export class LayeredGenerator implements Generator {
   }
 }
 
-/** The default world generator: heightmap, surface, caves, water, then cave torches. */
+/** The default world generator: heightmap, surface, caves, water, ore, then cave torches. */
 export function createWorldGenerator(): LayeredGenerator {
   return new LayeredGenerator(
     [
@@ -47,13 +48,14 @@ export function createWorldGenerator(): LayeredGenerator {
       new SurfacePainter(),
       new CaveCarver(),
       new WaterFiller(),
+      new OreScatterer(),
       new CaveTorcher(),
     ],
     SEA_LEVEL,
   );
 }
 
-/** A spelunking world: roomier caverns than default, lit with torches. */
+/** A spelunking world: roomier caverns than default, ore-rich and lit with torches. */
 export function createCavernsGenerator(): LayeredGenerator {
   return new LayeredGenerator(
     [
@@ -61,6 +63,7 @@ export function createCavernsGenerator(): LayeredGenerator {
       new SurfacePainter(),
       new CaveCarver({ threshold: 0.14, frequency: 1 / 30 }),
       new WaterFiller(),
+      new OreScatterer({ densityScale: 1.6 }),
       new CaveTorcher({ density: 0.05 }),
     ],
     SEA_LEVEL,

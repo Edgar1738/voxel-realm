@@ -16,6 +16,10 @@ export const PLANKS: BlockId = 11;
 export const COBBLESTONE: BlockId = 12;
 export const BRICK: BlockId = 13;
 export const LANTERN: BlockId = 14;
+export const COAL_ORE: BlockId = 15;
+export const IRON_ORE: BlockId = 16;
+export const GOLD_ORE: BlockId = 17;
+export const CRYSTAL: BlockId = 18;
 
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
@@ -45,9 +49,13 @@ export const TextureLayer = {
   Cobblestone: 13,
   Brick: 14,
   Lantern: 15,
+  CoalOre: 16,
+  IronOre: 17,
+  GoldOre: 18,
+  Crystal: 19,
 } as const;
 
-export const TEXTURE_LAYER_COUNT = 16;
+export const TEXTURE_LAYER_COUNT = 20;
 
 /** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
 export interface BlockDef {
@@ -165,5 +173,34 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     light: 14,
     faces: uniform(TextureLayer.Lantern),
+  },
+  {
+    id: COAL_ORE,
+    name: 'coal ore',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.CoalOre),
+  },
+  {
+    id: IRON_ORE,
+    name: 'iron ore',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.IronOre),
+  },
+  {
+    id: GOLD_ORE,
+    name: 'gold ore',
+    opaque: true,
+    transparent: false,
+    faces: uniform(TextureLayer.GoldOre),
+  },
+  {
+    id: CRYSTAL,
+    name: 'crystal',
+    opaque: true,
+    transparent: false,
+    light: 7,
+    faces: uniform(TextureLayer.Crystal),
   },
 ];
