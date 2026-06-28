@@ -8,7 +8,7 @@ import { createWorldGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
-import { cottage, well } from './prefabs';
+import { cottage, well, ruinedTower, brokenWall } from './prefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 
@@ -167,7 +167,18 @@ export function createGenerator(preset: WorldPreset): {
     case 'islands':
       return { generator: new HeightGenerator(islandsHeight, SEA_LEVEL), overlays: [] };
     case 'canyon':
-      return { generator: new HeightGenerator(canyonHeight, SEA_LEVEL), overlays: [] };
+      return {
+        generator: new HeightGenerator(canyonHeight, SEA_LEVEL),
+        overlays: [
+          scatterStructures([ruinedTower(), brokenWall(), brokenWall()], {
+            cellSize: 48,
+            density: 0.5,
+            clearFootprint: true,
+            minSurfaceY: SEA_LEVEL + 8, // ruins crown the plateaus, not the ravine floors
+            surfaceAt: canyonHeight,
+          }),
+        ],
+      };
     case 'villages':
       return {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),

@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { cottage, well } from '../src/worldgen/prefabs';
+import { cottage, well, ruinedTower, brokenWall } from '../src/worldgen/prefabs';
 
 describe('prefabs', () => {
   for (const [name, make] of [
     ['cottage', cottage],
     ['well', well],
+    ['ruinedTower', ruinedTower],
+    ['brokenWall', brokenWall],
   ] as const) {
     it(`${name}: every block sits within its declared dims`, () => {
       const s = make();
