@@ -7,6 +7,8 @@ import { scatterTrees } from './TreeScatterer';
 import { createWorldGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
+import { scatterStructures } from './Structures';
+import { cottage, well } from './prefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 
@@ -18,7 +20,8 @@ export type WorldPreset =
   | 'arena'
   | 'amplified'
   | 'islands'
-  | 'canyon';
+  | 'canyon'
+  | 'villages';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -28,6 +31,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'amplified',
   'islands',
   'canyon',
+  'villages',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -126,6 +130,17 @@ const canyonHeight: (seed: WorldSeed, wx: number, wz: number) => number = (() =>
   };
 })();
 
+const PLAINS_FBM: FbmOptions = { octaves: 3, persistence: 0.5, lacunarity: 2, frequency: 1 / 96 };
+
+/** Gentle rolling plains just above sea level — a calm canvas for scattered villages. */
+const plainsHeight: (seed: WorldSeed, wx: number, wz: number) => number = (() => {
+  const noise = noiseCache(0x711a);
+  return (seed, wx, wz) => {
+    const s = fbm2D(noise(seed), wx, wz, PLAINS_FBM); // [-1, 1]
+    return SEA_LEVEL + 6 + s * 5;
+  };
+})();
+
 /** Resolves a preset to its generator + overlays. */
 export function createGenerator(preset: WorldPreset): {
   generator: Generator;
@@ -153,6 +168,18 @@ export function createGenerator(preset: WorldPreset): {
       return { generator: new HeightGenerator(islandsHeight, SEA_LEVEL), overlays: [] };
     case 'canyon':
       return { generator: new HeightGenerator(canyonHeight, SEA_LEVEL), overlays: [] };
+    case 'villages':
+      return {
+        generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
+        overlays: [
+          scatterTrees,
+          scatterStructures([cottage(), well()], {
+            cellSize: 40,
+            density: 0.5,
+            surfaceAt: plainsHeight,
+          }),
+        ],
+      };
     case 'default':
     default:
       return { generator: createWorldGenerator(), overlays: [scatterTrees] };
