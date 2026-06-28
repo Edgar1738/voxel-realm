@@ -3,7 +3,7 @@ import { mulberry32 } from '../core/math';
 import { AIR } from '../blocks/blocks';
 import type { ChunkData } from '../world/ChunkData';
 import type { Overlay } from './Generator';
-import type { WorldSeed } from '../core/types';
+import type { BlockId, WorldSeed } from '../core/types';
 import type { Prefab } from '../core/Prefab';
 
 /**
