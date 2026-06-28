@@ -19,9 +19,10 @@ export function raycastVoxels(
   maxDistance: number,
 ): VoxelRaycastHit | undefined {
   const len = Math.hypot(direction.x, direction.y, direction.z);
-  const dx = len === 0 ? 0 : direction.x / len;
-  const dy = len === 0 ? 0 : direction.y / len;
-  const dz = len === 0 ? -1 : direction.z / len;
+  if (len === 0) return undefined;
+  const dx = direction.x / len;
+  const dy = direction.y / len;
+  const dz = direction.z / len;
 
   let vx = Math.floor(origin.x);
   let vy = Math.floor(origin.y);

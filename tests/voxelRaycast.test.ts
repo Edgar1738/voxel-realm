@@ -50,4 +50,16 @@ describe('raycastVoxels', () => {
       z: hit!.block.z + hit!.normal.z,
     });
   });
+
+  it('returns undefined for a zero-length direction vector', () => {
+    // A zero-length direction is nonsensical — no ray should be fired, no hit returned.
+    const sampler = {
+      // Even with a STONE block at z === -1 (where the old bug would fire toward),
+      // a zero-length direction must still return undefined.
+      getBlock: (x: number, y: number, z: number): number =>
+        x === 0 && y === 0 && z === -1 ? STONE : AIR,
+    };
+    const hit = raycastVoxels(sampler, { x: 0.5, y: 0.5, z: 0.5 }, { x: 0, y: 0, z: 0 }, 10);
+    expect(hit).toBeUndefined();
+  });
 });

@@ -46,9 +46,36 @@ function sweepAxis(
 }
 
 /**
+ * Attempts a step-up for a blocked horizontal move: shifts the player up by 1 voxel and
+ * retries the horizontal axis. Returns the new {x, y, z} if the stepped position is clear,
+ * or `null` if it is still blocked (wall taller than 1, ceiling in the way, etc.).
+ */
+function tryStepUp(
+  sampler: SoliditySampler,
+  pos: Vec3,
+  half: Vec3,
+  axis: 'x' | 'z',
+  d: number,
+): { x: number; y: number; z: number } | null {
+  // Raise by 1 + EPS to ensure floating-point boundaries don't keep the bottom face
+  // inside the voxel we are stepping over (e.g. 1.9 - 0.9 = 0.999... which floors to 0).
+  const raised: Vec3 = { ...pos, y: pos.y + 1 + EPS };
+  // Check that the raised position itself is clear before trying to move.
+  if (overlapsSolid(sampler, raised, half)) return null;
+  // Try the horizontal move from the raised position.
+  const result = sweepAxis(sampler, raised, half, axis, d);
+  if (result.hit) return null; // still blocked even raised — wall is taller than 1 block
+  return { ...raised, [axis]: result.value };
+}
+
+/**
  * Resolves an AABB move against the solidity sampler. Substeps the delta to stay under
  * one voxel per step, resolving X, Z, then Y so the player slides along walls and rests
  * cleanly on floors. `grounded` is true when a downward move was blocked.
+ *
+ * Step-up: when a horizontal (X or Z) move is blocked and there is no vertical delta
+ * in this substep (walk mode, not flying), the resolver tries shifting the player up by
+ * 1 voxel and retrying the move. If that path is clear the step-up is accepted.
  */
 export function resolveCollision(
   sampler: SoliditySampler,
@@ -64,8 +91,36 @@ export function resolveCollision(
   const sd: Vec3 = { x: delta.x / steps, y: delta.y / steps, z: delta.z / steps };
 
   for (let s = 0; s < steps; s++) {
-    pos.x = sweepAxis(sampler, pos, half, 'x', sd.x).value;
-    pos.z = sweepAxis(sampler, pos, half, 'z', sd.z).value;
+    // --- X axis ---
+    const xResult = sweepAxis(sampler, pos, half, 'x', sd.x);
+    if (xResult.hit && sd.y === 0 && sd.x !== 0) {
+      // Horizontal move blocked with no vertical component — attempt step-up.
+      const stepped = tryStepUp(sampler, pos, half, 'x', sd.x);
+      if (stepped !== null) {
+        pos.x = stepped.x;
+        pos.y = stepped.y;
+      } else {
+        pos.x = xResult.value;
+      }
+    } else {
+      pos.x = xResult.value;
+    }
+
+    // --- Z axis ---
+    const zResult = sweepAxis(sampler, pos, half, 'z', sd.z);
+    if (zResult.hit && sd.y === 0 && sd.z !== 0) {
+      const stepped = tryStepUp(sampler, pos, half, 'z', sd.z);
+      if (stepped !== null) {
+        pos.z = stepped.z;
+        pos.y = stepped.y;
+      } else {
+        pos.z = zResult.value;
+      }
+    } else {
+      pos.z = zResult.value;
+    }
+
+    // --- Y axis ---
     const y = sweepAxis(sampler, pos, half, 'y', sd.y);
     pos.y = y.value;
     if (y.hit && sd.y < 0) grounded = true;

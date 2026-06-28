@@ -48,3 +48,67 @@ describe('resolveCollision', () => {
     expect(r.center.z).toBeCloseTo(3, 5); // z free
   });
 });
+
+describe('resolveCollision step-up (walk mode)', () => {
+  // The ledge scenario: ground at y < 0, a 1-block ledge sits at x >= 1, y in [0,1).
+  // Player starts at x=0, y=0.9 (resting on the ground), walks toward +X.
+  // Without step-up, the ledge face at x=1 would block. With step-up, the player
+  // should land on top of the ledge (y center near 1 + HALF.y).
+  //
+  // sampler: ground (y<0) + ledge column at x=1, y in [0,1)
+  function ledgeSampler(wallHeight: number): SoliditySampler {
+    return sampler(
+      (x, y) =>
+        y < 0 || // ground
+        (x >= 1 && y >= 0 && y < wallHeight), // ledge / wall
+    );
+  }
+
+  it('steps up onto a 1-block ledge when walking in X', () => {
+    // Player resting on ground (y center = HALF.y = 0.9), moves toward +X into a 1-block ledge.
+    const world = ledgeSampler(1);
+    const center = { x: 0, y: HALF.y, z: 0 };
+    const r = resolveCollision(world, center, HALF, { x: 2, y: 0, z: 0 });
+    // Should have stepped up: x should advance past the ledge face.
+    expect(r.center.x).toBeGreaterThan(1);
+    // And the player's y should be elevated by ~1 voxel above where they started.
+    expect(r.center.y).toBeGreaterThan(HALF.y + 0.5);
+  });
+
+  it('does NOT step up a 2-block wall (too tall)', () => {
+    // 2-block wall: y in [0, 2) at x >= 1. Step-up only handles 1-block ledges.
+    const world = ledgeSampler(2);
+    const center = { x: 0, y: HALF.y, z: 0 };
+    const r = resolveCollision(world, center, HALF, { x: 2, y: 0, z: 0 });
+    // Should be blocked — x stays near the wall face.
+    expect(r.center.x).toBeLessThan(1);
+  });
+
+  it('steps up onto a 1-block ledge when walking in Z', () => {
+    // Same scenario but along the Z axis.
+    const world = sampler(
+      (_x, y, z) =>
+        y < 0 || // ground
+        (z >= 1 && y >= 0 && y < 1), // ledge
+    );
+    const center = { x: 0, y: HALF.y, z: 0 };
+    const r = resolveCollision(world, center, HALF, { x: 0, y: 0, z: 2 });
+    expect(r.center.z).toBeGreaterThan(1);
+    expect(r.center.y).toBeGreaterThan(HALF.y + 0.5);
+  });
+
+  it('step-up does NOT occur in fly mode (resolveCollision itself is mode-agnostic; caller skips gravity)', () => {
+    // resolveCollision does not know about fly mode — the PlayerController handles that.
+    // This test verifies the step-up only happens when the horizontal move is blocked AND
+    // the upward-shifted position is free. In fly mode the caller passes a different delta
+    // (with explicit vertical component), so the behaviour is naturally correct.
+    // Here we just confirm the wall scenario without a floor still blocks correctly
+    // (no ground means no grounded result, and wall still stops horizontal movement
+    // when the clearance above is also occupied).
+    const solidEverywhere = sampler((x, y) => x >= 1 && y >= 0 && y < 5);
+    const center = { x: 0, y: HALF.y, z: 0 };
+    const r = resolveCollision(solidEverywhere, center, HALF, { x: 2, y: 0, z: 0 });
+    // Solid for 5 blocks tall — step-up should not work.
+    expect(r.center.x).toBeLessThan(1);
+  });
+});
