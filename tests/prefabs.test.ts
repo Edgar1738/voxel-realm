@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { cottage, well, ruinedTower, brokenWall } from '../src/worldgen/prefabs';
+import { cottage, well, ruinedTower, brokenWall, lampPost } from '../src/worldgen/prefabs';
+import { LANTERN } from '../src/blocks/blocks';
 
 describe('prefabs', () => {
   for (const [name, make] of [
@@ -7,6 +8,7 @@ describe('prefabs', () => {
     ['well', well],
     ['ruinedTower', ruinedTower],
     ['brokenWall', brokenWall],
+    ['lampPost', lampPost],
   ] as const) {
     it(`${name}: every block sits within its declared dims`, () => {
       const s = make();
@@ -19,4 +21,9 @@ describe('prefabs', () => {
       }
     });
   }
+
+  it('lampPost and well carry a lantern (so villages glow at night)', () => {
+    expect(lampPost().blocks.some(([, , , id]) => id === LANTERN)).toBe(true);
+    expect(well().blocks.some(([, , , id]) => id === LANTERN)).toBe(true);
+  });
 });
