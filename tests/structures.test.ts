@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { scatterStructures, placementAt, type Structure } from '../src/worldgen/Structures';
+import {
+  scatterStructures,
+  placementAt,
+  placementsAt,
+  type Structure,
+} from '../src/worldgen/Structures';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../src/core/constants';
-import { AIR, COBBLESTONE } from '../src/blocks/blocks';
+import { AIR, COBBLESTONE, STONE } from '../src/blocks/blocks';
 import type { BlockId } from '../src/core/types';
 
 /** A simple 3x2x3 solid box prefab for predictable placement assertions. */
@@ -20,6 +25,70 @@ function nonAir(chunk: ChunkData): number {
   for (const v of chunk.data) if (v !== AIR) n++;
   return n;
 }
+
+/** A 4x3x4 hollow box (walls only); its interior cells are empty for clear-footprint tests. */
+function hollowBox(): Structure {
+  const W = 4;
+  const H = 3;
+  const D = 4;
+  const blocks: Array<[number, number, number, BlockId]> = [];
+  for (let y = 0; y < H; y++)
+    for (let z = 0; z < D; z++)
+      for (let x = 0; x < W; x++)
+        if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push([x, y, z, COBBLESTONE]);
+  return { dims: [W, H, D], blocks };
+}
+
+describe('placementsAt (clusters)', () => {
+  const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0, clusterCount: 3 };
+
+  it('returns clusterCount placements when the cell spawns', () => {
+    expect(placementsAt([box()], opts, 1337, 0, 0).length).toBe(3);
+  });
+
+  it('returns [] when density is 0', () => {
+    expect(placementsAt([box()], { ...opts, density: 0 }, 1337, 0, 0)).toEqual([]);
+  });
+
+  it('is deterministic', () => {
+    expect(placementsAt([box()], opts, 7, 1, 2)).toEqual(placementsAt([box()], opts, 7, 1, 2));
+  });
+
+  it('placementAt returns the first cluster placement (back-compat)', () => {
+    const ps = placementsAt([box()], opts, 7, 1, 2);
+    expect(placementAt([box()], opts, 7, 1, 2)).toEqual(ps[0]);
+  });
+
+  it('keeps every cluster origin inside the cell', () => {
+    for (const p of placementsAt([box()], opts, 55, 2, -1)) {
+      expect(p.ox).toBeGreaterThanOrEqual(2 * opts.cellSize);
+      expect(p.ox).toBeLessThanOrEqual(2 * opts.cellSize + (opts.cellSize - 3));
+    }
+  });
+});
+
+describe('scatterStructures clearFootprint', () => {
+  const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0 };
+  const stoneChunk = (): ChunkData => {
+    const c = new ChunkData(0, 0);
+    c.data.fill(STONE);
+    return c;
+  };
+
+  it('clears terrain inside a structure footprint when enabled', () => {
+    const p = placementAt([hollowBox()], opts, 99, 0, 0)!;
+    const c = stoneChunk();
+    scatterStructures([hollowBox()], { ...opts, clearFootprint: true })(c, 0, 0, 99);
+    expect(c.get(p.ox + 1, p.oy + 1, p.oz + 1)).toBe(AIR); // hollow interior cell
+  });
+
+  it('leaves terrain inside the footprint when disabled', () => {
+    const p = placementAt([hollowBox()], opts, 99, 0, 0)!;
+    const c = stoneChunk();
+    scatterStructures([hollowBox()], { ...opts, clearFootprint: false })(c, 0, 0, 99);
+    expect(c.get(p.ox + 1, p.oy + 1, p.oz + 1)).toBe(STONE);
+  });
+});
 
 describe('placementAt', () => {
   const opts = { cellSize: 8, surfaceAt: flatAt, density: 1, salt: 0 };

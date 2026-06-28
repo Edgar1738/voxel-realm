@@ -173,9 +173,12 @@ export function createGenerator(preset: WorldPreset): {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
           scatterTrees,
-          scatterStructures([cottage(), well()], {
-            cellSize: 40,
-            density: 0.5,
+          scatterStructures([cottage(), cottage(), well()], {
+            cellSize: 80,
+            density: 0.6,
+            clusterCount: 5,
+            clusterRadius: 9,
+            clearFootprint: true,
             surfaceAt: plainsHeight,
           }),
         ],
