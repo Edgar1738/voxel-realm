@@ -1,5 +1,4 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../core/constants';
-import { mulberry32 } from '../core/math';
 import { AIR, WATER, LANTERN } from '../blocks/blocks';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
@@ -12,6 +11,22 @@ export interface CaveTorcherOptions {
 }
 
 const SALT = 0x70c4ed; // distinct hash channel for torch placement
+
+/**
+ * Inline one-shot integer → [0,1) hash using a MurmurHash3-style avalanche
+ * finalizer. All multiplies via Math.imul to stay in 32-bit integer space,
+ * avoiding float precision loss for large seeds or coordinates.
+ */
+function hashToFloat(h: number): number {
+  // Every step uses >>> 0 to ensure the value stays unsigned before division.
+  let x = h >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  x = Math.imul(x, 0x45d9f3b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  x = Math.imul(x, 0x45d9f3b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x / 0x100000000; // unsigned 32-bit / 2^32 → [0,1)
+}
 
 /**
  * Lights carved caves: places lantern "torches" on cave floors so the (post-lighting) dark
@@ -40,15 +55,16 @@ export class CaveTorcher implements TerrainStage {
           const below = chunk.get(x, y - 1, z);
           if (below === AIR || below === WATER) continue; // need a solid floor
           if (chunk.get(x, y + 1, z) !== AIR) continue; // need headroom
-          const r = mulberry32(
-            ((worldX * 73856093) ^
-              (y * 19349663) ^
-              (worldZ * 83492791) ^
-              (ctx.seed * 2654435761) ^
+          // All multiplies use Math.imul to stay in 32-bit integer space,
+          // preventing float precision loss for large seeds or coordinates.
+          const hash =
+            (Math.imul(worldX, 73856093) ^
+              Math.imul(y, 19349663) ^
+              Math.imul(worldZ, 83492791) ^
+              Math.imul(ctx.seed, 2654435761) ^
               SALT) >>>
-              0,
-          )();
-          if (r < this.density) chunk.set(x, y, z, LANTERN);
+            0;
+          if (hashToFloat(hash) < this.density) chunk.set(x, y, z, LANTERN);
         }
       }
     }

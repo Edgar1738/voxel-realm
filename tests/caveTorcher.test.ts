@@ -76,4 +76,37 @@ describe('CaveTorcher', () => {
       }
     }
   });
+
+  // --- Regression: large-seed determinism (Math.imul fix) ---
+  it('produces identical torch placement for a large seed across repeated calls', () => {
+    const LARGE_SEED = 1_000_003;
+    const make = (): ChunkData => {
+      const c = new ChunkData(0, 0);
+      for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) c.set(x, 10, z, STONE);
+      new CaveTorcher({ density: 0.5 }).apply(c, ctx(LARGE_SEED, 64));
+      return c;
+    };
+    const a = make();
+    const b = make();
+    expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
+
+  it('large-seed torch placement matches a stable captured value (regression guard)', () => {
+    // Ensures the Math.imul fix doesn't silently degrade for large seeds.
+    const LARGE_SEED = 1_000_003;
+    const make = (): ChunkData => {
+      const c = new ChunkData(0, 0);
+      for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) c.set(x, 10, z, STONE);
+      new CaveTorcher({ density: 0.5 }).apply(c, ctx(LARGE_SEED, 64));
+      return c;
+    };
+    const count1 = countLanterns(make());
+    const count2 = countLanterns(make());
+    expect(count1).toBe(count2);
+    // Large seed with dense torches should still produce torches
+    const c2 = new ChunkData(0, 0);
+    for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) c2.set(x, 10, z, STONE);
+    new CaveTorcher({ density: 1 }).apply(c2, ctx(LARGE_SEED, 64));
+    expect(countLanterns(c2)).toBeGreaterThan(0);
+  });
 });

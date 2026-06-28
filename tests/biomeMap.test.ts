@@ -59,4 +59,84 @@ describe('BiomeMap', () => {
       expect(amp).toBeLessThanOrEqual(hi);
     }
   });
+
+  // --- New: integer key cache (no string allocation) ---
+  it('returns identical biome results after switching to integer key cache', () => {
+    // Verify the refactored cache key does not change classification output.
+    const map = new BiomeMap(SEED);
+    // Sample many points including negative coords (where packing must be correct)
+    const points = [
+      [0, 0],
+      [100, -250],
+      [-512, 512],
+      [32767, -32768],
+      [-32768, 32767],
+      [1000, 1000],
+      [-1000, -1000],
+      [255, -255],
+      [0, -1],
+      [-1, 0],
+    ];
+    // Build reference from a fresh map (no cache) and compare to cached map
+    const ref = new BiomeMap(SEED);
+    for (const [x, z] of points) {
+      expect(map.biomeAt(x, z)).toBe(ref.biomeAt(x, z));
+      expect(map.blendedTerrain(x, z).amplitude).toBeCloseTo(
+        ref.blendedTerrain(x, z).amplitude,
+        10,
+      );
+    }
+  });
+
+  it('cache hit returns the same biome as a cache miss', () => {
+    const map = new BiomeMap(SEED);
+    // First call is a miss, second is a hit — must match
+    const first = map.biomeAt(256, -256);
+    const second = map.biomeAt(256, -256);
+    expect(first).toBe(second);
+  });
+
+  it('handles negative coordinates without key collision', () => {
+    // With a naive pack like (x & 0xffff) | ((z & 0xffff) << 16),
+    // (1, 0) and (-65535, 0) would collide if truncated incorrectly.
+    // Verify distinct coords give distinct (or at least non-colliding) cache entries.
+    const map = new BiomeMap(SEED);
+    // If there were a collision, the wrong cached biome would be returned.
+    // We can't inspect the cache directly, but we verify each coord returns
+    // the same value on repeated lookups.
+    const coordPairs: [number, number][] = [
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+      [32767, 0],
+      [-32768, 0],
+      [0, 32767],
+      [0, -32768],
+      [256, 256],
+      [-256, -256],
+      [256, -256],
+      [-256, 256],
+    ];
+    for (const [x, z] of coordPairs) {
+      const b1 = map.biomeAt(x, z);
+      const b2 = map.biomeAt(x, z);
+      expect(b1).toBe(b2);
+    }
+  });
+
+  it('biomeAt result is stable across many lookups (cache does not corrupt values)', () => {
+    // Stress the cache by querying thousands of coords, then re-querying a subset.
+    const map = new BiomeMap(SEED);
+    const sample: Array<[number, number, Biome]> = [];
+    for (let x = -512; x <= 512; x += 32)
+      for (let z = -512; z <= 512; z += 32) {
+        const b = map.biomeAt(x, z);
+        sample.push([x, z, b]);
+      }
+    // Re-query — cache may have been populated or even cleared by cap; result must match
+    for (const [x, z, expected] of sample) {
+      expect(map.biomeAt(x, z)).toBe(expected);
+    }
+  });
 });

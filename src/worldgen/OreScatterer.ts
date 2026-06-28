@@ -1,5 +1,4 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../core/constants';
-import { mulberry32 } from '../core/math';
 import { STONE, COAL_ORE, IRON_ORE, GOLD_ORE, CRYSTAL } from '../blocks/blocks';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
@@ -21,7 +20,25 @@ const BANDS: readonly OreBand[] = [
   { id: COAL_ORE, minY: 14, maxY: 120, density: 0.02, salt: 0x0c0a1 },
 ];
 
-const MIN_Y = 5;
+/** Derived from BANDS so it stays in sync if bands ever change. */
+const MIN_Y = Math.min(...BANDS.map((b) => b.minY));
+
+/**
+ * Inline one-shot integer → [0,1) hash using the finalizer from the MurmurHash3
+ * bit-avalanche (all multiplies are 32-bit via Math.imul to avoid float precision
+ * loss on large seeds/coordinates). Returns a value in [0, 1).
+ */
+function hashToFloat(h: number): number {
+  // Mix with an avalanche finalizer; keep all arithmetic in 32-bit integer space.
+  // Every step uses >>> 0 to ensure the value stays unsigned before division.
+  let x = h >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  x = Math.imul(x, 0x45d9f3b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  x = Math.imul(x, 0x45d9f3b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x / 0x100000000; // unsigned 32-bit / 2^32 → [0,1)
+}
 
 export interface OreScattererOptions {
   /** Multiplies every band's density (0 disables; >1 enriches). Default 1. */
@@ -51,14 +68,16 @@ export class OreScatterer implements TerrainStage {
           if (chunk.get(x, y, z) !== STONE) continue;
           for (const band of BANDS) {
             if (y < band.minY || y > band.maxY) continue;
-            const r = mulberry32(
-              ((worldX * 73856093) ^
-                (y * 19349663) ^
-                (worldZ * 83492791) ^
-                (ctx.seed * 2654435761) ^
+            // All multiplies use Math.imul to stay in 32-bit integer space,
+            // preventing float precision loss for large seeds or coordinates.
+            const hash =
+              (Math.imul(worldX, 73856093) ^
+                Math.imul(y, 19349663) ^
+                Math.imul(worldZ, 83492791) ^
+                Math.imul(ctx.seed, 2654435761) ^
                 band.salt) >>>
-                0,
-            )();
+              0;
+            const r = hashToFloat(hash);
             if (r < band.density * this.densityScale) {
               chunk.set(x, y, z, band.id);
               break;
