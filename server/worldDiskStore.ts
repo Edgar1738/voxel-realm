@@ -45,12 +45,18 @@ export function readWorld(root: string, name: string): DiskSnapshot {
 
 const MAX_BACKUPS = 10;
 
+// Monotonic counter so backups created within the same millisecond get
+// distinct filenames. Zero-padded and used as a secondary sort key after
+// the fixed-width Date.now() timestamp, so lexicographic sort stays
+// chronological.
+let backupSeq = 0;
+
 /**
  * Write a snapshot atomically: write to a temp file in the same directory,
  * then rename onto the target (rename is atomic on a single filesystem).
  * Before replacing an existing non-empty world with an empty snapshot,
- * copy the current file into .backups/<name>-<timestamp>.json and prune
- * backups beyond MAX_BACKUPS.
+ * copy the current file into .backups/<name>-<timestamp>-<seq>.json and
+ * prune backups beyond MAX_BACKUPS.
  */
 function writeWorld(root: string, name: string, snap: DiskSnapshot): void {
   const target = fileFor(root, name);
@@ -66,8 +72,8 @@ function writeWorld(root: string, name: string, snap: DiskSnapshot): void {
       if (existingHasChunks) {
         const backupsDir = join(root, '.backups');
         mkdirSync(backupsDir, { recursive: true });
-        const timestamp = Date.now();
-        const backupFile = join(backupsDir, `${safeName}-${timestamp}.json`);
+        const stamp = `${Date.now()}-${String(backupSeq++).padStart(6, '0')}`;
+        const backupFile = join(backupsDir, `${safeName}-${stamp}.json`);
         copyFileSync(target, backupFile);
 
         // Prune oldest backups for this world beyond MAX_BACKUPS
