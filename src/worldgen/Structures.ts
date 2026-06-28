@@ -30,6 +30,8 @@ export interface ScatterOptions {
   clusterRadius?: number;
   /** Clear each structure's bounding box of intersecting terrain/foliage before stamping. */
   clearFootprint?: boolean;
+  /** If set, lay a surface path of this block connecting a cluster's members (a village street). */
+  streetBlock?: BlockId;
 }
 
 /** A resolved structure placement: which prefab, and its min-corner world position. */
@@ -43,7 +45,7 @@ export interface Placement {
 /**
  * Deterministic placements for a single grid cell, independent of which chunk asks — this is what
  * makes cross-chunk stamping consistent. Returns [] when the cell rolls empty; otherwise up to
- * `clusterCount` structures jittered within the cell (a hamlet).
+ * `clusterCount` structures clustered around a jittered village center (a hamlet).
  */
 export function placementsAt(
   structures: Structure[],
@@ -92,6 +94,68 @@ export function placementAt(
   return placementsAt(structures, opts, seed, cellX, cellZ)[0] ?? null;
 }
 
+/** Integer points along a 2D line (Bresenham), inclusive of both ends. */
+function linePoints(x0: number, z0: number, x1: number, z1: number): Array<[number, number]> {
+  const points: Array<[number, number]> = [];
+  const dx = Math.abs(x1 - x0);
+  const dz = Math.abs(z1 - z0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sz = z0 < z1 ? 1 : -1;
+  let err = dx - dz;
+  let x = x0;
+  let z = z0;
+  for (;;) {
+    points.push([x, z]);
+    if (x === x1 && z === z1) break;
+    const e2 = 2 * err;
+    if (e2 > -dz) {
+      err -= dz;
+      x += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      z += sz;
+    }
+  }
+  return points;
+}
+
+/** Surface-snapped path voxels connecting consecutive cluster members (a village street). */
+export function streetVoxels(
+  placements: Placement[],
+  surfaceAt: (seed: WorldSeed, x: number, z: number) => number,
+  seed: WorldSeed,
+): Array<[number, number, number]> {
+  const center = (p: Placement): [number, number] => [
+    p.ox + Math.floor(p.structure.dims[0] / 2),
+    p.oz + Math.floor(p.structure.dims[2] / 2),
+  ];
+  const out: Array<[number, number, number]> = [];
+  for (let i = 0; i + 1 < placements.length; i++) {
+    const [ax, az] = center(placements[i]);
+    const [bx, bz] = center(placements[i + 1]);
+    for (const [x, z] of linePoints(ax, az, bx, bz))
+      out.push([x, Math.round(surfaceAt(seed, x, z)), z]);
+  }
+  return out;
+}
+
+function setLocal(
+  chunk: ChunkData,
+  baseX: number,
+  baseZ: number,
+  wx: number,
+  wy: number,
+  wz: number,
+  id: BlockId,
+): void {
+  if (wy < 0 || wy >= WORLD_HEIGHT) return;
+  const lx = wx - baseX;
+  const lz = wz - baseZ;
+  if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) return;
+  chunk.set(lx, wy, lz, id);
+}
+
 function stampPlacement(
   chunk: ChunkData,
   baseX: number,
@@ -101,52 +165,44 @@ function stampPlacement(
 ): void {
   if (clearFootprint) {
     const [sx, sy, sz] = p.structure.dims;
-    for (let dy = 0; dy < sy; dy++) {
-      const wy = p.oy + dy;
-      if (wy < 0 || wy >= WORLD_HEIGHT) continue;
-      for (let dz = 0; dz < sz; dz++) {
-        for (let dx = 0; dx < sx; dx++) {
-          const lx = p.ox + dx - baseX;
-          const lz = p.oz + dz - baseZ;
-          if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) continue;
-          chunk.set(lx, wy, lz, AIR);
-        }
-      }
-    }
+    for (let dy = 0; dy < sy; dy++)
+      for (let dz = 0; dz < sz; dz++)
+        for (let dx = 0; dx < sx; dx++)
+          setLocal(chunk, baseX, baseZ, p.ox + dx, p.oy + dy, p.oz + dz, AIR);
   }
   for (const [dx, dy, dz, id] of p.structure.blocks) {
     if (id === AIR) continue;
-    const wy = p.oy + dy;
-    if (wy < 0 || wy >= WORLD_HEIGHT) continue;
-    const lx = p.ox + dx - baseX;
-    const lz = p.oz + dz - baseZ;
-    if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) continue;
-    chunk.set(lx, wy, lz, id);
+    setLocal(chunk, baseX, baseZ, p.ox + dx, p.oy + dy, p.oz + dz, id);
   }
 }
 
 /**
- * An Overlay that scatters prefab structures (optionally in clusters) across the world, snapped to
- * the terrain surface. Each chunk independently resolves the candidates whose footprint could reach
- * it and stamps only the voxels that fall inside the chunk, so structures straddling chunk borders
- * stay seamless.
+ * An Overlay that scatters prefab structures (optionally clustered into hamlets with streets) across
+ * the world, snapped to the terrain surface. Each chunk independently resolves the candidates whose
+ * cell overlaps it and stamps only the voxels inside the chunk, so a settlement straddling chunk
+ * borders stays seamless.
  */
 export function scatterStructures(structures: Structure[], opts: ScatterOptions): Overlay {
-  const { cellSize, clearFootprint = false } = opts;
-  const reachX = structures.reduce((m, s) => Math.max(m, s.dims[0]), 1);
-  const reachZ = structures.reduce((m, s) => Math.max(m, s.dims[2]), 1);
+  const { cellSize, surfaceAt, clearFootprint = false, streetBlock } = opts;
   return (chunk, cx, cz, seed) => {
     const baseX = cx * CHUNK_SIZE_X;
     const baseZ = cz * CHUNK_SIZE_Z;
-    const minCellX = Math.floor((baseX - reachX) / cellSize);
+    // a cell's content stays within [cell*cellSize, cell*cellSize + cellSize-1], so scan every cell
+    // whose span overlaps this chunk.
+    const minCellX = Math.floor((baseX - cellSize + 1) / cellSize);
     const maxCellX = Math.floor((baseX + CHUNK_SIZE_X - 1) / cellSize);
-    const minCellZ = Math.floor((baseZ - reachZ) / cellSize);
+    const minCellZ = Math.floor((baseZ - cellSize + 1) / cellSize);
     const maxCellZ = Math.floor((baseZ + CHUNK_SIZE_Z - 1) / cellSize);
     for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
       for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
-        for (const p of placementsAt(structures, opts, seed, cellX, cellZ)) {
-          stampPlacement(chunk, baseX, baseZ, p, clearFootprint);
+        const placements = placementsAt(structures, opts, seed, cellX, cellZ);
+        if (placements.length === 0) continue;
+        if (streetBlock !== undefined && placements.length > 1) {
+          for (const [wx, wy, wz] of streetVoxels(placements, surfaceAt, seed)) {
+            setLocal(chunk, baseX, baseZ, wx, wy, wz, streetBlock);
+          }
         }
+        for (const p of placements) stampPlacement(chunk, baseX, baseZ, p, clearFootprint);
       }
     }
   };

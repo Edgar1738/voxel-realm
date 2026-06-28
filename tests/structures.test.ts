@@ -3,11 +3,12 @@ import {
   scatterStructures,
   placementAt,
   placementsAt,
+  streetVoxels,
   type Structure,
 } from '../src/worldgen/Structures';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../src/core/constants';
-import { AIR, COBBLESTONE, STONE } from '../src/blocks/blocks';
+import { AIR, COBBLESTONE, STONE, PLANKS } from '../src/blocks/blocks';
 import type { BlockId } from '../src/core/types';
 
 /** A simple 3x2x3 solid box prefab for predictable placement assertions. */
@@ -38,6 +39,73 @@ function hollowBox(): Structure {
         if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push([x, y, z, COBBLESTONE]);
   return { dims: [W, H, D], blocks };
 }
+
+/** A 3x2x3 solid PLANKS box — distinguishable from cobblestone streets. */
+function planksBox(): Structure {
+  const blocks: Array<[number, number, number, BlockId]> = [];
+  for (let y = 0; y < 2; y++)
+    for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) blocks.push([x, y, z, PLANKS]);
+  return { dims: [3, 2, 3], blocks };
+}
+
+describe('streetVoxels', () => {
+  it('connects consecutive member centers along the surface', () => {
+    const ps = [
+      { structure: planksBox(), ox: 2, oy: 64, oz: 2 },
+      { structure: planksBox(), ox: 12, oy: 64, oz: 2 },
+    ];
+    const sv = streetVoxels(ps, flatAt, 0);
+    expect(sv.length).toBeGreaterThan(0);
+    expect(sv.every(([, y]) => y === 64)).toBe(true); // follows the surface
+    expect(sv.some(([x, , z]) => x === 3 && z === 3)).toBe(true); // member A center
+    expect(sv.some(([x, , z]) => x === 13 && z === 3)).toBe(true); // member B center
+  });
+});
+
+describe('scatterStructures streets', () => {
+  const base = {
+    cellSize: 16,
+    surfaceAt: flatAt,
+    density: 1,
+    salt: 0,
+    clusterCount: 2,
+    clusterRadius: 5,
+  };
+
+  it('lays a street block between cluster members', () => {
+    let seed = -1;
+    let open: [number, number, number] | undefined;
+    for (let s = 1; s <= 500 && !open; s++) {
+      const cand = placementsAt([planksBox()], base, s, 0, 0);
+      if (cand.length < 2) continue;
+      const inFoot = (x: number, z: number): boolean =>
+        cand.some(
+          (p) =>
+            x >= p.ox &&
+            x < p.ox + p.structure.dims[0] &&
+            z >= p.oz &&
+            z < p.oz + p.structure.dims[2],
+        );
+      open = streetVoxels(cand, flatAt, s).find(
+        ([x, , z]) => !inFoot(x, z) && x >= 0 && x < CHUNK_SIZE_X && z >= 0 && z < CHUNK_SIZE_Z,
+      );
+      if (open) seed = s;
+    }
+    expect(open, 'a street voxel between the buildings').toBeTruthy();
+    const chunk = new ChunkData(0, 0);
+    scatterStructures([planksBox()], { ...base, streetBlock: COBBLESTONE })(chunk, 0, 0, seed);
+    const [x, y, z] = open!;
+    expect(chunk.get(x, y, z)).toBe(COBBLESTONE);
+  });
+
+  it('lays no street block when streetBlock is unset', () => {
+    const chunk = new ChunkData(0, 0);
+    scatterStructures([planksBox()], base)(chunk, 0, 0, 123); // planks buildings only
+    let cobble = 0;
+    for (const v of chunk.data) if (v === COBBLESTONE) cobble++;
+    expect(cobble).toBe(0);
+  });
+});
 
 describe('placementsAt (clusters)', () => {
   const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0, clusterCount: 3 };

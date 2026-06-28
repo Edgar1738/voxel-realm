@@ -179,6 +179,7 @@ export function createGenerator(preset: WorldPreset): {
             clusterCount: 5,
             clusterRadius: 9,
             clearFootprint: true,
+            streetBlock: COBBLESTONE,
             surfaceAt: plainsHeight,
           }),
         ],
