@@ -14,7 +14,13 @@ import {
   PLANKS,
   COBBLESTONE,
   BRICK,
+  LANTERN,
+  COAL_ORE,
+  IRON_ORE,
+  GOLD_ORE,
+  CRYSTAL,
   TextureLayer,
+  TEXTURE_LAYER_COUNT,
   Face,
 } from '../src/blocks/blocks';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
@@ -129,5 +135,71 @@ describe('BlockRegistry.has', () => {
     const reg = new BlockRegistry();
     expect(reg.has(AIR)).toBe(true);
     expect(reg.has(9999)).toBe(false);
+  });
+});
+
+describe('TEXTURE_LAYER_COUNT is derived from TextureLayer', () => {
+  it('equals the number of keys in TextureLayer', () => {
+    expect(TEXTURE_LAYER_COUNT).toBe(Object.keys(TextureLayer).length);
+  });
+
+  it('equals 20 (current layer count)', () => {
+    expect(TEXTURE_LAYER_COUNT).toBe(20);
+  });
+});
+
+describe('newer block ids 14-18 (lantern, ores, crystal)', () => {
+  it('has lantern at id 14 with light emission 14 and opaque', () => {
+    expect(LANTERN).toBe(14);
+    const reg = new BlockRegistry();
+    expect(reg.isOpaque(LANTERN)).toBe(true);
+    expect(reg.emission(LANTERN)).toBe(14);
+  });
+
+  it('has coal ore at id 15, opaque, no emission', () => {
+    expect(COAL_ORE).toBe(15);
+    const reg = new BlockRegistry();
+    expect(reg.isOpaque(COAL_ORE)).toBe(true);
+    expect(reg.emission(COAL_ORE)).toBe(0);
+    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
+      expect(reg.faceLayer(COAL_ORE, f)).toBe(TextureLayer.CoalOre);
+    }
+  });
+
+  it('has iron ore at id 16, opaque, no emission', () => {
+    expect(IRON_ORE).toBe(16);
+    const reg = new BlockRegistry();
+    expect(reg.isOpaque(IRON_ORE)).toBe(true);
+    expect(reg.emission(IRON_ORE)).toBe(0);
+    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
+      expect(reg.faceLayer(IRON_ORE, f)).toBe(TextureLayer.IronOre);
+    }
+  });
+
+  it('has gold ore at id 17, opaque, no emission', () => {
+    expect(GOLD_ORE).toBe(17);
+    const reg = new BlockRegistry();
+    expect(reg.isOpaque(GOLD_ORE)).toBe(true);
+    expect(reg.emission(GOLD_ORE)).toBe(0);
+    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
+      expect(reg.faceLayer(GOLD_ORE, f)).toBe(TextureLayer.GoldOre);
+    }
+  });
+
+  it('has crystal at id 18 with light emission 7 and opaque', () => {
+    expect(CRYSTAL).toBe(18);
+    const reg = new BlockRegistry();
+    expect(reg.isOpaque(CRYSTAL)).toBe(true);
+    expect(reg.emission(CRYSTAL)).toBe(7);
+    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
+      expect(reg.faceLayer(CRYSTAL, f)).toBe(TextureLayer.Crystal);
+    }
+  });
+});
+
+describe('BlockRegistry.faceLayer throws on AIR', () => {
+  it('throws a clear error when called on AIR (faceless block)', () => {
+    const reg = new BlockRegistry();
+    expect(() => reg.faceLayer(AIR, Face.PosX)).toThrow(/faceLayer called on block "air"/);
   });
 });

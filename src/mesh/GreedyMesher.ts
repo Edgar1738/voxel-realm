@@ -6,6 +6,11 @@ import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
 import type { MeshPass } from './MeshPass';
 
+/** Encodes four AO levels (each 0..3) into 8 bits: level[i] occupies bits 2i+1..2i. */
+function packAoLevels(l0: number, l1: number, l2: number, l3: number): number {
+  return (l0 << 6) | (l1 << 4) | (l2 << 2) | l3;
+}
+
 const DIMS = [CHUNK_SIZE_X, WORLD_HEIGHT, CHUNK_SIZE_Z];
 
 /** Maps (axis, sign) to the Face enum used for texture-layer lookup. */
@@ -21,8 +26,16 @@ interface MaskCell {
   ao: [number, number, number, number];
   /** Packed face light: skyLevel*16 + blockLevel (sampled at the air-side voxel). */
   light: number;
-  /** Merge key combining layer + the four AO values + light. */
-  key: string;
+  /**
+   * Integer merge key packed as:
+   *   bits 23-16  layer       (8 bits, 0..255)
+   *   bits 15-14  ao[0]       (2 bits, AO level index 0..3)
+   *   bits 13-12  ao[1]       (2 bits)
+   *   bits 11-10  ao[2]       (2 bits)
+   *   bits  9-8   ao[3]       (2 bits)
+   *   bits  7-0   light       (8 bits, sky*16+block, 0..255)
+   */
+  key: number;
 }
 
 interface Buffers {
@@ -43,6 +56,13 @@ interface Buffers {
  * neighbor => air => border face emitted). AO is baked into a per-vertex brightness.
  */
 export class GreedyMesher {
+  // Pre-allocated scratch buffers reused across every inner-loop call; never
+  // allocated inside the du*dv*dd loops to avoid GC pressure during chunk rebuilds.
+  private readonly _solid: [number, number, number] = [0, 0, 0];
+  private readonly _neighbor: [number, number, number] = [0, 0, 0];
+  private readonly _air: [number, number, number] = [0, 0, 0];
+  private readonly _sample: [number, number, number] = [0, 0, 0];
+
   constructor(private readonly registry: BlockRegistry) {}
 
   mesh(view: VoxelView, pass: MeshPass): MeshData {
@@ -75,43 +95,57 @@ export class GreedyMesher {
     };
   }
 
-  private opaqueAt(view: VoxelView, c: number[]): boolean {
+  private opaqueAt(view: VoxelView, c: readonly [number, number, number]): boolean {
     return this.registry.isOpaque(view.get(c[0], c[1], c[2]));
   }
 
-  /** AO for the 4 corners of a face, sampled on the air side of the solid voxel. */
+  /**
+   * AO brightness for the 4 corners of a face, sampled on the air side of the solid
+   * voxel. Also writes the raw AO levels (0..3) into `outLevels` for key packing.
+   * Uses pre-allocated scratch arrays — must not be called concurrently.
+   */
   private cornerAO(
     view: VoxelView,
-    solid: number[],
+    solid: readonly [number, number, number],
     axis: number,
     sign: number,
     u: number,
     v: number,
+    outLevels: [number, number, number, number],
   ): [number, number, number, number] {
-    const air = [...solid];
-    air[axis] += sign;
+    // air = solid shifted one step in the face direction (no allocation).
+    this._air[0] = solid[0];
+    this._air[1] = solid[1];
+    this._air[2] = solid[2];
+    this._air[axis] += sign;
 
-    const sample = (du: number, dv: number): number => {
-      const p = [...air];
-      p[u] += du;
-      p[v] += dv;
-      return this.opaqueAt(view, p) ? 1 : 0;
+    const sampleAt = (du: number, dv: number): number => {
+      this._sample[0] = this._air[0];
+      this._sample[1] = this._air[1];
+      this._sample[2] = this._air[2];
+      this._sample[u] += du;
+      this._sample[v] += dv;
+      return this.opaqueAt(view, this._sample) ? 1 : 0;
     };
 
     const cornerLevel = (i: number, j: number): number => {
       const su = i === 1 ? 1 : -1;
       const sv = j === 1 ? 1 : -1;
-      const side1 = sample(su, 0);
-      const side2 = sample(0, sv);
-      const corner = sample(su, sv);
+      const side1 = sampleAt(su, 0);
+      const side2 = sampleAt(0, sv);
+      const corner = sampleAt(su, sv);
       return vertexAO(side1, side2, corner);
     };
 
+    outLevels[0] = cornerLevel(0, 0);
+    outLevels[1] = cornerLevel(1, 0);
+    outLevels[2] = cornerLevel(1, 1);
+    outLevels[3] = cornerLevel(0, 1);
     return [
-      aoBrightness(cornerLevel(0, 0)),
-      aoBrightness(cornerLevel(1, 0)),
-      aoBrightness(cornerLevel(1, 1)),
-      aoBrightness(cornerLevel(0, 1)),
+      aoBrightness(outLevels[0]),
+      aoBrightness(outLevels[1]),
+      aoBrightness(outLevels[2]),
+      aoBrightness(outLevels[3]),
     ];
   }
 
@@ -128,30 +162,44 @@ export class GreedyMesher {
     const dv = DIMS[v];
     const dd = DIMS[axis];
 
+    // Scratch for AO levels; reused each cell to avoid per-cell allocation.
+    const aoLevels: [number, number, number, number] = [0, 0, 0, 0];
+
     for (let i = 0; i < dd; i++) {
       const mask: (MaskCell | null)[] = new Array(du * dv).fill(null);
 
       for (let b = 0; b < dv; b++) {
         for (let a = 0; a < du; a++) {
-          const solid = [0, 0, 0];
-          solid[axis] = i;
-          solid[u] = a;
-          solid[v] = b;
+          // Write into pre-allocated scratch arrays instead of spreading new arrays.
+          this._solid[axis] = i;
+          this._solid[u] = a;
+          this._solid[v] = b;
 
-          const id = view.get(solid[0], solid[1], solid[2]);
+          const id = view.get(this._solid[0], this._solid[1], this._solid[2]);
           if (!pass.includes(id)) continue;
 
-          const neighbor = [...solid];
-          neighbor[axis] += sign;
-          const neighborId = view.get(neighbor[0], neighbor[1], neighbor[2]);
+          this._neighbor[0] = this._solid[0];
+          this._neighbor[1] = this._solid[1];
+          this._neighbor[2] = this._solid[2];
+          this._neighbor[axis] += sign;
+          const neighborId = view.get(this._neighbor[0], this._neighbor[1], this._neighbor[2]);
           if (!pass.faceVisible(id, neighborId)) continue; // face hidden
 
           const layer = this.registry.faceLayer(id, faceFor(axis, sign));
-          const ao = this.cornerAO(view, solid, axis, sign, u, v);
-          const sky = view.skyLight(neighbor[0], neighbor[1], neighbor[2]);
-          const block = view.blockLight(neighbor[0], neighbor[1], neighbor[2]);
+          const ao = this.cornerAO(view, this._solid, axis, sign, u, v, aoLevels);
+          const sky = view.skyLight(this._neighbor[0], this._neighbor[1], this._neighbor[2]);
+          const block = view.blockLight(this._neighbor[0], this._neighbor[1], this._neighbor[2]);
           const light = sky * 16 + block;
-          mask[a + b * du] = { layer, ao, light, key: `${layer}|${ao.join(',')}|${light}` };
+
+          // Integer merge key (no string allocation):
+          //   bits 23-16  layer  (8 bits)
+          //   bits 15-8   ao     (4×2 bits packed by packAoLevels)
+          //   bits  7-0   light  (8 bits)
+          const key =
+            (layer << 16) |
+            (packAoLevels(aoLevels[0], aoLevels[1], aoLevels[2], aoLevels[3]) << 8) |
+            light;
+          mask[a + b * du] = { layer, ao, light, key };
         }
       }
 
@@ -256,7 +304,10 @@ export class GreedyMesher {
       buf.light.push(cell.light);
     }
 
-    // Flip the split diagonal to keep AO interpolation symmetric (0fps rule).
+    // AO seam-minimization: choose the diagonal split whose two triangles interpolate
+    // AO more symmetrically. Flipping when the "off-diagonal" sum is greater ensures
+    // the darker corners end up on the same triangle, reducing visible AO artifacts
+    // at face boundaries.
     const flipped = cell.ao[0] + cell.ao[2] < cell.ao[1] + cell.ao[3];
     let tri = flipped ? [0, 1, 3, 1, 2, 3] : [0, 1, 2, 0, 2, 3];
     if (sign < 0) tri = [tri[0], tri[2], tri[1], tri[3], tri[5], tri[4]];

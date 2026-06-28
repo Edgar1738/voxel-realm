@@ -29,9 +29,15 @@ export class BlockRegistry {
     return this.get(id).light ?? 0;
   }
 
-  /** Texture layer index for a given block face. */
+  /** Texture layer index for a given block face. Throws if the block has no faces
+   *  (e.g. AIR) so that a mesh pass that incorrectly includes a faceless block fails
+   *  loudly instead of silently baking undefined/NaN into the geometry. */
   faceLayer(id: BlockId, face: Face): number {
-    return this.get(id).faces[face];
+    const def = this.get(id);
+    if (def.faces.length === 0) {
+      throw new Error(`faceLayer called on block "${def.name}" (id ${id}) which has no faces`);
+    }
+    return def.faces[face];
   }
 
   /** Number of DataArrayTexture layers the renderer must allocate. */

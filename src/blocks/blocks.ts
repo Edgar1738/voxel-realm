@@ -55,14 +55,14 @@ export const TextureLayer = {
   Crystal: 19,
 } as const;
 
-export const TEXTURE_LAYER_COUNT = 20;
+export const TEXTURE_LAYER_COUNT = Object.keys(TextureLayer).length;
 
 /** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
 export interface BlockDef {
   id: BlockId;
   name: string;
   opaque: boolean;
-  /** Forward-looking flag (unused in M1; opaque blocks only). */
+  /** Whether the block is rendered in the transparent render pass (water, glass, etc.). */
   transparent: boolean;
   /** Texture layer per face, indexed by Face; empty for air. */
   faces: number[];

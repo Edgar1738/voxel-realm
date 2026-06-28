@@ -90,6 +90,23 @@ describe('GreedyMesher', () => {
     expect(faceCount(withNb)).toBe(faceCount(noNb) - 1);
   });
 
+  it('culls the +Z border faces when a south neighbor is present', () => {
+    const c = new ChunkData(0, 0);
+    const south = new ChunkData(0, 1);
+    for (let x = 0; x < CHUNK_SIZE_X; x++)
+      for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+        c.set(x, 0, z, GRASS);
+        south.set(x, 0, z, GRASS);
+      }
+    const withNb = mesher.mesh(
+      viewOf(c, (dcx, dcz) => (dcx === 0 && dcz === 1 ? south : undefined)),
+      OPAQUE,
+    );
+    const noNb = mesher.mesh(viewOf(c), OPAQUE);
+    // The south neighbor removes the +Z side quad.
+    expect(faceCount(withNb)).toBe(faceCount(noNb) - 1);
+  });
+
   it('darkens AO in a corner next to an occluder', () => {
     const c = new ChunkData(0, 0);
     c.set(8, 10, 8, GRASS); // the lit voxel
