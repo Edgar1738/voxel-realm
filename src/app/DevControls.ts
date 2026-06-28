@@ -219,8 +219,9 @@ export function installDevControls(ctx: DevControlsContext): void {
     );
     const result = edit.group(() => applyVoxelsInBatches(voxels, applyBatch, maxBatchSize));
     if (result.unloaded > 0) {
+      const prefix = opts.label ? `[${opts.label}] ` : '';
       console.warn(
-        `Voxel Realm build: ${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
+        `Voxel Realm build: ${prefix}${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
       );
     }
     if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
@@ -436,6 +437,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
         throw new Error('copy region too large (>200k)');
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const blocks: Array<[number, number, number, BlockId]> = [];
       for (let y = ay; y <= by; y++)
         for (let z = az; z <= bz; z++)
@@ -459,8 +465,13 @@ export function installDevControls(ctx: DevControlsContext): void {
       z2: number,
       fromId: BlockId,
       toId: BlockId,
-    ): BatchedEditResult =>
-      applyAny(
+    ): BatchedEditResult => {
+      try {
+        manager.preloadBox(Math.min(x1, x2), Math.min(z1, z2), Math.max(x1, x2), Math.max(z1, z2));
+      } catch {
+        /* region too large to auto-preload */
+      }
+      return applyAny(
         replaceVoxels(
           (x, y, z) => manager.getBlock(x, y, z),
           { x1, y1, z1, x2, y2, z2 },
@@ -468,7 +479,8 @@ export function installDevControls(ctx: DevControlsContext): void {
           toId,
         ),
         { label: 'replace' },
-      ),
+      );
+    },
 
     /** Move a box by (dx,dy,dz): copy, clear the source, paste at the offset — one undo. */
     move: (
@@ -494,7 +506,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       return applyAny([...clear, ...paste], { label: 'move' });
     },
 
-    /** Mirror a box in place across 'x' or 'z' (one undo). */
+    /**
+     * Mirror a box in place across 'x' or 'z' (one undo).
+     * NOTE: pastes in place WITHOUT clearing the source footprint — mirroring a non-square region
+     * can leave residual original voxels outside the new footprint; clear the box first (or use
+     * square regions) if that matters.
+     */
     mirror: (
       x1: number,
       y1: number,
@@ -511,7 +528,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       return applyAny(prefabToVoxels(mirrorPrefab(bp, axis), ox, oy, oz), { label: 'mirror' });
     },
 
-    /** Rotate a box in place about Y by `quarterTurns` * 90deg, re-anchored at the min corner (one undo). */
+    /**
+     * Rotate a box in place about Y by `quarterTurns` * 90deg, re-anchored at the min corner (one undo).
+     * NOTE: pastes in place WITHOUT clearing the source footprint — rotating a non-square region
+     * can leave residual original voxels outside the new footprint; clear the box first (or use
+     * square regions) if that matters.
+     */
     rotate: (
       x1: number,
       y1: number,
