@@ -1,4 +1,4 @@
-import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER } from '../blocks/blocks';
+import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER, LANTERN } from '../blocks/blocks';
 import type { Structure } from './Structures';
 import type { BlockId } from '../core/types';
 
@@ -68,8 +68,22 @@ export function well(): Structure {
     put(cx, 3, cz, WOOD);
   }
   for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) put(x, 4, z, PLANKS);
+  put(1, 3, 1, LANTERN); // lantern hanging under the canopy
 
   return { dims: [3, 5, 3], blocks };
+}
+
+/** A wood post topped with a lantern — lights village streets at night. */
+export function lampPost(): Structure {
+  return {
+    dims: [1, 4, 1],
+    blocks: [
+      [0, 0, 0, WOOD],
+      [0, 1, 0, WOOD],
+      [0, 2, 0, WOOD],
+      [0, 3, 0, LANTERN],
+    ],
+  };
 }
 
 /** A crumbled 5x5 cobblestone tower — ragged wall heights with breaches and a little rubble. */

@@ -8,7 +8,7 @@ import { createWorldGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
-import { cottage, well, ruinedTower, brokenWall } from './prefabs';
+import { cottage, well, ruinedTower, brokenWall, lampPost } from './prefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 
@@ -184,7 +184,7 @@ export function createGenerator(preset: WorldPreset): {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
           scatterTrees,
-          scatterStructures([cottage(), cottage(), well()], {
+          scatterStructures([cottage(), cottage(), well(), lampPost()], {
             cellSize: 80,
             density: 0.6,
             clusterCount: 5,
