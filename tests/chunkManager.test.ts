@@ -5,7 +5,7 @@ import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { WORLD_HEIGHT } from '../src/core/constants';
 import { voxelIndex } from '../src/core/coords';
-import { WATER, AIR, STONE } from '../src/blocks/blocks';
+import { WATER, AIR, STONE, LANTERN } from '../src/blocks/blocks';
 import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 
 const SEED = 1337;
@@ -283,5 +283,95 @@ describe('ChunkManager.preload / isLoaded', () => {
     const mgr = makeManager(new FakeSink(), 0, 64, 64);
     expect(mgr.preload(0, 0, 0).generated).toBe(1); // chunk (0,0)
     expect(mgr.preload(0, 0, 0).generated).toBe(0); // already present
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-chunk block light propagation
+// ---------------------------------------------------------------------------
+
+describe('ChunkManager cross-chunk block light', () => {
+  /**
+   * Helper that creates a manager with two adjacent chunks loaded, clears a path at the
+   * given y so there are no opaque blocks along the route, places a LANTERN at the
+   * east border of chunk (0,0), and returns the manager.
+   *
+   * Chunk (0,0) covers world X in [0,15]; chunk (1,0) covers world X in [16,31].
+   * The LANTERN is placed at world (15, testY, 8) — local (15,70,8) in chunk (0,0),
+   * which is the east border face. The east neighbor (1,0) should pick up the crossing
+   * light on its west border face at world (16, testY, 8).
+   */
+  const testY = 150; // well above the terrain surface to avoid opaque blocks
+
+  it('block light from an emitter at a chunk border appears in the neighbor chunk', () => {
+    const sink = new FakeSink();
+    // Load chunk (0,0) and its east neighbor (1,0) via preload.
+    const mgr = makeManager(sink, 0, 64, 64);
+    mgr.preload(0, 0, 1); // 3×3 = 9 chunks; this loads both (0,0) and (1,0)
+
+    // Verify the neighbor border cell at testY is currently AIR (no block, no block light).
+    expect(mgr.getBlock(16, testY, 8)).toBe(AIR);
+    // Before placing the lantern, block light at the neighbor border should be 0
+    // (no emitters near the border at this height in generated terrain).
+    expect(mgr.getBlockLight(16, testY, 8)).toBe(0);
+
+    // Place the LANTERN at the east border of chunk (0,0).
+    mgr.applyEdits([{ x: 15, y: testY, z: 8, id: LANTERN }]);
+
+    // The lantern (emission 14) is at world x=15 (east border of chunk 0,0).
+    // After the border-seed pass:
+    //   - chunk (0,0) east face at (15, testY, 8) has block light 14 (the lantern itself)
+    //   - chunk (1,0) west border seed: arriving = 14 - 1 = 13 at world (16, testY, 8)
+    // The neighbor chunk must now have block light > 0 at the border.
+    expect(mgr.getBlockLight(16, testY, 8)).toBeGreaterThan(0);
+    // More precisely it should be 13 (one step from the lantern across the border).
+    expect(mgr.getBlockLight(16, testY, 8)).toBe(13);
+    // One step further in should be 12.
+    expect(mgr.getBlockLight(17, testY, 8)).toBe(12);
+  });
+
+  it('removing the lantern removes the cross-chunk light', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64);
+    mgr.preload(0, 0, 1);
+
+    // Place lantern, verify light crosses.
+    mgr.applyEdits([{ x: 15, y: testY, z: 8, id: LANTERN }]);
+    expect(mgr.getBlockLight(16, testY, 8)).toBeGreaterThan(0);
+
+    // Remove lantern — light should disappear from the neighbor chunk.
+    mgr.applyEdits([{ x: 15, y: testY, z: 8, id: AIR }]);
+    expect(mgr.getBlockLight(16, testY, 8)).toBe(0);
+  });
+
+  it('a chunk with no emitters near the border has zero cross-chunk block light contribution', () => {
+    // The interior of the generated terrain at testY is AIR.
+    // No emitters anywhere, so neighbor block light at the border should be 0.
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    mgr.preload(0, 0, 1);
+    // Verify there is no lantern or emissive block influencing the border at testY.
+    // (Generated terrain never places LANTERNs at testY=150.)
+    expect(mgr.getBlockLight(16, testY, 8)).toBe(0);
+  });
+
+  it('block light does not cross a sealed opaque wall at the chunk border', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    mgr.preload(0, 0, 1);
+
+    // Fill the entire east border column of chunk (0,0) — all y, all z — with
+    // opaque STONE, creating a floor-to-ceiling wall. Then place the lantern
+    // just inside. With a complete vertical wall, light cannot wrap around the
+    // wall through above/below, and the neighbor should receive 0 block light.
+    const edits: { x: number; y: number; z: number; id: number }[] = [];
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      for (let z = 0; z < 16; z++) {
+        edits.push({ x: 15, y, z, id: STONE }); // full-height opaque wall on the border
+      }
+    }
+    edits.push({ x: 14, y: testY, z: 8, id: LANTERN }); // lantern just behind the wall
+    mgr.applyEdits(edits);
+
+    // The floor-to-ceiling opaque wall at x=15 blocks all border light.
+    expect(mgr.getBlockLight(16, testY, 8)).toBe(0);
   });
 });

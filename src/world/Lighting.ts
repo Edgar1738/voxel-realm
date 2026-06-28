@@ -20,6 +20,19 @@ export interface LightInput {
   emission(x: number, y: number, z: number): number;
 }
 
+/**
+ * Neighbor block-light accessor used by the border-seed pass. Returns the block
+ * light level at a local voxel coord in the neighbor at the given (dcx, dcz) offset
+ * (each −1 or +1), or 0 if the neighbor is not loaded.
+ */
+export type NeighborBlockLight = (
+  dcx: number,
+  dcz: number,
+  lx: number,
+  y: number,
+  lz: number,
+) => number;
+
 const MAX_LIGHT = 15;
 
 // Axis-aligned neighbour offsets (the 6 face neighbours).
@@ -138,4 +151,121 @@ export function computeChunkLight(input: LightInput): LightField {
   propagate(block, seedBlock(block, input), input);
 
   return { sky, block };
+}
+
+/**
+ * Border-seed pass: seeds the block-light BFS with values arriving from already-computed
+ * horizontal neighbors, then propagates inward (bounded to ≤15 steps by the existing
+ * propagate() logic). Call this AFTER computeChunkLight to layer cross-chunk light onto
+ * an already-lit block array.
+ *
+ * Only updates cells where the incoming border value exceeds what was already computed
+ * locally, so interior emitters are never dimmed. Returns true if any cell was raised
+ * (caller can use this to decide whether to re-light adjacent chunks).
+ */
+export function applyBorderBlockLight(
+  block: Uint8Array,
+  input: LightInput,
+  getNeighborLight: NeighborBlockLight,
+): boolean {
+  const seeds: number[] = [];
+  let changed = false;
+
+  // West neighbor (dcx=-1): their x=CHUNK_SIZE_X-1 faces our x=0
+  for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const neighborLevel = getNeighborLight(-1, 0, CHUNK_SIZE_X - 1, y, z);
+      if (neighborLevel <= 1) continue;
+      const arriving = neighborLevel - 1;
+      const idx = voxelIndex(0, y, z);
+      if (arriving > block[idx] && !input.isOpaque(0, y, z)) {
+        block[idx] = arriving;
+        seeds.push(idx);
+        changed = true;
+      }
+    }
+  }
+
+  // East neighbor (dcx=+1): their x=0 faces our x=CHUNK_SIZE_X-1
+  for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const neighborLevel = getNeighborLight(1, 0, 0, y, z);
+      if (neighborLevel <= 1) continue;
+      const arriving = neighborLevel - 1;
+      const idx = voxelIndex(CHUNK_SIZE_X - 1, y, z);
+      if (arriving > block[idx] && !input.isOpaque(CHUNK_SIZE_X - 1, y, z)) {
+        block[idx] = arriving;
+        seeds.push(idx);
+        changed = true;
+      }
+    }
+  }
+
+  // North neighbor (dcz=-1): their z=CHUNK_SIZE_Z-1 faces our z=0
+  for (let x = 0; x < CHUNK_SIZE_X; x++) {
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const neighborLevel = getNeighborLight(0, -1, x, y, CHUNK_SIZE_Z - 1);
+      if (neighborLevel <= 1) continue;
+      const arriving = neighborLevel - 1;
+      const idx = voxelIndex(x, y, 0);
+      if (arriving > block[idx] && !input.isOpaque(x, y, 0)) {
+        block[idx] = arriving;
+        seeds.push(idx);
+        changed = true;
+      }
+    }
+  }
+
+  // South neighbor (dcz=+1): their z=0 faces our z=CHUNK_SIZE_Z-1
+  for (let x = 0; x < CHUNK_SIZE_X; x++) {
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      const neighborLevel = getNeighborLight(0, 1, x, y, 0);
+      if (neighborLevel <= 1) continue;
+      const arriving = neighborLevel - 1;
+      const idx = voxelIndex(x, y, CHUNK_SIZE_Z - 1);
+      if (arriving > block[idx] && !input.isOpaque(x, y, CHUNK_SIZE_Z - 1)) {
+        block[idx] = arriving;
+        seeds.push(idx);
+        changed = true;
+      }
+    }
+  }
+
+  if (seeds.length > 0) {
+    propagate(block, seeds, input);
+  }
+
+  return changed;
+}
+
+/**
+ * Compute the "border light export" for a chunk: the maximum block-light value
+ * on the border face voxels facing each neighbor. Used by ChunkManager to detect
+ * whether a chunk's outgoing light changed (triggering neighbor re-lighting).
+ *
+ * Returns a 4-element tuple [west_max, east_max, north_max, south_max] where each
+ * element is the max block-light at that border face column.
+ */
+export function borderLightExport(block: Uint8Array): readonly [number, number, number, number] {
+  let west = 0;
+  let east = 0;
+  let north = 0;
+  let south = 0;
+
+  for (let y = 0; y < WORLD_HEIGHT; y++) {
+    for (let t = 0; t < CHUNK_SIZE_Z; t++) {
+      const wVal = block[voxelIndex(0, y, t)];
+      const eVal = block[voxelIndex(CHUNK_SIZE_X - 1, y, t)];
+      if (wVal > west) west = wVal;
+      if (eVal > east) east = eVal;
+    }
+    for (let t = 0; t < CHUNK_SIZE_X; t++) {
+      const nVal = block[voxelIndex(t, y, 0)];
+      const sVal = block[voxelIndex(t, y, CHUNK_SIZE_Z - 1)];
+      if (nVal > north) north = nVal;
+      if (sVal > south) south = sVal;
+    }
+  }
+
+  return [west, east, north, south];
 }
