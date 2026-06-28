@@ -4,7 +4,7 @@ import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE } from '../blocks/blocks';
 import { scatterTrees } from './TreeScatterer';
-import { createWorldGenerator } from './LayeredGenerator';
+import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
@@ -21,7 +21,8 @@ export type WorldPreset =
   | 'amplified'
   | 'islands'
   | 'canyon'
-  | 'villages';
+  | 'villages'
+  | 'caverns';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -32,6 +33,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'islands',
   'canyon',
   'villages',
+  'caverns',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -195,6 +197,8 @@ export function createGenerator(preset: WorldPreset): {
           }),
         ],
       };
+    case 'caverns':
+      return { generator: createCavernsGenerator(), overlays: [scatterTrees] };
     case 'default':
     default:
       return { generator: createWorldGenerator(), overlays: [scatterTrees] };
