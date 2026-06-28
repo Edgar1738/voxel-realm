@@ -264,3 +264,73 @@ describe('scatterStructures overlay', () => {
     expect(crossedBorder, 'placement should span both chunks').toBe(true);
   });
 });
+
+describe('scatterStructures at negative chunk coordinates', () => {
+  const opts = { cellSize: 8, surfaceAt: flatAt, density: 1, salt: 0 };
+
+  it('is deterministic at negative cx/cz: same seed gives identical chunks', () => {
+    const a = new ChunkData(-3, -5);
+    const b = new ChunkData(-3, -5);
+    scatterStructures([box()], opts)(a, -3, -5, 1337);
+    scatterStructures([box()], opts)(b, -3, -5, 1337);
+    expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
+
+  it('differs across distinct negative cells (not all hashing to the same bucket)', () => {
+    const a = new ChunkData(-1, -1);
+    const b = new ChunkData(-2, -2);
+    scatterStructures([box()], opts)(a, -1, -1, 42);
+    scatterStructures([box()], opts)(b, -2, -2, 42);
+    // Very unlikely to be identical if hashing works correctly
+    expect(Array.from(a.data)).not.toEqual(Array.from(b.data));
+  });
+
+  it('does not throw at negative coordinates', () => {
+    const coords: [number, number][] = [
+      [-1, -1],
+      [-10, -10],
+      [-100, -100],
+      [-1, 0],
+      [0, -1],
+    ];
+    for (const [cx, cz] of coords) {
+      const c = new ChunkData(cx, cz);
+      expect(() => scatterStructures([box()], opts)(c, cx, cz, 999)).not.toThrow();
+    }
+  });
+
+  it('writes only in-bounds voxels (no out-of-range Y) at negative coords', () => {
+    for (let cx = -5; cx < 0; cx++) {
+      for (let cz = -5; cz < 0; cz++) {
+        const c = new ChunkData(cx, cz);
+        scatterStructures([box()], opts)(c, cx, cz, 77);
+        // Every written voxel must be within [0, WORLD_HEIGHT)
+        for (let x = 0; x < CHUNK_SIZE_X; x++)
+          for (let z = 0; z < CHUNK_SIZE_Z; z++)
+            for (let y = 0; y < WORLD_HEIGHT; y++) {
+              const v = c.get(x, y, z);
+              expect(v === AIR || v === COBBLESTONE).toBe(true);
+            }
+      }
+    }
+  });
+
+  it('placement at negative cell matches a second identical call (determinism)', () => {
+    const p1 = placementAt([box()], opts, 1337, -3, -7);
+    const p2 = placementAt([box()], opts, 1337, -3, -7);
+    expect(p1).toEqual(p2);
+  });
+
+  it('a negative-coord chunk with density=1 receives placed blocks', () => {
+    // With density=1, every cell spawns — verify something is written
+    let foundAny = false;
+    for (let cx = -4; cx < 0 && !foundAny; cx++) {
+      for (let cz = -4; cz < 0 && !foundAny; cz++) {
+        const c = new ChunkData(cx, cz);
+        scatterStructures([box()], opts)(c, cx, cz, 55);
+        if (nonAir(c) > 0) foundAny = true;
+      }
+    }
+    expect(foundAny).toBe(true);
+  });
+});
