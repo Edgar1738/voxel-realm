@@ -15,6 +15,7 @@ export const CACTUS: BlockId = 10;
 export const PLANKS: BlockId = 11;
 export const COBBLESTONE: BlockId = 12;
 export const BRICK: BlockId = 13;
+export const LANTERN: BlockId = 14;
 
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
@@ -43,9 +44,10 @@ export const TextureLayer = {
   Planks: 12,
   Cobblestone: 13,
   Brick: 14,
+  Lantern: 15,
 } as const;
 
-export const TEXTURE_LAYER_COUNT = 15;
+export const TEXTURE_LAYER_COUNT = 16;
 
 /** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
 export interface BlockDef {
@@ -56,6 +58,8 @@ export interface BlockDef {
   transparent: boolean;
   /** Texture layer per face, indexed by Face; empty for air. */
   faces: number[];
+  /** Self-emitted light level (0..15); 0/undefined for non-emitters. Drives the lighting pass. */
+  light?: number;
 }
 
 function uniform(layer: number): number[] {
@@ -153,5 +157,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     faces: uniform(TextureLayer.Brick),
+  },
+  {
+    id: LANTERN,
+    name: 'lantern',
+    opaque: true,
+    transparent: false,
+    light: 14,
+    faces: uniform(TextureLayer.Lantern),
   },
 ];

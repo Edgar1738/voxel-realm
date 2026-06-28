@@ -120,7 +120,7 @@ describe('BlockRegistry', () => {
   });
 
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(15);
+    expect(reg.layerCount).toBe(16);
   });
 });
 

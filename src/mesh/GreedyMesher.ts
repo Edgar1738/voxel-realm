@@ -19,7 +19,9 @@ interface MaskCell {
   layer: number;
   /** AO brightness per corner, order (0,0) (1,0) (1,1) (0,1) in (u,v). */
   ao: [number, number, number, number];
-  /** Merge key combining layer + the four AO values. */
+  /** Packed face light: skyLevel*16 + blockLevel (sampled at the air-side voxel). */
+  light: number;
+  /** Merge key combining layer + the four AO values + light. */
   key: string;
 }
 
@@ -29,6 +31,7 @@ interface Buffers {
   uvs: number[];
   layers: number[];
   ao: number[];
+  light: number[];
   indices: number[];
   vertCount: number;
 }
@@ -49,6 +52,7 @@ export class GreedyMesher {
       uvs: [],
       layers: [],
       ao: [],
+      light: [],
       indices: [],
       vertCount: 0,
     };
@@ -66,6 +70,7 @@ export class GreedyMesher {
       uvs: new Float32Array(buf.uvs),
       layers: new Float32Array(buf.layers),
       ao: new Float32Array(buf.ao),
+      light: new Float32Array(buf.light),
       indices: new Uint32Array(buf.indices),
     };
   }
@@ -143,7 +148,10 @@ export class GreedyMesher {
 
           const layer = this.registry.faceLayer(id, faceFor(axis, sign));
           const ao = this.cornerAO(view, solid, axis, sign, u, v);
-          mask[a + b * du] = { layer, ao, key: `${layer}|${ao.join(',')}` };
+          const sky = view.skyLight(neighbor[0], neighbor[1], neighbor[2]);
+          const block = view.blockLight(neighbor[0], neighbor[1], neighbor[2]);
+          const light = sky * 16 + block;
+          mask[a + b * du] = { layer, ao, light, key: `${layer}|${ao.join(',')}|${light}` };
         }
       }
 
@@ -245,6 +253,7 @@ export class GreedyMesher {
       buf.uvs.push(uvs[k][0], uvs[k][1]);
       buf.layers.push(cell.layer);
       buf.ao.push(cell.ao[k]);
+      buf.light.push(cell.light);
     }
 
     // Flip the split diagonal to keep AO interpolation symmetric (0fps rule).

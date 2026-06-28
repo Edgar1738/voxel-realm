@@ -143,6 +143,14 @@ const glass =
     return border ? shade(base, 24) : shade(base, (rng() - 0.5) * 6);
   };
 
+/** A dark metal frame around a glowing core (lantern). */
+const lantern =
+  (frame: RGB, glow: RGB): Pixel =>
+  (px, py, rng) => {
+    const onFrame = px <= 1 || py <= 1 || px >= TILE - 2 || py >= TILE - 2 || px === 7 || px === 8;
+    return onFrame ? shade(frame, (rng() - 0.5) * 8) : shade(glow, (rng() - 0.5) * 18);
+  };
+
 /** Builds the procedural block-face texture array (one layer per TextureLayer). */
 export function createTextureArray(): DataArrayTexture {
   const data = new Uint8Array(TILE * TILE * 4 * TEXTURE_LAYER_COUNT);
@@ -161,6 +169,7 @@ export function createTextureArray(): DataArrayTexture {
   paint(data, TextureLayer.Planks, planks([165, 130, 80]));
   paint(data, TextureLayer.Cobblestone, cobble([118, 118, 122], [70, 70, 74]));
   paint(data, TextureLayer.Brick, brick([150, 70, 58], [198, 182, 162]));
+  paint(data, TextureLayer.Lantern, lantern([60, 52, 40], [255, 226, 140]));
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;

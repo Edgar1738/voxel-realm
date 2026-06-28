@@ -7,6 +7,8 @@ export interface MeshData {
   layers: Float32Array;
   /** Baked ambient-occlusion brightness multiplier per vertex (0..1). */
   ao: Float32Array;
+  /** Packed per-vertex light: skyLevel*16 + blockLevel (each 0..15). */
+  light: Float32Array;
   indices: Uint32Array;
 }
 

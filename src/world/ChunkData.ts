@@ -8,11 +8,24 @@ export class ChunkData {
   readonly cx: number;
   readonly cz: number;
   readonly data: Uint8Array;
+  /** Baked per-voxel light (0..15), filled by the lighting pass before meshing. */
+  readonly skyLight = new Uint8Array(CHUNK_VOLUME);
+  readonly blockLight = new Uint8Array(CHUNK_VOLUME);
 
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;
     this.cz = cz;
     this.data = data ?? new Uint8Array(CHUNK_VOLUME); // Uint8Array defaults to 0 = AIR
+  }
+
+  /** Baked skylight at a local voxel (caller ensures in-bounds). */
+  getSkyLight(x: number, y: number, z: number): number {
+    return this.skyLight[voxelIndex(x, y, z)];
+  }
+
+  /** Baked block light at a local voxel (caller ensures in-bounds). */
+  getBlockLight(x: number, y: number, z: number): number {
+    return this.blockLight[voxelIndex(x, y, z)];
   }
 
   /** Reads a voxel; out-of-bounds returns AIR (callers rely on this for border meshing). */
