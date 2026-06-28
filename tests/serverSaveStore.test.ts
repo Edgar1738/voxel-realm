@@ -5,6 +5,14 @@ import { ServerSaveStore } from '../src/persistence/ServerSaveStore';
 const ok = (json: unknown): Response =>
   ({ ok: true, json: async () => json }) as unknown as Response;
 
+const notOk = (status = 500): Response =>
+  ({
+    ok: false,
+    status,
+    statusText: 'Server Error',
+    json: async () => ({}),
+  }) as unknown as Response;
+
 const isValidBlockId = (id: number): boolean => id >= 0 && id <= 13;
 
 beforeEach(() => {
@@ -40,6 +48,26 @@ describe('ServerSaveStore', () => {
     expect(url).toContain('chunk=2%2C3');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ entries: [[7, 5]] });
+  });
+
+  it('saveChunkDelta rejects on a non-OK response so the caller keeps the edit dirty', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => notOk(500)),
+    );
+    const store = new ServerSaveStore('x', isValidBlockId);
+    await expect(store.saveChunkDelta('0,0', [[1, 2]])).rejects.toThrow(/world save failed/);
+  });
+
+  it('saveChunkDelta rejects when fetch throws (network error)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down');
+      }),
+    );
+    const store = new ServerSaveStore('x', isValidBlockId);
+    await expect(store.saveChunkDelta('0,0', [[1, 2]])).rejects.toThrow('network down');
   });
 
   it('loadDeltas degrades to empty when the fetch fails', async () => {
