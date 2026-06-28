@@ -19,9 +19,12 @@ import {
   IRON_ORE,
   GOLD_ORE,
   CRYSTAL,
-  TextureLayer,
   TEXTURE_LAYER_COUNT,
   Face,
+  BLOCK_DEFS,
+  BLOCK_TEXTURES,
+  buildBlockTextures,
+  type BlockDef,
 } from '../src/blocks/blocks';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 
@@ -72,32 +75,9 @@ describe('BlockRegistry', () => {
     expect(reg.isOpaque(STONE)).toBe(true);
   });
 
-  it('maps grass faces: top=grass-top, bottom=dirt, sides=grass-side', () => {
-    expect(reg.faceLayer(GRASS, Face.PosY)).toBe(TextureLayer.GrassTop);
-    expect(reg.faceLayer(GRASS, Face.NegY)).toBe(TextureLayer.Dirt);
-    expect(reg.faceLayer(GRASS, Face.PosX)).toBe(TextureLayer.GrassSide);
-    expect(reg.faceLayer(GRASS, Face.NegZ)).toBe(TextureLayer.GrassSide);
-  });
-
-  it('maps dirt and stone uniformly on all faces', () => {
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(DIRT, f)).toBe(TextureLayer.Dirt);
-      expect(reg.faceLayer(STONE, f)).toBe(TextureLayer.Stone);
-    }
-  });
-
   it('treats wood and leaves as opaque', () => {
     expect(reg.isOpaque(WOOD)).toBe(true);
     expect(reg.isOpaque(LEAVES)).toBe(true);
-  });
-
-  it('maps wood: rings on top/bottom, bark on the sides; leaves uniform', () => {
-    expect(reg.faceLayer(WOOD, Face.PosY)).toBe(TextureLayer.WoodTop);
-    expect(reg.faceLayer(WOOD, Face.NegY)).toBe(TextureLayer.WoodTop);
-    expect(reg.faceLayer(WOOD, Face.PosX)).toBe(TextureLayer.WoodSide);
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(LEAVES, f)).toBe(TextureLayer.Leaves);
-    }
   });
 
   it('treats sand as opaque and water as non-opaque/transparent', () => {
@@ -126,7 +106,7 @@ describe('BlockRegistry', () => {
   });
 
   it('exposes the number of texture layers for the DataArrayTexture', () => {
-    expect(reg.layerCount).toBe(20);
+    expect(reg.layerCount).toBe(TEXTURE_LAYER_COUNT);
   });
 });
 
@@ -138,13 +118,14 @@ describe('BlockRegistry.has', () => {
   });
 });
 
-describe('TEXTURE_LAYER_COUNT is derived from TextureLayer', () => {
-  it('equals the number of keys in TextureLayer', () => {
-    expect(TEXTURE_LAYER_COUNT).toBe(Object.keys(TextureLayer).length);
+describe('TEXTURE_LAYER_COUNT is derived from BLOCK_TEXTURES', () => {
+  it('equals the number of unique specs built from BLOCK_DEFS', () => {
+    expect(TEXTURE_LAYER_COUNT).toBe(BLOCK_TEXTURES.layerCount);
   });
 
-  it('equals 20 (current layer count)', () => {
-    expect(TEXTURE_LAYER_COUNT).toBe(20);
+  it('is a positive integer', () => {
+    expect(TEXTURE_LAYER_COUNT).toBeGreaterThan(0);
+    expect(Number.isInteger(TEXTURE_LAYER_COUNT)).toBe(true);
   });
 });
 
@@ -161,9 +142,6 @@ describe('newer block ids 14-18 (lantern, ores, crystal)', () => {
     const reg = new BlockRegistry();
     expect(reg.isOpaque(COAL_ORE)).toBe(true);
     expect(reg.emission(COAL_ORE)).toBe(0);
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(COAL_ORE, f)).toBe(TextureLayer.CoalOre);
-    }
   });
 
   it('has iron ore at id 16, opaque, no emission', () => {
@@ -171,9 +149,6 @@ describe('newer block ids 14-18 (lantern, ores, crystal)', () => {
     const reg = new BlockRegistry();
     expect(reg.isOpaque(IRON_ORE)).toBe(true);
     expect(reg.emission(IRON_ORE)).toBe(0);
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(IRON_ORE, f)).toBe(TextureLayer.IronOre);
-    }
   });
 
   it('has gold ore at id 17, opaque, no emission', () => {
@@ -181,9 +156,6 @@ describe('newer block ids 14-18 (lantern, ores, crystal)', () => {
     const reg = new BlockRegistry();
     expect(reg.isOpaque(GOLD_ORE)).toBe(true);
     expect(reg.emission(GOLD_ORE)).toBe(0);
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(GOLD_ORE, f)).toBe(TextureLayer.GoldOre);
-    }
   });
 
   it('has crystal at id 18 with light emission 7 and opaque', () => {
@@ -191,15 +163,49 @@ describe('newer block ids 14-18 (lantern, ores, crystal)', () => {
     const reg = new BlockRegistry();
     expect(reg.isOpaque(CRYSTAL)).toBe(true);
     expect(reg.emission(CRYSTAL)).toBe(7);
-    for (const f of [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ]) {
-      expect(reg.faceLayer(CRYSTAL, f)).toBe(TextureLayer.Crystal);
-    }
   });
 });
 
-describe('BlockRegistry.faceLayer throws on AIR', () => {
-  it('throws a clear error when called on AIR (faceless block)', () => {
-    const reg = new BlockRegistry();
-    expect(() => reg.faceLayer(AIR, Face.PosX)).toThrow(/faceLayer called on block "air"/);
+describe('buildBlockTextures', () => {
+  it('resolves every non-air block to 6 in-range face layers', () => {
+    for (const def of BLOCK_DEFS) {
+      if (!def.faces) continue;
+      const layers = BLOCK_TEXTURES.faceLayers.get(def.id);
+      expect(layers, `block ${def.name}`).toBeDefined();
+      expect(layers).toHaveLength(6);
+      for (const l of layers!) {
+        expect(l).toBeGreaterThanOrEqual(0);
+        expect(l).toBeLessThan(TEXTURE_LAYER_COUNT);
+      }
+    }
+  });
+
+  it('dedups identical specs into one layer', () => {
+    const defs: BlockDef[] = [
+      {
+        id: 1,
+        name: 'a',
+        opaque: true,
+        transparent: false,
+        faces: { pattern: 'speckle', colors: [[1, 2, 3]] },
+      },
+      {
+        id: 2,
+        name: 'b',
+        opaque: true,
+        transparent: false,
+        faces: { pattern: 'speckle', colors: [[1, 2, 3]] },
+      },
+    ];
+    const t = buildBlockTextures(defs);
+    expect(t.layerCount).toBe(1); // both blocks share the single unique spec
+    expect(t.faceLayers.get(1)).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(t.faceLayers.get(2)).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it('grass top and side resolve to different layers', () => {
+    const g = BLOCK_TEXTURES.faceLayers.get(GRASS)!;
+    expect(g[Face.PosY]).not.toBe(g[Face.PosX]); // top != side
+    expect(g[Face.NegY]).toBe(BLOCK_TEXTURES.faceLayers.get(DIRT)![Face.PosY]); // grass bottom == dirt
   });
 });
