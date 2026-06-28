@@ -1,20 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreativeInventory, CREATIVE_BLOCKS } from '../src/app/CreativeInventory';
-import {
-  GRASS,
-  DIRT,
-  STONE,
-  SAND,
-  WOOD,
-  LEAVES,
-  SNOW,
-  CACTUS,
-  GLASS,
-  PLANKS,
-  COBBLESTONE,
-  BRICK,
-  LANTERN,
-} from '../src/blocks/blocks';
+import { GRASS, STONE, SNOW, CACTUS, WOOD, BLOCK_DEFS, AIR } from '../src/blocks/blocks';
 
 describe('CreativeInventory', () => {
   let inv: CreativeInventory;
@@ -38,21 +24,8 @@ describe('CreativeInventory', () => {
     });
 
     it('CREATIVE_BLOCKS contains the expected solids in order', () => {
-      expect(CREATIVE_BLOCKS).toEqual([
-        GRASS,
-        DIRT,
-        STONE,
-        SAND,
-        WOOD,
-        LEAVES,
-        SNOW,
-        CACTUS,
-        GLASS,
-        PLANKS,
-        COBBLESTONE,
-        BRICK,
-        LANTERN,
-      ]);
+      const expected = BLOCK_DEFS.filter((d) => d.creative).map((d) => d.id);
+      expect(CREATIVE_BLOCKS).toEqual(expected);
     });
   });
 
@@ -135,5 +108,14 @@ describe('CreativeInventory', () => {
       expect(h1).not.toBe(h2);
       expect(h1).toEqual(h2);
     });
+  });
+});
+
+describe('CREATIVE_BLOCKS derivation', () => {
+  it('contains exactly the blocks flagged creative, never AIR', () => {
+    const expected = BLOCK_DEFS.filter((d) => d.creative).map((d) => d.id);
+    expect(CREATIVE_BLOCKS).toEqual(expected);
+    expect(CREATIVE_BLOCKS).not.toContain(AIR);
+    expect(CREATIVE_BLOCKS.length).toBeGreaterThan(0);
   });
 });
