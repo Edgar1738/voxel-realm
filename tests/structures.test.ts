@@ -334,3 +334,17 @@ describe('scatterStructures at negative chunk coordinates', () => {
     expect(foundAny).toBe(true);
   });
 });
+
+it('placementsAt is deterministic at large cell coordinates (Math.imul, no float overflow)', () => {
+  const structures: Structure[] = [{ dims: [1, 1, 1], blocks: [[0, 0, 0, 1]] }];
+  const opts = { cellSize: 32, surfaceAt: () => 10, density: 1 };
+  const seed = 1234;
+  // A cell far from origin where plain * would overflow past 2^53.
+  const a = placementsAt(structures, opts, seed, 900000, 900000);
+  const b = placementsAt(structures, opts, seed, 900000, 900000);
+  expect(a).toEqual(b);
+  expect(a.length).toBe(1);
+  // Differs from a neighbouring cell (hash actually mixes, not collapsed to a constant).
+  const c = placementsAt(structures, opts, seed, 900001, 900000);
+  expect(a[0].ox === c[0].ox && a[0].oz === c[0].oz).toBe(false);
+});

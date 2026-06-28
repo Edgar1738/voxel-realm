@@ -29,6 +29,7 @@ import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
 import type { WorldPreset } from '../worldgen/Presets';
+import type { Prefab } from '../core/Prefab';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -51,10 +52,7 @@ export interface DevControlsContext {
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
-export interface Blueprint {
-  dims: [number, number, number];
-  blocks: Array<[number, number, number, BlockId]>;
-}
+export type Blueprint = Prefab;
 
 type Html2Canvas = (
   el: HTMLElement,
