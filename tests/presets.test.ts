@@ -129,6 +129,69 @@ describe('world presets', () => {
     const b = surfaceHeight(generator, 1, -2, 3, 7);
     expect(a).toBe(b);
   });
+
+  it('caverns: valid preset, returns a working generator with the tree overlay', () => {
+    expect(isWorldPreset('caverns')).toBe(true);
+    const { generator, overlays } = createGenerator('caverns');
+    expect(typeof generator.generateBaseChunk).toBe('function');
+    expect(overlays).toHaveLength(1); // scatterTrees
+
+    // Must not throw and must return a ChunkData with some non-air content
+    const c = generator.generateBaseChunk(SEED, 0, 0);
+    let hasGround = false;
+    for (const v of c.data) {
+      if (v !== AIR) {
+        hasGround = true;
+        break;
+      }
+    }
+    expect(hasGround).toBe(true);
+  });
+
+  it('caverns: carves significantly more air below the surface than a flat world', () => {
+    const { generator: cavernsGen } = createGenerator('caverns');
+    const { generator: flatGen } = createGenerator('flat');
+
+    // Count sub-surface air across a small chunk sample
+    function subSurfaceAirCount(gen: ReturnType<typeof createGenerator>['generator']): number {
+      let airCount = 0;
+      for (let cx = -1; cx <= 1; cx++) {
+        for (let cz = -1; cz <= 1; cz++) {
+          const c = gen.generateBaseChunk(SEED, cx, cz);
+          for (let lx = 0; lx < CHUNK_SIZE_X; lx++) {
+            for (let lz = 0; lz < CHUNK_SIZE_Z; lz++) {
+              // Find surface top
+              let surface = -1;
+              for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+                if (c.get(lx, y, lz) !== AIR) {
+                  surface = y;
+                  break;
+                }
+              }
+              if (surface < 2) continue;
+              // Count air strictly below the surface
+              for (let y = 1; y < surface; y++) {
+                if (c.get(lx, y, lz) === AIR) airCount++;
+              }
+            }
+          }
+        }
+      }
+      return airCount;
+    }
+
+    const cavernsAir = subSurfaceAirCount(cavernsGen);
+    const flatAir = subSurfaceAirCount(flatGen);
+    // Caverns should have substantially more underground air pockets than flat terrain
+    expect(cavernsAir).toBeGreaterThan(flatAir * 5);
+  });
+
+  it('caverns: is deterministic across repeated generateBaseChunk calls', () => {
+    const { generator } = createGenerator('caverns');
+    const a = generator.generateBaseChunk(SEED, 2, -3);
+    const b = generator.generateBaseChunk(SEED, 2, -3);
+    expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
 });
 
 describe('resolveBootPreset', () => {

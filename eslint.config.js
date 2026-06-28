@@ -18,7 +18,7 @@ export default tseslint.config(
     },
     plugins: { prettier },
     rules: {
-      'prettier/prettier': 'warn',
+      'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },

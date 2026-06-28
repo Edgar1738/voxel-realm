@@ -96,7 +96,7 @@ export class PlayerController {
     this.position.x = res.center.x;
     this.position.y = res.center.y;
     this.position.z = res.center.z;
-    this.grounded = (this.flying || submerged) ? false : res.grounded;
+    this.grounded = this.flying || submerged ? false : res.grounded;
     if (res.grounded && this.vy < 0) this.vy = 0;
   }
 }
