@@ -12,6 +12,7 @@ import {
   deleteWorld,
   safeWorldName,
 } from './server/worldDiskStore';
+import { isAllowedDevOrigin } from './server/devRequestGuard';
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024; // reject request bodies larger than this (dev guard)
 
@@ -64,6 +65,10 @@ function devDisk(): Plugin {
           res.statusCode = 405;
           return res.end('POST only');
         }
+        if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+          res.statusCode = 403;
+          return res.end('forbidden: cross-origin request rejected');
+        }
         void readBody(req)
           .then((body) => {
             try {
@@ -86,6 +91,10 @@ function devDisk(): Plugin {
       server.middlewares.use('/__blueprint', (req, res) => {
         const blueprintDir = dir('.blueprints');
         if (req.method === 'POST') {
+          if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+            res.statusCode = 403;
+            return res.end('forbidden: cross-origin request rejected');
+          }
           void readBody(req)
             .then((body) => {
               try {
@@ -126,6 +135,10 @@ function devDisk(): Plugin {
         }
 
         if (req.method === 'DELETE') {
+          if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+            res.statusCode = 403;
+            return res.end('forbidden: cross-origin request rejected');
+          }
           deleteWorld(root, name);
           return sendJson(res, { ok: true });
         }
@@ -133,6 +146,11 @@ function devDisk(): Plugin {
         if (req.method !== 'POST') {
           res.statusCode = 405;
           return res.end('GET/POST/DELETE only');
+        }
+
+        if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+          res.statusCode = 403;
+          return res.end('forbidden: cross-origin request rejected');
         }
 
         const copyTo = url.searchParams.get('copyTo');
