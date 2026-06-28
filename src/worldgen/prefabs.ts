@@ -71,3 +71,46 @@ export function well(): Structure {
 
   return { dims: [3, 5, 3], blocks };
 }
+
+/** A crumbled 5x5 cobblestone tower — ragged wall heights with breaches and a little rubble. */
+export function ruinedTower(): Structure {
+  const W = 5;
+  const D = 5;
+  const blocks: Array<[number, number, number, BlockId]> = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      if (!(x === 0 || x === W - 1 || z === 0 || z === D - 1)) continue; // hollow walls
+      const h = 3 + ((x * 3 + z * 5) % 5); // ragged crown, 3..7
+      for (let y = 0; y <= h; y++) {
+        if ((x + z + y) % 7 === 0 && y > 0 && y < h) continue; // breaches/windows
+        put(x, y, z, COBBLESTONE);
+      }
+    }
+  }
+  for (const [rx, rz] of [
+    [1, 1],
+    [2, 2],
+    [3, 1],
+  ])
+    put(rx, 0, rz, COBBLESTONE); // fallen rubble inside
+  return { dims: [W, 8, D], blocks };
+}
+
+/** A toppled cobblestone wall segment with ragged height and a few fallen blocks. */
+export function brokenWall(): Structure {
+  const L = 6;
+  const blocks: Array<[number, number, number, BlockId]> = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  for (let x = 0; x < L; x++) {
+    const h = 1 + ((x * 7) % 4); // ragged 1..4
+    for (let y = 0; y <= h; y++) if ((x + y) % 5 !== 0) put(x, y, 0, COBBLESTONE);
+  }
+  put(2, 0, 1, COBBLESTONE);
+  put(4, 0, 1, COBBLESTONE); // toppled blocks
+  return { dims: [L, 5, 2], blocks };
+}

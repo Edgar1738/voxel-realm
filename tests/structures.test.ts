@@ -135,6 +135,16 @@ describe('placementsAt (clusters)', () => {
   });
 });
 
+describe('minSurfaceY filter', () => {
+  const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0 };
+
+  it('skips cells whose center surface is below minSurfaceY', () => {
+    // flat surface is 64
+    expect(placementsAt([box()], { ...opts, minSurfaceY: 70 }, 5, 0, 0)).toEqual([]);
+    expect(placementsAt([box()], { ...opts, minSurfaceY: 60 }, 5, 0, 0).length).toBeGreaterThan(0);
+  });
+});
+
 describe('scatterStructures clearFootprint', () => {
   const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0 };
   const stoneChunk = (): ChunkData => {

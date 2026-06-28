@@ -32,6 +32,8 @@ export interface ScatterOptions {
   clearFootprint?: boolean;
   /** If set, lay a surface path of this block connecting a cluster's members (a village street). */
   streetBlock?: BlockId;
+  /** Skip cells whose center surface is below this height (e.g. keep ruins off ravine floors). */
+  minSurfaceY?: number;
 }
 
 /** A resolved structure placement: which prefab, and its min-corner world position. */
@@ -68,6 +70,9 @@ export function placementsAt(
     cellX * cellSize + margin + Math.floor(rng() * Math.max(1, cellSize - 2 * margin));
   const centerZ =
     cellZ * cellSize + margin + Math.floor(rng() * Math.max(1, cellSize - 2 * margin));
+  if (opts.minSurfaceY !== undefined && surfaceAt(seed, centerX, centerZ) < opts.minSurfaceY) {
+    return [];
+  }
   const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
   const placements: Placement[] = [];
   for (let i = 0; i < count; i++) {
