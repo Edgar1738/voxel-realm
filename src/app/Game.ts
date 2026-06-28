@@ -6,7 +6,7 @@ import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
-import { createGenerator, isWorldPreset, type WorldPreset } from '../worldgen/Presets';
+import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldgen/Presets';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
@@ -63,19 +63,22 @@ export class Game {
     const daynight = new DayNight(renderer.scene, [material, transparentMaterial]);
     const celestial = new CelestialSky(renderer.scene);
 
-    // Pick the world environment (?world=flat|void|arena|default).
-    const requested = new URLSearchParams(window.location.search).get('world');
-    const preset: WorldPreset = isWorldPreset(requested) ? requested : 'default';
-    const { generator, overlays } = createGenerator(preset);
-
     // Load the durable save (or start fresh / discard an incompatible one).
     // Shared storage in dev (server-owned, named worlds via ?save=); IndexedDB in production.
     const worldName = worldNameFromSearch(window.location.search);
     const store: SaveStore = import.meta.env.DEV
       ? new ServerSaveStore(worldName, (id) => registry.has(id as BlockId))
       : new IndexedDbSaveStore();
+    const meta = await store.loadMeta();
+
+    // Pick the world environment. An explicit `?world=` wins; otherwise an existing save keeps its
+    // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
+    const requested = new URLSearchParams(window.location.search).get('world');
+    const preset: WorldPreset = resolveBootPreset(requested, meta);
+    const { generator, overlays } = createGenerator(preset);
+
     let savedDeltas: WorldDeltas = new Map();
-    const action = resolveSaveAction(await store.loadMeta(), SEED, SAVE_VERSION, preset);
+    const action = resolveSaveAction(meta, SEED, SAVE_VERSION, preset);
     if (action.kind === 'load') {
       savedDeltas = await store.loadDeltas();
     } else {

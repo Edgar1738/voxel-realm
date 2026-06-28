@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createGenerator, isWorldPreset } from '../src/worldgen/Presets';
+import { createGenerator, isWorldPreset, resolveBootPreset } from '../src/worldgen/Presets';
 import { AIR, GRASS, COBBLESTONE, WATER } from '../src/blocks/blocks';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
 import type { Generator } from '../src/worldgen/Generator';
 import type { WorldPreset } from '../src/worldgen/Presets';
+import type { WorldMeta } from '../src/persistence/SaveTypes';
 
 const SEED = 1337;
 
@@ -127,5 +128,31 @@ describe('world presets', () => {
     const a = surfaceHeight(generator, 1, -2, 3, 7);
     const b = surfaceHeight(generator, 1, -2, 3, 7);
     expect(a).toBe(b);
+  });
+});
+
+describe('resolveBootPreset', () => {
+  const meta = (preset?: string): WorldMeta =>
+    preset === undefined ? { seed: SEED, version: 1 } : { seed: SEED, version: 1, preset };
+
+  it('uses an explicit ?world= param when it is a valid preset', () => {
+    expect(resolveBootPreset('void', meta('flat'))).toBe('void');
+  });
+
+  it("keeps an existing save's stored preset when ?world= is absent", () => {
+    // Regression: a bare ?save=<name> must NOT fall back to "default" and discard a flat world.
+    expect(resolveBootPreset(null, meta('flat'))).toBe('flat');
+  });
+
+  it('ignores an invalid ?world= and keeps the saved preset', () => {
+    expect(resolveBootPreset('nonsense', meta('canyon'))).toBe('canyon');
+  });
+
+  it('falls back to "default" for a brand-new world (no stored meta)', () => {
+    expect(resolveBootPreset(null, undefined)).toBe('default');
+  });
+
+  it('falls back to "default" when meta has no preset and no param is given', () => {
+    expect(resolveBootPreset(null, meta(undefined))).toBe('default');
   });
 });
