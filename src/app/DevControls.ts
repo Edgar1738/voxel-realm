@@ -29,7 +29,8 @@ import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
 import type { WorldPreset } from '../worldgen/Presets';
-import type { Prefab } from '../core/Prefab';
+import { rotateY, mirror as mirrorPrefab, repeat, type Prefab } from '../core/Prefab';
+import { replaceVoxels, prefabToVoxels } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -447,6 +448,110 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
       applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+
+    /** Replace every `fromId` voxel in the box with `toId` (one undo). */
+    replace: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      fromId: BlockId,
+      toId: BlockId,
+    ): BatchedEditResult =>
+      applyAny(
+        replaceVoxels(
+          (x, y, z) => manager.getBlock(x, y, z),
+          { x1, y1, z1, x2, y2, z2 },
+          fromId,
+          toId,
+        ),
+        { label: 'replace' },
+      ),
+
+    /** Move a box by (dx,dy,dz): copy, clear the source, paste at the offset — one undo. */
+    move: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      dx: number,
+      dy: number,
+      dz: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      const clear = boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({
+        ...v,
+        id: AIR,
+      }));
+      const paste = prefabToVoxels(bp, ox + dx, oy + dy, oz + dz);
+      return applyAny([...clear, ...paste], { label: 'move' });
+    },
+
+    /** Mirror a box in place across 'x' or 'z' (one undo). */
+    mirror: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      axis: 'x' | 'z',
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(mirrorPrefab(bp, axis), ox, oy, oz), { label: 'mirror' });
+    },
+
+    /** Rotate a box in place about Y by `quarterTurns` * 90deg, re-anchored at the min corner (one undo). */
+    rotate: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      quarterTurns: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(rotateY(bp, quarterTurns), ox, oy, oz), { label: 'rotate' });
+    },
+
+    /** Tile a box into an nx*ny*nz grid with the given per-axis stride (one undo). */
+    array: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      nx: number,
+      ny: number,
+      nz: number,
+      sx: number,
+      sy: number,
+      sz: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(repeat(bp, nx, ny, nz, [sx, sy, sz]), ox, oy, oz), {
+        label: 'array',
+      });
+    },
+
     line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
       applyAny(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
     cylinder: (cx: number, cy: number, cz: number, radius: number, height: number, id: BlockId) =>
