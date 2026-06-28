@@ -22,7 +22,8 @@ export function formatDevHudRows(state: DevState): DevHudRow[] {
   ];
 }
 
-export function installDevHud(ctx: DevStateContext): void {
+/** Returns a teardown function that stops the HUD update loop and removes the element. */
+export function installDevHud(ctx: DevStateContext): () => void {
   installDevHudStyle();
 
   const root = document.createElement('aside');
@@ -58,7 +59,12 @@ export function installDevHud(ctx: DevStateContext): void {
   };
 
   render();
-  window.setInterval(render, UPDATE_MS);
+  const intervalId = window.setInterval(render, UPDATE_MS);
+
+  return (): void => {
+    window.clearInterval(intervalId);
+    root.remove();
+  };
 }
 
 function fmt(value: number): string {
