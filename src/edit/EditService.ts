@@ -1,9 +1,10 @@
-import type { EditableWorld, EditBatch, EditOutcome, SetVoxel } from './EditTypes';
+import type { EditableWorld, EditBatch, EditOutcome, SetVoxel, VoxelChange } from './EditTypes';
 
 /** Pure batch undo/redo engine. Delegates mutations to an injected EditableWorld. */
 export class EditService {
   private readonly undoStack: EditBatch[] = [];
   private readonly redoStack: EditBatch[] = [];
+  private pending: VoxelChange[] | null = null;
 
   constructor(
     private readonly world: EditableWorld,
@@ -14,10 +15,19 @@ export class EditService {
    * Applies `edits` to the world. If any voxels actually changed, wraps them
    * in an EditBatch, pushes it onto the undo stack (capped at historyLimit),
    * clears the redo stack, and returns the batch. Returns undefined if nothing changed.
+   *
+   * While a group is open (between beginGroup/endGroup), mutations are applied
+   * immediately but accumulated into the pending group instead of pushing their
+   * own batch onto the undo stack.
    */
   apply(edits: SetVoxel[]): EditBatch | undefined {
     const changes = this.world.applyEdits(edits);
     if (changes.length === 0) return undefined;
+
+    if (this.pending) {
+      this.pending.push(...changes);
+      return { changes };
+    }
 
     const batch: EditBatch = { changes };
 
@@ -28,6 +38,45 @@ export class EditService {
     this.redoStack.length = 0;
 
     return batch;
+  }
+
+  /**
+   * Opens a pending group. Subsequent apply() calls mutate the world immediately
+   * but accumulate their changes into the group. Also clears the redo stack once,
+   * just like a normal apply(). Nested beginGroup() calls are ignored.
+   */
+  beginGroup(): void {
+    if (this.pending) return; // already grouping; ignore nested begins
+    this.pending = [];
+    this.redoStack.length = 0;
+  }
+
+  /**
+   * Closes the pending group and pushes the accumulated changes as a single
+   * EditBatch onto the undo stack (capped at historyLimit). Returns the batch,
+   * or undefined if the group was empty or no group was open.
+   */
+  endGroup(): EditBatch | undefined {
+    const changes = this.pending;
+    this.pending = null;
+    if (!changes || changes.length === 0) return undefined;
+    const batch: EditBatch = { changes };
+    if (this.undoStack.length >= this.historyLimit) this.undoStack.shift();
+    this.undoStack.push(batch);
+    return batch;
+  }
+
+  /**
+   * Runs `fn` inside a group: begins before, ends after (in a finally block so
+   * the group always closes even if `fn` throws). Returns the value from `fn`.
+   */
+  group<T>(fn: () => T): T {
+    this.beginGroup();
+    try {
+      return fn();
+    } finally {
+      this.endGroup();
+    }
   }
 
   /**
