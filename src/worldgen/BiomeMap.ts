@@ -63,7 +63,13 @@ export class BiomeMap implements BiomeSource {
   private readonly ch: Channels;
   // Memoizes classification per (worldX,worldZ): the 5x5 blend kernel samples points that
   // overlap heavily across a chunk's columns, so this cuts noise evaluations several-fold.
-  private readonly cache = new Map<string, Biome>();
+  // Key packing: Cantor pairing (k1+k2+1)*(k1+k2)/2 + k2 applied to non-negative shifted
+  // coords gives a unique integer for any (worldX, worldZ) pair in the expected range
+  // (coordinates are shifted by 32768 so [−32768,32767] maps to [0,65535], collision-free
+  // for any pair of values in that shifted range since the Cantor result fits in a float53).
+  // The wholesale-clear cap remains: bursty chunk generation reuses points within a burst,
+  // so a simple cap bounds memory without hurting locality much.
+  private readonly cache = new Map<number, Biome>();
 
   constructor(seed: WorldSeed) {
     this.ch = {
@@ -74,7 +80,15 @@ export class BiomeMap implements BiomeSource {
   }
 
   biomeAt(worldX: number, worldZ: number): Biome {
-    const key = `${worldX},${worldZ}`;
+    // Pack two coords into a single number using a Cantor-style pairing on shifted coords.
+    // Shift by 32768 so the range [−32768, 32767] maps to [0, 65535] (non-negative).
+    // Cantor(a,b) = (a+b+1)*(a+b)/2 + b is collision-free for any two non-negative integers
+    // and fits in a float64 mantissa (53 bits) for a,b ≤ 65535.
+    const a = (worldX + 32768) & 0xffff;
+    const b = (worldZ + 32768) & 0xffff;
+    const s = a + b;
+    const key = ((s + 1) * s) / 2 + b;
+
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
 

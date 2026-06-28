@@ -41,8 +41,12 @@ function growOak(chunk: ChunkData, x: number, z: number, base: number, trunkHeig
   const placeLeaves = (cy: number, radius: number): void => {
     if (cy >= WORLD_HEIGHT) return;
     for (let dx = -radius; dx <= radius; dx++) {
+      const lx = x + dx;
+      if (lx < 0 || lx >= CHUNK_SIZE_X) continue; // cross-chunk leaves are intentionally dropped
       for (let dz = -radius; dz <= radius; dz++) {
-        if (chunk.get(x + dx, cy, z + dz) === AIR) chunk.set(x + dx, cy, z + dz, LEAVES);
+        const lz = z + dz;
+        if (lz < 0 || lz >= CHUNK_SIZE_Z) continue; // cross-chunk leaves are intentionally dropped
+        if (chunk.get(lx, cy, lz) === AIR) chunk.set(lx, cy, lz, LEAVES);
       }
     }
   };
