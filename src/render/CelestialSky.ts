@@ -74,7 +74,10 @@ export class CelestialSky {
   private readonly starMat: PointsMaterial;
   private readonly sunDir = new Vector3();
 
+  private readonly scene: Scene;
+
   constructor(scene: Scene) {
+    this.scene = scene;
     this.sunMat = new SpriteMaterial({
       map: discTexture('rgba(255,250,230,1)', 'rgba(255,240,200,0)'),
       color: new Color(0xfff4d6),
@@ -116,6 +119,21 @@ export class CelestialSky {
     this.stars.renderOrder = -10;
 
     scene.add(this.sun, this.moon, this.stars);
+  }
+
+  /**
+   * Disposes all GPU resources owned by this object and removes its objects from the scene.
+   * The sun/moon textures live on their materials; the star geometry is held directly.
+   */
+  dispose(): void {
+    this.scene.remove(this.sun, this.moon, this.stars);
+    // SpriteMaterial.map is the CanvasTexture we allocated — dispose both.
+    this.sunMat.map?.dispose();
+    this.sunMat.dispose();
+    this.moonMat.map?.dispose();
+    this.moonMat.dispose();
+    this.stars.geometry.dispose();
+    this.starMat.dispose();
   }
 
   /**
