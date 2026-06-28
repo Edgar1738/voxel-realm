@@ -85,8 +85,13 @@ export class Game {
       if (action.reason === 'incompatible') {
         console.warn('Voxel Realm: incompatible save — discarding stored edits.');
       }
-      await store.clearDeltas(); // mismatch or no meta => stored deltas are orphans
-      await store.saveMeta({ seed: SEED, version: SAVE_VERSION, preset });
+      // Non-fatal: if the dev server is unreachable, boot an in-memory world rather than crash.
+      try {
+        await store.clearDeltas(); // mismatch or no meta => stored deltas are orphans
+        await store.saveMeta({ seed: SEED, version: SAVE_VERSION, preset });
+      } catch (err) {
+        console.error('Voxel Realm: could not initialise save metadata', err);
+      }
     }
 
     const sink = new ChunkMeshRegistry(renderer.scene, material, transparentMaterial);
@@ -102,31 +107,47 @@ export class Game {
     );
 
     // Debounced per-chunk persistence: a touched chunk is flushed once after a short idle.
+    // A key stays dirty until its write is confirmed, so a failed save is retried, not lost.
     const dirty = new Set<string>();
+    const inFlight = new Set<Promise<unknown>>();
     let flushTimer: number | undefined;
     let savesSuppressed = false; // set during reset so pending edits aren't re-written
-    const flush = (): void => {
+    function scheduleFlush(): void {
+      if (flushTimer === undefined) flushTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
+    }
+    function flush(): void {
       flushTimer = undefined;
       if (savesSuppressed) {
         dirty.clear();
         return;
       }
-      for (const key of dirty) {
-        void store
+      const keys = [...dirty];
+      dirty.clear(); // re-added below only for writes that fail, so new edits aren't dropped
+      for (const key of keys) {
+        const pending = store
           .saveChunkDelta(key, manager.getChunkDelta(key))
-          .catch((err) => console.error('Voxel Realm: save failed', err));
+          .catch((err) => {
+            console.error('Voxel Realm: save failed, will retry', err);
+            dirty.add(key);
+            scheduleFlush();
+          })
+          .finally(() => inFlight.delete(pending));
+        inFlight.add(pending);
       }
-      dirty.clear();
-    };
+    }
     manager.onChunkDeltaChanged = (key) => {
       dirty.add(key);
-      if (flushTimer === undefined) flushTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
+      scheduleFlush();
     };
     // Best-effort flush of any pending edits when the tab is hidden/closed.
-    window.addEventListener('pagehide', () => {
-      if (flushTimer !== undefined) window.clearTimeout(flushTimer);
-      flush();
-    });
+    window.addEventListener(
+      'pagehide',
+      () => {
+        if (flushTimer !== undefined) window.clearTimeout(flushTimer);
+        flush();
+      },
+      { once: true },
+    );
 
     const overlay = document.getElementById('overlay') ?? undefined;
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
@@ -204,7 +225,14 @@ export class Game {
       savesSuppressed = true;
       if (flushTimer !== undefined) window.clearTimeout(flushTimer);
       dirty.clear();
-      void store.clearDeltas().then(() => window.location.reload());
+      // Let in-flight saves settle first, or a late write could land after the clear.
+      void Promise.allSettled([...inFlight])
+        .then(() => store.clearDeltas())
+        .then(() => window.location.reload())
+        .catch((err) => {
+          console.error('Voxel Realm: reset failed', err);
+          window.location.reload();
+        });
     });
 
     /** Applies an edit set (capped), reports the result, and clears any pending selection. */

@@ -39,15 +39,16 @@ export class ServerSaveStore implements SaveStore {
   }
 
   private async post(url: string, body: unknown): Promise<void> {
-    try {
-      const init: RequestInit = { method: 'POST' };
-      if (body !== undefined) {
-        init.headers = { 'content-type': 'application/json' };
-        init.body = JSON.stringify(body);
-      }
-      await fetch(url, init);
-    } catch (err) {
-      console.error('Voxel Realm: world save failed', err);
+    const init: RequestInit = { method: 'POST' };
+    if (body !== undefined) {
+      init.headers = { 'content-type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    // Let failures propagate (network error or non-2xx) so callers can keep the edit dirty
+    // and retry instead of silently dropping it.
+    const res = await fetch(url, init);
+    if (!res.ok) {
+      throw new Error(`Voxel Realm: world save failed (${res.status} ${res.statusText})`);
     }
   }
 
