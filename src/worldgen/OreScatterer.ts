@@ -1,5 +1,5 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../core/constants';
-import { STONE, COAL_ORE, IRON_ORE, GOLD_ORE, CRYSTAL } from '../blocks/blocks';
+import { STONE, COAL_ORE, IRON_ORE, GOLD_ORE, CRYSTAL, EMERALD_ORE } from '../blocks/blocks';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
 import type { BlockId } from '../core/types';
@@ -14,6 +14,7 @@ interface OreBand {
 
 /** Rarest/deepest first so a richer ore wins a contested voxel. */
 const BANDS: readonly OreBand[] = [
+  { id: EMERALD_ORE, minY: 5, maxY: 26, density: 0.003, salt: 0x0e3a7 },
   { id: CRYSTAL, minY: 5, maxY: 24, density: 0.004, salt: 0x0c8a1 },
   { id: GOLD_ORE, minY: 5, maxY: 30, density: 0.006, salt: 0x0901d },
   { id: IRON_ORE, minY: 8, maxY: 62, density: 0.013, salt: 0x01401 },

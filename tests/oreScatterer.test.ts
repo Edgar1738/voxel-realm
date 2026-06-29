@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { OreScatterer } from '../src/worldgen/OreScatterer';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_AREA } from '../src/core/constants';
-import { STONE, DIRT, COAL_ORE, IRON_ORE, GOLD_ORE, CRYSTAL } from '../src/blocks/blocks';
+import {
+  STONE,
+  DIRT,
+  COAL_ORE,
+  IRON_ORE,
+  GOLD_ORE,
+  CRYSTAL,
+  EMERALD_ORE,
+} from '../src/blocks/blocks';
 import type { GenContext } from '../src/worldgen/TerrainStage';
 import type { BiomeSource } from '../src/worldgen/BiomeMap';
 
@@ -30,11 +38,13 @@ function stoneChunk(): ChunkData {
 function countOres(c: ChunkData): number {
   let n = 0;
   for (const v of c.data)
-    if (v === COAL_ORE || v === IRON_ORE || v === GOLD_ORE || v === CRYSTAL) n++;
+    if (v === COAL_ORE || v === IRON_ORE || v === GOLD_ORE || v === CRYSTAL || v === EMERALD_ORE)
+      n++;
   return n;
 }
 
 const BAND_Y: Record<number, [number, number]> = {
+  [EMERALD_ORE]: [5, 26],
   [CRYSTAL]: [5, 24],
   [GOLD_ORE]: [5, 30],
   [IRON_ORE]: [8, 62],
@@ -99,19 +109,19 @@ describe('OreScatterer', () => {
     // seed 3393265 × 2654435761 overflows float53 and produces a different hash,
     // which would yield a different ore count. If this assertion fails, the imul
     // fix was reverted.
-    // Captured value: 498 (with hashToFloat avalanche finalizer, cx=0, cz=0, surface=64).
+    // Captured value: 514 (with hashToFloat avalanche finalizer, cx=0, cz=0, surface=64, includes EMERALD_ORE).
     const DIVERGENT_SEED = 3_393_265;
     const c = stoneChunk();
     new OreScatterer().apply(c, ctx(DIVERGENT_SEED));
-    expect(countOres(c)).toBe(498);
+    expect(countOres(c)).toBe(514);
   });
 
   it('matches pinned ore count for default seed 1337 (stability guard)', () => {
     // Ensures the default-seed world is unchanged by any refactor.
-    // Captured value: 473 (hashToFloat avalanche, cx=0, cz=0, surface=64).
+    // Captured value: 492 (hashToFloat avalanche, cx=0, cz=0, surface=64, includes EMERALD_ORE).
     const c = stoneChunk();
     new OreScatterer().apply(c, ctx(1337));
-    expect(countOres(c)).toBe(473);
+    expect(countOres(c)).toBe(492);
   });
 
   it('large-seed and default-seed outputs differ (seeds produce distinct worlds)', () => {
@@ -131,10 +141,22 @@ describe('OreScatterer', () => {
       for (let z = 0; z < 16; z++)
         for (let y = 0; y < 5; y++) {
           const v = c.get(x, y, z);
+          expect(v).not.toBe(EMERALD_ORE);
           expect(v).not.toBe(COAL_ORE);
           expect(v).not.toBe(IRON_ORE);
           expect(v).not.toBe(GOLD_ORE);
           expect(v).not.toBe(CRYSTAL);
         }
+  });
+
+  it('places emerald ore in deep stone for some seed', () => {
+    // Scan across seeds; emerald (rare, density 0.003) should appear at least once in 40 seeds.
+    let found = false;
+    for (let seed = 0; seed < 40 && !found; seed++) {
+      const c = stoneChunk();
+      new OreScatterer().apply(c, ctx(seed));
+      for (let i = 0; i < c.data.length; i++) if (c.data[i] === EMERALD_ORE) found = true;
+    }
+    expect(found).toBe(true);
   });
 });
