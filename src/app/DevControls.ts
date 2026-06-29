@@ -606,6 +606,9 @@ export function installDevControls(ctx: DevControlsContext): void {
       sz: number,
     ): BatchedEditResult => {
       const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const projected = bp.blocks.length * nx * ny * nz;
+      if (projected > MAX_BUILD)
+        throw new Error(`array build too large (${projected} > ${MAX_BUILD})`);
       const ox = Math.min(x1, x2),
         oy = Math.min(y1, y2),
         oz = Math.min(z1, z2);
