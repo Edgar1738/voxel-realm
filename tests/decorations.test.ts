@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ChunkData } from '../src/world/ChunkData';
-import { GRASS, STONE, FLOWER, TALL_GRASS, AIR } from '../src/blocks/blocks';
+import { GRASS, STONE, FLOWER, TALL_GRASS } from '../src/blocks/blocks';
 import { scatterDecorations } from '../src/worldgen/Decorations';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../src/core/constants';
 
@@ -41,13 +41,33 @@ describe('scatterDecorations', () => {
     for (let z = 0; z < CHUNK_SIZE_Z; z++)
       for (let x = 0; x < CHUNK_SIZE_X; x++) expect(d.get(x, 40, z)).toBe(GRASS);
   });
-  it('is border-stable: a column produces the same plant regardless of which chunk owns it', () => {
-    // world column (16,16) is local (0,0) of chunk (1,1).
-    const here = grassFlat(1, 1, 40);
-    scatterDecorations({ density: 1 })(here, 1, 1, 1337);
-    // Re-derive the same world column via the hash directly is covered by determinism above;
-    // here we assert at least that high density fills most columns (sanity).
-    expect(countPlants(here, 40)).toBeGreaterThan(0);
-    void AIR;
+  it('is world-coordinate-keyed: two chunks with the same seed produce different local patterns', () => {
+    // If placement were keyed on chunk-local coords (or chunk index), both chunks would receive
+    // plants at IDENTICAL local (lx,lz) positions when given the same seed.  Because it is keyed
+    // on true world coordinates (wx = cx*CHUNK_SIZE_X + lx), the two chunks produce different
+    // local patterns — the anti-seam guarantee.
+    const overlay = scatterDecorations({ density: 0.5 });
+    const chunkA = grassFlat(0, 0, 40);
+    const chunkB = grassFlat(3, 0, 40);
+    overlay(chunkA, 0, 0, 1337);
+    overlay(chunkB, 3, 0, 1337);
+
+    // Collect the set of local (lx,lz) positions that received a plant in each chunk.
+    const setA = new Set<string>();
+    const setB = new Set<string>();
+    for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+      for (let x = 0; x < CHUNK_SIZE_X; x++) {
+        const idA = chunkA.get(x, 41, z);
+        const idB = chunkB.get(x, 41, z);
+        if (idA === FLOWER || idA === TALL_GRASS) setA.add(`${x},${z}`);
+        if (idB === FLOWER || idB === TALL_GRASS) setB.add(`${x},${z}`);
+      }
+    }
+
+    // Both chunks must have plants (density 0.5 guarantees this).
+    expect(setA.size).toBeGreaterThan(0);
+    expect(setB.size).toBeGreaterThan(0);
+    // The local patterns must differ — proves world-coordinate keying, not chunk-local RNG.
+    expect([...setA].sort().join('|')).not.toBe([...setB].sort().join('|'));
   });
 });
