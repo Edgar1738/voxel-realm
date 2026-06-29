@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { cottage, well, ruinedTower, brokenWall, lampPost } from '../src/worldgen/prefabs';
+import {
+  cottage,
+  well,
+  ruinedTower,
+  brokenWall,
+  lampPost,
+  barn,
+  watchtower,
+  marketStall,
+} from '../src/worldgen/prefabs';
 import { LANTERN } from '../src/blocks/blocks';
 
 describe('prefabs', () => {
@@ -25,5 +34,26 @@ describe('prefabs', () => {
   it('lampPost and well carry a lantern (so villages glow at night)', () => {
     expect(lampPost().blocks.some(([, , , id]) => id === LANTERN)).toBe(true);
     expect(well().blocks.some(([, , , id]) => id === LANTERN)).toBe(true);
+  });
+});
+
+describe('Track C prefabs (buildings)', () => {
+  it('barn has the right dims and a non-empty block list', () => {
+    const p = barn();
+    expect(p.dims).toEqual([7, 6, 9]);
+    expect(p.blocks.length).toBeGreaterThan(40);
+    expect(
+      p.blocks.every(([x, y, z]) => x >= 0 && y >= 0 && z >= 0 && x < 7 && y < 6 && z < 9),
+    ).toBe(true);
+  });
+  it('watchtower is tall and topped with a lantern', () => {
+    const p = watchtower();
+    expect(p.dims[1]).toBeGreaterThanOrEqual(9);
+    expect(p.blocks.some(([, , , id]) => id === LANTERN)).toBe(true);
+  });
+  it('marketStall fits its dims', () => {
+    const p = marketStall();
+    expect(p.dims).toEqual([5, 4, 5]);
+    expect(p.blocks.length).toBeGreaterThan(10);
   });
 });

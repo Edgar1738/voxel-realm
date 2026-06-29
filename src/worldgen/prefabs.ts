@@ -1,5 +1,5 @@
 import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER, LANTERN } from '../blocks/blocks';
-import type { Prefab } from '../core/Prefab';
+import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { BlockId } from '../core/types';
 
 /** A 5x5 plank cottage with corner logs, a door, side windows, and a pitched roof. */
@@ -111,6 +111,75 @@ export function ruinedTower(): Prefab {
   ])
     put(rx, 0, rz, COBBLESTONE); // fallen rubble inside
   return { dims: [W, 8, D], blocks };
+}
+
+/** A 7x9 plank barn with corner logs, a wide front doorway, and a pitched roof. */
+export function barn(): Prefab {
+  const W = 7,
+    D = 9;
+  const blocks: PrefabVoxel[] = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  const corner = (x: number, z: number): boolean =>
+    (x === 0 || x === W - 1) && (z === 0 || z === D - 1);
+  for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) put(x, 0, z, COBBLESTONE); // floor
+  for (let y = 1; y <= 3; y++)
+    for (let z = 0; z < D; z++)
+      for (let x = 0; x < W; x++) {
+        if (!(x === 0 || x === W - 1 || z === 0 || z === D - 1)) continue;
+        if (z === 0 && x >= 2 && x <= 4 && y <= 2) continue; // wide front doorway
+        put(x, y, z, corner(x, z) ? WOOD : PLANKS);
+      }
+  for (let x = 0; x < W; x++) {
+    // pitched roof: ridge at x=3 peaks at y=5, slopes down toward edges
+    const ry = Math.min(5, 4 + (3 - Math.abs(x - 3)));
+    for (let z = 0; z < D; z++) put(x, ry, z, PLANKS);
+    for (let y = 4; y < ry; y++) {
+      put(x, y, 0, PLANKS);
+      put(x, y, D - 1, PLANKS);
+    }
+  }
+  return { dims: [W, 6, D], blocks };
+}
+
+/** A slender cobblestone watchtower with a railed top and a lantern. */
+export function watchtower(): Prefab {
+  const blocks: PrefabVoxel[] = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  const H = 9;
+  for (let y = 0; y < H; y++)
+    for (let z = 0; z < 3; z++)
+      for (let x = 0; x < 3; x++)
+        if (x === 0 || x === 2 || z === 0 || z === 2) put(x, y, z, COBBLESTONE); // hollow shaft
+  for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) put(x, H, z, PLANKS); // platform floor
+  for (let z = 0; z < 3; z++)
+    // crenellated rail
+    for (let x = 0; x < 3; x++)
+      if ((x === 0 || x === 2 || z === 0 || z === 2) && (x + z) % 2 === 0)
+        put(x, H + 1, z, COBBLESTONE);
+  put(1, H + 1, 1, LANTERN);
+  return { dims: [3, H + 2, 3], blocks };
+}
+
+/** A small wood-frame market stall with a plank canopy. */
+export function marketStall(): Prefab {
+  const blocks: PrefabVoxel[] = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  for (const [cx, cz] of [
+    [0, 0],
+    [4, 0],
+    [0, 4],
+    [4, 4],
+  ] as const)
+    for (let y = 0; y <= 2; y++) put(cx, y, cz, WOOD); // four posts
+  for (let z = 0; z < 5; z++) for (let x = 0; x < 5; x++) put(x, 3, z, PLANKS); // canopy
+  for (let x = 1; x < 4; x++) put(x, 1, 0, PLANKS); // front counter
+  return { dims: [5, 4, 5], blocks };
 }
 
 /** A toppled cobblestone wall segment with ragged height and a few fallen blocks. */
