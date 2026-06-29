@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
+import { buildBlockTextures, type BlockDef } from '../src/blocks/blocks';
+import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { AIR, GRASS, STONE, WATER, GLASS } from '../src/blocks/blocks';
 
 const reg = new BlockRegistry();
@@ -40,5 +41,55 @@ describe('transparentPass', () => {
     expect(pass.faceVisible(WATER, GLASS)).toBe(true);
     expect(pass.faceVisible(GLASS, WATER)).toBe(true);
     expect(pass.faceVisible(GLASS, GLASS)).toBe(false); // same type still culled
+  });
+});
+
+// --- Shape-aware tests (Task 2) ---
+
+const stoneFaces = {
+  pattern: 'stone' as const,
+  colors: [[128, 128, 132]] as [number, number, number][],
+};
+const DEFS: BlockDef[] = [
+  { id: 0, name: 'air', opaque: false, transparent: true },
+  { id: 1, name: 'stone', opaque: true, transparent: false, faces: stoneFaces },
+  { id: 2, name: 'slab', opaque: true, transparent: false, shape: 'slab', faces: stoneFaces },
+  {
+    id: 3,
+    name: 'glass',
+    opaque: false,
+    transparent: true,
+    faces: { pattern: 'glass' as const, colors: [[205, 232, 240]] as [number, number, number][] },
+  },
+  {
+    id: 4,
+    name: 'plant',
+    opaque: false,
+    transparent: false,
+    shape: 'cross',
+    faces: { pattern: 'grassTop' as const, colors: [[60, 140, 60]] as [number, number, number][] },
+  },
+];
+const reg2 = new BlockRegistry(DEFS, buildBlockTextures(DEFS));
+const op = opaquePass(reg2);
+const tp = transparentPass(reg2);
+
+describe('opaquePass (shape-aware)', () => {
+  it('greedy-meshes only full cubes (not slabs)', () => {
+    expect(op.includes(1)).toBe(true);
+    expect(op.includes(2)).toBe(false); // slab emitted separately
+  });
+  it('shows a cube face against a non-occluding slab', () => {
+    expect(op.faceVisible(1, 2)).toBe(true); // cube next to slab → face visible
+    expect(op.faceVisible(1, 1)).toBe(false); // cube next to cube → culled
+    expect(op.faceVisible(1, 0)).toBe(true); // cube next to air → visible
+  });
+});
+
+describe('transparentPass (shape-aware)', () => {
+  it('includes transparent cubes but never non-cube shapes', () => {
+    expect(tp.includes(3)).toBe(true); // glass cube
+    expect(tp.includes(4)).toBe(false); // plant is non-cube → not in transparent cube pass
+    expect(tp.includes(1)).toBe(false); // opaque cube
   });
 });

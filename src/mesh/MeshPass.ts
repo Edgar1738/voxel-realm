@@ -8,23 +8,24 @@ export interface MeshPass {
   faceVisible(self: BlockId, neighbor: BlockId): boolean;
 }
 
-/** Opaque solids: any opaque block; a face shows against any non-opaque neighbor. */
+/** Opaque solids: only FULL cubes greedy-mesh; a cube face shows against any non-occluder. */
 export function opaquePass(registry: BlockRegistry): MeshPass {
   return {
-    includes: (id) => registry.isOpaque(id),
-    faceVisible: (_self, neighbor) => !registry.isOpaque(neighbor),
+    includes: (id) => registry.occludes(id),
+    faceVisible: (_self, neighbor) => !registry.occludes(neighbor),
   };
 }
 
 /**
- * Translucent blocks (water, glass, ...) share one pass. A face shows against air or against a
- * *different* transparent block, so a water↔glass boundary stays visible (each side renders its
- * own face under backface culling), while same-type (water↔water, glass↔glass) and transparent↔
- * solid internal faces are culled.
+ * Translucent CUBES (water, glass, ...) share one pass. Non-cube shapes (slabs/plants) are
+ * excluded — slabs render in the opaque mesh and plants in the cutout mesh, so a transparent
+ * plant must never also emit a full transparent cube here. A face shows against air or a
+ * *different* transparent block, so a water↔glass boundary stays visible while same-type and
+ * transparent↔solid internal faces are culled.
  */
 export function transparentPass(registry: BlockRegistry): MeshPass {
   return {
-    includes: (id) => id !== AIR && registry.get(id).transparent,
+    includes: (id) => id !== AIR && registry.get(id).transparent && registry.shape(id) === 'cube',
     faceVisible: (self, neighbor) =>
       neighbor === AIR || (neighbor !== self && registry.get(neighbor).transparent),
   };
