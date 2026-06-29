@@ -91,14 +91,19 @@ export function resolveCollision(
   const sd: Vec3 = { x: delta.x / steps, y: delta.y / steps, z: delta.z / steps };
 
   for (let s = 0; s < steps; s++) {
+    // Track y at the start of this substep to cap net vertical gain from step-ups.
+    const substepStartY = pos.y;
+
     // --- X axis ---
     const xResult = sweepAxis(sampler, pos, half, 'x', sd.x);
+    let steppedUp = false;
     if (xResult.hit && sd.y === 0 && sd.x !== 0) {
       // Horizontal move blocked with no vertical component — attempt step-up.
       const stepped = tryStepUp(sampler, pos, half, 'x', sd.x);
       if (stepped !== null) {
         pos.x = stepped.x;
         pos.y = stepped.y;
+        steppedUp = true;
       } else {
         pos.x = xResult.value;
       }
@@ -109,7 +114,9 @@ export function resolveCollision(
     // --- Z axis ---
     const zResult = sweepAxis(sampler, pos, half, 'z', sd.z);
     if (zResult.hit && sd.y === 0 && sd.z !== 0) {
-      const stepped = tryStepUp(sampler, pos, half, 'z', sd.z);
+      // Only attempt step-up if we haven't already stepped up in this substep;
+      // a second step-up would over-pop the player into an inside corner.
+      const stepped = !steppedUp ? tryStepUp(sampler, pos, half, 'z', sd.z) : null;
       if (stepped !== null) {
         pos.z = stepped.z;
         pos.y = stepped.y;
@@ -118,6 +125,14 @@ export function resolveCollision(
       }
     } else {
       pos.z = zResult.value;
+    }
+
+    // Cap the net vertical gain from step-up(s) in this substep to 1 voxel.
+    // Use +EPS (matching tryStepUp's raise amount) so the clamped position reliably
+    // places the player's feet above the ledge top, preventing a redundant step-up
+    // on the very next substep due to floating-point floor precision.
+    if (pos.y - substepStartY > 1.0) {
+      pos.y = substepStartY + 1.0 + EPS;
     }
 
     // --- Y axis ---

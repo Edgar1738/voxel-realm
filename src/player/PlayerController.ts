@@ -52,13 +52,12 @@ export class PlayerController {
       this.vy = 0;
     }
 
+    const feetY = this.position.y - HALF.y;
+    const headY = this.position.y + HALF.y;
     const submerged =
       !this.flying &&
-      world.isWater(
-        Math.floor(this.position.x),
-        Math.floor(this.position.y),
-        Math.floor(this.position.z),
-      );
+      (world.isWater(Math.floor(this.position.x), Math.floor(feetY), Math.floor(this.position.z)) ||
+        world.isWater(Math.floor(this.position.x), Math.floor(headY), Math.floor(this.position.z)));
 
     // Horizontal direction from yaw (forward = -Z at yaw 0, right = +X at yaw 0).
     const fwd: Vec3 = { x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) };

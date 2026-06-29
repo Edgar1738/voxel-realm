@@ -97,6 +97,28 @@ describe('resolveCollision step-up (walk mode)', () => {
     expect(r.center.y).toBeGreaterThan(HALF.y + 0.5);
   });
 
+  it('caps net vertical gain at 1.0 per substep when diagonal step-up hits an inside corner', () => {
+    // Diagonal move: both X and Z are blocked, both attempt step-up.
+    // Without the cap, step-up on X raises y by 1+EPS, then step-up on Z raises it again
+    // by another 1+EPS in the same substep, giving net y gain > 1.
+    // With the cap, net y gain per substep must be <= 1.0.
+    //
+    // Setup: ground at y < 0, ledges at x>=1 (y in [0,1)) AND z>=1 (y in [0,1)).
+    // Player starts at (0, HALF.y, 0) moving diagonally toward (+X, +Z).
+    const diagonalCorner = sampler(
+      (x, y, z) =>
+        y < 0 || // ground
+        (x >= 1 && y >= 0 && y < 1) || // ledge along X
+        (z >= 1 && y >= 0 && y < 1), // ledge along Z
+    );
+    const startY = HALF.y;
+    const center = { x: 0, y: startY, z: 0 };
+    const r = resolveCollision(diagonalCorner, center, HALF, { x: 2, y: 0, z: 2 });
+    // The net y gain must be at most 1 block (allow +EPS=1e-3 that tryStepUp adds
+    // for float-boundary safety — the invariant is "no more than 1 step-up per substep").
+    expect(r.center.y - startY).toBeLessThanOrEqual(1.0 + 2e-3);
+  });
+
   it('step-up does NOT occur in fly mode (resolveCollision itself is mode-agnostic; caller skips gravity)', () => {
     // resolveCollision does not know about fly mode — the PlayerController handles that.
     // This test verifies the step-up only happens when the horizontal move is blocked AND
