@@ -23,6 +23,13 @@ describe('replaceVoxels', () => {
       { x: 2, y: 0, z: 0, id: 7 },
     ]);
   });
+
+  it('throws on an over-large box', () => {
+    const read = () => 0 as number;
+    expect(() =>
+      replaceVoxels(read, { x1: 0, y1: 0, z1: 0, x2: 999, y2: 999, z2: 999 }, 1, 2),
+    ).toThrow(/too large|200000/);
+  });
 });
 
 describe('prefabToVoxels', () => {

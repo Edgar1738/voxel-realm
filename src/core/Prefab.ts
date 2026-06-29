@@ -93,6 +93,9 @@ export function repeat(
   nz: number,
   stride: [number, number, number],
 ): Prefab {
+  const MAX_REPEAT = 200000;
+  if (nx * ny * nz * p.blocks.length > MAX_REPEAT)
+    throw new Error(`repeat too large (>${MAX_REPEAT})`);
   const blocks: PrefabVoxel[] = [];
   for (let iz = 0; iz < nz; iz++)
     for (let iy = 0; iy < ny; iy++)

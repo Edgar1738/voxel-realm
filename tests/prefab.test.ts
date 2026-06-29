@@ -76,6 +76,14 @@ describe('repeat', () => {
     expect(r.blocks.length).toBe(L.blocks.length * 2);
     expect(r.dims).toEqual([4, 1, 2]); // two copies offset by stride 2 in x
   });
+
+  it('throws when the tiled total exceeds the cap', () => {
+    const p = {
+      dims: [1, 1, 1] as [number, number, number],
+      blocks: [[0, 0, 0, 1]] as [number, number, number, number][],
+    };
+    expect(() => repeat(p, 1000, 1000, 1, [2, 0, 0])).toThrow(/too large|cap/i);
+  });
 });
 
 describe('validatePrefab', () => {

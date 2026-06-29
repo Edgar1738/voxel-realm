@@ -212,6 +212,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     voxels: SetVoxel[],
     opts: { label?: string; maxBatchSize?: number; preload?: boolean } = {},
   ): BatchedEditResult => {
+    if (voxels.length > MAX_BUILD)
+      throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
     const valid = voxels.filter((v) => registry.has(v.id));
     const invalidCount = voxels.length - valid.length;
     if (invalidCount > 0) {

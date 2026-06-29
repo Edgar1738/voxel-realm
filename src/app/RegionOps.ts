@@ -21,6 +21,8 @@ export function replaceVoxels(
   const [ax, bx] = [Math.min(box.x1, box.x2), Math.max(box.x1, box.x2)];
   const [ay, by] = [Math.min(box.y1, box.y2), Math.max(box.y1, box.y2)];
   const [az, bz] = [Math.min(box.z1, box.z2), Math.max(box.z1, box.z2)];
+  if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
+    throw new Error('replace box too large (>200000)');
   const out: SetVoxel[] = [];
   for (let x = ax; x <= bx; x++)
     for (let y = ay; y <= by; y++)
