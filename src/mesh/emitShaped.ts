@@ -3,6 +3,7 @@ import { Face } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
+import { unpackState } from '../world/VoxelState';
 
 interface Buf {
   positions: number[];
@@ -104,6 +105,35 @@ const FACES: ReadonlyArray<[number, number, Face]> = [
   [2, -1, Face.NegZ],
 ];
 
+/**
+ * Emits one axis-aligned box [lo..hi] inside voxel (vx,vy,vz). A face is culled only when it lies
+ * exactly on the voxel boundary AND the neighbour voxel in that direction is a full-cube occluder
+ * (mid-voxel faces — slab tops, stair risers — are always emitted). Generalizes the slab box.
+ */
+function emitBoxCulled(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  vx: number,
+  vy: number,
+  vz: number,
+  lo: [number, number, number],
+  hi: [number, number, number],
+): void {
+  const vMin = [vx, vy, vz];
+  const vMax = [vx + 1, vy + 1, vz + 1];
+  for (const [axis, sign, face] of FACES) {
+    const d = sign > 0 ? hi[axis] : lo[axis];
+    const onBoundary = d === (sign > 0 ? vMax[axis] : vMin[axis]);
+    const nx = vx + (axis === 0 ? sign : 0);
+    const ny = vy + (axis === 1 ? sign : 0);
+    const nz = vz + (axis === 2 ? sign : 0);
+    if (onBoundary && registry.occludes(view.get(nx, ny, nz))) continue;
+    pushBoxFace(buf, axis, sign, lo, hi, registry.faceLayer(id, face), packLight(view, nx, ny, nz));
+  }
+}
+
 function emitSlab(
   buf: Buf,
   view: VoxelView,
@@ -113,16 +143,56 @@ function emitSlab(
   y: number,
   z: number,
 ): void {
-  const lo: [number, number, number] = [x, y, z];
-  const hi: [number, number, number] = [x + 1, y + 0.5, z + 1];
-  for (const [axis, sign, face] of FACES) {
-    // The top face (y+0.5) never sits flush against the voxel above (y+1), so always emit it.
-    const isTop = axis === 1 && sign > 0;
-    const nx = x + (axis === 0 ? sign : 0);
-    const ny = y + (axis === 1 ? sign : 0);
-    const nz = z + (axis === 2 ? sign : 0);
-    if (!isTop && registry.occludes(view.get(nx, ny, nz))) continue; // flush against a full cube
-    pushBoxFace(buf, axis, sign, lo, hi, registry.faceLayer(id, face), packLight(view, nx, ny, nz));
+  emitBoxCulled(buf, view, registry, id, x, y, z, [x, y, z], [x + 1, y + 0.5, z + 1]);
+}
+
+/** The two boxes (bottom half-box + back upper-half box) of a stair, by facing + half. */
+function stairBoxes(
+  x: number,
+  y: number,
+  z: number,
+  facing: number,
+  half: number,
+): Array<[[number, number, number], [number, number, number]]> {
+  const yFullLo = half === 1 ? y + 0.5 : y;
+  const yFullHi = half === 1 ? y + 1 : y + 0.5;
+  const yStepLo = half === 1 ? y : y + 0.5;
+  const yStepHi = half === 1 ? y + 0.5 : y + 1;
+  let sx0 = x;
+  let sx1 = x + 1;
+  let sz0 = z;
+  let sz1 = z + 1;
+  if (facing === 0)
+    sz0 = z + 0.5; // N → step on the south half
+  else if (facing === 2)
+    sz1 = z + 0.5; // S → north half
+  else if (facing === 1)
+    sx1 = x + 0.5; // E → west half
+  else sx0 = x + 0.5; // W → east half
+  return [
+    [
+      [x, yFullLo, z],
+      [x + 1, yFullHi, z + 1],
+    ],
+    [
+      [sx0, yStepLo, sz0],
+      [sx1, yStepHi, sz1],
+    ],
+  ];
+}
+
+function emitStair(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  const { facing, half } = unpackState(view.getState(x, y, z));
+  for (const [lo, hi] of stairBoxes(x, y, z, facing, half)) {
+    emitBoxCulled(buf, view, registry, id, x, y, z, lo, hi);
   }
 }
 
@@ -186,6 +256,7 @@ export function emitShaped(
         const id = view.get(x, y, z);
         const shape = registry.shape(id);
         if (shape === 'slab') emitSlab(slabs, view, registry, id, x, y, z);
+        else if (shape === 'stair') emitStair(slabs, view, registry, id, x, y, z);
         else if (shape === 'cross') emitCross(cross, view, registry, id, x, y, z);
       }
     }
