@@ -194,8 +194,12 @@ export function resolveCollision(
       const movedDown: Vec3 = { ...pos, y: pos.y + sd.y };
       if (overlapsSolid(sampler, movedDown, half)) {
         const support = highestSupport(sampler, pos, half, feet0, feet0 + sd.y);
-        pos.y = support + half.y;
-        grounded = true;
+        if (support === -Infinity) {
+          pos.y += sd.y; // no qualifying surface (defensive — unreachable via the shipped caller)
+        } else {
+          pos.y = support + half.y;
+          grounded = true;
+        }
       } else {
         pos.y += sd.y;
       }
