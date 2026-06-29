@@ -3,7 +3,7 @@ import { Face } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
-import { unpackState } from '../world/VoxelState';
+import { unpackState, FACING } from '../world/VoxelState';
 
 interface Buf {
   positions: number[];
@@ -162,11 +162,11 @@ function stairBoxes(
   let sx1 = x + 1;
   let sz0 = z;
   let sz1 = z + 1;
-  if (facing === 0)
+  if (facing === FACING.N)
     sz0 = z + 0.5; // N → step on the south half
-  else if (facing === 2)
+  else if (facing === FACING.S)
     sz1 = z + 0.5; // S → north half
-  else if (facing === 1)
+  else if (facing === FACING.E)
     sx1 = x + 0.5; // E → west half
   else sx0 = x + 0.5; // W → east half
   return [
