@@ -11,6 +11,8 @@ export class ChunkData {
   /** Baked per-voxel light (0..15), filled by the lighting pass before meshing. */
   readonly skyLight = new Uint8Array(CHUNK_VOLUME);
   readonly blockLight = new Uint8Array(CHUNK_VOLUME);
+  /** Per-voxel orientation state (0 = unoriented). See VoxelState. */
+  readonly state = new Uint8Array(CHUNK_VOLUME);
 
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;
@@ -39,5 +41,18 @@ export class ChunkData {
       throw new RangeError(`ChunkData.set out of bounds: (${x}, ${y}, ${z})`);
     }
     this.data[voxelIndex(x, y, z)] = id;
+  }
+
+  /** Reads a voxel's orientation state; out-of-bounds returns 0. */
+  getState(x: number, y: number, z: number): number {
+    if (!inChunkBounds(x, y, z)) return 0;
+    return this.state[voxelIndex(x, y, z)];
+  }
+
+  setState(x: number, y: number, z: number, s: number): void {
+    if (!inChunkBounds(x, y, z)) {
+      throw new RangeError(`ChunkData.setState out of bounds: (${x}, ${y}, ${z})`);
+    }
+    this.state[voxelIndex(x, y, z)] = s & 0xff;
   }
 }
