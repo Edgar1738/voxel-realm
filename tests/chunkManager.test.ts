@@ -307,6 +307,14 @@ describe('ChunkManager.preloadBox', () => {
     // 17×17 = 289 chunks > 256
     expect(() => mgr.preloadBox(0, 0, 16 * 16, 16 * 16)).toThrow('preloadBox region too large');
   });
+
+  it('preloadBox meshes all box chunks after generating them all', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    const res = mgr.preloadBox(0, 0, 40, 40);
+    expect(res.generated + res.meshed).toBeGreaterThan(0);
+    expect(mgr.isLoaded(0, 0)).toBe(true);
+    expect(mgr.isLoaded(40, 40)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
