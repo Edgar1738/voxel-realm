@@ -1,7 +1,7 @@
 # Stairs + Per-Voxel State (Track E2) — Design
 
 - **Date:** 2026-06-29
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending) — `docs/plans/2026-06-29-stairs-track-e2.md`, 8 TDD tasks + a server-persistence fix; suite 538 green. Live smoke confirmed stateful stairs persist through the dev disk save round-trip (after fixing `server/worldDiskStore.ts`, which the plan had missed).
 - **Branch:** `claude/stairs-track-e2` (off `main` @ `ac5b0d2`, which includes E1).
 - **Origin:** The oriented-shape track deferred from E1. E1 shipped orientation-free shapes (slabs, cross-plants); stairs are the first shape that needs **per-voxel orientation state**, so this phase builds that state foundation (which doors/gates will later reuse) with stairs as the first consumer.
 
