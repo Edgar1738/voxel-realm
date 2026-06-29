@@ -174,4 +174,44 @@ describe('worldDiskStore', () => {
     ]);
     expect(() => writeChunk(root, 'w', '0,0', tooMany)).toThrow(/too many|length/i);
   });
+
+  // --- NEW: [index, id, state] stateful entries round-trip ---
+  it('writes and reads back [index, id, state] entries intact', () => {
+    const entries: Array<[number, number, number]> = [
+      [0, 5, 1],
+      [10, 3, 4],
+      [20, 7, 255],
+    ];
+    writeChunk(root, 'stairs', '2,3', entries);
+    const snap = readWorld(root, 'stairs');
+    expect(snap.chunks['2,3']).toEqual(entries);
+  });
+
+  it('rejects a [index, id, state] entry with state out of 0..255', () => {
+    expect(() => writeChunk(root, 'w', '0,0', [[0, 5, 256]])).toThrow(/state|255/i);
+  });
+
+  it('rejects an entry with length other than 2 or 3', () => {
+    // Cast to bypass TS — we test the runtime guard
+    expect(() => writeChunk(root, 'w', '0,0', [[0] as unknown as [number, number]])).toThrow(
+      /entry must be/i,
+    );
+  });
+
+  it('mixed 2-element and 3-element entries round-trip in the same chunk', () => {
+    const entries: Array<[number, number] | [number, number, number]> = [
+      [1, 5],
+      [2, 3, 2],
+      [3, 7, 0],
+      [4, 1],
+    ];
+    writeChunk(root, 'mixed', '0,0', entries);
+    const snap = readWorld(root, 'mixed');
+    // state=0 entries may be stored as [index, id] or [index, id, 0] — compare the key fields
+    const stored = snap.chunks['0,0'];
+    expect(stored).toHaveLength(4);
+    expect(stored[0][0]).toBe(1);
+    expect(stored[0][1]).toBe(5);
+    expect(stored[1]).toEqual([2, 3, 2]);
+  });
 });

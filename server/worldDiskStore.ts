@@ -12,9 +12,11 @@ import {
 import { resolve, join } from 'node:path';
 import { CHUNK_VOLUME } from '../src/core/constants';
 
+export type ChunkEntry = [number, number] | [number, number, number];
+
 export interface DiskSnapshot {
   meta?: { seed: number; version: number; preset?: string };
-  chunks: Record<string, Array<[number, number]>>;
+  chunks: Record<string, Array<ChunkEntry>>;
 }
 
 /** Filesystem-safe world name; never empty. */
@@ -68,8 +70,7 @@ function writeWorld(root: string, name: string, snap: DiskSnapshot): void {
   if (incomingEmpty && existsSync(target)) {
     try {
       const existing = JSON.parse(readFileSync(target, 'utf8')) as Partial<DiskSnapshot>;
-      const existingHasChunks =
-        existing.chunks != null && Object.keys(existing.chunks).length > 0;
+      const existingHasChunks = existing.chunks != null && Object.keys(existing.chunks).length > 0;
       if (existingHasChunks) {
         const backupsDir = join(root, '.backups');
         mkdirSync(backupsDir, { recursive: true });
@@ -109,17 +110,23 @@ export function writeChunk(
   root: string,
   name: string,
   key: string,
-  entries: Array<[number, number]>,
+  entries: Array<ChunkEntry>,
 ): void {
   if (entries.length > CHUNK_VOLUME)
     throw new Error(`chunk ${key}: too many entries (${entries.length} > ${CHUNK_VOLUME})`);
   for (const e of entries) {
-    if (!Array.isArray(e) || e.length !== 2) throw new Error(`chunk ${key}: entry must be [index, id]`);
+    if (!Array.isArray(e) || (e.length !== 2 && e.length !== 3))
+      throw new Error(`chunk ${key}: entry must be [index, id] or [index, id, state]`);
     const [idx, id] = e;
     if (!Number.isInteger(idx) || idx < 0 || idx >= CHUNK_VOLUME)
       throw new Error(`chunk ${key}: index ${idx} out of range`);
     if (!Number.isInteger(id) || id < 0 || id > 255)
       throw new Error(`chunk ${key}: block id ${id} out of 0..255`);
+    if (e.length === 3) {
+      const state = e[2];
+      if (!Number.isInteger(state) || state < 0 || state > 255)
+        throw new Error(`chunk ${key}: state ${String(state)} out of 0..255`);
+    }
   }
   const snap = readWorld(root, name);
   if (entries.length === 0) delete snap.chunks[key];
