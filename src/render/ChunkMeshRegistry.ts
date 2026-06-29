@@ -8,9 +8,10 @@ import type { ChunkMeshes } from '../mesh/MeshTypes';
 interface Entry {
   opaque?: Mesh;
   transparent?: Mesh;
+  cutout?: Mesh;
 }
 
-/** Owns each chunk's opaque + (optional) transparent THREE.Meshes; positions and disposes them. */
+/** Owns each chunk's opaque + (optional) transparent + (optional) cutout THREE.Meshes; positions and disposes them. */
 export class ChunkMeshRegistry implements ChunkSink {
   private readonly entries = new Map<string, Entry>();
 
@@ -18,6 +19,7 @@ export class ChunkMeshRegistry implements ChunkSink {
     private readonly scene: Scene,
     private readonly opaqueMaterial: Material,
     private readonly transparentMaterial: Material,
+    private readonly cutoutMaterial: Material,
     private readonly texture?: Texture,
   ) {}
 
@@ -44,6 +46,14 @@ export class ChunkMeshRegistry implements ChunkSink {
       this.scene.add(transparent);
       entry.transparent = transparent;
     }
+
+    if (meshes.cutout.indices.length > 0) {
+      const cutout = buildChunkMesh(meshes.cutout, this.cutoutMaterial);
+      cutout.position.set(ox, 0, oz);
+      this.scene.add(cutout);
+      entry.cutout = cutout;
+    }
+
     this.entries.set(key, entry);
   }
 
@@ -72,8 +82,8 @@ export class ChunkMeshRegistry implements ChunkSink {
   }
 
   /**
-   * Releases every live chunk geometry, the shared opaque/transparent materials, and the texture
-   * (if one was passed to the constructor). Call when the registry is no longer needed.
+   * Releases every live chunk geometry, the shared opaque/transparent/cutout materials, and the
+   * texture (if one was passed to the constructor). Call when the registry is no longer needed.
    */
   disposeAll(): void {
     for (const key of [...this.entries.keys()]) {
@@ -81,6 +91,7 @@ export class ChunkMeshRegistry implements ChunkSink {
     }
     this.opaqueMaterial.dispose();
     this.transparentMaterial.dispose();
+    this.cutoutMaterial.dispose();
     this.texture?.dispose();
   }
 
@@ -94,6 +105,10 @@ export class ChunkMeshRegistry implements ChunkSink {
     if (entry.transparent) {
       this.scene.remove(entry.transparent);
       entry.transparent.geometry.dispose();
+    }
+    if (entry.cutout) {
+      this.scene.remove(entry.cutout);
+      entry.cutout.geometry.dispose();
     }
     this.entries.delete(key);
   }

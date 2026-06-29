@@ -46,6 +46,7 @@ uniform float uFogNear;
 uniform float uFogFar;
 uniform float uAlpha;
 uniform float uDayLight;
+uniform float uAlphaTest;
 
 in vec2 vUv;
 in float vLayer;
@@ -57,7 +58,9 @@ in vec3 vViewPos;
 out vec4 fragColor;
 
 void main() {
-  vec3 base = texture(uTex, vec3(vUv, vLayer)).rgb;
+  vec4 texel = texture(uTex, vec3(vUv, vLayer));
+  if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
+  vec3 base = texel.rgb;
   float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
@@ -72,11 +75,15 @@ void main() {
 }
 `;
 
-function buildMaterial(
-  tex: DataArrayTexture,
-  alpha: number,
-  transparent: boolean,
-): RawShaderMaterial {
+interface MaterialOpts {
+  alpha?: number;
+  transparent?: boolean;
+  doubleSide?: boolean;
+  alphaTest?: number;
+}
+
+function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShaderMaterial {
+  const { alpha = 1.0, transparent = false, doubleSide = false, alphaTest = 0 } = opts;
   const material = new RawShaderMaterial({
     glslVersion: GLSL3,
     uniforms: {
@@ -87,23 +94,27 @@ function buildMaterial(
       uFogFar: { value: 220 },
       uAlpha: { value: alpha },
       uDayLight: { value: 1.0 },
+      uAlphaTest: { value: alphaTest },
     },
     vertexShader,
     fragmentShader,
   });
-  if (transparent) {
-    material.transparent = true;
-    material.depthWrite = false;
-    material.side = DoubleSide;
-  }
+  material.transparent = transparent;
+  if (transparent) material.depthWrite = false;
+  if (doubleSide) material.side = DoubleSide;
   return material;
 }
 
 export function createChunkMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, 1.0, false);
+  return buildMaterial(tex);
 }
 
 /** Translucent material for the transparent pass (water/glass; drawn after opaque, no depth write). */
 export function createTransparentMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, 0.72, true);
+  return buildMaterial(tex, { alpha: 0.72, transparent: true, doubleSide: true });
+}
+
+/** Cutout material for plants: opaque + depth-writing, double-sided, with an alpha-test discard. */
+export function createCutoutMaterial(tex: DataArrayTexture): RawShaderMaterial {
+  return buildMaterial(tex, { alpha: 1.0, doubleSide: true, alphaTest: 0.5 });
 }

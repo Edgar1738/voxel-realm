@@ -1,6 +1,10 @@
 import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
-import { createChunkMaterial, createTransparentMaterial } from '../render/ChunkMaterial';
+import {
+  createChunkMaterial,
+  createTransparentMaterial,
+  createCutoutMaterial,
+} from '../render/ChunkMaterial';
 import { DayNight } from '../render/DayNight';
 import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
@@ -42,7 +46,8 @@ export class Game {
     const texture = createTextureArray();
     const material = createChunkMaterial(texture);
     const transparentMaterial = createTransparentMaterial(texture);
-    const daynight = new DayNight(renderer.scene, [material, transparentMaterial]);
+    const cutoutMaterial = createCutoutMaterial(texture);
+    const daynight = new DayNight(renderer.scene, [material, transparentMaterial, cutoutMaterial]);
     const celestial = new CelestialSky(renderer.scene);
 
     // Load the durable save (or start fresh / discard an incompatible one).
@@ -76,7 +81,12 @@ export class Game {
       }
     }
 
-    const sink = new ChunkMeshRegistry(renderer.scene, material, transparentMaterial);
+    const sink = new ChunkMeshRegistry(
+      renderer.scene,
+      material,
+      transparentMaterial,
+      cutoutMaterial,
+    );
     const manager = new ChunkManager(
       generator,
       new GreedyMesher(registry),

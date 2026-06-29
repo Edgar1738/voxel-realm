@@ -4,7 +4,7 @@ import type { ChunkMeshes } from '../src/mesh/MeshTypes';
 /**
  * ChunkMeshRegistry unit tests covering:
  *   1. Air-chunk optimisation — no opaque Mesh is added to the scene when opaque indices are empty.
- *   2. disposeAll() — disposes every live chunk geometry, both shared materials, and the texture.
+ *   2. disposeAll() — disposes every live chunk geometry, all shared materials, and the texture.
  *
  * We bypass three.js GPU objects entirely by mocking the module and buildChunkMesh.
  */
@@ -49,6 +49,18 @@ function makeScene() {
   };
 }
 
+function emptyMeshData() {
+  return {
+    positions: new Float32Array(0),
+    normals: new Float32Array(0),
+    uvs: new Float32Array(0),
+    layers: new Float32Array(0),
+    ao: new Float32Array(0),
+    light: new Float32Array(0),
+    indices: new Uint32Array(0),
+  };
+}
+
 /** Returns a minimal ChunkMeshes payload with the given index counts. */
 function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): ChunkMeshes {
   return {
@@ -70,6 +82,7 @@ function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): Chu
       light: new Float32Array(transparentIndices > 0 ? transparentIndices : 0),
       indices: new Uint32Array(transparentIndices),
     },
+    cutout: emptyMeshData(),
   };
 }
 
@@ -86,10 +99,12 @@ describe('ChunkMeshRegistry — sortTransparent()', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     registry.upload('0,0', makeChunkMeshes(0, 6)); // near origin
@@ -111,10 +126,12 @@ describe('ChunkMeshRegistry — air-chunk opaque skip', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     // Air chunk: zero opaque indices, zero transparent indices
@@ -131,10 +148,12 @@ describe('ChunkMeshRegistry — air-chunk opaque skip', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     registry.upload('0,0', makeChunkMeshes(6, 0));
@@ -152,10 +171,12 @@ describe('ChunkMeshRegistry — disposeAll()', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     registry.upload('0,0', makeChunkMeshes(6, 0));
@@ -169,7 +190,7 @@ describe('ChunkMeshRegistry — disposeAll()', () => {
     }
   });
 
-  it('disposes the shared opaque and transparent materials', async () => {
+  it('disposes the shared opaque, transparent, and cutout materials', async () => {
     vi.clearAllMocks();
     createdMeshes.length = 0;
 
@@ -177,16 +198,19 @@ describe('ChunkMeshRegistry — disposeAll()', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     registry.disposeAll();
 
     expect(opaqueMat.dispose).toHaveBeenCalledOnce();
     expect(transparentMat.dispose).toHaveBeenCalledOnce();
+    expect(cutoutMat.dispose).toHaveBeenCalledOnce();
   });
 
   it('disposes the texture when one is provided', async () => {
@@ -197,11 +221,13 @@ describe('ChunkMeshRegistry — disposeAll()', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const tex = makeTextureMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
       tex as unknown as import('three').Texture,
     );
 
@@ -218,10 +244,12 @@ describe('ChunkMeshRegistry — disposeAll()', () => {
     const scene = makeScene();
     const opaqueMat = makeMaterialMock();
     const transparentMat = makeMaterialMock();
+    const cutoutMat = makeMaterialMock();
     const registry = new ChunkMeshRegistry(
       scene as unknown as import('three').Scene,
       opaqueMat as unknown as import('three').Material,
       transparentMat as unknown as import('three').Material,
+      cutoutMat as unknown as import('three').Material,
     );
 
     // Should not throw even without a texture
