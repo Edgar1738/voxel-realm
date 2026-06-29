@@ -29,14 +29,37 @@ describe('emitStair', () => {
     expect(maxY).toBeCloseTo(11, 5); // the upper step reaches the voxel top
   });
 
-  it('rotates the upper step with facing (a known vertex differs N vs E)', () => {
+  it('all 4 facings produce pairwise distinct geometry', () => {
     const mk = (facing: number) => {
       const d = new ChunkData(0, 0);
       d.set(2, 10, 2, 1);
       d.setState(2, 10, 2, packState(facing, 0));
       return [...emitShaped(view(d), reg).slabs.positions];
     };
-    expect(mk(FACING.N)).not.toEqual(mk(FACING.E));
+    const [n, e, s, w] = [mk(FACING.N), mk(FACING.E), mk(FACING.S), mk(FACING.W)];
+    // Every pair must be distinct — catches any two facings collapsing to the same shape.
+    expect(n).not.toEqual(e);
+    expect(n).not.toEqual(s);
+    expect(n).not.toEqual(w);
+    expect(e).not.toEqual(s);
+    expect(e).not.toEqual(w);
+    expect(s).not.toEqual(w);
+  });
+
+  it('top-half stair (half=1) produces geometry different from bottom-half (half=0)', () => {
+    const mk = (half: number) => {
+      const d = new ChunkData(0, 0);
+      d.set(2, 10, 2, 1);
+      d.setState(2, 10, 2, packState(FACING.N, half));
+      return [...emitShaped(view(d), reg).slabs.positions];
+    };
+    const bottom = mk(0);
+    const top = mk(1);
+    expect(top).not.toEqual(bottom);
+    // For half=1 the full-footprint box occupies y+0.5..y+1: its bottom face is at y+0.5=10.5.
+    const yVals = Array.from({ length: top.length / 3 }, (_, i) => top[i * 3 + 1]);
+    expect(yVals.some((v) => Math.abs(v - 10.5) < 1e-5)).toBe(true); // full box bottom at 10.5
+    expect(yVals.some((v) => Math.abs(v - 11) < 1e-5)).toBe(true); // full box top at 11
   });
 });
 
