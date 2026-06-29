@@ -80,8 +80,8 @@ describe('world presets', () => {
     expect(c.get(0, SEA_LEVEL, 0)).toBe(COBBLESTONE);
   });
 
-  it('default: keeps the tree overlay', () => {
-    expect(createGenerator('default').overlays).toHaveLength(1);
+  it('default: keeps the tree and decoration overlays', () => {
+    expect(createGenerator('default').overlays).toHaveLength(2);
   });
 
   it('isWorldPreset guards unknown values', () => {

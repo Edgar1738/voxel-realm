@@ -4,6 +4,7 @@ import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
 import { scatterTrees } from './TreeScatterer';
+import { scatterDecorations } from './Decorations';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
@@ -225,6 +226,7 @@ export function createGenerator(preset: WorldPreset): {
             streetBlock: COBBLESTONE,
             surfaceAt: plainsHeight,
           }),
+          scatterDecorations(),
         ],
       };
     case 'frontier':
@@ -241,12 +243,13 @@ export function createGenerator(preset: WorldPreset): {
             streetBlock: GRAVEL,
             surfaceAt: plainsHeight,
           }),
+          scatterDecorations(),
         ],
       };
     case 'caverns':
       return { generator: createCavernsGenerator(), overlays: [scatterTrees] };
     case 'default':
     default:
-      return { generator: createWorldGenerator(), overlays: [scatterTrees] };
+      return { generator: createWorldGenerator(), overlays: [scatterTrees, scatterDecorations()] };
   }
 }
