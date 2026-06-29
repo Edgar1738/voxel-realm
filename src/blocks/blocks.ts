@@ -31,6 +31,12 @@ export const MUD: BlockId = 24;
 export const TERRACOTTA: BlockId = 25;
 export const GRAVEL: BlockId = 26;
 
+/** Render/collision shape of a block. The block id implies the shape (no save state). */
+export type Shape = 'cube' | 'slab' | 'cross';
+
+/** Collision footprint of a block within its voxel cell. */
+export type CollisionBox = 'none' | 'full' | 'lowerHalf';
+
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
   PosX = 0,
@@ -51,6 +57,8 @@ export interface BlockDef {
   light?: number;
   /** Whether the block appears in the creative picker. */
   creative?: boolean;
+  /** Render + collision shape. Omitted = 'cube'. */
+  shape?: Shape;
   /** Per-face texture specs (shorthand allowed). Omitted only for AIR. */
   faces?: FaceTextures;
 }
