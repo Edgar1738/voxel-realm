@@ -152,7 +152,9 @@ describe('ChunkManager editing', () => {
     const next = terrain === STONE ? AIR : STONE;
     const changes = mgr.applyEdits([{ x: 1, y: 70, z: 1, id: next }]);
 
-    expect(changes).toEqual([{ x: 1, y: 70, z: 1, before: terrain, after: next }]);
+    expect(changes).toEqual([
+      { x: 1, y: 70, z: 1, before: terrain, after: next, beforeState: 0, afterState: 0 },
+    ]);
     expect(mgr.getBlock(1, 70, 1)).toBe(next);
     expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(beforeUploads); // re-meshed
     expect(mgr.getChunkDelta('0,0')).toEqual([[voxelIndex(1, 70, 1), next]]);

@@ -24,7 +24,15 @@ function makeFakeWorld(initial: Record<string, number> = {}): EditableWorld & {
         const before = store.get(key(edit.x, edit.y, edit.z)) ?? AIR;
         if (before === edit.id) continue;
         store.set(key(edit.x, edit.y, edit.z), edit.id);
-        changes.push({ x: edit.x, y: edit.y, z: edit.z, before, after: edit.id });
+        changes.push({
+          x: edit.x,
+          y: edit.y,
+          z: edit.z,
+          before,
+          after: edit.id,
+          beforeState: 0,
+          afterState: 0,
+        });
       }
       return changes;
     },

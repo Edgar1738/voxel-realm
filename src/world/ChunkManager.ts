@@ -29,6 +29,8 @@ import type { ChunkMeshes } from '../mesh/MeshTypes';
 import type { WorldSeed, BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { SetVoxel, VoxelChange, WorldVoxel } from '../edit/EditTypes';
+import { packVoxel, voxelId, voxelState } from '../persistence/SaveTypes';
+import type { ChunkDeltaEntries, WorldDeltas } from '../persistence/SaveTypes';
 
 /** Pure seam to the renderer: upload/dispose chunk meshes by key. */
 export interface ChunkSink {
@@ -41,9 +43,6 @@ export interface ChunkManagerOptions {
   genBudget: number;
   meshBudget: number;
 }
-
-/** In-memory edit deltas: chunk key -> (voxelIndex -> blockId), each a diff from base terrain. */
-export type WorldDeltas = Map<string, Map<number, BlockId>>;
 
 const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
   [1, 0],
@@ -79,7 +78,7 @@ export class ChunkManager {
   private readonly transparentPass: MeshPass;
 
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
-  onChunkDeltaChanged?: (key: string, entries: ReadonlyArray<[number, BlockId]>) => void;
+  onChunkDeltaChanged?: (key: string, entries: ChunkDeltaEntries) => void;
 
   constructor(
     private readonly generator: Generator,
@@ -228,11 +227,22 @@ export class ChunkManager {
       const lx = worldToLocal(edit.x);
       const lz = worldToLocal(edit.z);
       const before = entry.data.get(lx, edit.y, lz);
-      if (before === edit.id) continue;
+      const beforeState = entry.data.getState(lx, edit.y, lz);
+      const nextState = edit.state ?? 0;
+      if (before === edit.id && beforeState === nextState) continue;
 
       entry.data.set(lx, edit.y, lz, edit.id);
-      this.updateDelta(cx, cz, lx, edit.y, lz, edit.id);
-      changes.push({ x: edit.x, y: edit.y, z: edit.z, before, after: edit.id });
+      entry.data.setState(lx, edit.y, lz, nextState);
+      this.updateDelta(cx, cz, lx, edit.y, lz, edit.id, nextState);
+      changes.push({
+        x: edit.x,
+        y: edit.y,
+        z: edit.z,
+        before,
+        after: edit.id,
+        beforeState,
+        afterState: nextState,
+      });
 
       const key = chunkKey(cx, cz);
       editedChunks.add(key);
@@ -422,9 +432,14 @@ export class ChunkManager {
     );
   }
 
-  /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] entries (for persistence). */
-  getChunkDelta(key: string): ReadonlyArray<[number, BlockId]> {
-    return [...(this.deltas.get(key)?.entries() ?? [])].sort((a, b) => a[0] - b[0]);
+  /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] or [voxelIndex, blockId, state] entries (for persistence). */
+  getChunkDelta(key: string): ChunkDeltaEntries {
+    return [...(this.deltas.get(key)?.entries() ?? [])]
+      .sort((a, b) => a[0] - b[0])
+      .map(([index, packed]): [number, number] | [number, number, number] => {
+        const state = voxelState(packed);
+        return state === 0 ? [index, voxelId(packed)] : [index, voxelId(packed), state];
+      });
   }
 
   private updateDelta(
@@ -434,20 +449,23 @@ export class ChunkManager {
     y: number,
     lz: number,
     id: BlockId,
+    state: number,
   ): void {
     const key = chunkKey(cx, cz);
     const index = voxelIndex(lx, y, lz);
-    const baseId = this.baseChunks.get(key)?.get(lx, y, lz);
+    const base = this.baseChunks.get(key);
+    const baseId = base?.get(lx, y, lz);
+    const baseState = base?.getState(lx, y, lz) ?? 0;
     let delta = this.deltas.get(key);
-    if (baseId === id) {
-      // Reverted to generated terrain: drop the delta entry.
+    if (baseId === id && baseState === state) {
+      // Reverted to generated terrain (both id and state match): drop the delta entry.
       delta?.delete(index);
     } else {
       if (!delta) {
         delta = new Map();
         this.deltas.set(key, delta);
       }
-      delta.set(index, id);
+      delta.set(index, packVoxel(id, state));
     }
     if (delta && delta.size === 0) this.deltas.delete(key);
   }
@@ -455,9 +473,10 @@ export class ChunkManager {
   private applySavedDeltas(chunk: ChunkData, key: string): void {
     const delta = this.deltas.get(key);
     if (!delta) return;
-    for (const [index, id] of delta) {
+    for (const [index, packed] of delta) {
       const { x, y, z } = indexToLocal(index);
-      chunk.set(x, y, z, id);
+      chunk.set(x, y, z, voxelId(packed));
+      chunk.setState(x, y, z, voxelState(packed));
     }
   }
 
@@ -567,5 +586,7 @@ export class ChunkManager {
 }
 
 function cloneChunk(chunk: ChunkData): ChunkData {
-  return new ChunkData(chunk.cx, chunk.cz, new Uint8Array(chunk.data));
+  const copy = new ChunkData(chunk.cx, chunk.cz, new Uint8Array(chunk.data));
+  copy.state.set(chunk.state);
+  return copy;
 }

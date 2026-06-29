@@ -8,11 +8,15 @@ export interface WorldVoxel {
 
 export interface SetVoxel extends WorldVoxel {
   id: BlockId;
+  /** Orientation state (0 = unoriented). */
+  state?: number;
 }
 
 export interface VoxelChange extends WorldVoxel {
   before: BlockId;
   after: BlockId;
+  beforeState: number;
+  afterState: number;
 }
 
 export interface EditBatch {
