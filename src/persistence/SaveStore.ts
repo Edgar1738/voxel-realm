@@ -1,4 +1,4 @@
-import type { BlockId } from '../core/types';
+import { packVoxel } from './SaveTypes';
 import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 
 /** Durable storage for world meta + per-chunk edit deltas. */
@@ -13,7 +13,7 @@ export interface SaveStore {
 /** In-memory SaveStore for tests/dev (no durability). */
 export class MemorySaveStore implements SaveStore {
   private meta: WorldMeta | undefined;
-  private readonly chunks = new Map<string, Map<number, BlockId>>();
+  private readonly chunks = new Map<string, Map<number, number>>();
 
   async loadMeta(): Promise<WorldMeta | undefined> {
     return this.meta;
@@ -31,7 +31,7 @@ export class MemorySaveStore implements SaveStore {
 
   async saveChunkDelta(chunkKey: string, entries: ChunkDeltaEntries): Promise<void> {
     if (entries.length === 0) this.chunks.delete(chunkKey);
-    else this.chunks.set(chunkKey, new Map(entries));
+    else this.chunks.set(chunkKey, new Map(entries.map((e) => [e[0], packVoxel(e[1], e[2] ?? 0)])));
   }
 
   async clearDeltas(): Promise<void> {
