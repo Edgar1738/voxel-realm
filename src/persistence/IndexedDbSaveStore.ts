@@ -1,5 +1,5 @@
-import type { BlockId } from '../core/types';
 import type { SaveStore } from './SaveStore';
+import { packVoxel } from './SaveTypes';
 import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 
 const DB_NAME = 'voxel-realm';
@@ -13,7 +13,7 @@ const META_KEY = 'world';
 
 interface ChunkRecord {
   chunkKey: string;
-  entries: Array<[number, BlockId]>;
+  entries: Array<[number, number] | [number, number, number]>;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -62,7 +62,10 @@ export class IndexedDbSaveStore implements SaveStore {
     const records = await idbRequest<ChunkRecord[]>(store.getAll());
     const out: WorldDeltas = new Map();
     for (const record of records) {
-      out.set(record.chunkKey, new Map(record.entries));
+      out.set(
+        record.chunkKey,
+        new Map(record.entries.map((e) => [e[0], packVoxel(e[1], e[2] ?? 0)])),
+      );
     }
     return out;
   }
