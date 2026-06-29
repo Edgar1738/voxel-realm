@@ -1,6 +1,9 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from './constants';
 import type { LocalCoord } from './types';
 
+if (CHUNK_SIZE_X !== CHUNK_SIZE_Z)
+  throw new Error('worldToChunkCoord/worldToLocal assume CHUNK_SIZE_X === CHUNK_SIZE_Z');
+
 /**
  * THE voxel-index convention. Flat layout, x fastest then z then y:
  *   index = x + CHUNK_SIZE_X * (z + CHUNK_SIZE_Z * y)
@@ -22,12 +25,12 @@ export function inChunkBounds(x: number, y: number, z: number): boolean {
   return x >= 0 && x < CHUNK_SIZE_X && y >= 0 && y < WORLD_HEIGHT && z >= 0 && z < CHUNK_SIZE_Z;
 }
 
-/** Floor-divide a world coordinate to its chunk coordinate (handles negatives). */
+/** Floor-divide a world coordinate to its chunk coordinate (handles negatives). Assumes CHUNK_SIZE_X === CHUNK_SIZE_Z. */
 export function worldToChunkCoord(world: number): number {
   return Math.floor(world / CHUNK_SIZE_X);
 }
 
-/** Map a world coordinate to its non-negative local coordinate (handles negatives). */
+/** Map a world coordinate to its non-negative local coordinate (handles negatives). Assumes CHUNK_SIZE_X === CHUNK_SIZE_Z. */
 export function worldToLocal(world: number): number {
   return ((world % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
 }

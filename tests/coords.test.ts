@@ -14,6 +14,10 @@ describe('constants', () => {
   it('chunk volume matches dimensions', () => {
     expect(CHUNK_VOLUME).toBe(CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z);
   });
+
+  it('chunk dimensions are equal (worldToChunkCoord/worldToLocal invariant)', () => {
+    expect(CHUNK_SIZE_X).toBe(CHUNK_SIZE_Z);
+  });
 });
 
 describe('voxelIndex', () => {
