@@ -184,6 +184,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       outOfWorld,
       unloaded,
       noChange,
+      invalid: 0,
       unloadedChunks: [...unloadedChunkSet],
     };
   };
@@ -205,8 +206,16 @@ export function installDevControls(ctx: DevControlsContext): void {
     voxels: SetVoxel[],
     opts: { label?: string; maxBatchSize?: number; preload?: boolean } = {},
   ): BatchedEditResult => {
-    if (voxels.length > 0 && opts.preload !== false) {
-      const b = voxelBounds(voxels);
+    const valid = voxels.filter((v) => registry.has(v.id));
+    const invalidCount = voxels.length - valid.length;
+    if (invalidCount > 0) {
+      const prefix = opts.label ? `[${opts.label}] ` : '';
+      console.warn(
+        `Voxel Realm build: ${prefix}${invalidCount} voxel(s) rejected for unknown block id`,
+      );
+    }
+    if (valid.length > 0 && opts.preload !== false) {
+      const b = voxelBounds(valid);
       try {
         manager.preloadBox(b.minX, b.minZ, b.maxX, b.maxZ);
       } catch {
@@ -217,15 +226,20 @@ export function installDevControls(ctx: DevControlsContext): void {
       MAX_BUILD,
       Math.max(1, Math.floor(opts.maxBatchSize ?? MAX_BUILD)),
     );
-    const result = edit.group(() => applyVoxelsInBatches(voxels, applyBatch, maxBatchSize));
-    if (result.unloaded > 0) {
+    const result = edit.group(() => applyVoxelsInBatches(valid, applyBatch, maxBatchSize));
+    const finalResult: BatchedEditResult = {
+      ...result,
+      requested: result.requested + invalidCount,
+      invalid: result.invalid + invalidCount,
+    };
+    if (finalResult.unloaded > 0) {
       const prefix = opts.label ? `[${opts.label}] ` : '';
       console.warn(
-        `Voxel Realm build: ${prefix}${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
+        `Voxel Realm build: ${prefix}${finalResult.unloaded} voxel(s) hit unloaded chunks ${finalResult.unloadedChunks.join(' ')}`,
       );
     }
-    if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
-    return result;
+    if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, finalResult);
+    return finalResult;
   };
 
   const orbitCamera = (
@@ -452,7 +466,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
-    paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
+    paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
       applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
 
     /** Replace every `fromId` voxel in the box with `toId` (one undo). */
@@ -593,7 +607,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
-    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<EditResult> => {
+    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<BatchedEditResult> => {
       const bp = await loadBlueprint(name);
       return applyAny(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),

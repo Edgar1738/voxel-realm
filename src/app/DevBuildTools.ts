@@ -10,6 +10,8 @@ export interface EditResult {
   unloaded: number;
   /** Loaded and in-world, but already had the requested block. */
   noChange: number;
+  /** Voxels rejected for an unknown/out-of-range block id. */
+  invalid: number;
   /** Chunk keys that were unloaded at apply time (deduped) — for self-diagnosing failed builds. */
   unloadedChunks: string[];
 }
@@ -119,6 +121,7 @@ function combineEditResults(batches: EditResult[]): BatchedEditResult {
     unloaded: sum(batches, 'unloaded'),
     outOfWorld: sum(batches, 'outOfWorld'),
     noChange: sum(batches, 'noChange'),
+    invalid: sum(batches, 'invalid'),
     unloadedChunks: [...chunks],
     batches,
   };
