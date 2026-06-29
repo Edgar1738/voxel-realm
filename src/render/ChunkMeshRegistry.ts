@@ -47,6 +47,26 @@ export class ChunkMeshRegistry implements ChunkSink {
     this.entries.set(key, entry);
   }
 
+  /**
+   * Sets each transparent mesh's `renderOrder` to the negative squared camera distance so that
+   * farther chunks (smaller renderOrder) are drawn before nearer ones. Call once per frame before
+   * the scene render.
+   */
+  sortTransparent(camera: { x: number; z: number }): void {
+    for (const [key, entry] of this.entries) {
+      if (!entry.transparent) continue;
+      const { cx, cz } = parseChunkKey(key);
+      const dx = (cx + 0.5) * CHUNK_SIZE_X - camera.x;
+      const dz = (cz + 0.5) * CHUNK_SIZE_Z - camera.z;
+      entry.transparent.renderOrder = -(dx * dx + dz * dz); // farther = smaller = drawn first
+    }
+  }
+
+  /** Test accessor: returns the transparent mesh's renderOrder for the given chunk key, or null. */
+  transparentRenderOrder(key: string): number | null {
+    return this.entries.get(key)?.transparent?.renderOrder ?? null;
+  }
+
   dispose(key: string): void {
     this.remove(key);
   }
