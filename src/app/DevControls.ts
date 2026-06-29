@@ -36,7 +36,7 @@ import {
   validatePrefab,
   type Prefab,
 } from '../core/Prefab';
-import { replaceVoxels, prefabToVoxels } from './RegionOps';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -456,7 +456,14 @@ export function installDevControls(ctx: DevControlsContext): void {
     ): BatchedEditResult =>
       applyAny(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
-    copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
+    copy: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+    ): Blueprint & { unloaded: string[] } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
@@ -474,7 +481,15 @@ export function installDevControls(ctx: DevControlsContext): void {
             const id = manager.getBlock(x, y, z);
             if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
           }
-      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
+        x1: ax,
+        y1: ay,
+        z1: az,
+        x2: bx,
+        y2: by,
+        z2: bz,
+      });
+      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
@@ -652,15 +667,16 @@ export function installDevControls(ctx: DevControlsContext): void {
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
       registry.get(manager.getBlock(x, y, z)).name,
-    /** Highest non-air voxel in the (x,z) column: {y, block}, or y=null if all air/unloaded. */
-    surface: (x: number, z: number): { y: number | null; block: string } => {
+    /** Highest non-air voxel in the (x,z) column: {y, block, unloaded}, or y=null if all air/unloaded. */
+    surface: (x: number, z: number): { y: number | null; block: string; unloaded: boolean } => {
+      const unloaded = !manager.isLoaded(x, z);
       for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
         const id = manager.getBlock(x, y, z);
-        if (id !== AIR) return { y, block: registry.get(id).name };
+        if (id !== AIR) return { y, block: registry.get(id).name, unloaded };
       }
-      return { y: null, block: 'air' };
+      return { y: null, block: 'air', unloaded };
     },
-    /** Block histogram over a box (capped at 200k voxels): { dims, nonAir, counts }. */
+    /** Block histogram over a box (capped at 200k voxels): { dims, nonAir, counts, unloaded }. */
     scan: (
       x1: number,
       y1: number,
@@ -668,12 +684,23 @@ export function installDevControls(ctx: DevControlsContext): void {
       x2: number,
       y2: number,
       z2: number,
-    ): { dims: [number, number, number]; nonAir: number; counts: Record<string, number> } => {
+    ): {
+      dims: [number, number, number];
+      nonAir: number;
+      counts: Record<string, number>;
+      unloaded: string[];
+    } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       const dims: [number, number, number] = [bx - ax + 1, by - ay + 1, bz - az + 1];
       if (dims[0] * dims[1] * dims[2] > 200000) throw new Error('scan region too large (>200k)');
+      const box = { x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz };
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const counts: Record<string, number> = {};
       let nonAir = 0;
       for (let y = ay; y <= by; y++)
@@ -685,19 +712,25 @@ export function installDevControls(ctx: DevControlsContext): void {
             const name = registry.get(id).name;
             counts[name] = (counts[name] ?? 0) + 1;
           }
-      return { dims, nonAir, counts };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), box);
+      return { dims, nonAir, counts, unloaded };
     },
-    /** ASCII top-down floor plan of one y-layer (area capped at 80x80): { y, legend, rows }. */
+    /** ASCII top-down floor plan of one y-layer (area capped at 80x80): { y, legend, rows, unloaded }. */
     slice: (
       y: number,
       x1: number,
       z1: number,
       x2: number,
       z2: number,
-    ): { y: number; legend: Record<string, string>; rows: string[] } => {
+    ): { y: number; legend: Record<string, string>; rows: string[]; unloaded: string[] } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       if ((bx - ax + 1) * (bz - az + 1) > 6400) throw new Error('slice area too large (>80x80)');
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const palette = '#@%&*+=oxOXNHBW';
       const chars = new Map<BlockId, string>();
       const rows: string[] = [];
@@ -716,7 +749,15 @@ export function installDevControls(ctx: DevControlsContext): void {
       }
       const legend: Record<string, string> = {};
       for (const [id, ch] of chars) legend[ch] = registry.get(id).name;
-      return { y, legend, rows };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
+        x1: ax,
+        y1: y,
+        z1: az,
+        x2: bx,
+        y2: y,
+        z2: bz,
+      });
+      return { y, legend, rows, unloaded };
     },
     blocks: (): Array<{ id: BlockId; name: string }> =>
       CREATIVE_BLOCKS.map((id) => ({ id, name: registry.get(id).name })),
