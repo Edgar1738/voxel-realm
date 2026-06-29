@@ -10,6 +10,7 @@ import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
+import { stairStateFromYaw } from './placement';
 
 const REACH = 6;
 const TUNNEL_LENGTH = 8;
@@ -127,7 +128,9 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
-        callbacks.onRun([{ ...hit.adjacent, id: selected }], 'Placed');
+        const voxel: SetVoxel = { ...hit.adjacent, id: selected };
+        if (registry.shape(selected) === 'stair') voxel.state = stairStateFromYaw(rig.yaw);
+        callbacks.onRun([voxel], 'Placed');
         return;
       }
       if (e.button !== 0) return;
