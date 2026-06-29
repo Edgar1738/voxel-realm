@@ -34,4 +34,24 @@ describe('ServerWorldCatalog', () => {
     const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
     expect(calls[0][1].method).toBe('DELETE');
   });
+
+  it('copyWorld throws on a non-2xx response', async () => {
+    vi.stubGlobal('fetch', (async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'err',
+    })) as unknown as typeof fetch);
+    await expect(copyWorld('a', 'b')).rejects.toThrow();
+    vi.unstubAllGlobals();
+  });
+
+  it('deleteWorld throws on a non-2xx response', async () => {
+    vi.stubGlobal('fetch', (async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'err',
+    })) as unknown as typeof fetch);
+    await expect(deleteWorld('a')).rejects.toThrow();
+    vi.unstubAllGlobals();
+  });
 });
