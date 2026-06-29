@@ -86,6 +86,7 @@ export class BlockRegistry {
       case 'cube':
         return 'full';
       case 'slab':
+      case 'stair':
         return 'lowerHalf';
       case 'cross':
         return 'none';
@@ -114,5 +115,5 @@ export class BlockRegistry {
 }
 
 function isShape(value: string): value is Shape {
-  return value === 'cube' || value === 'slab' || value === 'cross';
+  return value === 'cube' || value === 'slab' || value === 'cross' || value === 'stair';
 }

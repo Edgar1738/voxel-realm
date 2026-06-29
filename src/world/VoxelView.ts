@@ -31,6 +31,15 @@ export class VoxelView {
     return nb ? nb.get(lx, y, lz) : AIR;
   }
 
+  /** Orientation state at a local voxel; 0 outside the center chunk or out of range. */
+  getState(x: number, y: number, z: number): number {
+    if (y < 0 || y >= WORLD_HEIGHT) return 0;
+    const dcx = Math.floor(x / CHUNK_SIZE_X);
+    const dcz = Math.floor(z / CHUNK_SIZE_Z);
+    if (dcx !== 0 || dcz !== 0) return 0;
+    return this.center.getState(x, y, z);
+  }
+
   /** Baked skylight at a (possibly neighbor/out-of-range) voxel. Open sky above world / at
    * unloaded borders reads 15 so surfaces never darken at a seam; below the world reads 0. */
   skyLight(x: number, y: number, z: number): number {

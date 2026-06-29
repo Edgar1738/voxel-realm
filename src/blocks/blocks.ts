@@ -36,7 +36,7 @@ export const FLOWER: BlockId = 29;
 export const TALL_GRASS: BlockId = 30;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
-export type Shape = 'cube' | 'slab' | 'cross';
+export type Shape = 'cube' | 'slab' | 'cross' | 'stair';
 
 /** Collision footprint of a block within its voxel cell. */
 export type CollisionBox = 'none' | 'full' | 'lowerHalf';
