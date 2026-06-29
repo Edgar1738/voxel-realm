@@ -22,6 +22,14 @@ export const COAL_ORE: BlockId = 15;
 export const IRON_ORE: BlockId = 16;
 export const GOLD_ORE: BlockId = 17;
 export const CRYSTAL: BlockId = 18;
+export const DEEPSLATE: BlockId = 19;
+export const EMERALD_ORE: BlockId = 20;
+export const GLOWSTONE: BlockId = 21;
+export const BOOKSHELF: BlockId = 22;
+export const FURNACE: BlockId = 23;
+export const MUD: BlockId = 24;
+export const TERRACOTTA: BlockId = 25;
+export const GRAVEL: BlockId = 26;
 
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
@@ -206,6 +214,84 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     light: 7,
     faces: ore([120, 220, 235]),
+  },
+  {
+    id: DEEPSLATE,
+    name: 'deepslate',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([62, 62, 70]),
+  },
+  {
+    id: EMERALD_ORE,
+    name: 'emerald ore',
+    opaque: true,
+    transparent: false,
+    faces: ore([40, 200, 110]),
+  },
+  {
+    id: GLOWSTONE,
+    name: 'glowstone',
+    opaque: true,
+    transparent: false,
+    light: 15,
+    creative: true,
+    faces: { pattern: 'glow', colors: [[230, 200, 110]] },
+  },
+  {
+    id: BOOKSHELF,
+    name: 'bookshelf',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: { pattern: 'planks', colors: [[165, 130, 80]] },
+      side: { pattern: 'bookshelf', colors: [[150, 116, 70]] },
+      bottom: { pattern: 'planks', colors: [[165, 130, 80]] },
+    },
+  },
+  {
+    id: FURNACE,
+    name: 'furnace',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: stone([120, 120, 124]),
+      side: {
+        pattern: 'furnace',
+        colors: [
+          [120, 120, 124],
+          [60, 48, 44],
+        ],
+      },
+      bottom: stone([120, 120, 124]),
+    },
+  },
+  {
+    id: MUD,
+    name: 'mud',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([90, 74, 60], 14),
+  },
+  {
+    id: TERRACOTTA,
+    name: 'terracotta',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([170, 96, 70], 16),
+  },
+  {
+    id: GRAVEL,
+    name: 'gravel',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([120, 116, 112], 26),
   },
 ];
 

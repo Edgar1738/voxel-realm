@@ -19,6 +19,14 @@ import {
   IRON_ORE,
   GOLD_ORE,
   CRYSTAL,
+  DEEPSLATE,
+  EMERALD_ORE,
+  GLOWSTONE,
+  BOOKSHELF,
+  FURNACE,
+  MUD,
+  TERRACOTTA,
+  GRAVEL,
   TEXTURE_LAYER_COUNT,
   Face,
   BLOCK_DEFS,
@@ -207,5 +215,26 @@ describe('buildBlockTextures', () => {
     const g = BLOCK_TEXTURES.faceLayers.get(GRASS)!;
     expect(g[Face.PosY]).not.toBe(g[Face.PosX]); // top != side
     expect(g[Face.NegY]).toBe(BLOCK_TEXTURES.faceLayers.get(DIRT)![Face.PosY]); // grass bottom == dirt
+  });
+});
+
+describe('Track C blocks', () => {
+  const reg = new BlockRegistry();
+  const ids = [DEEPSLATE, EMERALD_ORE, GLOWSTONE, BOOKSHELF, FURNACE, MUD, TERRACOTTA, GRAVEL];
+  it('assigns contiguous append-only ids 19..26', () => {
+    expect(ids).toEqual([19, 20, 21, 22, 23, 24, 25, 26]);
+  });
+  it('each new block resolves to 6 face layers', () => {
+    for (const id of ids) expect(BLOCK_TEXTURES.faceLayers.get(id)).toHaveLength(6);
+  });
+  it('glowstone emits light 15', () => {
+    expect(reg.emission(GLOWSTONE)).toBe(15);
+  });
+  it('emerald ore is not in the creative picker (mined), the rest are', () => {
+    const byId = new Map(BLOCK_DEFS.map((d) => [d.id, d]));
+    expect(byId.get(EMERALD_ORE)!.creative).toBeFalsy();
+    for (const id of [DEEPSLATE, GLOWSTONE, BOOKSHELF, FURNACE, MUD, TERRACOTTA, GRAVEL]) {
+      expect(byId.get(id)!.creative).toBe(true);
+    }
   });
 });
