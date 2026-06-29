@@ -103,6 +103,7 @@ export class EditService {
       y: c.y,
       z: c.z,
       id: c.before,
+      state: c.beforeState,
     }));
     this.world.applyEdits(reverseEdits);
     this.redoStack.push(batch);
@@ -126,6 +127,7 @@ export class EditService {
       y: c.y,
       z: c.z,
       id: c.after,
+      state: c.afterState,
     }));
     this.world.applyEdits(forwardEdits);
     this.undoStack.push(batch);
