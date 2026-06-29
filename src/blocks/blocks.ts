@@ -34,6 +34,10 @@ export const STONE_SLAB: BlockId = 27;
 export const PLANK_SLAB: BlockId = 28;
 export const FLOWER: BlockId = 29;
 export const TALL_GRASS: BlockId = 30;
+export const STAIRS_STONE: BlockId = 31;
+export const STAIRS_PLANK: BlockId = 32;
+export const STAIRS_COBBLE: BlockId = 33;
+export const STAIRS_BRICK: BlockId = 34;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape = 'cube' | 'slab' | 'cross' | 'stair';
@@ -346,6 +350,54 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     shape: 'cross',
     faces: { pattern: 'tallGrass', colors: [[70, 150, 64]] },
+  },
+  {
+    id: STAIRS_STONE,
+    name: 'stone stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: stone([128, 128, 132]),
+  },
+  {
+    id: STAIRS_PLANK,
+    name: 'plank stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
+  },
+  {
+    id: STAIRS_COBBLE,
+    name: 'cobblestone stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: {
+      pattern: 'cobble',
+      colors: [
+        [118, 118, 122],
+        [70, 70, 74],
+      ],
+    },
+  },
+  {
+    id: STAIRS_BRICK,
+    name: 'brick stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [150, 70, 58],
+        [198, 182, 162],
+      ],
+    },
   },
 ];
 
