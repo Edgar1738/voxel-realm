@@ -4,16 +4,14 @@ import { AIR } from '../blocks/blocks';
 import type { ChunkData } from '../world/ChunkData';
 import type { Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
+import type { Prefab } from '../core/Prefab';
 
 /**
  * A portable, position-independent prefab: per-voxel [dx, dy, dz, id] offsets from the min corner
  * (non-air only). Identical shape to a dev-studio Blueprint, so a structure you `__vr.copy` and
  * save can be scattered by the generator.
  */
-export interface Structure {
-  dims: [number, number, number];
-  blocks: Array<[number, number, number, BlockId]>;
-}
+export type Structure = Prefab;
 
 export interface ScatterOptions {
   /** One spawning candidate per `cellSize` x `cellSize` world region. */
@@ -59,7 +57,11 @@ export function placementsAt(
   const { cellSize, surfaceAt, density = 0.5, salt = 0, clusterCount = 1 } = opts;
   if (structures.length === 0) return [];
   const rng = mulberry32(
-    ((cellX * 73856093) ^ (cellZ * 19349663) ^ (seed * 83492791) ^ (salt * 2654435761)) >>> 0,
+    (Math.imul(cellX, 73856093) ^
+      Math.imul(cellZ, 19349663) ^
+      Math.imul(seed, 83492791) ^
+      Math.imul(salt, 2654435761)) >>>
+      0,
   );
   if (rng() > density) return [];
   const count = Math.max(1, Math.floor(clusterCount));

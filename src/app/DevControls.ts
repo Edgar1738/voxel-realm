@@ -24,11 +24,13 @@ import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './De
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
-import { worldToChunkCoord } from '../core/coords';
+import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
 import type { WorldPreset } from '../worldgen/Presets';
+import { rotateY, mirror as mirrorPrefab, repeat, type Prefab } from '../core/Prefab';
+import { replaceVoxels, prefabToVoxels } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -51,10 +53,7 @@ export interface DevControlsContext {
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
-export interface Blueprint {
-  dims: [number, number, number];
-  blocks: Array<[number, number, number, BlockId]>;
-}
+export type Blueprint = Prefab;
 
 type Html2Canvas = (
   el: HTMLElement,
@@ -168,24 +167,63 @@ export function installDevControls(ctx: DevControlsContext): void {
       throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
     let outOfWorld = 0;
     let unloaded = 0;
+    const unloadedChunkSet = new Set<string>();
     for (const v of voxels) {
       if (v.y < 0 || v.y >= WORLD_HEIGHT) outOfWorld++;
-      else if (!manager.isLoaded(v.x, v.z)) unloaded++;
+      else if (!manager.isLoaded(v.x, v.z)) {
+        unloaded++;
+        unloadedChunkSet.add(chunkKey(worldToChunkCoord(v.x), worldToChunkCoord(v.z)));
+      }
     }
     const batch = edit.apply(voxels);
     const applied = batch ? batch.changes.length : 0;
     const noChange = Math.max(0, voxels.length - applied - outOfWorld - unloaded);
-    return { requested: voxels.length, applied, outOfWorld, unloaded, noChange };
+    return {
+      requested: voxels.length,
+      applied,
+      outOfWorld,
+      unloaded,
+      noChange,
+      unloadedChunks: [...unloadedChunkSet],
+    };
   };
+  const voxelBounds = (voxels: SetVoxel[]) => {
+    let minX = Infinity,
+      minZ = Infinity,
+      maxX = -Infinity,
+      maxZ = -Infinity;
+    for (const v of voxels) {
+      if (v.x < minX) minX = v.x;
+      if (v.z < minZ) minZ = v.z;
+      if (v.x > maxX) maxX = v.x;
+      if (v.z > maxZ) maxZ = v.z;
+    }
+    return { minX, minZ, maxX, maxZ };
+  };
+
   const applyAny = (
     voxels: SetVoxel[],
-    opts: { label?: string; maxBatchSize?: number } = {},
+    opts: { label?: string; maxBatchSize?: number; preload?: boolean } = {},
   ): BatchedEditResult => {
+    if (voxels.length > 0 && opts.preload !== false) {
+      const b = voxelBounds(voxels);
+      try {
+        manager.preloadBox(b.minX, b.minZ, b.maxX, b.maxZ);
+      } catch {
+        /* region too large to auto-preload; fall through and report unloaded honestly */
+      }
+    }
     const maxBatchSize = Math.min(
       MAX_BUILD,
       Math.max(1, Math.floor(opts.maxBatchSize ?? MAX_BUILD)),
     );
-    const result = applyVoxelsInBatches(voxels, applyBatch, maxBatchSize);
+    const result = edit.group(() => applyVoxelsInBatches(voxels, applyBatch, maxBatchSize));
+    if (result.unloaded > 0) {
+      const prefix = opts.label ? `[${opts.label}] ` : '';
+      console.warn(
+        `Voxel Realm build: ${prefix}${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
+      );
+    }
     if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
     return result;
   };
@@ -355,7 +393,7 @@ export function installDevControls(ctx: DevControlsContext): void {
         { label: opts.label ?? 'path' },
       );
     },
-    place: (x: number, y: number, z: number, id: BlockId): EditResult =>
+    place: (x: number, y: number, z: number, id: BlockId): BatchedEditResult =>
       applyAny([{ x, y, z, id }]),
     fill: (
       x1: number,
@@ -365,7 +403,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       y2: number,
       z2: number,
       id: BlockId,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id })),
       ),
@@ -376,11 +414,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       x2: number,
       y2: number,
       z2: number,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(
         boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({ ...v, id: AIR })),
       ),
-    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): EditResult =>
+    sphere: (cx: number, cy: number, cz: number, radius: number, id: BlockId): BatchedEditResult =>
       applyAny(sphereVoxels({ x: cx, y: cy, z: cz }, radius).map((v) => ({ ...v, id }))),
     tunnel: (
       x: number,
@@ -390,7 +428,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       length: number,
       radius: number,
       id: BlockId,
-    ): EditResult =>
+    ): BatchedEditResult =>
       applyAny(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
     copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
@@ -399,6 +437,11 @@ export function installDevControls(ctx: DevControlsContext): void {
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
         throw new Error('copy region too large (>200k)');
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const blocks: Array<[number, number, number, BlockId]> = [];
       for (let y = ay; y <= by; y++)
         for (let z = az; z <= bz; z++)
@@ -411,6 +454,126 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
       applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+
+    /** Replace every `fromId` voxel in the box with `toId` (one undo). */
+    replace: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      fromId: BlockId,
+      toId: BlockId,
+    ): BatchedEditResult => {
+      try {
+        manager.preloadBox(Math.min(x1, x2), Math.min(z1, z2), Math.max(x1, x2), Math.max(z1, z2));
+      } catch {
+        /* region too large to auto-preload */
+      }
+      return applyAny(
+        replaceVoxels(
+          (x, y, z) => manager.getBlock(x, y, z),
+          { x1, y1, z1, x2, y2, z2 },
+          fromId,
+          toId,
+        ),
+        { label: 'replace' },
+      );
+    },
+
+    /** Move a box by (dx,dy,dz): copy, clear the source, paste at the offset — one undo. */
+    move: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      dx: number,
+      dy: number,
+      dz: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      const clear = boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({
+        ...v,
+        id: AIR,
+      }));
+      const paste = prefabToVoxels(bp, ox + dx, oy + dy, oz + dz);
+      return applyAny([...clear, ...paste], { label: 'move' });
+    },
+
+    /**
+     * Mirror a box in place across 'x' or 'z' (one undo).
+     * NOTE: pastes in place WITHOUT clearing the source footprint — mirroring a non-square region
+     * can leave residual original voxels outside the new footprint; clear the box first (or use
+     * square regions) if that matters.
+     */
+    mirror: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      axis: 'x' | 'z',
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(mirrorPrefab(bp, axis), ox, oy, oz), { label: 'mirror' });
+    },
+
+    /**
+     * Rotate a box in place about Y by `quarterTurns` * 90deg, re-anchored at the min corner (one undo).
+     * NOTE: pastes in place WITHOUT clearing the source footprint — rotating a non-square region
+     * can leave residual original voxels outside the new footprint; clear the box first (or use
+     * square regions) if that matters.
+     */
+    rotate: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      quarterTurns: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(rotateY(bp, quarterTurns), ox, oy, oz), { label: 'rotate' });
+    },
+
+    /** Tile a box into an nx*ny*nz grid with the given per-axis stride (one undo). */
+    array: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      nx: number,
+      ny: number,
+      nz: number,
+      sx: number,
+      sy: number,
+      sz: number,
+    ): BatchedEditResult => {
+      const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const ox = Math.min(x1, x2),
+        oy = Math.min(y1, y2),
+        oz = Math.min(z1, z2);
+      return applyAny(prefabToVoxels(repeat(bp, nx, ny, nz, [sx, sy, sz]), ox, oy, oz), {
+        label: 'array',
+      });
+    },
+
     line: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: BlockId) =>
       applyAny(lineVoxels(x1, y1, z1, x2, y2, z2, id)),
     cylinder: (cx: number, cy: number, cz: number, radius: number, height: number, id: BlockId) =>

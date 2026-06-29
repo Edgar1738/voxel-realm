@@ -1,9 +1,9 @@
 import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER, LANTERN } from '../blocks/blocks';
-import type { Structure } from './Structures';
+import type { Prefab } from '../core/Prefab';
 import type { BlockId } from '../core/types';
 
 /** A 5x5 plank cottage with corner logs, a door, side windows, and a pitched roof. */
-export function cottage(): Structure {
+export function cottage(): Prefab {
   const W = 5;
   const D = 5;
   const blocks: Array<[number, number, number, BlockId]> = [];
@@ -47,7 +47,7 @@ export function cottage(): Structure {
 }
 
 /** A 3x3 cobblestone well with a water basin and a small plank canopy. */
-export function well(): Structure {
+export function well(): Prefab {
   const blocks: Array<[number, number, number, BlockId]> = [];
   const put = (x: number, y: number, z: number, id: BlockId): void => {
     blocks.push([x, y, z, id]);
@@ -74,7 +74,7 @@ export function well(): Structure {
 }
 
 /** A wood post topped with a lantern — lights village streets at night. */
-export function lampPost(): Structure {
+export function lampPost(): Prefab {
   return {
     dims: [1, 4, 1],
     blocks: [
@@ -87,7 +87,7 @@ export function lampPost(): Structure {
 }
 
 /** A crumbled 5x5 cobblestone tower — ragged wall heights with breaches and a little rubble. */
-export function ruinedTower(): Structure {
+export function ruinedTower(): Prefab {
   const W = 5;
   const D = 5;
   const blocks: Array<[number, number, number, BlockId]> = [];
@@ -114,7 +114,7 @@ export function ruinedTower(): Structure {
 }
 
 /** A toppled cobblestone wall segment with ragged height and a few fallen blocks. */
-export function brokenWall(): Structure {
+export function brokenWall(): Prefab {
   const L = 6;
   const blocks: Array<[number, number, number, BlockId]> = [];
   const put = (x: number, y: number, z: number, id: BlockId): void => {

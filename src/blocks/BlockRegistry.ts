@@ -1,12 +1,41 @@
+// src/blocks/BlockRegistry.ts
 import type { BlockId } from '../core/types';
-import { BLOCK_DEFS, TEXTURE_LAYER_COUNT, type BlockDef, type Face } from './blocks';
+import {
+  BLOCK_DEFS,
+  BLOCK_TEXTURES,
+  TEXTURE_LAYER_COUNT,
+  type BlockDef,
+  type Face,
+} from './blocks';
 
 /** Single source of truth for block lookups. Built from the stable BLOCK_DEFS table. */
 export class BlockRegistry {
   private readonly byId = new Map<BlockId, BlockDef>();
 
   constructor() {
-    for (const def of BLOCK_DEFS) this.byId.set(def.id, def);
+    for (const def of BLOCK_DEFS) {
+      if (this.byId.has(def.id)) throw new Error(`Duplicate block id: ${def.id} (${def.name})`);
+      this.byId.set(def.id, def);
+    }
+    this.selfCheck();
+  }
+
+  /** Fail loudly at boot if the declarative table is internally inconsistent. */
+  private selfCheck(): void {
+    for (const def of BLOCK_DEFS) {
+      if (!def.faces) continue;
+      const layers = BLOCK_TEXTURES.faceLayers.get(def.id);
+      if (!layers || layers.length !== 6) {
+        throw new Error(`Block "${def.name}" (id ${def.id}) did not resolve to 6 face layers`);
+      }
+      for (const l of layers) {
+        if (l < 0 || l >= TEXTURE_LAYER_COUNT) {
+          throw new Error(
+            `Block "${def.name}" face layer ${l} out of range 0..${TEXTURE_LAYER_COUNT - 1}`,
+          );
+        }
+      }
+    }
   }
 
   get(id: BlockId): BlockDef {
@@ -29,15 +58,14 @@ export class BlockRegistry {
     return this.get(id).light ?? 0;
   }
 
-  /** Texture layer index for a given block face. Throws if the block has no faces
-   *  (e.g. AIR) so that a mesh pass that incorrectly includes a faceless block fails
-   *  loudly instead of silently baking undefined/NaN into the geometry. */
+  /** Texture layer index for a block face. Throws on faceless blocks (e.g. AIR). */
   faceLayer(id: BlockId, face: Face): number {
     const def = this.get(id);
-    if (def.faces.length === 0) {
+    const layers = BLOCK_TEXTURES.faceLayers.get(id);
+    if (!layers) {
       throw new Error(`faceLayer called on block "${def.name}" (id ${id}) which has no faces`);
     }
-    return def.faces[face];
+    return layers[face];
   }
 
   /** Number of DataArrayTexture layers the renderer must allocate. */

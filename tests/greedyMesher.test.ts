@@ -5,7 +5,7 @@ import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../src/core/constants';
-import { GRASS, STONE, WATER, TextureLayer, AIR } from '../src/blocks/blocks';
+import { GRASS, STONE, WATER, AIR, Face } from '../src/blocks/blocks';
 
 const reg = new BlockRegistry();
 const mesher = new GreedyMesher(reg);
@@ -70,7 +70,7 @@ describe('GreedyMesher', () => {
       for (let z = 0; z < CHUNK_SIZE_Z; z++) c.set(x, 0, z, GRASS);
     const mesh = mesher.mesh(viewOf(c), OPAQUE);
     expect(faceCount(mesh)).toBe(6);
-    expect(layerForNormal(mesh, [0, 1, 0])).toBe(TextureLayer.GrassTop);
+    expect(layerForNormal(mesh, [0, 1, 0])).toBe(reg.faceLayer(GRASS, Face.PosY));
   });
 
   it('culls the +X border faces when an east neighbor is present', () => {
@@ -124,7 +124,7 @@ describe('GreedyMesher', () => {
     // The 2 shared faces are culled; the 4 side columns each merge into one 1x2 quad,
     // plus a top and a bottom quad => 6 quads (not 10, which would be unmerged).
     expect(faceCount(mesh)).toBe(6);
-    expect(layerForNormal(mesh, [0, 0, 1])).toBe(TextureLayer.Stone);
+    expect(layerForNormal(mesh, [0, 0, 1])).toBe(reg.faceLayer(STONE, Face.PosZ));
     expect(AIR).toBe(0);
   });
 });

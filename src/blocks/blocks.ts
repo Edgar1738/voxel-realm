@@ -1,4 +1,6 @@
 import type { BlockId } from '../core/types';
+import type { TextureSpec, FaceTextures } from './textures';
+import { expandFaces, specKey } from './textures';
 
 /** Stable, append-only block ids. NEVER reorder or reuse (saves store ids). */
 export const AIR: BlockId = 0;
@@ -31,140 +33,153 @@ export enum Face {
   NegZ = 5,
 }
 
-/** Texture layer indices into the DataArrayTexture (one layer per face texture). */
-export const TextureLayer = {
-  GrassTop: 0,
-  GrassSide: 1,
-  Dirt: 2,
-  Stone: 3,
-  WoodTop: 4,
-  WoodSide: 5,
-  Leaves: 6,
-  Sand: 7,
-  Water: 8,
-  Snow: 9,
-  Cactus: 10,
-  Glass: 11,
-  Planks: 12,
-  Cobblestone: 13,
-  Brick: 14,
-  Lantern: 15,
-  CoalOre: 16,
-  IronOre: 17,
-  GoldOre: 18,
-  Crystal: 19,
-} as const;
-
-export const TEXTURE_LAYER_COUNT = Object.keys(TextureLayer).length;
-
-/** Definition of one block type. `faces` lists the texture layer per Face (0..5). */
+/** Definition of one block type. `faces` is declarative; AIR omits it. */
 export interface BlockDef {
   id: BlockId;
   name: string;
   opaque: boolean;
-  /** Whether the block is rendered in the transparent render pass (water, glass, etc.). */
   transparent: boolean;
-  /** Texture layer per face, indexed by Face; empty for air. */
-  faces: number[];
-  /** Self-emitted light level (0..15); 0/undefined for non-emitters. Drives the lighting pass. */
+  /** Self-emitted light (0..15). */
   light?: number;
+  /** Whether the block appears in the creative picker. */
+  creative?: boolean;
+  /** Per-face texture specs (shorthand allowed). Omitted only for AIR. */
+  faces?: FaceTextures;
 }
 
-function uniform(layer: number): number[] {
-  return [layer, layer, layer, layer, layer, layer];
-}
+const stone = (c: [number, number, number]): TextureSpec => ({ pattern: 'stone', colors: [c] });
+const speck = (c: [number, number, number], amp: number): TextureSpec => ({
+  pattern: 'speckle',
+  colors: [c],
+  amp,
+});
+const ore = (spot: [number, number, number]): TextureSpec => ({ pattern: 'ore', colors: [spot] });
 
-/** The block table. Order here does not affect ids — ids are explicit above. */
+/** The block table — the single source of truth. Order here does NOT affect ids. */
 export const BLOCK_DEFS: BlockDef[] = [
-  { id: AIR, name: 'air', opaque: false, transparent: true, faces: [] },
+  { id: AIR, name: 'air', opaque: false, transparent: true },
   {
     id: GRASS,
     name: 'grass',
     opaque: true,
     transparent: false,
-    // PosX, NegX, PosY(top), NegY(bottom), PosZ, NegZ
-    faces: [
-      TextureLayer.GrassSide,
-      TextureLayer.GrassSide,
-      TextureLayer.GrassTop,
-      TextureLayer.Dirt,
-      TextureLayer.GrassSide,
-      TextureLayer.GrassSide,
-    ],
+    creative: true,
+    faces: {
+      top: { pattern: 'grassTop', colors: [[86, 152, 60]] },
+      side: {
+        pattern: 'grassSide',
+        colors: [
+          [134, 96, 62],
+          [86, 152, 60],
+        ],
+      },
+      bottom: speck([134, 96, 62], 20),
+    },
   },
-  { id: DIRT, name: 'dirt', opaque: true, transparent: false, faces: uniform(TextureLayer.Dirt) },
+  {
+    id: DIRT,
+    name: 'dirt',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([134, 96, 62], 20),
+  },
   {
     id: STONE,
     name: 'stone',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Stone),
+    creative: true,
+    faces: stone([128, 128, 132]),
   },
   {
     id: WOOD,
     name: 'wood',
     opaque: true,
     transparent: false,
-    // PosX, NegX, PosY(top), NegY(bottom), PosZ, NegZ
-    faces: [
-      TextureLayer.WoodSide,
-      TextureLayer.WoodSide,
-      TextureLayer.WoodTop,
-      TextureLayer.WoodTop,
-      TextureLayer.WoodSide,
-      TextureLayer.WoodSide,
-    ],
+    creative: true,
+    faces: {
+      top: { pattern: 'rings', colors: [[160, 130, 85]] },
+      side: { pattern: 'bark', colors: [[105, 78, 46]] },
+      bottom: { pattern: 'rings', colors: [[160, 130, 85]] },
+    },
   },
   {
     id: LEAVES,
     name: 'leaves',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Leaves),
+    creative: true,
+    faces: { pattern: 'leaves', colors: [[54, 120, 44]] },
   },
-  { id: SAND, name: 'sand', opaque: true, transparent: false, faces: uniform(TextureLayer.Sand) },
   {
-    id: WATER,
-    name: 'water',
-    opaque: false,
-    transparent: true,
-    faces: uniform(TextureLayer.Water),
+    id: SAND,
+    name: 'sand',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([206, 190, 140], 12),
   },
-  { id: SNOW, name: 'snow', opaque: true, transparent: false, faces: uniform(TextureLayer.Snow) },
+  { id: WATER, name: 'water', opaque: false, transparent: true, faces: speck([50, 110, 200], 10) },
+  {
+    id: SNOW,
+    name: 'snow',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([236, 240, 245], 6),
+  },
   {
     id: CACTUS,
     name: 'cactus',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Cactus),
+    creative: true,
+    faces: { pattern: 'ridges', colors: [[60, 110, 60]] },
   },
   {
     id: GLASS,
     name: 'glass',
     opaque: false,
     transparent: true,
-    faces: uniform(TextureLayer.Glass),
+    creative: true,
+    faces: { pattern: 'glass', colors: [[205, 232, 240]] },
   },
   {
     id: PLANKS,
     name: 'planks',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Planks),
+    creative: true,
+    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
   },
   {
     id: COBBLESTONE,
     name: 'cobblestone',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Cobblestone),
+    creative: true,
+    faces: {
+      pattern: 'cobble',
+      colors: [
+        [118, 118, 122],
+        [70, 70, 74],
+      ],
+    },
   },
   {
     id: BRICK,
     name: 'brick',
     opaque: true,
     transparent: false,
-    faces: uniform(TextureLayer.Brick),
+    creative: true,
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [150, 70, 58],
+        [198, 182, 162],
+      ],
+    },
   },
   {
     id: LANTERN,
@@ -172,35 +187,56 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     light: 14,
-    faces: uniform(TextureLayer.Lantern),
+    creative: true,
+    faces: {
+      pattern: 'lantern',
+      colors: [
+        [60, 52, 40],
+        [255, 226, 140],
+      ],
+    },
   },
-  {
-    id: COAL_ORE,
-    name: 'coal ore',
-    opaque: true,
-    transparent: false,
-    faces: uniform(TextureLayer.CoalOre),
-  },
-  {
-    id: IRON_ORE,
-    name: 'iron ore',
-    opaque: true,
-    transparent: false,
-    faces: uniform(TextureLayer.IronOre),
-  },
-  {
-    id: GOLD_ORE,
-    name: 'gold ore',
-    opaque: true,
-    transparent: false,
-    faces: uniform(TextureLayer.GoldOre),
-  },
+  { id: COAL_ORE, name: 'coal ore', opaque: true, transparent: false, faces: ore([40, 40, 44]) },
+  { id: IRON_ORE, name: 'iron ore', opaque: true, transparent: false, faces: ore([196, 150, 110]) },
+  { id: GOLD_ORE, name: 'gold ore', opaque: true, transparent: false, faces: ore([235, 205, 70]) },
   {
     id: CRYSTAL,
     name: 'crystal',
     opaque: true,
     transparent: false,
     light: 7,
-    faces: uniform(TextureLayer.Crystal),
+    faces: ore([120, 220, 235]),
   },
 ];
+
+export interface BlockTextures {
+  uniqueSpecs: TextureSpec[];
+  faceLayers: Map<BlockId, number[]>;
+  layerCount: number;
+}
+
+/** Dedup all face specs into layers (first-appearance order) and resolve per-block face layers. */
+export function buildBlockTextures(defs: BlockDef[]): BlockTextures {
+  const uniqueSpecs: TextureSpec[] = [];
+  const layerByKey = new Map<string, number>();
+  const faceLayers = new Map<BlockId, number[]>();
+  for (const def of defs) {
+    if (!def.faces) continue;
+    const specs = expandFaces(def.faces);
+    const layers = specs.map((spec) => {
+      const key = specKey(spec);
+      let layer = layerByKey.get(key);
+      if (layer === undefined) {
+        layer = uniqueSpecs.length;
+        layerByKey.set(key, layer);
+        uniqueSpecs.push(spec);
+      }
+      return layer;
+    });
+    faceLayers.set(def.id, layers);
+  }
+  return { uniqueSpecs, faceLayers, layerCount: uniqueSpecs.length };
+}
+
+export const BLOCK_TEXTURES: BlockTextures = buildBlockTextures(BLOCK_DEFS);
+export const TEXTURE_LAYER_COUNT = BLOCK_TEXTURES.layerCount;

@@ -137,3 +137,30 @@ describe('EditService', () => {
     expect(world.store.get('0,0,0')).toBe(GRASS);
   });
 });
+
+describe('EditService grouping', () => {
+  it('coalesces multiple applies into one undo', () => {
+    const svc = new EditService(makeFakeWorld());
+    svc.group(() => {
+      svc.apply([{ x: 0, y: 0, z: 0, id: STONE }]);
+      svc.apply([{ x: 1, y: 0, z: 0, id: STONE }]);
+      svc.apply([{ x: 2, y: 0, z: 0, id: STONE }]);
+    });
+    expect(svc.undo()).toBe('ok');
+    // one undo reverses ALL three
+    expect(svc.undo()).toBe('empty');
+  });
+
+  it('closes the group even when fn throws', () => {
+    const svc = new EditService(makeFakeWorld());
+    expect(() =>
+      svc.group(() => {
+        svc.apply([{ x: 0, y: 0, z: 0, id: STONE }]);
+        throw new Error('boom');
+      }),
+    ).toThrow('boom');
+    // history is intact and the partial work is one undoable batch
+    expect(svc.undo()).toBe('ok');
+    expect(svc.undo()).toBe('empty');
+  });
+});

@@ -10,6 +10,8 @@ export interface EditResult {
   unloaded: number;
   /** Loaded and in-world, but already had the requested block. */
   noChange: number;
+  /** Chunk keys that were unloaded at apply time (deduped) — for self-diagnosing failed builds. */
+  unloadedChunks: string[];
 }
 
 export interface BatchedEditResult extends EditResult {
@@ -109,12 +111,15 @@ export function createMemoryBookmarks(getPose: () => Pose, setPose: (pose: Pose)
 }
 
 function combineEditResults(batches: EditResult[]): BatchedEditResult {
+  const chunks = new Set<string>();
+  for (const b of batches) for (const c of b.unloadedChunks) chunks.add(c);
   return {
     requested: sum(batches, 'requested'),
     applied: sum(batches, 'applied'),
     unloaded: sum(batches, 'unloaded'),
     outOfWorld: sum(batches, 'outOfWorld'),
     noChange: sum(batches, 'noChange'),
+    unloadedChunks: [...chunks],
     batches,
   };
 }
@@ -167,8 +172,12 @@ function compareVoxels(a: SetVoxel, b: SetVoxel): number {
   return a.x - b.x || a.y - b.y || a.z - b.z || a.id - b.id;
 }
 
-function sum(results: EditResult[], key: keyof EditResult): number {
-  return results.reduce((total, result) => total + result[key], 0);
+type NumericEditKey = {
+  [K in keyof EditResult]: EditResult[K] extends number ? K : never;
+}[keyof EditResult];
+
+function sum(results: EditResult[], key: NumericEditKey): number {
+  return results.reduce((total, result) => total + (result[key] as number), 0);
 }
 
 function clonePose(pose: Pose): Pose {
