@@ -1,4 +1,4 @@
-import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER, LANTERN } from '../blocks/blocks';
+import { PLANKS, COBBLESTONE, GLASS, WOOD, WATER, LANTERN, DIRT, LEAVES } from '../blocks/blocks';
 import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { BlockId } from '../core/types';
 
@@ -196,4 +196,42 @@ export function brokenWall(): Prefab {
   put(2, 0, 1, COBBLESTONE);
   put(4, 0, 1, COBBLESTONE); // toppled blocks
   return { dims: [L, 5, 2], blocks };
+}
+
+/** A 9-long plank footbridge with support posts at the ends. */
+export function bridge(): Prefab {
+  const L = 9;
+  const blocks: PrefabVoxel[] = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  for (let x = 0; x < L; x++) {
+    put(x, 1, 0, PLANKS);
+    put(x, 1, 1, PLANKS);
+  } // 2-wide deck
+  for (let x = 0; x < L; x += 4) {
+    put(x, 0, 0, WOOD);
+    put(x, 0, 1, WOOD);
+  } // posts
+  for (let x = 0; x < L; x++) {
+    put(x, 2, 0, WOOD);
+    put(x, 2, 1, WOOD);
+  } // low railings
+  return { dims: [L, 3, 2], blocks };
+}
+
+/** A 5x5 tilled dirt plot bordered by wood, with a few crop markers. */
+export function farmPlot(): Prefab {
+  const blocks: PrefabVoxel[] = [];
+  const put = (x: number, y: number, z: number, id: BlockId): void => {
+    blocks.push([x, y, z, id]);
+  };
+  for (let z = 0; z < 5; z++)
+    for (let x = 0; x < 5; x++) {
+      const border = x === 0 || x === 4 || z === 0 || z === 4;
+      put(x, 0, z, border ? WOOD : DIRT);
+    }
+  for (let z = 1; z < 4; z++)
+    for (let x = 1; x < 4; x++) if ((x + z) % 2 === 0) put(x, 1, z, LEAVES); // crop rows
+  return { dims: [5, 2, 5], blocks };
 }

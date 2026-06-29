@@ -8,8 +8,10 @@ import {
   barn,
   watchtower,
   marketStall,
+  bridge,
+  farmPlot,
 } from '../src/worldgen/prefabs';
-import { LANTERN } from '../src/blocks/blocks';
+import { LANTERN, PLANKS, DIRT } from '../src/blocks/blocks';
 
 describe('prefabs', () => {
   for (const [name, make] of [
@@ -55,5 +57,18 @@ describe('Track C prefabs (buildings)', () => {
     const p = marketStall();
     expect(p.dims).toEqual([5, 4, 5]);
     expect(p.blocks.length).toBeGreaterThan(10);
+  });
+});
+
+describe('Track C prefabs (terrain features)', () => {
+  it('bridge is a long plank deck with posts', () => {
+    const p = bridge();
+    expect(p.dims[0]).toBeGreaterThanOrEqual(8);
+    expect(p.blocks.some(([, , , id]) => id === PLANKS)).toBe(true);
+  });
+  it('farmPlot is a bordered dirt patch', () => {
+    const p = farmPlot();
+    expect(p.dims).toEqual([5, 2, 5]);
+    expect(p.blocks.some(([, , , id]) => id === DIRT)).toBe(true);
   });
 });
