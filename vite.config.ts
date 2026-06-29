@@ -130,6 +130,10 @@ function devDisk(): Plugin {
         const name = safeWorldName(url.searchParams.get('name'));
 
         if (req.method === 'GET') {
+          if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+            res.statusCode = 403;
+            return res.end('forbidden: cross-origin request rejected');
+          }
           if (url.searchParams.has('list')) return sendJson(res, { worlds: listWorlds(root) });
           return sendJson(res, readWorld(root, name));
         }

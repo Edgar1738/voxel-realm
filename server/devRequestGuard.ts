@@ -13,18 +13,22 @@ const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
  * Returns `true` when the request should be allowed through the dev guard.
  *
  * @param origin - Value of the `Origin` request header (may be undefined).
- * @param host   - Value of the `Host` request header (available for future use).
+ * @param host   - Value of the `Host` request header. When provided, the origin's
+ *                 host:port must match the server's `Host` header exactly.
  */
 export function isAllowedDevOrigin(
   origin: string | undefined,
-  _host: string | undefined,
+  host: string | undefined,
 ): boolean {
   // No Origin header → same-origin navigation or non-browser client → allow.
   if (origin === undefined) return true;
 
   try {
-    const { hostname } = new URL(origin);
-    return ALLOWED_HOSTNAMES.has(hostname);
+    const originUrl = new URL(origin);
+    if (!ALLOWED_HOSTNAMES.has(originUrl.hostname)) return false;
+    // When the server Host header is known, require the origin's host:port to match.
+    if (host !== undefined && originUrl.host !== host) return false;
+    return true;
   } catch {
     // Unparseable origin → deny defensively.
     return false;
