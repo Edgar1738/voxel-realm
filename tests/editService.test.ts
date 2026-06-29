@@ -169,19 +169,23 @@ describe('EditService grouping edge cases', () => {
   it('an empty group does not clear redo', () => {
     const svc = new EditService(makeFakeWorld());
     svc.apply([{ x: 0, y: 0, z: 0, id: 1 }]);
-    expect(svc.undo()).toBe('ok');          // sets up a redo entry
-    svc.group(() => { svc.apply([]); });      // no real change
-    expect(svc.redo()).toBe('ok');           // redo still available
+    expect(svc.undo()).toBe('ok'); // sets up a redo entry
+    svc.group(() => {
+      svc.apply([]);
+    }); // no real change
+    expect(svc.redo()).toBe('ok'); // redo still available
   });
 
   it('nested groups commit as one batch on the outer close', () => {
     const svc = new EditService(makeFakeWorld());
     svc.group(() => {
       svc.apply([{ x: 0, y: 0, z: 0, id: 1 }]);
-      svc.group(() => { svc.apply([{ x: 1, y: 0, z: 0, id: 1 }]); }); // nested
+      svc.group(() => {
+        svc.apply([{ x: 1, y: 0, z: 0, id: 1 }]);
+      }); // nested
       svc.apply([{ x: 2, y: 0, z: 0, id: 1 }]);
     });
-    expect(svc.undo()).toBe('ok');   // one undo reverses ALL three
+    expect(svc.undo()).toBe('ok'); // one undo reverses ALL three
     expect(svc.undo()).toBe('empty');
   });
 });
