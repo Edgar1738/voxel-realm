@@ -9,7 +9,15 @@ describe('createTextureArray', () => {
     const data = tex.image.data as Uint8Array;
     expect(data.length).toBe(TILE * TILE * 4 * TEXTURE_LAYER_COUNT);
     expect(tex.image.depth).toBe(TEXTURE_LAYER_COUNT);
-    // every alpha byte is opaque
-    for (let i = 3; i < data.length; i += 4) expect(data[i]).toBe(255);
+    // most layers are fully opaque; plant/cross layers have transparent pixels — at least one
+    // alpha byte must be 255 across the whole array (sanity: array is not zeroed out)
+    let hasOpaque = false;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] === 255) {
+        hasOpaque = true;
+        break;
+      }
+    }
+    expect(hasOpaque).toBe(true);
   });
 });

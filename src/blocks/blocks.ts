@@ -30,6 +30,10 @@ export const FURNACE: BlockId = 23;
 export const MUD: BlockId = 24;
 export const TERRACOTTA: BlockId = 25;
 export const GRAVEL: BlockId = 26;
+export const STONE_SLAB: BlockId = 27;
+export const PLANK_SLAB: BlockId = 28;
+export const FLOWER: BlockId = 29;
+export const TALL_GRASS: BlockId = 30;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape = 'cube' | 'slab' | 'cross';
@@ -300,6 +304,48 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     faces: speck([120, 116, 112], 26),
+  },
+  {
+    id: STONE_SLAB,
+    name: 'stone slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: stone([128, 128, 132]),
+  },
+  {
+    id: PLANK_SLAB,
+    name: 'plank slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
+  },
+  {
+    id: FLOWER,
+    name: 'flower',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: {
+      pattern: 'flower',
+      colors: [
+        [60, 140, 60],
+        [220, 70, 90],
+      ],
+    },
+  },
+  {
+    id: TALL_GRASS,
+    name: 'tall grass',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: { pattern: 'tallGrass', colors: [[70, 150, 64]] },
   },
 ];
 
