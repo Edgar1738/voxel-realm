@@ -10,6 +10,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { CHUNK_VOLUME } from '../src/core/constants';
 
 export interface DiskSnapshot {
   meta?: { seed: number; version: number; preset?: string };
@@ -110,6 +111,16 @@ export function writeChunk(
   key: string,
   entries: Array<[number, number]>,
 ): void {
+  if (entries.length > CHUNK_VOLUME)
+    throw new Error(`chunk ${key}: too many entries (${entries.length} > ${CHUNK_VOLUME})`);
+  for (const e of entries) {
+    if (!Array.isArray(e) || e.length !== 2) throw new Error(`chunk ${key}: entry must be [index, id]`);
+    const [idx, id] = e;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= CHUNK_VOLUME)
+      throw new Error(`chunk ${key}: index ${idx} out of range`);
+    if (!Number.isInteger(id) || id < 0 || id > 255)
+      throw new Error(`chunk ${key}: block id ${id} out of 0..255`);
+  }
   const snap = readWorld(root, name);
   if (entries.length === 0) delete snap.chunks[key];
   else snap.chunks[key] = entries;

@@ -13,11 +13,18 @@ export async function listWorlds(): Promise<string[]> {
 }
 
 export async function copyWorld(from: string, to: string): Promise<void> {
-  await fetch(`${ENDPOINT}?name=${encodeURIComponent(from)}&copyTo=${encodeURIComponent(to)}`, {
-    method: 'POST',
-  });
+  const res = await fetch(
+    `${ENDPOINT}?name=${encodeURIComponent(from)}&copyTo=${encodeURIComponent(to)}`,
+    { method: 'POST' },
+  );
+  if (!res.ok) {
+    throw new Error(`Voxel Realm: copyWorld failed (${res.status} ${res.statusText})`);
+  }
 }
 
 export async function deleteWorld(name: string): Promise<void> {
-  await fetch(`${ENDPOINT}?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+  const res = await fetch(`${ENDPOINT}?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    throw new Error(`Voxel Realm: deleteWorld failed (${res.status} ${res.statusText})`);
+  }
 }

@@ -20,6 +20,7 @@ describe('applyVoxelsInBatches', () => {
         unloaded: batch.length === 1 ? 1 : 0,
         outOfWorld: 0,
         noChange: batch.length > 1 ? 1 : 0,
+        invalid: 0,
         unloadedChunks: [],
       };
     };
@@ -33,11 +34,36 @@ describe('applyVoxelsInBatches', () => {
       unloaded: 1,
       outOfWorld: 0,
       noChange: 2,
+      invalid: 0,
       unloadedChunks: [],
       batches: [
-        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1, unloadedChunks: [] },
-        { requested: 3, applied: 2, unloaded: 0, outOfWorld: 0, noChange: 1, unloadedChunks: [] },
-        { requested: 1, applied: 0, unloaded: 1, outOfWorld: 0, noChange: 0, unloadedChunks: [] },
+        {
+          requested: 3,
+          applied: 2,
+          unloaded: 0,
+          outOfWorld: 0,
+          noChange: 1,
+          invalid: 0,
+          unloadedChunks: [],
+        },
+        {
+          requested: 3,
+          applied: 2,
+          unloaded: 0,
+          outOfWorld: 0,
+          noChange: 1,
+          invalid: 0,
+          unloadedChunks: [],
+        },
+        {
+          requested: 1,
+          applied: 0,
+          unloaded: 1,
+          outOfWorld: 0,
+          noChange: 0,
+          invalid: 0,
+          unloadedChunks: [],
+        },
       ],
     });
   });
@@ -56,6 +82,7 @@ describe('applyVoxelsInBatches', () => {
           unloaded: 0,
           outOfWorld: 0,
           noChange: 0,
+          invalid: 0,
           unloadedChunks: ['0,1', '2,3'],
         };
       } else {
@@ -66,6 +93,7 @@ describe('applyVoxelsInBatches', () => {
           unloaded: 0,
           outOfWorld: 0,
           noChange: 0,
+          invalid: 0,
           unloadedChunks: ['0,1'],
         };
       }
@@ -130,6 +158,27 @@ describe('buildTerrainPathVoxels', () => {
       { x: 4, y: 73, z: 5, id: COBBLESTONE },
     ]);
   });
+});
+
+it('combineEditResults sums the invalid count across batches', () => {
+  const applyBatch = (b: { x: number; y: number; z: number; id: number }[]): EditResult => ({
+    requested: b.length,
+    applied: 0,
+    unloaded: 0,
+    outOfWorld: 0,
+    noChange: 0,
+    invalid: b.length,
+    unloadedChunks: [],
+  });
+  const r = applyVoxelsInBatches(
+    [
+      { x: 0, y: 0, z: 0, id: 999 },
+      { x: 1, y: 0, z: 0, id: 999 },
+    ],
+    applyBatch,
+    1,
+  );
+  expect(r.invalid).toBe(2);
 });
 
 describe('createMemoryBookmarks', () => {

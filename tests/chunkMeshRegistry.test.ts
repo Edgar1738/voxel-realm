@@ -77,6 +77,31 @@ function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): Chu
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('ChunkMeshRegistry — sortTransparent()', () => {
+  it('sortTransparent orders farther chunks before nearer ones', async () => {
+    vi.clearAllMocks();
+    createdMeshes.length = 0;
+
+    const { ChunkMeshRegistry } = await import('../src/render/ChunkMeshRegistry');
+    const scene = makeScene();
+    const opaqueMat = makeMaterialMock();
+    const transparentMat = makeMaterialMock();
+    const registry = new ChunkMeshRegistry(
+      scene as unknown as import('three').Scene,
+      opaqueMat as unknown as import('three').Material,
+      transparentMat as unknown as import('three').Material,
+    );
+
+    registry.upload('0,0', makeChunkMeshes(0, 6)); // near origin
+    registry.upload('5,5', makeChunkMeshes(0, 6)); // far from origin
+    registry.sortTransparent({ x: 0, z: 0 });
+
+    const near = registry.transparentRenderOrder('0,0');
+    const far = registry.transparentRenderOrder('5,5');
+    expect(far).toBeLessThan(near!); // farther drawn first (smaller renderOrder)
+  });
+});
+
 describe('ChunkMeshRegistry — air-chunk opaque skip', () => {
   it('does NOT add an opaque mesh when opaque indices are empty', async () => {
     vi.clearAllMocks();

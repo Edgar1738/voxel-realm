@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { CHUNK_VOLUME } from '../src/core/constants';
 import {
   readWorld,
   writeChunk,
@@ -157,5 +158,20 @@ describe('worldDiskStore', () => {
     // alpha and beta should still be listed
     expect(worlds).toContain('alpha');
     expect(worlds).toContain('beta');
+  });
+
+  // --- NEW: chunk payload validation ---
+  it('rejects an out-of-range voxel index', () => {
+    expect(() => writeChunk(root, 'w', '0,0', [[CHUNK_VOLUME + 1, 3]])).toThrow(/index/i);
+  });
+  it('rejects an out-of-range block id', () => {
+    expect(() => writeChunk(root, 'w', '0,0', [[0, 999]])).toThrow(/id|255/i);
+  });
+  it('rejects too many entries', () => {
+    const tooMany: Array<[number, number]> = Array.from({ length: CHUNK_VOLUME + 1 }, (_, i) => [
+      i % CHUNK_VOLUME,
+      1,
+    ]);
+    expect(() => writeChunk(root, 'w', '0,0', tooMany)).toThrow(/too many|length/i);
   });
 });

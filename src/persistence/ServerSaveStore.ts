@@ -39,7 +39,7 @@ export class ServerSaveStore implements SaveStore {
   }
 
   private async post(url: string, body: unknown): Promise<void> {
-    const init: RequestInit = { method: 'POST' };
+    const init: RequestInit = { method: 'POST', keepalive: true };
     if (body !== undefined) {
       init.headers = { 'content-type': 'application/json' };
       init.body = JSON.stringify(body);

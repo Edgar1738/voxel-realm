@@ -130,6 +130,10 @@ function devDisk(): Plugin {
         const name = safeWorldName(url.searchParams.get('name'));
 
         if (req.method === 'GET') {
+          if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+            res.statusCode = 403;
+            return res.end('forbidden: cross-origin request rejected');
+          }
           if (url.searchParams.has('list')) return sendJson(res, { worlds: listWorlds(root) });
           return sendJson(res, readWorld(root, name));
         }
@@ -184,7 +188,13 @@ function devDisk(): Plugin {
                     Number.isInteger(e[0]) &&
                     Number.isInteger(e[1]),
                 );
-                writeChunk(root, name, chunk, clean);
+                try {
+                  writeChunk(root, name, chunk, clean);
+                } catch (err) {
+                  res.statusCode = 400;
+                  res.end(String(err));
+                  return;
+                }
                 return sendJson(res, { ok: true });
               }
               res.statusCode = 400;

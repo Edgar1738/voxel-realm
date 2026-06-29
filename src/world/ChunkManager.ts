@@ -373,13 +373,22 @@ export class ChunkManager {
     if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) > MAX_CHUNKS) {
       throw new Error('preloadBox region too large (>256 chunks)');
     }
+    // Pass 1: generate every chunk in the box so all neighbors exist before any mesh runs.
     let generated = 0;
+    for (let cz = cz0; cz <= cz1; cz++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        if (this.ensureGenerated(cx, cz)) generated++;
+      }
+    }
+    // Pass 2: mesh every now-generated chunk (neighbors are all present, so no stale seams).
     let meshed = 0;
     for (let cz = cz0; cz <= cz1; cz++) {
       for (let cx = cx0; cx <= cx1; cx++) {
-        const r = this.preload(cx, cz, 0); // radius 0 = just this chunk
-        generated += r.generated;
-        meshed += r.meshed;
+        const entry = this.store.get(cx, cz);
+        if (entry && entry.state === ChunkState.Generated) {
+          this.meshChunk(cx, cz);
+          meshed++;
+        }
       }
     }
     return { generated, meshed };

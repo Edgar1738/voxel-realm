@@ -221,10 +221,12 @@ describe('scatterStructures overlay', () => {
   it('only writes blocks at the snapped surface height band', () => {
     const c = new ChunkData(0, 0);
     scatterStructures([box()], opts)(c, 0, 0, 1337);
+    const badYCoords: number[] = [];
     for (let x = 0; x < CHUNK_SIZE_X; x++)
       for (let z = 0; z < CHUNK_SIZE_Z; z++)
         for (let y = 0; y < WORLD_HEIGHT; y++)
-          if (c.get(x, y, z) !== AIR) expect(y === 64 || y === 65).toBe(true);
+          if (c.get(x, y, z) !== AIR && y !== 64 && y !== 65) badYCoords.push(y);
+    expect(badYCoords).toEqual([]);
   });
 
   it('does not throw on structures near the world ceiling (clips out-of-range Y)', () => {
@@ -300,19 +302,22 @@ describe('scatterStructures at negative chunk coordinates', () => {
   });
 
   it('writes only in-bounds voxels (no out-of-range Y) at negative coords', () => {
+    const badVoxels: Array<{ cx: number; cz: number; x: number; y: number; z: number; v: number }> =
+      [];
     for (let cx = -5; cx < 0; cx++) {
       for (let cz = -5; cz < 0; cz++) {
         const c = new ChunkData(cx, cz);
         scatterStructures([box()], opts)(c, cx, cz, 77);
-        // Every written voxel must be within [0, WORLD_HEIGHT)
+        // Every written voxel must be AIR or COBBLESTONE (in-bounds placement only)
         for (let x = 0; x < CHUNK_SIZE_X; x++)
           for (let z = 0; z < CHUNK_SIZE_Z; z++)
             for (let y = 0; y < WORLD_HEIGHT; y++) {
               const v = c.get(x, y, z);
-              expect(v === AIR || v === COBBLESTONE).toBe(true);
+              if (v !== AIR && v !== COBBLESTONE) badVoxels.push({ cx, cz, x, y, z, v });
             }
       }
     }
+    expect(badVoxels).toEqual([]);
   });
 
   it('placement at negative cell matches a second identical call (determinism)', () => {

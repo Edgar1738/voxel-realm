@@ -5,6 +5,7 @@ export class EditService {
   private readonly undoStack: EditBatch[] = [];
   private readonly redoStack: EditBatch[] = [];
   private pending: VoxelChange[] | null = null;
+  private depth = 0;
 
   constructor(
     private readonly world: EditableWorld,
@@ -25,6 +26,8 @@ export class EditService {
     if (changes.length === 0) return undefined;
 
     if (this.pending) {
+      // Clear redo lazily — only when the first real change is recorded inside the group.
+      if (this.pending.length === 0) this.redoStack.length = 0;
       this.pending.push(...changes);
       return { changes };
     }
@@ -42,21 +45,25 @@ export class EditService {
 
   /**
    * Opens a pending group. Subsequent apply() calls mutate the world immediately
-   * but accumulate their changes into the group. Also clears the redo stack once,
-   * just like a normal apply(). Nested beginGroup() calls are ignored.
+   * but accumulate their changes into the group. Redo is cleared lazily on the
+   * first real change (not here). Nested beginGroup() calls increment the depth
+   * counter so only the outermost endGroup() commits the batch.
    */
   beginGroup(): void {
-    if (this.pending) return; // already grouping; ignore nested begins
-    this.pending = [];
-    this.redoStack.length = 0;
+    if (this.depth === 0) this.pending = [];
+    this.depth += 1;
   }
 
   /**
-   * Closes the pending group and pushes the accumulated changes as a single
-   * EditBatch onto the undo stack (capped at historyLimit). Returns the batch,
-   * or undefined if the group was empty or no group was open.
+   * Closes the pending group. If this is the outermost close (depth returns to 0),
+   * pushes the accumulated changes as a single EditBatch onto the undo stack
+   * (capped at historyLimit). Returns the batch, or undefined if the group was
+   * empty, no group was open, or this was an inner close.
    */
   endGroup(): EditBatch | undefined {
+    if (this.depth === 0) return undefined;
+    this.depth -= 1;
+    if (this.depth > 0) return undefined; // still inside an outer group
     const changes = this.pending;
     this.pending = null;
     if (!changes || changes.length === 0) return undefined;

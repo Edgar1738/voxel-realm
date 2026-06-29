@@ -80,4 +80,17 @@ describe('ServerSaveStore', () => {
     const store = new ServerSaveStore('x', isValidBlockId);
     await expect(store.loadDeltas()).resolves.toEqual(new Map());
   });
+
+  it('server saves use keepalive so unload writes are honored', async () => {
+    const calls: RequestInit[] = [];
+    const fake = (async (_u: string, init: RequestInit) => {
+      calls.push(init);
+      return { ok: true, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', fake);
+    const store = new ServerSaveStore('w', () => true);
+    await store.saveChunkDelta('0,0', [[0, 1]]);
+    expect(calls[0].keepalive).toBe(true);
+    vi.unstubAllGlobals();
+  });
 });

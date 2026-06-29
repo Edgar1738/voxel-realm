@@ -307,6 +307,34 @@ describe('ChunkManager.preloadBox', () => {
     // 17×17 = 289 chunks > 256
     expect(() => mgr.preloadBox(0, 0, 16 * 16, 16 * 16)).toThrow('preloadBox region too large');
   });
+
+  it('preloadBox meshes all box chunks after generating them all', () => {
+    const mgr = makeManager(new FakeSink(), 0, 64, 64);
+    const res = mgr.preloadBox(0, 0, 40, 40);
+    expect(res.generated + res.meshed).toBeGreaterThan(0);
+    expect(mgr.isLoaded(0, 0)).toBe(true);
+    expect(mgr.isLoaded(40, 40)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seam-emitter removal de-propagation (Task 12 regression guard)
+// ---------------------------------------------------------------------------
+
+describe('ChunkManager seam-emitter removal de-propagation', () => {
+  it('lowers a neighbor border light when a seam emitter is removed', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64);
+    mgr.preloadBox(0, 0, 33, 0); // load two adjacent chunks across the x=16 seam
+    // place a lantern (id 14) just inside chunk 0 at the seam, above terrain surface
+    mgr.setBlock(15, 150, 0, LANTERN);
+    const litBefore = mgr.getBlockLight(16, 150, 0); // neighbor cell across the seam
+    expect(litBefore).toBeGreaterThan(0);
+    // remove it
+    mgr.setBlock(15, 150, 0, AIR);
+    const litAfter = mgr.getBlockLight(16, 150, 0);
+    expect(litAfter).toBe(0); // neighbor must go dark
+  });
 });
 
 // ---------------------------------------------------------------------------

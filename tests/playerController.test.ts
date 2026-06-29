@@ -82,6 +82,39 @@ describe('PlayerController eye', () => {
   });
 });
 
+describe('PlayerController (submerged detection)', () => {
+  it('treats feet-in-water as submerged even when the body center is dry', () => {
+    // Water only at y <= 1: the player center is at y=2 (dry), but feet are at y=2-0.9=1.1
+    // which floors to voxel y=1 — that IS water. Should use swim physics (slower speed).
+    const feetWaterOnly: PlayerWorld = {
+      isSolid: () => false,
+      isWater: (_x, y) => y <= 1, // only voxels at y=0 and y=1 are water
+    };
+    // Player center at y=2: feet at y=1.1 (voxel y=1, water), center at y=2 (voxel y=2, dry)
+    const inWater = new PlayerController({ x: 0, y: 2, z: 0 }, false);
+    const onLand = new PlayerController({ x: 0, y: 2, z: 0 }, false);
+    inWater.update(0.1, input({ forward: true }), 0, feetWaterOnly);
+    onLand.update(0.1, input({ forward: true }), 0, FLOOR);
+    // Swim speed (3.3) < walk speed (5.5), so horizontal displacement should be less
+    expect(Math.abs(inWater.position.z)).toBeLessThan(Math.abs(onLand.position.z));
+  });
+
+  it('treats head-in-water as submerged even when the body center is dry', () => {
+    // Water only at y >= 3: player center at y=2 (dry), head at y=2+0.9=2.9 which floors to y=2 (dry)
+    // So head voxel at y=2 is NOT water, but let's use y=3 floor: head at y=2.9 → floor(2.9)=2, not 3.
+    // Instead: center at y=2.5, head at y=3.4 → floor(3.4)=3, which IS water.
+    const headWaterOnly: PlayerWorld = {
+      isSolid: () => false,
+      isWater: (_x, y) => y >= 3, // voxels at y=3+ are water
+    };
+    const inWater = new PlayerController({ x: 0, y: 2.5, z: 0 }, false);
+    const onLand = new PlayerController({ x: 0, y: 2.5, z: 0 }, false);
+    inWater.update(0.1, input({ forward: true }), 0, headWaterOnly);
+    onLand.update(0.1, input({ forward: true }), 0, FLOOR);
+    expect(Math.abs(inWater.position.z)).toBeLessThan(Math.abs(onLand.position.z));
+  });
+});
+
 describe('PlayerController (swimming)', () => {
   it('swims up with Space while submerged', () => {
     const p = new PlayerController({ x: 0, y: 50, z: 0 }, false);

@@ -139,4 +139,24 @@ describe('BiomeMap', () => {
       expect(map.biomeAt(x, z)).toBe(expected);
     }
   });
+
+  it('does not alias coordinates 65536 apart', () => {
+    // Seed 2 is chosen because (0,0) classifies as Plains and (65536,0) classifies as
+    // Forest — they produce DIFFERENT biomes, making this test meaningful. With the old
+    // aliasing cache (e.g. key = x & 0xffff), both coords would share the same cache
+    // slot, so biomeAt(65536,0) would incorrectly return (0,0)'s cached biome (Plains),
+    // causing `expect(b).toBe(ref.biomeAt(65536,0))` to fail (Plains ≠ Forest).
+    const ALIAS_SEED = 2;
+    const m = new BiomeMap(ALIAS_SEED);
+    const a = m.biomeAt(0, 0);
+    const b = m.biomeAt(65536, 0);
+    // Precondition: the two coords classify differently — this is what makes the test
+    // meaningful. If they were the same biome the alias bug would be undetectable.
+    expect(a).not.toBe(b);
+    // Cross-check against a cold (cache-free) instance so a re-introduced alias is caught:
+    // a buggy cache would return (0,0)'s biome for (65536,0), making b !== ref.biomeAt(65536,0).
+    const ref = new BiomeMap(ALIAS_SEED);
+    expect(a).toBe(ref.biomeAt(0, 0));
+    expect(b).toBe(ref.biomeAt(65536, 0));
+  });
 });

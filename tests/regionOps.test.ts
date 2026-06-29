@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { replaceVoxels, prefabToVoxels } from '../src/app/RegionOps';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from '../src/app/RegionOps';
 import type { Prefab } from '../src/core/Prefab';
 
 describe('replaceVoxels', () => {
@@ -23,6 +23,29 @@ describe('replaceVoxels', () => {
       { x: 2, y: 0, z: 0, id: 7 },
     ]);
   });
+
+  it('throws on an over-large box', () => {
+    const read = () => 0 as number;
+    expect(() =>
+      replaceVoxels(read, { x1: 0, y1: 0, z1: 0, x2: 999, y2: 999, z2: 999 }, 1, 2),
+    ).toThrow(/too large|200000/);
+  });
+});
+
+it('unloadedChunksInBox lists deduped chunk keys for unloaded columns', () => {
+  const loaded = (x: number, z: number) => x >= 0 && z >= 0; // negative-x and negative-z columns unloaded
+  const keys = unloadedChunksInBox(loaded, { x1: -20, y1: 0, z1: -20, x2: 0, y2: 0, z2: 0 });
+  expect(keys.length).toBeGreaterThan(0);
+  expect(new Set(keys).size).toBe(keys.length); // verify deduplication
+  // all unloaded chunks must have either negative x or negative z (or both)
+  expect(
+    keys.every((k) => {
+      const [cxStr, czStr] = k.split(',');
+      const cx = Number(cxStr);
+      const cz = Number(czStr);
+      return cx < 0 || cz < 0;
+    }),
+  ).toBe(true);
 });
 
 describe('prefabToVoxels', () => {

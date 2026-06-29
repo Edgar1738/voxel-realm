@@ -29,8 +29,14 @@ import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
 import type { WorldPreset } from '../worldgen/Presets';
-import { rotateY, mirror as mirrorPrefab, repeat, type Prefab } from '../core/Prefab';
-import { replaceVoxels, prefabToVoxels } from './RegionOps';
+import {
+  rotateY,
+  mirror as mirrorPrefab,
+  repeat,
+  validatePrefab,
+  type Prefab,
+} from '../core/Prefab';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -184,6 +190,7 @@ export function installDevControls(ctx: DevControlsContext): void {
       outOfWorld,
       unloaded,
       noChange,
+      invalid: 0,
       unloadedChunks: [...unloadedChunkSet],
     };
   };
@@ -205,8 +212,18 @@ export function installDevControls(ctx: DevControlsContext): void {
     voxels: SetVoxel[],
     opts: { label?: string; maxBatchSize?: number; preload?: boolean } = {},
   ): BatchedEditResult => {
-    if (voxels.length > 0 && opts.preload !== false) {
-      const b = voxelBounds(voxels);
+    if (voxels.length > MAX_BUILD)
+      throw new Error(`build too large (${voxels.length} > ${MAX_BUILD})`);
+    const valid = voxels.filter((v) => registry.has(v.id));
+    const invalidCount = voxels.length - valid.length;
+    if (invalidCount > 0) {
+      const prefix = opts.label ? `[${opts.label}] ` : '';
+      console.warn(
+        `Voxel Realm build: ${prefix}${invalidCount} voxel(s) rejected for unknown block id`,
+      );
+    }
+    if (valid.length > 0 && opts.preload !== false) {
+      const b = voxelBounds(valid);
       try {
         manager.preloadBox(b.minX, b.minZ, b.maxX, b.maxZ);
       } catch {
@@ -217,15 +234,20 @@ export function installDevControls(ctx: DevControlsContext): void {
       MAX_BUILD,
       Math.max(1, Math.floor(opts.maxBatchSize ?? MAX_BUILD)),
     );
-    const result = edit.group(() => applyVoxelsInBatches(voxels, applyBatch, maxBatchSize));
-    if (result.unloaded > 0) {
+    const result = edit.group(() => applyVoxelsInBatches(valid, applyBatch, maxBatchSize));
+    const finalResult: BatchedEditResult = {
+      ...result,
+      requested: result.requested + invalidCount,
+      invalid: result.invalid + invalidCount,
+    };
+    if (finalResult.unloaded > 0) {
       const prefix = opts.label ? `[${opts.label}] ` : '';
       console.warn(
-        `Voxel Realm build: ${prefix}${result.unloaded} voxel(s) hit unloaded chunks ${result.unloadedChunks.join(' ')}`,
+        `Voxel Realm build: ${prefix}${finalResult.unloaded} voxel(s) hit unloaded chunks ${finalResult.unloadedChunks.join(' ')}`,
       );
     }
-    if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, result);
-    return result;
+    if (opts.label) console.debug(`Voxel Realm build: ${opts.label}`, finalResult);
+    return finalResult;
   };
 
   const orbitCamera = (
@@ -272,7 +294,10 @@ export function installDevControls(ctx: DevControlsContext): void {
   const loadBlueprint = async (name: string): Promise<Blueprint> => {
     const res = await fetch(`/__blueprint?name=${encodeURIComponent(name)}`);
     if (!res.ok) throw new Error(`blueprint not found: ${name}`);
-    return (await res.json()) as Blueprint;
+    const bp: unknown = await res.json();
+    const reason = validatePrefab(bp);
+    if (reason) throw new Error(`invalid blueprint: ${reason}`);
+    return bp as Blueprint;
   };
 
   const api = {
@@ -431,7 +456,14 @@ export function installDevControls(ctx: DevControlsContext): void {
     ): BatchedEditResult =>
       applyAny(tunnelVoxels({ x, y, z }, dir, length, radius).map((v) => ({ ...v, id }))),
     /** Copy a region into a portable blueprint (relative coords, non-air only). */
-    copy: (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Blueprint => {
+    copy: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+    ): Blueprint & { unloaded: string[] } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
@@ -449,10 +481,18 @@ export function installDevControls(ctx: DevControlsContext): void {
             const id = manager.getBlock(x, y, z);
             if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
           }
-      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
+        x1: ax,
+        y1: ay,
+        z1: az,
+        x2: bx,
+        y2: by,
+        z2: bz,
+      });
+      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
-    paste: (bp: Blueprint, ox: number, oy: number, oz: number): EditResult =>
+    paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
       applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
 
     /** Replace every `fromId` voxel in the box with `toId` (one undo). */
@@ -566,6 +606,9 @@ export function installDevControls(ctx: DevControlsContext): void {
       sz: number,
     ): BatchedEditResult => {
       const bp = api.copy(x1, y1, z1, x2, y2, z2);
+      const projected = bp.blocks.length * nx * ny * nz;
+      if (projected > MAX_BUILD)
+        throw new Error(`array build too large (${projected} > ${MAX_BUILD})`);
       const ox = Math.min(x1, x2),
         oy = Math.min(y1, y2),
         oz = Math.min(z1, z2);
@@ -593,8 +636,10 @@ export function installDevControls(ctx: DevControlsContext): void {
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
-    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<EditResult> => {
+    stamp: async (name: string, ox: number, oy: number, oz: number): Promise<BatchedEditResult> => {
       const bp = await loadBlueprint(name);
+      const reason = validatePrefab(bp);
+      if (reason) throw new Error(`invalid blueprint: ${reason}`);
       return applyAny(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
       );
@@ -625,15 +670,16 @@ export function installDevControls(ctx: DevControlsContext): void {
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
       registry.get(manager.getBlock(x, y, z)).name,
-    /** Highest non-air voxel in the (x,z) column: {y, block}, or y=null if all air/unloaded. */
-    surface: (x: number, z: number): { y: number | null; block: string } => {
+    /** Highest non-air voxel in the (x,z) column: {y, block, unloaded}, or y=null if all air/unloaded. */
+    surface: (x: number, z: number): { y: number | null; block: string; unloaded: boolean } => {
+      const unloaded = !manager.isLoaded(x, z);
       for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
         const id = manager.getBlock(x, y, z);
-        if (id !== AIR) return { y, block: registry.get(id).name };
+        if (id !== AIR) return { y, block: registry.get(id).name, unloaded };
       }
-      return { y: null, block: 'air' };
+      return { y: null, block: 'air', unloaded };
     },
-    /** Block histogram over a box (capped at 200k voxels): { dims, nonAir, counts }. */
+    /** Block histogram over a box (capped at 200k voxels): { dims, nonAir, counts, unloaded }. */
     scan: (
       x1: number,
       y1: number,
@@ -641,12 +687,23 @@ export function installDevControls(ctx: DevControlsContext): void {
       x2: number,
       y2: number,
       z2: number,
-    ): { dims: [number, number, number]; nonAir: number; counts: Record<string, number> } => {
+    ): {
+      dims: [number, number, number];
+      nonAir: number;
+      counts: Record<string, number>;
+      unloaded: string[];
+    } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       const dims: [number, number, number] = [bx - ax + 1, by - ay + 1, bz - az + 1];
       if (dims[0] * dims[1] * dims[2] > 200000) throw new Error('scan region too large (>200k)');
+      const box = { x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz };
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const counts: Record<string, number> = {};
       let nonAir = 0;
       for (let y = ay; y <= by; y++)
@@ -658,19 +715,25 @@ export function installDevControls(ctx: DevControlsContext): void {
             const name = registry.get(id).name;
             counts[name] = (counts[name] ?? 0) + 1;
           }
-      return { dims, nonAir, counts };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), box);
+      return { dims, nonAir, counts, unloaded };
     },
-    /** ASCII top-down floor plan of one y-layer (area capped at 80x80): { y, legend, rows }. */
+    /** ASCII top-down floor plan of one y-layer (area capped at 80x80): { y, legend, rows, unloaded }. */
     slice: (
       y: number,
       x1: number,
       z1: number,
       x2: number,
       z2: number,
-    ): { y: number; legend: Record<string, string>; rows: string[] } => {
+    ): { y: number; legend: Record<string, string>; rows: string[]; unloaded: string[] } => {
       const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
       const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       if ((bx - ax + 1) * (bz - az + 1) > 6400) throw new Error('slice area too large (>80x80)');
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
       const palette = '#@%&*+=oxOXNHBW';
       const chars = new Map<BlockId, string>();
       const rows: string[] = [];
@@ -689,7 +752,15 @@ export function installDevControls(ctx: DevControlsContext): void {
       }
       const legend: Record<string, string> = {};
       for (const [id, ch] of chars) legend[ch] = registry.get(id).name;
-      return { y, legend, rows };
+      const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
+        x1: ax,
+        y1: y,
+        z1: az,
+        x2: bx,
+        y2: y,
+        z2: bz,
+      });
+      return { y, legend, rows, unloaded };
     },
     blocks: (): Array<{ id: BlockId; name: string }> =>
       CREATIVE_BLOCKS.map((id) => ({ id, name: registry.get(id).name })),

@@ -221,6 +221,7 @@ export class Game {
         worldToChunkCoord(Math.floor(player.position.x)),
         worldToChunkCoord(Math.floor(player.position.z)),
       );
+      sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 
     // Dev-only frame capture + roam/capture controls (window.__vr).

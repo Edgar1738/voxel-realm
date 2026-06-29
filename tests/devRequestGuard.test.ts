@@ -30,3 +30,13 @@ describe('isAllowedDevOrigin', () => {
     expect(isAllowedDevOrigin('not-a-valid-origin', 'localhost:5173')).toBe(false);
   });
 });
+
+it('allows a same-host origin', () => {
+  expect(isAllowedDevOrigin('http://localhost:5173', 'localhost:5173')).toBe(true);
+});
+it('denies a different-port localhost origin', () => {
+  expect(isAllowedDevOrigin('http://localhost:6006', 'localhost:5173')).toBe(false);
+});
+it('still allows a missing Origin (non-browser / same-origin nav)', () => {
+  expect(isAllowedDevOrigin(undefined, 'localhost:5173')).toBe(true);
+});
