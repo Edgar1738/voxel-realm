@@ -134,3 +134,15 @@ describe('resolveCollision step-up (walk mode)', () => {
     expect(r.center.x).toBeLessThan(1);
   });
 });
+
+it('full-cube floor still rests the player at the integer top (regression)', () => {
+  const floor: SoliditySampler = { isSolid: (_x, y) => y < 0 };
+  const r = resolveCollision(
+    floor,
+    { x: 0, y: 5, z: 0 },
+    { x: 0.3, y: 0.9, z: 0.3 },
+    { x: 0, y: -10, z: 0 },
+  );
+  expect(r.center.y).toBeCloseTo(0 + 0.9, 5); // feet at 0 (top of voxel y=-1), center at 0.9
+  expect(r.grounded).toBe(true);
+});

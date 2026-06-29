@@ -3,6 +3,8 @@ import type { Vec3 } from '../core/types';
 /** Queries whether the voxel at integer world coords is solid (blocks the player). */
 export interface SoliditySampler {
   isSolid(x: number, y: number, z: number): boolean;
+  /** Collision footprint of a voxel; defaults (when absent) to 'full' if isSolid else 'none'. */
+  solidBox?(x: number, y: number, z: number): 'none' | 'full' | 'lowerHalf';
 }
 
 export interface CollisionResult {
@@ -13,7 +15,20 @@ export interface CollisionResult {
 const STEP = 0.4; // max substep distance (< 1 voxel) to avoid tunneling
 const EPS = 1e-3;
 
-/** True if the AABB [center±half] overlaps any solid voxel. */
+type Box = 'none' | 'full' | 'lowerHalf';
+
+/** The collision box at a voxel, falling back to isSolid when no solidBox is provided. */
+function boxAt(sampler: SoliditySampler, x: number, y: number, z: number): Box {
+  if (sampler.solidBox) return sampler.solidBox(x, y, z);
+  return sampler.isSolid(x, y, z) ? 'full' : 'none';
+}
+
+/** The top surface height of a voxel's solid region (its base is the voxel floor `y`). */
+function boxTop(box: Box, y: number): number {
+  return box === 'lowerHalf' ? y + 0.5 : y + 1; // 'full' → y+1
+}
+
+/** True if the AABB [center±half] overlaps any solid voxel's solid sub-box. */
 function overlapsSolid(sampler: SoliditySampler, center: Vec3, half: Vec3): boolean {
   const x0 = Math.floor(center.x - half.x);
   const x1 = Math.floor(center.x + half.x);
@@ -21,10 +36,48 @@ function overlapsSolid(sampler: SoliditySampler, center: Vec3, half: Vec3): bool
   const y1 = Math.floor(center.y + half.y);
   const z0 = Math.floor(center.z - half.z);
   const z1 = Math.floor(center.z + half.z);
+  const aabbMinY = center.y - half.y;
+  const aabbMaxY = center.y + half.y;
   for (let y = y0; y <= y1; y++)
     for (let z = z0; z <= z1; z++)
-      for (let x = x0; x <= x1; x++) if (sampler.isSolid(x, y, z)) return true;
+      for (let x = x0; x <= x1; x++) {
+        const box = boxAt(sampler, x, y, z);
+        if (box === 'none') continue;
+        if (box === 'full') return true; // any full voxel in the floored range overlaps
+        // lowerHalf: solid region is [y, y+0.5] — overlap only if the AABB dips into it.
+        if (aabbMinY < y + 0.5 && aabbMaxY > y) return true;
+      }
   return false;
+}
+
+/**
+ * Highest solid surface under the footprint at or below the player's feet, scanning the band the
+ * feet pass through. Used to rest the player on the actual surface (slab top = y+0.5, full = y+1).
+ * Returns -Infinity if nothing solid is hit.
+ */
+function highestSupport(
+  sampler: SoliditySampler,
+  center: Vec3,
+  half: Vec3,
+  feet0: number,
+  feetTarget: number,
+): number {
+  const x0 = Math.floor(center.x - half.x);
+  const x1 = Math.floor(center.x + half.x);
+  const z0 = Math.floor(center.z - half.z);
+  const z1 = Math.floor(center.z + half.z);
+  const yLo = Math.floor(feetTarget - EPS);
+  const yHi = Math.floor(feet0 + EPS);
+  let best = -Infinity;
+  for (let y = yLo; y <= yHi; y++)
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++) {
+        const box = boxAt(sampler, x, y, z);
+        if (box === 'none') continue;
+        const top = boxTop(box, y);
+        if (top <= feet0 + EPS && top > best) best = top;
+      }
+  return best;
 }
 
 /** Moves one axis by `d`, clamping to the contact plane if it would enter a solid. */
@@ -136,9 +189,20 @@ export function resolveCollision(
     }
 
     // --- Y axis ---
-    const y = sweepAxis(sampler, pos, half, 'y', sd.y);
-    pos.y = y.value;
-    if (y.hit && sd.y < 0) grounded = true;
+    if (sd.y < 0) {
+      const feet0 = pos.y - half.y;
+      const movedDown: Vec3 = { ...pos, y: pos.y + sd.y };
+      if (overlapsSolid(sampler, movedDown, half)) {
+        const support = highestSupport(sampler, pos, half, feet0, feet0 + sd.y);
+        pos.y = support + half.y;
+        grounded = true;
+      } else {
+        pos.y += sd.y;
+      }
+    } else {
+      const y = sweepAxis(sampler, pos, half, 'y', sd.y);
+      pos.y = y.value;
+    }
   }
 
   return { center: pos, grounded };

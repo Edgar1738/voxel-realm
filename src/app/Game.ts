@@ -108,6 +108,7 @@ export class Game {
     const sampler = {
       isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
+      solidBox: (x: number, y: number, z: number) => manager.solidBox(x, y, z),
     };
 
     const edit = new EditService(manager);
