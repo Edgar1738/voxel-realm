@@ -98,7 +98,10 @@ function devDisk(): Plugin {
           void readBody(req)
             .then((body) => {
               try {
-                const { name, blueprint } = JSON.parse(body) as { name?: string; blueprint: unknown };
+                const { name, blueprint } = JSON.parse(body) as {
+                  name?: string;
+                  blueprint: unknown;
+                };
                 const file = resolve(blueprintDir, `${safeName(name, 'blueprint')}.json`);
                 writeFileSync(file, JSON.stringify(blueprint));
                 sendJson(res, { path: file });
@@ -172,7 +175,7 @@ function devDisk(): Plugin {
             try {
               const payload = JSON.parse(body || '{}') as {
                 meta?: { seed: number; version: number; preset?: string };
-                entries?: Array<[number, number]>;
+                entries?: Array<[number, number] | [number, number, number]>;
               };
               if (url.searchParams.has('meta')) {
                 writeMeta(root, name, payload.meta);
@@ -182,11 +185,12 @@ function devDisk(): Plugin {
               if (chunk && /^-?\d+,-?\d+$/.test(chunk)) {
                 const entries = Array.isArray(payload.entries) ? payload.entries : [];
                 const clean = entries.filter(
-                  (e) =>
+                  (e): e is [number, number] | [number, number, number] =>
                     Array.isArray(e) &&
-                    e.length === 2 &&
+                    (e.length === 2 || e.length === 3) &&
                     Number.isInteger(e[0]) &&
-                    Number.isInteger(e[1]),
+                    Number.isInteger(e[1]) &&
+                    (e.length === 2 || Number.isInteger(e[2])),
                 );
                 try {
                   writeChunk(root, name, chunk, clean);
