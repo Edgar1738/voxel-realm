@@ -3,7 +3,8 @@ import { mulberry32 } from '../core/math';
 export const TILE = 16; // px per tile
 
 export type RGB = readonly [number, number, number];
-export type Pixel = (px: number, py: number, rng: () => number) => RGB;
+export type RGBA = readonly [number, number, number, number];
+export type Pixel = (px: number, py: number, rng: () => number) => RGB | RGBA;
 
 export type PatternName =
   | 'speckle'
@@ -22,7 +23,9 @@ export type PatternName =
   | 'ore'
   | 'glow'
   | 'bookshelf'
-  | 'furnace';
+  | 'furnace'
+  | 'flower'
+  | 'tallGrass';
 
 export type TextureSpec = { pattern: PatternName; colors: RGB[]; amp?: number } | { custom: Pixel };
 
@@ -152,6 +155,34 @@ const furnaceP =
     return inFirebox ? shade(fire, (rng() - 0.5) * 24) : shade(stoneBase, (rng() - 0.5) * 18);
   };
 
+const TRANSPARENT: RGBA = [0, 0, 0, 0];
+
+/** Tall grass: a few vertical green blades on a transparent background. */
+const tallGrassP =
+  (green: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    // Blades at fixed columns; each blade rises to a jagged top. Everything else is transparent.
+    const bladeCols = [3, 6, 8, 11, 13];
+    const onBlade = bladeCols.includes(px) && py >= 4 + ((px * 5) % 4) && py <= TILE - 1;
+    if (!onBlade) return TRANSPARENT;
+    const c = shade(green, (rng() - 0.5) * 26 + (py < 8 ? 14 : 0));
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
+/** Flower: a green stem with a small colored bloom, on a transparent background. */
+const flowerP =
+  (stem: RGB, petal: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const onStem = (px === 7 || px === 8) && py >= 7;
+    const dx = px - 7.5;
+    const dy = py - 5;
+    const onBloom = dx * dx + dy * dy <= 6.5;
+    if (!onStem && !onBloom) return TRANSPARENT;
+    const base = onBloom ? petal : stem;
+    const c = shade(base, (rng() - 0.5) * 22);
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
 /** Map a pattern name + its color list to a Pixel. colors[0] is the base; others as documented. */
 function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
   const c0 = colors[0] ?? [128, 128, 128];
@@ -191,6 +222,10 @@ function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
       return bookshelfP(c0);
     case 'furnace':
       return furnaceP(c0, c1);
+    case 'flower':
+      return flowerP(c0, c1);
+    case 'tallGrass':
+      return tallGrassP(c0);
   }
 }
 
@@ -246,7 +281,7 @@ export function paintLayer(out: Uint8Array, layer: number, spec: TextureSpec): v
       out[p] = clamp(c[0]);
       out[p + 1] = clamp(c[1]);
       out[p + 2] = clamp(c[2]);
-      out[p + 3] = 255;
+      out[p + 3] = c.length > 3 ? clamp((c as RGBA)[3]) : 255;
     }
   }
 }
