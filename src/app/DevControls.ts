@@ -29,7 +29,13 @@ import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
 import type { WorldPreset } from '../worldgen/Presets';
-import { rotateY, mirror as mirrorPrefab, repeat, type Prefab } from '../core/Prefab';
+import {
+  rotateY,
+  mirror as mirrorPrefab,
+  repeat,
+  validatePrefab,
+  type Prefab,
+} from '../core/Prefab';
 import { replaceVoxels, prefabToVoxels } from './RegionOps';
 
 /**
@@ -286,7 +292,10 @@ export function installDevControls(ctx: DevControlsContext): void {
   const loadBlueprint = async (name: string): Promise<Blueprint> => {
     const res = await fetch(`/__blueprint?name=${encodeURIComponent(name)}`);
     if (!res.ok) throw new Error(`blueprint not found: ${name}`);
-    return (await res.json()) as Blueprint;
+    const bp: unknown = await res.json();
+    const reason = validatePrefab(bp);
+    if (reason) throw new Error(`invalid blueprint: ${reason}`);
+    return bp as Blueprint;
   };
 
   const api = {
@@ -609,6 +618,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Load a named blueprint and stamp it at (ox,oy,oz). */
     stamp: async (name: string, ox: number, oy: number, oz: number): Promise<BatchedEditResult> => {
       const bp = await loadBlueprint(name);
+      const reason = validatePrefab(bp);
+      if (reason) throw new Error(`invalid blueprint: ${reason}`);
       return applyAny(
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
       );

@@ -3,6 +3,33 @@ import type { BlockId } from './types';
 /** A non-air voxel offset from the prefab's min corner: [dx, dy, dz, id]. */
 export type PrefabVoxel = [number, number, number, BlockId];
 
+const MAX_PREFAB_BLOCKS = 200000;
+
+/** Structural validation for an untrusted Prefab. Returns null if valid, else a reason. */
+export function validatePrefab(p: unknown): string | null {
+  if (typeof p !== 'object' || p === null) return 'prefab must be an object';
+  const o = p as { dims?: unknown; blocks?: unknown };
+  if (
+    !Array.isArray(o.dims) ||
+    o.dims.length !== 3 ||
+    !o.dims.every((d) => Number.isInteger(d) && (d as number) > 0)
+  ) {
+    return 'dims must be three positive integers';
+  }
+  const [sx, sy, sz] = o.dims as number[];
+  if (!Array.isArray(o.blocks)) return 'blocks must be an array';
+  if (o.blocks.length > MAX_PREFAB_BLOCKS) return `too many blocks (>${MAX_PREFAB_BLOCKS})`;
+  for (const b of o.blocks) {
+    if (!Array.isArray(b) || b.length !== 4) return 'each block must be [dx,dy,dz,id]';
+    const [dx, dy, dz, id] = b as number[];
+    if (![dx, dy, dz, id].every(Number.isInteger)) return 'block fields must be integers';
+    if (dx < 0 || dy < 0 || dz < 0 || dx >= sx || dy >= sy || dz >= sz)
+      return `block offset out of dims range`;
+    if (id < 0 || id > 255) return `block id ${id} out of 0..255`;
+  }
+  return null;
+}
+
 /** Portable, position-independent block group. Identical shape to a dev Blueprint. */
 export interface Prefab {
   dims: [number, number, number];

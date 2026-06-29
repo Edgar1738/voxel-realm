@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { normalize, rotateY, mirror, repeat, type Prefab } from '../src/core/Prefab';
+import {
+  normalize,
+  rotateY,
+  mirror,
+  repeat,
+  validatePrefab,
+  type Prefab,
+} from '../src/core/Prefab';
 
 const L: Prefab = {
   // An L-shape footprint (y=0): (0,0),(1,0),(0,1). dims 2x1x2.
@@ -68,5 +75,22 @@ describe('repeat', () => {
     const r = repeat(L, 2, 1, 1, [2, 0, 0]);
     expect(r.blocks.length).toBe(L.blocks.length * 2);
     expect(r.dims).toEqual([4, 1, 2]); // two copies offset by stride 2 in x
+  });
+});
+
+describe('validatePrefab', () => {
+  it('accepts a well-formed prefab', () => {
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 3]] })).toBeNull();
+  });
+  it('rejects non-array blocks / bad dims', () => {
+    expect(validatePrefab({ dims: [0, 1, 1], blocks: [] })).toMatch(/dims/i);
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: 'nope' })).toMatch(/blocks/i);
+  });
+  it('rejects negative or out-of-dims offsets', () => {
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[-1, 0, 0, 3]] })).toMatch(/offset|range/i);
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[5, 0, 0, 3]] })).toMatch(/offset|range/i);
+  });
+  it('rejects a block id outside 0..255', () => {
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 999]] })).toMatch(/id/i);
   });
 });
