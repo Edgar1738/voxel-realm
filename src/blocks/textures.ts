@@ -19,7 +19,10 @@ export type PatternName =
   | 'leaves'
   | 'glass'
   | 'lantern'
-  | 'ore';
+  | 'ore'
+  | 'glow'
+  | 'bookshelf'
+  | 'furnace';
 
 export type TextureSpec = { pattern: PatternName; colors: RGB[]; amp?: number } | { custom: Pixel };
 
@@ -126,6 +129,28 @@ const oreP =
   (spot: RGB): Pixel =>
   (_px, _py, rng) =>
     rng() < 0.18 ? shade(spot, (rng() - 0.5) * 26) : shade([128, 128, 132], (rng() - 0.5) * 18);
+/** Bright, faintly-mottled emitter face (glowstone). */
+const glowP =
+  (base: RGB): Pixel =>
+  (_px, _py, rng) =>
+    shade(base, (rng() - 0.5) * 18 + (rng() < 0.2 ? 14 : 0));
+/** Horizontal shelves with vertical book spines (bookshelf side). */
+const bookshelfP =
+  (wood: RGB): Pixel =>
+  (px, py, rng) => {
+    const shelf = py % 7 === 0 || py % 7 === 6;
+    if (shelf) return shade(wood, -28);
+    const spine = (px * 7 + ((py / 7) | 0) * 13) % 5;
+    const tint: RGB = spine === 0 ? [150, 60, 50] : spine === 2 ? [60, 90, 150] : [70, 120, 70];
+    return shade(tint, (rng() - 0.5) * 20);
+  };
+/** Stone block with a dark firebox arch (furnace front). */
+const furnaceP =
+  (stoneBase: RGB, fire: RGB): Pixel =>
+  (px, py, rng) => {
+    const inFirebox = px >= 4 && px <= 11 && py >= 8 && py <= 13;
+    return inFirebox ? shade(fire, (rng() - 0.5) * 24) : shade(stoneBase, (rng() - 0.5) * 18);
+  };
 
 /** Map a pattern name + its color list to a Pixel. colors[0] is the base; others as documented. */
 function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
@@ -160,6 +185,12 @@ function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
       return lanternP(c0, c1);
     case 'ore':
       return oreP(c0);
+    case 'glow':
+      return glowP(c0);
+    case 'bookshelf':
+      return bookshelfP(c0);
+    case 'furnace':
+      return furnaceP(c0, c1);
   }
 }
 

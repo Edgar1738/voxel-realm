@@ -66,3 +66,14 @@ describe('paintLayer', () => {
     expect(px(0, 0, () => 0.5)).toEqual([1, 2, 3]);
   });
 });
+
+describe('new content patterns', () => {
+  it('resolves glow/bookshelf/furnace to a Pixel', () => {
+    for (const pattern of ['glow', 'bookshelf', 'furnace'] as const) {
+      const px = resolvePixel({ pattern, colors: [[200, 180, 100]] });
+      const c = px(3, 4, () => 0.5);
+      expect(c).toHaveLength(3);
+      expect(c.every((v) => typeof v === 'number')).toBe(true);
+    }
+  });
+});
