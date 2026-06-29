@@ -1,5 +1,5 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../core/constants';
-import { GRASS, DIRT, STONE, SAND, SNOW } from '../blocks/blocks';
+import { GRASS, DIRT, STONE, SAND, SNOW, MUD } from '../blocks/blocks';
 import { Biome } from './BiomeMap';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
@@ -28,6 +28,9 @@ export class SurfacePainter implements TerrainStage {
         } else if (biome === Biome.Desert) {
           cap = SAND;
           band = SAND;
+        } else if (biome === Biome.Swamp) {
+          cap = MUD;
+          band = MUD;
         }
 
         for (let y = 0; y <= height; y++) {

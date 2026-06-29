@@ -8,6 +8,7 @@ export enum Biome {
   Desert,
   Mountains,
   Tundra,
+  Swamp,
 }
 
 /** Terrain parameters a biome contributes to the heightmap. */
@@ -29,6 +30,7 @@ const DEFS: Record<Biome, BiomeDef> = {
   [Biome.Desert]: { biome: Biome.Desert, amplitude: 4, baseOffset: -1 },
   [Biome.Mountains]: { biome: Biome.Mountains, amplitude: 55, baseOffset: 8 },
   [Biome.Tundra]: { biome: Biome.Tundra, amplitude: 12, baseOffset: 0 },
+  [Biome.Swamp]: { biome: Biome.Swamp, amplitude: 5, baseOffset: -2 },
 };
 
 const CLIMATE_FREQ = 1 / 512; // large, contiguous regions
@@ -37,6 +39,7 @@ const HOT = 0.3;
 const DRY = -0.1;
 const COLD = -0.35;
 const WET = 0.25;
+const SWAMP_WET = 0.45; // warm + very wet → Swamp (checked before Forest)
 
 // Salts to derive independent channels from one seed.
 const SALT_T = 0x7e3a1b;
@@ -96,6 +99,7 @@ export class BiomeMap implements BiomeSource {
     if (m > MOUNTAIN_THRESHOLD) return Biome.Mountains;
     if (t > HOT && h < DRY) return Biome.Desert;
     if (t < COLD) return Biome.Tundra;
+    if (t > 0 && h > SWAMP_WET) return Biome.Swamp;
     if (h > WET) return Biome.Forest;
     return Biome.Plains;
   }

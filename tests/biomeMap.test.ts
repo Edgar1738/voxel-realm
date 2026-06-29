@@ -159,4 +159,14 @@ describe('BiomeMap', () => {
     expect(a).toBe(ref.biomeAt(0, 0));
     expect(b).toBe(ref.biomeAt(65536, 0));
   });
+
+  it('classifies some warm, very-wet column as Swamp', () => {
+    let found = false;
+    for (let seed = 0; seed < 200 && !found; seed++) {
+      const m = new BiomeMap(seed);
+      for (let s = 0; s < 8 && !found; s++)
+        if (m.biomeAt(s * 777, s * 1313) === Biome.Swamp) found = true;
+    }
+    expect(found).toBe(true);
+  });
 });

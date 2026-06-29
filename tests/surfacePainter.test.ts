@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { SurfacePainter } from '../src/worldgen/SurfacePainter';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_AREA, SEA_LEVEL } from '../src/core/constants';
-import { AIR, GRASS, DIRT, STONE, SAND, SNOW } from '../src/blocks/blocks';
+import { AIR, GRASS, DIRT, STONE, SAND, SNOW, MUD } from '../src/blocks/blocks';
 import { Biome, type BiomeSource } from '../src/worldgen/BiomeMap';
 import type { GenContext } from '../src/worldgen/TerrainStage';
 
@@ -66,5 +66,13 @@ describe('SurfacePainter biome caps', () => {
     stage.apply(chunk, ctx(top, Biome.Tundra)); // even in tundra, the shoreline is sand
     expect(chunk.get(0, top, 0)).toBe(SAND);
     expect(chunk.get(0, 0, 0)).toBe(STONE);
+  });
+
+  it('caps a non-beach swamp column with mud', () => {
+    const top = SEA_LEVEL + 5; // well above beach threshold (seaLevel+1)
+    const chunk = new ChunkData(0, 0);
+    stage.apply(chunk, ctx(top, Biome.Swamp));
+    expect(chunk.get(0, top, 0)).toBe(MUD);
+    expect(chunk.get(0, top - 1, 0)).toBe(MUD);
   });
 });
