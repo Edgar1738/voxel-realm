@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createGenerator, isWorldPreset, resolveBootPreset } from '../src/worldgen/Presets';
+import {
+  createGenerator,
+  isWorldPreset,
+  resolveBootPreset,
+  WORLD_PRESETS,
+} from '../src/worldgen/Presets';
 import { AIR, GRASS, COBBLESTONE, WATER } from '../src/blocks/blocks';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
 import type { Generator } from '../src/worldgen/Generator';
@@ -191,6 +196,18 @@ describe('world presets', () => {
     const a = generator.generateBaseChunk(SEED, 2, -3);
     const b = generator.generateBaseChunk(SEED, 2, -3);
     expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
+});
+
+describe('frontier preset', () => {
+  it('is a recognized preset', () => {
+    expect(isWorldPreset('frontier')).toBe(true);
+    expect(WORLD_PRESETS).toContain('frontier');
+  });
+  it('resolves to a generator with at least one overlay (the prefab scatter)', () => {
+    const { generator, overlays } = createGenerator('frontier');
+    expect(generator).toBeDefined();
+    expect(overlays.length).toBeGreaterThanOrEqual(1);
   });
 });
 

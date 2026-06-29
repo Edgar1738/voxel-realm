@@ -2,13 +2,24 @@ import { createNoise2D, type NoiseFunction2D } from 'simplex-noise';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
-import { AIR, GRASS, DIRT, STONE, COBBLESTONE } from '../blocks/blocks';
+import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
 import { scatterTrees } from './TreeScatterer';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
-import { cottage, well, ruinedTower, brokenWall, lampPost } from './prefabs';
+import {
+  cottage,
+  well,
+  ruinedTower,
+  brokenWall,
+  lampPost,
+  barn,
+  watchtower,
+  marketStall,
+  bridge,
+  farmPlot,
+} from './prefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 import type { WorldMeta } from '../persistence/SaveTypes';
@@ -23,7 +34,8 @@ export type WorldPreset =
   | 'islands'
   | 'canyon'
   | 'villages'
-  | 'caverns';
+  | 'caverns'
+  | 'frontier';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -35,6 +47,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'canyon',
   'villages',
   'caverns',
+  'frontier',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -210,6 +223,22 @@ export function createGenerator(preset: WorldPreset): {
             clusterRadius: 9,
             clearFootprint: true,
             streetBlock: COBBLESTONE,
+            surfaceAt: plainsHeight,
+          }),
+        ],
+      };
+    case 'frontier':
+      return {
+        generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
+        overlays: [
+          scatterTrees,
+          scatterStructures([barn(), watchtower(), marketStall(), farmPlot(), bridge()], {
+            cellSize: 72,
+            density: 0.6,
+            clusterCount: 3,
+            clusterRadius: 12,
+            clearFootprint: true,
+            streetBlock: GRAVEL,
             surfaceAt: plainsHeight,
           }),
         ],
