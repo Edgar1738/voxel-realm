@@ -1,7 +1,7 @@
 # Non-cube Shapes (Track E1) — Design
 
 - **Date:** 2026-06-29 (rev. after a Codex external review)
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending) — `docs/plans/2026-06-29-shapes-track-e1.md`, 10 TDD tasks, suite 513 green.
 - **Branch:** `claude/shapes-track-e` (stacked on `claude/content-track-c` / PR #26, so it sees block ids 19–26 and continues at **27**; rebase/retarget to `main` after #26 merges).
 - **Origin:** Track E from the 2026-06-28 review — the non-cube geometry unlock. **Phase E1: orientation-free shapes** (slabs + cross-plants). Oriented shapes (stairs, fences) are E2 (they need per-voxel orientation/metadata).
 
