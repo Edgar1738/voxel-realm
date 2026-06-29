@@ -418,8 +418,11 @@ export function installDevControls(ctx: DevControlsContext): void {
         { label: opts.label ?? 'path' },
       );
     },
-    place: (x: number, y: number, z: number, id: BlockId): BatchedEditResult =>
-      applyAny([{ x, y, z, id }]),
+    place: (x: number, y: number, z: number, id: BlockId, state?: number): BatchedEditResult => {
+      const voxel: SetVoxel = { x, y, z, id };
+      if (state !== undefined) voxel.state = state;
+      return applyAny([voxel]);
+    },
     fill: (
       x1: number,
       y1: number,
