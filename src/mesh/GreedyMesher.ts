@@ -50,6 +50,13 @@ interface Buffers {
 }
 
 /**
+ * Maximum cells in any single meshing slice.
+ * The largest slice occurs on the X or Z axis (du=WORLD_HEIGHT, dv=16 or vice-versa):
+ *   max(CHUNK_SIZE_X, CHUNK_SIZE_Z) * WORLD_HEIGHT
+ */
+const MAX_SLICE_CELLS = Math.max(CHUNK_SIZE_X, CHUNK_SIZE_Z) * WORLD_HEIGHT;
+
+/**
  * Greedy mesher: for each of the 6 face directions, sweeps voxel slices, builds a 2D
  * mask of exposed faces (with per-corner AO), and merges equal cells into rectangles.
  * Reads neighbors through VoxelView so chunk-border faces cull correctly (missing
@@ -62,6 +69,11 @@ export class GreedyMesher {
   private readonly _neighbor: [number, number, number] = [0, 0, 0];
   private readonly _air: [number, number, number] = [0, 0, 0];
   private readonly _sample: [number, number, number] = [0, 0, 0];
+
+  // Pooled slice scratch buffers: sized once to the largest possible slice and
+  // cleared in-place between slices (no per-slice allocation / GC pressure).
+  private readonly _mask: (MaskCell | null)[] = new Array(MAX_SLICE_CELLS).fill(null);
+  private readonly _visited: Uint8Array = new Uint8Array(MAX_SLICE_CELLS);
 
   constructor(private readonly registry: BlockRegistry) {}
 
@@ -166,7 +178,10 @@ export class GreedyMesher {
     const aoLevels: [number, number, number, number] = [0, 0, 0, 0];
 
     for (let i = 0; i < dd; i++) {
-      const mask: (MaskCell | null)[] = new Array(du * dv).fill(null);
+      // Reuse the pooled mask buffer — clear only the cells we will write.
+      const sliceSize = du * dv;
+      this._mask.fill(null, 0, sliceSize);
+      const mask = this._mask;
 
       for (let b = 0; b < dv; b++) {
         for (let a = 0; a < du; a++) {
@@ -218,7 +233,10 @@ export class GreedyMesher {
     i: number,
     buf: Buffers,
   ): void {
-    const visited = new Uint8Array(du * dv);
+    // Reuse the pooled visited buffer — zero only the cells we will inspect.
+    const sliceSize = du * dv;
+    this._visited.fill(0, 0, sliceSize);
+    const visited = this._visited;
 
     for (let b = 0; b < dv; b++) {
       for (let a = 0; a < du; a++) {

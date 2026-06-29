@@ -145,6 +145,78 @@ function countFacesWithNormal(
   return count;
 }
 
+describe('GreedyMesher exact output (regression guard for pooling)', () => {
+  it('produces byte-identical positions/indices/layers/ao/light for a single STONE voxel at (1,1,1)', () => {
+    const c = new ChunkData(0, 0);
+    c.set(1, 1, 1, STONE);
+    const mesh = mesher.mesh(viewOf(c), OPAQUE);
+
+    // Exact positions captured before any pooling change — must remain identical.
+    expect(Array.from(mesh.positions)).toEqual([
+      2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 2, 1, 2, 1, 1, 2, 2, 2,
+      2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 1, 1,
+      1, 2, 1, 1, 2, 2, 1, 1, 2, 1,
+    ]);
+    expect(Array.from(mesh.indices)).toEqual([
+      0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11, 12, 14, 13, 12, 15, 14, 16, 17, 18,
+      16, 18, 19, 20, 22, 21, 20, 23, 22,
+    ]);
+    // All 6 faces × 4 vertices use the same stone layer (3).
+    expect(Array.from(mesh.layers)).toEqual(new Array(24).fill(3));
+    // No AO occluders → all corners at full brightness (1.0).
+    expect(Array.from(mesh.ao)).toEqual(new Array(24).fill(1));
+    // No sky or block light → light = 0.
+    expect(Array.from(mesh.light)).toEqual(new Array(24).fill(0));
+  });
+});
+
+describe('GreedyMesher exact output – multi-voxel stale-buffer regression', () => {
+  /**
+   * Fixture: 3 isolated voxels at distinct positions spanning multiple slice rows
+   * and face directions, plus a 2×2 cluster — 6 voxels total.
+   *   (1,1,1)           — isolated, populates mask rows at y=1, z=1
+   *   (3,5,3)           — isolated, populates mask rows at y=5, z=3 (different slices)
+   *   (10,8,2)+(11,8,2)+(10,8,3)+(11,8,3) — 2×2 cluster at y=8
+   *
+   * Multiple mask rows across multiple face directions are populated, which
+   * exposes any stale-buffer leak from a wrong per-slice clear.
+   */
+  it('produces byte-identical positions/indices/layers/ao/light for 2 isolated voxels + a 2×2 cluster (6 voxels total)', () => {
+    const c = new ChunkData(0, 0);
+    c.set(1, 1, 1, STONE);
+    c.set(3, 5, 3, STONE);
+    c.set(10, 8, 2, STONE);
+    c.set(11, 8, 2, STONE);
+    c.set(10, 8, 3, STONE);
+    c.set(11, 8, 3, STONE);
+    const mesh = mesher.mesh(viewOf(c), OPAQUE);
+
+    expect(Array.from(mesh.positions)).toEqual([
+      2, 1, 1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 4, 5, 3, 4, 6, 3, 4, 6, 4, 4, 5, 4, 12, 8, 2, 12, 9, 2,
+      12, 9, 4, 12, 8, 4, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 2, 3, 5, 3, 3, 6, 3, 3, 6, 4, 3, 5, 4,
+      10, 8, 2, 10, 9, 2, 10, 9, 4, 10, 8, 4, 1, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 3, 6, 3, 3, 6, 4,
+      4, 6, 4, 4, 6, 3, 10, 9, 2, 10, 9, 4, 12, 9, 4, 12, 9, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 1, 1,
+      3, 5, 3, 3, 5, 4, 4, 5, 4, 4, 5, 3, 10, 8, 2, 10, 8, 4, 12, 8, 4, 12, 8, 2, 1, 1, 2, 2, 1, 2,
+      2, 2, 2, 1, 2, 2, 3, 5, 4, 4, 5, 4, 4, 6, 4, 3, 6, 4, 10, 8, 4, 12, 8, 4, 12, 9, 4, 10, 9, 4,
+      1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 2, 1, 10, 8, 2, 12, 8, 2, 12, 9, 2, 10, 9, 2, 3, 5, 3, 4, 5, 3,
+      4, 6, 3, 3, 6, 3,
+    ]);
+    expect(Array.from(mesh.indices)).toEqual([
+      0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 14, 13, 12, 15, 14, 16, 18, 17,
+      16, 19, 18, 20, 22, 21, 20, 23, 22, 24, 25, 26, 24, 26, 27, 28, 29, 30, 28, 30, 31, 32, 33,
+      34, 32, 34, 35, 36, 38, 37, 36, 39, 38, 40, 42, 41, 40, 43, 42, 44, 46, 45, 44, 47, 46, 48,
+      49, 50, 48, 50, 51, 52, 53, 54, 52, 54, 55, 56, 57, 58, 56, 58, 59, 60, 62, 61, 60, 63, 62,
+      64, 66, 65, 64, 67, 66, 68, 70, 69, 68, 71, 70,
+    ]);
+    // All faces are STONE (layer 3).
+    expect(Array.from(mesh.layers)).toEqual(new Array(72).fill(3));
+    // No AO occluders → all corners at full brightness (1.0).
+    expect(Array.from(mesh.ao)).toEqual(new Array(72).fill(1));
+    // No sky or block light → light = 0.
+    expect(Array.from(mesh.light)).toEqual(new Array(72).fill(0));
+  });
+});
+
 describe('GreedyMesher water pass', () => {
   it('renders the water surface against air but not buried water faces', () => {
     const c = new ChunkData(0, 0);
