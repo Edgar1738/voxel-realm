@@ -16,10 +16,7 @@ const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
  * @param host   - Value of the `Host` request header. When provided, the origin's
  *                 host:port must match the server's `Host` header exactly.
  */
-export function isAllowedDevOrigin(
-  origin: string | undefined,
-  host: string | undefined,
-): boolean {
+export function isAllowedDevOrigin(origin: string | undefined, host: string | undefined): boolean {
   // No Origin header → same-origin navigation or non-browser client → allow.
   if (origin === undefined) return true;
 
