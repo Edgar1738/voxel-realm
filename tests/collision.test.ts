@@ -206,3 +206,77 @@ describe('collision precision (fence/stair)', () => {
     expect(r.center.y).toBeGreaterThan(1 + HALF.y); // rose at least onto the lower half
   });
 });
+
+// ---------------------------------------------------------------------------
+// Gravity-path step-up (E6 task-3b): step-up must fire when grounded=true
+// even though gravity makes sd.y slightly negative each substep.
+// ---------------------------------------------------------------------------
+describe('gravity-path step-up (grounded walk)', () => {
+  // Small negative y-delta that gravity would contribute over one 60 Hz frame.
+  // This is the scenario that was broken: sd.y < 0 so the old sd.y===0 gate never fired.
+  const GRAV_DY = -28 * (1 / 60); // ~-0.467 per frame — one substep has sd.y < 0
+
+  it('grounded walk +X into 1-block ledge: climbs the ledge (gravity-path)', () => {
+    // Floor at y<1, ledge block at x=1 y=1. Player walks +X with gravity-like negative dy.
+    const s = sampler({ '1,1,0': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded
+    );
+    expect(r.center.x).toBeGreaterThan(1); // climbed the ledge
+  });
+
+  it('grounded walk +Z into 1-block ledge: climbs the ledge (gravity-path)', () => {
+    const s = sampler({ '0,1,1': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 0, y: GRAV_DY, z: 1 },
+      true, // grounded
+    );
+    expect(r.center.z).toBeGreaterThan(1); // climbed the ledge
+  });
+
+  it('airborne (grounded=false) + negative sd.y: stays blocked at ledge (not grounded)', () => {
+    // Same geometry but player is airborne — step-up must NOT fire.
+    const s = sampler({ '1,1,0': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      false, // NOT grounded
+    );
+    expect(r.center.x).toBeLessThan(1); // blocked — airborne, no step-up
+  });
+
+  it('grounded walk: fence (TALL_BOX) still blocks even when grounded=true', () => {
+    // tryStepUp raises by 1+EPS; the fence top is 1.5 → head still overlaps → null → blocked.
+    const s = sampler({ '1,1,0': [TALL_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded, but fence is too tall
+    );
+    expect(r.center.x).toBeLessThan(1); // still blocked
+  });
+
+  it('grounded walk: climbs a stair when grounded=true and sd.y<0', () => {
+    const s = sampler({ '1,1,0': stairBoxes(FACING.W, 0) });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded
+    );
+    expect(r.center.x).toBeGreaterThan(1); // climbed the stair
+    expect(r.center.y).toBeGreaterThan(1 + HALF.y); // rose above lower step
+  });
+});

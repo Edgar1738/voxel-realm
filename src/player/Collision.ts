@@ -148,17 +148,23 @@ function tryStepUp(
 
 /**
  * Resolves an AABB move against the sampler. Substeps the delta to stay under one voxel/step,
- * resolving X, Z, then Y. Step-up: a blocked horizontal move with no vertical delta retries raised
- * by 1 voxel. `grounded` is true when a downward move was blocked.
+ * resolving X, Z, then Y. Step-up: a blocked horizontal move with no vertical delta (or when
+ * grounded with a small negative delta from gravity) retries raised by 1 voxel. `grounded` is
+ * true when a downward move was blocked.
+ *
+ * @param grounded - Pass `true` when the player was on the ground last frame. This broadens the
+ *   step-up gate to also fire when `sd.y < 0` (gravity contribution), allowing 1-block ledge
+ *   climbing and stair walk-up during a normal grounded walk. Defaults to `false` (back-compat).
  */
 export function resolveCollision(
   sampler: SoliditySampler,
   center: Vec3,
   half: Vec3,
   delta: Vec3,
+  grounded = false,
 ): CollisionResult {
   const pos: Vec3 = { ...center };
-  let grounded = false;
+  let isGrounded = false;
 
   const maxComp = Math.max(Math.abs(delta.x), Math.abs(delta.y), Math.abs(delta.z));
   const steps = Math.max(1, Math.ceil(maxComp / STEP));
@@ -167,10 +173,16 @@ export function resolveCollision(
   for (let s = 0; s < steps; s++) {
     const substepStartY = pos.y;
 
+    // Step-up fires when the horizontal move is blocked AND either:
+    //   (a) sd.y === 0 — no vertical component at all, OR
+    //   (b) grounded && sd.y < 0 — the caller says the player was grounded last frame;
+    //       the small negative sd.y is just gravity, not a meaningful fall/jump.
+    const canStepUp = sd.y === 0 || (grounded && sd.y < 0);
+
     // --- X axis ---
     const xResult = sweepAxis(sampler, pos, half, 'x', sd.x);
     let steppedUp = false;
-    if (xResult.hit && sd.y === 0 && sd.x !== 0) {
+    if (xResult.hit && canStepUp && sd.x !== 0) {
       const stepped = tryStepUp(sampler, pos, half, 'x', sd.x);
       if (stepped !== null) {
         pos.x = stepped.x;
@@ -185,7 +197,7 @@ export function resolveCollision(
 
     // --- Z axis ---
     const zResult = sweepAxis(sampler, pos, half, 'z', sd.z);
-    if (zResult.hit && sd.y === 0 && sd.z !== 0) {
+    if (zResult.hit && canStepUp && sd.z !== 0) {
       const stepped = !steppedUp ? tryStepUp(sampler, pos, half, 'z', sd.z) : null;
       if (stepped !== null) {
         pos.z = stepped.z;
@@ -209,7 +221,7 @@ export function resolveCollision(
           pos.y += sd.y;
         } else {
           pos.y = support + half.y;
-          grounded = true;
+          isGrounded = true;
         }
       } else {
         pos.y += sd.y;
@@ -220,5 +232,5 @@ export function resolveCollision(
     }
   }
 
-  return { center: pos, grounded };
+  return { center: pos, grounded: isGrounded };
 }
