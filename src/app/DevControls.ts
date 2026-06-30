@@ -36,6 +36,7 @@ import {
   validatePrefab,
   type Prefab,
 } from '../core/Prefab';
+import { toggleOpen } from '../world/VoxelState';
 import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
 
 /**
@@ -422,6 +423,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       const voxel: SetVoxel = { x, y, z, id };
       if (state !== undefined) voxel.state = state;
       return applyAny([voxel]);
+    },
+    toggle: (x: number, y: number, z: number): BatchedEditResult | { toggled: false } => {
+      const id = manager.getBlock(x, y, z);
+      if (!registry.isToggleable(id)) return { toggled: false };
+      const state = manager.getState(x, y, z);
+      return applyAny([{ x, y, z, id, state: toggleOpen(state) }]);
     },
     fill: (
       x1: number,
