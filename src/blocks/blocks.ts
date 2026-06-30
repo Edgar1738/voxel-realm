@@ -38,6 +38,9 @@ export const STAIRS_STONE: BlockId = 31;
 export const STAIRS_PLANK: BlockId = 32;
 export const STAIRS_COBBLE: BlockId = 33;
 export const STAIRS_BRICK: BlockId = 34;
+export const OAK_FENCE: BlockId = 35;
+export const COBBLE_WALL: BlockId = 36;
+export const STONEBRICK_WALL: BlockId = 37;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall';
@@ -396,6 +399,45 @@ export const BLOCK_DEFS: BlockDef[] = [
       colors: [
         [150, 70, 58],
         [198, 182, 162],
+      ],
+    },
+  },
+  {
+    id: OAK_FENCE,
+    name: 'oak fence',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'fence',
+    faces: { pattern: 'planks', colors: [[150, 116, 70]] },
+  },
+  {
+    id: COBBLE_WALL,
+    name: 'cobblestone wall',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'wall',
+    faces: {
+      pattern: 'cobble',
+      colors: [
+        [118, 118, 122],
+        [70, 70, 74],
+      ],
+    },
+  },
+  {
+    id: STONEBRICK_WALL,
+    name: 'stone brick wall',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'wall',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [120, 120, 124],
+        [150, 150, 154],
       ],
     },
   },
