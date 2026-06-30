@@ -14,11 +14,13 @@ in vec2 uv;
 in float layer;
 in float ao;
 in float light;
+in vec3 tint;
 
 out vec2 vUv;
 out float vLayer;
 out float vAo;
 out float vLight;
+out vec3 vTint;
 out vec3 vNormal;
 out vec3 vViewPos;
 
@@ -27,6 +29,7 @@ void main() {
   vLayer = layer;
   vAo = ao;
   vLight = light;
+  vTint = tint;
   vNormal = normalize(normalMatrix * normal);
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vViewPos = mv.xyz;
@@ -52,6 +55,7 @@ in vec2 vUv;
 in float vLayer;
 in float vAo;
 in float vLight;
+in vec3 vTint;
 in vec3 vNormal;
 in vec3 vViewPos;
 
@@ -60,7 +64,7 @@ out vec4 fragColor;
 void main() {
   vec4 texel = texture(uTex, vec3(vUv, vLayer));
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
-  vec3 base = texel.rgb;
+  vec3 base = texel.rgb * vTint;
   float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;

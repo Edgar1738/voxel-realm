@@ -1,7 +1,7 @@
 # Biome Tint (Track E5) — Design
 
 - **Date:** 2026-06-30
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending)
 - **Branch:** `claude/tint-track-e5` (off `main` @ `939b1c0`, which includes E1–E4).
 - **Origin:** The "biome-grass tint" deferred from E1 (and again from E2/E3). Grass, leaves, and foliage plants should look different per biome — lush in forest, murky in swamp, pale in tundra, dry in desert — instead of one fixed green everywhere.
 
