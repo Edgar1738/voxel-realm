@@ -1,7 +1,7 @@
 # Fences + Walls (Track E3) — Design
 
 - **Date:** 2026-06-30
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending) — `docs/plans/2026-06-30-fences-walls-track-e3.md`, 4 TDD tasks; suite 549 green. Live smoke: 3 blocks registered, fence/wall/cube placement combos mesh without error.
 - **Branch:** `claude/fences-track-e3` (off `main` @ `384eaa7`, which includes E1 + E2).
 - **Origin:** The neighbour-connecting building shapes. E1 added orientation-free shapes (slabs, cross-plants); E2 added oriented/stateful shapes (stairs). Fences/walls are different again: their geometry is **derived from their neighbours** at mesh time (a post + arms reaching to adjacent fences/walls/cubes), so they need **no stored state and no save-format change** — they slot into the existing E1/E2 shape system.
 
