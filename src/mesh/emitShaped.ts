@@ -3,7 +3,7 @@ import { Face } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
-import { unpackState, FACING } from '../world/VoxelState';
+import { unpackState, FACING, isOpen } from '../world/VoxelState';
 
 interface Buf {
   positions: number[];
@@ -305,6 +305,90 @@ function emitConnected(
   }
 }
 
+/**
+ * The boxes of a fence gate. `facing` N/S → the gate spans the Z axis (posts at the z ends);
+ * E/W → spans the X axis. Closed: two rails fill the gap between the posts (blocking the cross
+ * passage). Open: the rails swing 90° to lie flat against the near post, clearing the gap.
+ */
+function gateBoxes(
+  x: number,
+  y: number,
+  z: number,
+  facing: number,
+  open: boolean,
+): Array<[[number, number, number], [number, number, number]]> {
+  const spanZ = facing === FACING.N || facing === FACING.S;
+  const boxes: Array<[[number, number, number], [number, number, number]]> = [];
+  const railYs: Array<[number, number]> = [
+    [0.3, 0.45],
+    [0.62, 0.77],
+  ];
+  if (spanZ) {
+    // posts at z=0 and z=1 ends, centred on x
+    boxes.push([
+      [x + 0.4, y, z],
+      [x + 0.6, y + 1, z + 0.16],
+    ]);
+    boxes.push([
+      [x + 0.4, y, z + 0.84],
+      [x + 0.6, y + 1, z + 1],
+    ]);
+    for (const [yLo, yHi] of railYs) {
+      if (open)
+        // swung: rail lies along X near the z=0 post
+        boxes.push([
+          [x + 0.16, y + yLo, z],
+          [x + 0.84, y + yHi, z + 0.16],
+        ]);
+      else
+        // closed: rail spans Z between the posts, centred on x
+        boxes.push([
+          [x + 0.45, y + yLo, z + 0.16],
+          [x + 0.55, y + yHi, z + 0.84],
+        ]);
+    }
+  } else {
+    // posts at x=0 and x=1 ends, centred on z
+    boxes.push([
+      [x, y, z + 0.4],
+      [x + 0.16, y + 1, z + 0.6],
+    ]);
+    boxes.push([
+      [x + 0.84, y, z + 0.4],
+      [x + 1, y + 1, z + 0.6],
+    ]);
+    for (const [yLo, yHi] of railYs) {
+      if (open)
+        boxes.push([
+          [x, y + yLo, z + 0.16],
+          [x + 0.16, y + yHi, z + 0.84],
+        ]);
+      else
+        boxes.push([
+          [x + 0.16, y + yLo, z + 0.45],
+          [x + 0.84, y + yHi, z + 0.55],
+        ]);
+    }
+  }
+  return boxes;
+}
+
+function emitGate(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  const state = view.getState(x, y, z);
+  const { facing } = unpackState(state);
+  for (const [lo, hi] of gateBoxes(x, y, z, facing, isOpen(state))) {
+    emitBoxCulled(buf, view, registry, id, x, y, z, lo, hi);
+  }
+}
+
 /** Two crossed billboard quads spanning the voxel. Double-sided (the cutout material) + no AO. */
 function emitCross(
   buf: Buf,
@@ -368,6 +452,7 @@ export function emitShaped(
         else if (shape === 'stair') emitStair(slabs, view, registry, id, x, y, z);
         else if (shape === 'fence' || shape === 'wall')
           emitConnected(slabs, view, registry, id, x, y, z);
+        else if (shape === 'gate') emitGate(slabs, view, registry, id, x, y, z);
         else if (shape === 'cross') emitCross(cross, view, registry, id, x, y, z);
       }
     }
