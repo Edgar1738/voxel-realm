@@ -22,7 +22,6 @@ import { computeChunkLight, applyBorderBlockLight, borderLightExport } from './L
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { emitShaped, mergeMeshData } from '../mesh/emitShaped';
 import { WATER, AIR } from '../blocks/blocks';
-import type { CollisionBox } from '../blocks/blocks';
 import type { AABB } from '../blocks/shapeBoxes';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
@@ -163,23 +162,6 @@ export class ChunkManager {
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
     if (!entry) return true;
     return this.registry.isOpaque(entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)));
-  }
-
-  /**
-   * Collision footprint of the voxel at world coords. Below the world is a full solid (so the
-   * player never falls out); above it is empty; an unloaded chunk is full (never fall through
-   * unstreamed terrain); a non-opaque voxel (air/water/plants) is empty; otherwise the block's
-   * shape-derived box ('full' or 'lowerHalf').
-   */
-  solidBox(wx: number, wy: number, wz: number): CollisionBox {
-    if (wy < 0) return 'full';
-    if (wy >= WORLD_HEIGHT) return 'none';
-    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
-    if (!entry) return 'full';
-    const id = entry.data.get(worldToLocal(wx), wy, worldToLocal(wz));
-    if (!this.registry.isOpaque(id)) return 'none';
-    const state = entry.data.getState(worldToLocal(wx), wy, worldToLocal(wz));
-    return this.registry.collisionBoxFor(id, state);
   }
 
   /** World-space collision boxes for a voxel. Below-world/unloaded read solid (full cube). */

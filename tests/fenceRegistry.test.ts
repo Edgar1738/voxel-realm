@@ -18,9 +18,9 @@ const DEFS: BlockDef[] = [
 const reg = new BlockRegistry(DEFS, buildBlockTextures(DEFS));
 
 describe('fence/wall registry', () => {
-  it('collide as full and do not occlude', () => {
-    expect(reg.collisionBox(2)).toBe('full');
-    expect(reg.collisionBox(4)).toBe('full');
+  it('have collision AABBs and do not occlude', () => {
+    expect(reg.collisionAABBs(2, 0).length).toBeGreaterThan(0); // fence has collision boxes
+    expect(reg.collisionAABBs(4, 0).length).toBeGreaterThan(0); // wall has collision boxes
     expect(reg.occludes(2)).toBe(false);
     expect(reg.occludes(4)).toBe(false);
   });

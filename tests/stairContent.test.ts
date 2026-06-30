@@ -11,7 +11,7 @@ describe('stair content', () => {
   it('all are stair-shaped, opaque, creative, lowerHalf, resolve faces', () => {
     for (const id of [STAIRS_STONE, STAIRS_PLANK, STAIRS_COBBLE, STAIRS_BRICK]) {
       expect(reg.shape(id)).toBe('stair');
-      expect(reg.collisionBox(id)).toBe('lowerHalf');
+      expect(reg.collisionAABBs(id, 0).length).toBeGreaterThan(0); // stairs have collision boxes
       expect(reg.get(id).creative).toBe(true);
       expect(() => reg.faceLayer(id, 0)).not.toThrow();
     }

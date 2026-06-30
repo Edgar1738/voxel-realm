@@ -10,7 +10,6 @@ import {
   type BlockTextures,
   type TintCategory,
   type Shape,
-  type CollisionBox,
 } from './blocks';
 
 /** Single source of truth for block lookups. Built from the stable BLOCK_DEFS table. */
@@ -89,28 +88,6 @@ export class BlockRegistry {
   /** True only for a full opaque cube: hides neighbour faces and casts AO. Slabs/plants do not. */
   occludes(id: BlockId): boolean {
     return this.get(id).opaque && this.shape(id) === 'cube';
-  }
-
-  /** Collision footprint of a block within its cell, derived from its shape. */
-  collisionBox(id: BlockId): CollisionBox {
-    switch (this.shape(id)) {
-      case 'cube':
-      case 'fence':
-      case 'wall':
-      case 'gate':
-        return 'full';
-      case 'slab':
-      case 'stair':
-        return 'lowerHalf';
-      case 'cross':
-        return 'none';
-    }
-  }
-
-  /** State-aware collision: an open gate is passable; everything else ignores state. */
-  collisionBoxFor(id: BlockId, state: number): CollisionBox {
-    if (this.shape(id) === 'gate') return isOpen(state) ? 'none' : 'full';
-    return this.collisionBox(id);
   }
 
   /** Sub-voxel collision boxes (local, 0..1.5) for a block in a given state. */

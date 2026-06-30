@@ -31,12 +31,12 @@ const DEFS: BlockDef[] = [
 const reg = new BlockRegistry(DEFS, buildBlockTextures(DEFS));
 
 describe('gate registry', () => {
-  it('isToggleable only for gates; state-aware collisionBoxFor', () => {
+  it('isToggleable only for gates; state-aware collisionAABBs', () => {
     expect(reg.isToggleable(2)).toBe(true);
     expect(reg.isToggleable(1)).toBe(false);
-    expect(reg.collisionBoxFor(2, packState(FACING.N, 0))).toBe('full'); // closed
-    expect(reg.collisionBoxFor(2, setOpen(packState(FACING.N, 0), true))).toBe('none'); // open
-    expect(reg.collisionBoxFor(1, 0)).toBe('full'); // non-gate ignores state
-    expect(reg.collisionBox(2)).toBe('full'); // gate's stateless default = closed
+    expect(reg.collisionAABBs(2, packState(FACING.N, 0)).length).toBeGreaterThan(0); // closed gate has boxes
+    expect(reg.collisionAABBs(2, setOpen(packState(FACING.N, 0), true)).length).toBe(0); // open gate is passable
+    expect(reg.collisionAABBs(1, 0).length).toBeGreaterThan(0); // non-gate ignores state, always solid
+    expect(reg.collisionAABBs(2, 0).length).toBeGreaterThan(0); // gate stateless default (state=0 = closed)
   });
 });

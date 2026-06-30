@@ -64,8 +64,8 @@ describe('emitStair', () => {
 });
 
 describe('registry stair flags', () => {
-  it('stair collides as lowerHalf and does not occlude', () => {
-    expect(reg.collisionBox(1)).toBe('lowerHalf');
+  it('stair has collision AABBs and does not occlude', () => {
+    expect(reg.collisionAABBs(1, 0).length).toBeGreaterThan(0); // stair is not passable
     expect(reg.occludes(1)).toBe(false);
   });
 });

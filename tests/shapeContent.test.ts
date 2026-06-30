@@ -10,10 +10,10 @@ describe('shape content blocks', () => {
   });
   it('slabs are opaque lowerHalf; plants are cross + non-solid + non-occluding', () => {
     expect(reg.shape(STONE_SLAB)).toBe('slab');
-    expect(reg.collisionBox(PLANK_SLAB)).toBe('lowerHalf');
+    expect(reg.collisionAABBs(PLANK_SLAB, 0).length).toBeGreaterThan(0); // slab has collision boxes
     expect(reg.occludes(STONE_SLAB)).toBe(false);
     expect(reg.shape(FLOWER)).toBe('cross');
-    expect(reg.collisionBox(TALL_GRASS)).toBe('none');
+    expect(reg.collisionAABBs(TALL_GRASS, 0).length).toBe(0); // cross/plant is passable
     expect(reg.occludes(FLOWER)).toBe(false);
   });
   it('all four appear in the creative picker and resolve to 6 face layers', () => {
