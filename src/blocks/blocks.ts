@@ -41,6 +41,7 @@ export const STAIRS_BRICK: BlockId = 34;
 export const OAK_FENCE: BlockId = 35;
 export const COBBLE_WALL: BlockId = 36;
 export const STONEBRICK_WALL: BlockId = 37;
+export const OAK_FENCE_GATE: BlockId = 38;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall' | 'gate';
@@ -440,6 +441,15 @@ export const BLOCK_DEFS: BlockDef[] = [
         [150, 150, 154],
       ],
     },
+  },
+  {
+    id: OAK_FENCE_GATE,
+    name: 'oak fence gate',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'gate',
+    faces: { pattern: 'planks', colors: [[150, 116, 70]] },
   },
 ];
 
