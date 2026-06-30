@@ -46,6 +46,9 @@ export const OAK_FENCE_GATE: BlockId = 38;
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall' | 'gate';
 
+/** Biome-tint category for a block's foliage faces. Omitted = untinted. */
+export type TintCategory = 'grass' | 'foliage';
+
 /** Collision footprint of a block within its voxel cell. */
 export type CollisionBox = 'none' | 'full' | 'lowerHalf';
 
@@ -71,6 +74,10 @@ export interface BlockDef {
   creative?: boolean;
   /** Render + collision shape. Omitted = 'cube'. */
   shape?: Shape;
+  /** Biome-tint category applied to this block's faces (foliage). Omitted = untinted. */
+  tint?: TintCategory;
+  /** When true, only the top (PosY) face is tinted (e.g. grass — sides are dirt). */
+  tintTopOnly?: boolean;
   /** Per-face texture specs (shorthand allowed). Omitted only for AIR. */
   faces?: FaceTextures;
 }
@@ -92,6 +99,8 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
+    tint: 'grass',
+    tintTopOnly: true,
     faces: {
       top: { pattern: 'grassTop', colors: [[86, 152, 60]] },
       side: {
@@ -138,6 +147,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
+    tint: 'foliage',
     faces: { pattern: 'leaves', colors: [[54, 120, 44]] },
   },
   {
@@ -353,6 +363,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'cross',
+    tint: 'foliage',
     faces: { pattern: 'tallGrass', colors: [[70, 150, 64]] },
   },
   {
