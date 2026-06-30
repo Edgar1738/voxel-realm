@@ -40,7 +40,7 @@ export const STAIRS_COBBLE: BlockId = 33;
 export const STAIRS_BRICK: BlockId = 34;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
-export type Shape = 'cube' | 'slab' | 'cross' | 'stair';
+export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall';
 
 /** Collision footprint of a block within its voxel cell. */
 export type CollisionBox = 'none' | 'full' | 'lowerHalf';

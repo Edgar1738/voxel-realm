@@ -84,6 +84,8 @@ export class BlockRegistry {
   collisionBox(id: BlockId): CollisionBox {
     switch (this.shape(id)) {
       case 'cube':
+      case 'fence':
+      case 'wall':
         return 'full';
       case 'slab':
       case 'stair':
@@ -91,6 +93,11 @@ export class BlockRegistry {
       case 'cross':
         return 'none';
     }
+  }
+
+  /** True if a fence/wall `self` should connect to `neighbor`: a full opaque cube, or the same shape. */
+  connectsTo(self: BlockId, neighbor: BlockId): boolean {
+    return this.occludes(neighbor) || this.shape(neighbor) === this.shape(self);
   }
 
   /** A block's self-emitted light level (0..15); 0 for non-emitters. */
@@ -115,5 +122,12 @@ export class BlockRegistry {
 }
 
 function isShape(value: string): value is Shape {
-  return value === 'cube' || value === 'slab' || value === 'cross' || value === 'stair';
+  return (
+    value === 'cube' ||
+    value === 'slab' ||
+    value === 'cross' ||
+    value === 'stair' ||
+    value === 'fence' ||
+    value === 'wall'
+  );
 }
