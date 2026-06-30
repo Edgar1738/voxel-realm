@@ -1,7 +1,7 @@
 # Interactive Openables — Fence Gate (Track E4) — Design
 
 - **Date:** 2026-06-30
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending) — `docs/plans/2026-06-30-interactive-gate-track-e4.md`, 6 TDD tasks; suite 558 green. Live smoke: gate places, `__vr.toggle` flips it (air → no-op), open state persists to disk as `[index,38,8]` and survives reload. (Known cosmetic limitation: the open panel always swings to one post regardless of N/S vs E/W facing — gate still functions; facing-correct swing is a future polish.)
 - **Branch:** `claude/gates-track-e4` (off `main` @ `ff32c33`, which includes E1–E3).
 - **Origin:** The interactive-block track. E2 added the per-voxel `state` byte (reserving bit 3 "for doors = open"); E3 added neighbour-connecting fences. This track adds the **interactive machinery** — a "use" action that toggles a block's `open` state, with state-aware collision — and ships a **fence gate** as the first consumer. Trapdoors and 2-tall doors become follow-ups once the machinery exists.
 
