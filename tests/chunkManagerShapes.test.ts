@@ -76,7 +76,7 @@ describe('ChunkManager shaped meshing + collisionBoxesAt', () => {
     );
     mgr.preload(0, 0, 0);
     expect(meshes.get('0,0')!.opaque.indices.length).toBeGreaterThan(0);
-    expect(mgr.collisionBoxesAt(0, 40, 0).length).toBeGreaterThan(0); // slab has collision boxes
+    expect(mgr.collisionBoxesAt(0, 40, 0)).toEqual([[0, 40, 0, 1, 40.5, 1]]); // slab lowerHalf world box
     expect(mgr.collisionBoxesAt(0, 41, 0).length).toBe(0); // air above is passable
   });
 });

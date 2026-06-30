@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { OAK_FENCE, COBBLE_WALL, STONEBRICK_WALL } from '../src/blocks/blocks';
+import { TALL_BOX } from '../src/blocks/shapeBoxes';
 
 const reg = new BlockRegistry();
 
@@ -13,7 +14,7 @@ describe('fence/wall content', () => {
     expect(reg.shape(COBBLE_WALL)).toBe('wall');
     expect(reg.shape(STONEBRICK_WALL)).toBe('wall');
     for (const id of [OAK_FENCE, COBBLE_WALL, STONEBRICK_WALL]) {
-      expect(reg.collisionAABBs(id, 0).length).toBeGreaterThan(0); // fence/wall has collision boxes
+      expect(reg.collisionAABBs(id, 0)).toEqual([TALL_BOX]); // fence/wall is a single tall box
       expect(reg.occludes(id)).toBe(false);
       expect(reg.get(id).creative).toBe(true);
       expect(() => reg.faceLayer(id, 0)).not.toThrow();

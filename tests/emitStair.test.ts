@@ -65,7 +65,7 @@ describe('emitStair', () => {
 
 describe('registry stair flags', () => {
   it('stair has collision AABBs and does not occlude', () => {
-    expect(reg.collisionAABBs(1, 0).length).toBeGreaterThan(0); // stair is not passable
+    expect(reg.collisionAABBs(1, 0).length).toBe(2); // stair is not passable (two boxes)
     expect(reg.occludes(1)).toBe(false);
   });
 });

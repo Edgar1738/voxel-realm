@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { buildBlockTextures, type BlockDef } from '../src/blocks/blocks';
+import { CUBE_BOX, SLAB_BOX } from '../src/blocks/shapeBoxes';
 
 const DEFS: BlockDef[] = [
   { id: 0, name: 'air', opaque: false, transparent: true },
@@ -52,8 +53,8 @@ describe('BlockRegistry shape/occludes/collisionAABBs', () => {
     expect(reg.occludes(4)).toBe(false); // non-opaque cube (water)
   });
   it('maps shape to collision AABBs', () => {
-    expect(reg.collisionAABBs(1, 0).length).toBeGreaterThan(0); // full cube
-    expect(reg.collisionAABBs(2, 0).length).toBeGreaterThan(0); // lowerHalf slab
-    expect(reg.collisionAABBs(3, 0).length).toBe(0); // passable cross
+    expect(reg.collisionAABBs(1, 0)).toEqual([CUBE_BOX]); // full cube
+    expect(reg.collisionAABBs(2, 0)).toEqual([SLAB_BOX]); // lowerHalf slab
+    expect(reg.collisionAABBs(3, 0)).toEqual([]); // passable cross
   });
 });

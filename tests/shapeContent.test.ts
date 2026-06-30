@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { STONE_SLAB, PLANK_SLAB, FLOWER, TALL_GRASS } from '../src/blocks/blocks';
+import { SLAB_BOX } from '../src/blocks/shapeBoxes';
 
 const reg = new BlockRegistry();
 
@@ -10,7 +11,7 @@ describe('shape content blocks', () => {
   });
   it('slabs are opaque lowerHalf; plants are cross + non-solid + non-occluding', () => {
     expect(reg.shape(STONE_SLAB)).toBe('slab');
-    expect(reg.collisionAABBs(PLANK_SLAB, 0).length).toBeGreaterThan(0); // slab has collision boxes
+    expect(reg.collisionAABBs(PLANK_SLAB, 0)).toEqual([SLAB_BOX]); // slab has collision boxes
     expect(reg.occludes(STONE_SLAB)).toBe(false);
     expect(reg.shape(FLOWER)).toBe('cross');
     expect(reg.collisionAABBs(TALL_GRASS, 0).length).toBe(0); // cross/plant is passable
