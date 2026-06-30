@@ -19,6 +19,8 @@ import {
   type TerrainPathPoint,
 } from './DevBuildTools';
 import { collectDevState, type DevState } from './DevState';
+import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
+import type { RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
 import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './DevShapes';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
@@ -57,6 +59,8 @@ export interface DevControlsContext {
   celestial: CelestialSky;
   preset: WorldPreset;
   worldName: string;
+  profiler: FrameProfiler;
+  roam: RoamDriver;
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
@@ -69,6 +73,7 @@ type Html2Canvas = (
 
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
+const round = (v: number, decimals: number): number => Number(v.toFixed(decimals));
 
 export function installDevControls(ctx: DevControlsContext): void {
   const {
@@ -83,6 +88,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     celestial,
     preset,
     worldName,
+    profiler,
+    roam,
   } = ctx;
 
   const currentWorld = worldName;
@@ -775,7 +782,75 @@ export function installDevControls(ctx: DevControlsContext): void {
     blocks: (): Array<{ id: BlockId; name: string }> =>
       CREATIVE_BLOCKS.map((id) => ({ id, name: registry.get(id).name })),
     state: (): DevState =>
-      collectDevState({ player, rig, manager, inventory, registry, preset, worldName }),
+      collectDevState({ player, rig, manager, inventory, registry, preset, worldName, profiler }),
+    /**
+     * Roam benchmark (P0): warm up so chunks settle, then fly `distance` units along `axis`
+     * at `speed` (default flight speed) while sampling per-frame stats. Logs a table, copies
+     * the JSON to the clipboard, and returns the summary. Portable metrics (totalGens/
+     * totalMeshes) compare across machines; frame-time percentiles are same-machine only.
+     */
+    bench: async (opts?: {
+      axis?: 'x' | 'z';
+      distance?: number;
+      speed?: number;
+      warmupMs?: number;
+      start?: Vec3;
+    }): Promise<ProfilerSummary> => {
+      const axis = opts?.axis ?? 'x';
+      const distance = opts?.distance ?? 256;
+      const speed = opts?.speed ?? 30;
+      const warmupMs = opts?.warmupMs ?? 1500;
+
+      const prevPos = { ...player.position };
+      const prevFlying = player.flying;
+      player.flying = true;
+      if (opts?.start) {
+        player.position.x = opts.start.x;
+        player.position.y = opts.start.y;
+        player.position.z = opts.start.z;
+      }
+      syncCamera();
+
+      // Warm up (no sampling) so we measure steady-state roam, not cold spawn-load.
+      await new Promise((resolve) => setTimeout(resolve, warmupMs));
+      profiler.reset();
+      await roam.start({ axis, distance, speed }); // resolved by the render loop's per-frame step
+
+      const summary = profiler.summary();
+      player.position.x = prevPos.x;
+      player.position.y = prevPos.y;
+      player.position.z = prevPos.z;
+      player.flying = prevFlying;
+      syncCamera();
+
+      console.log(
+        `[vr.bench] preset=${preset} world=${currentWorld} axis=${axis} distance=${distance} ` +
+          `speed=${speed} | portable: totalGens=${summary.totalGens} totalMeshes=${summary.totalMeshes}`,
+      );
+      console.table({
+        framesSampled: summary.framesSampled,
+        meanFps: round(summary.meanFps, 1),
+        frameMsP50: round(summary.frameMs.p50, 2),
+        frameMsP95: round(summary.frameMs.p95, 2),
+        frameMsP99: round(summary.frameMs.p99, 2),
+        frameMsMax: round(summary.frameMs.max, 2),
+        updateMsP50: round(summary.updateMs.p50, 2),
+        updateMsP95: round(summary.updateMs.p95, 2),
+        updateMsMax: round(summary.updateMs.max, 2),
+        totalGens: summary.totalGens,
+        totalMeshes: summary.totalMeshes,
+        peakGensPerFrame: summary.peakGensPerFrame,
+        peakMeshesPerFrame: summary.peakMeshesPerFrame,
+        longFrames16: summary.longFrames16,
+        longFrames33: summary.longFrames33,
+      });
+      try {
+        await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
+      } catch {
+        /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
+      }
+      return summary;
+    },
     /** Lists the available methods (so a fresh session can discover the API). */
     help: (): string[] => Object.keys(api),
   };

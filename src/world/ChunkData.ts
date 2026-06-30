@@ -15,6 +15,12 @@ export class ChunkData {
   readonly state = new Uint8Array(CHUNK_VOLUME);
   /** Per-column biome ordinal (0 = Plains). Regenerated, NOT serialized. */
   readonly biomeData = new Uint8Array(CHUNK_AREA);
+  /**
+   * Whether this chunk contains any shaped (non-cube) voxel — slab/stair/fence/wall/gate/cross.
+   * Set by ChunkManager after generation/edits (P3) so meshing can skip the shaped pass for
+   * the common all-cube chunk. Monotonic: only ever set true (a stale true just costs one scan).
+   */
+  hasShaped = false;
 
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;

@@ -53,6 +53,26 @@ describe('emitShaped cross', () => {
   });
 });
 
+describe('emitShaped early-out (P3)', () => {
+  it('returns empty buffers without scanning when hasShaped is false', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2); // a slab
+    d.set(4, 12, 4, 3); // a plant (cross)
+    const { slabs, cross } = emitShaped(view(d), reg, false);
+    expect(slabs.positions.length).toBe(0);
+    expect(slabs.indices.length).toBe(0);
+    expect(cross.positions.length).toBe(0);
+    expect(cross.indices.length).toBe(0);
+  });
+
+  it('emits as normal when hasShaped is true', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2);
+    const { slabs } = emitShaped(view(d), reg, true);
+    expect(slabs.positions.length / 3).toBe(24);
+  });
+});
+
 describe('mergeMeshData', () => {
   it('concatenates and offsets indices', () => {
     const a = {

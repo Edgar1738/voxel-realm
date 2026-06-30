@@ -12,8 +12,10 @@ export const CHUNK_VOLUME = CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z;
 export const VIEW_DISTANCE = 4;
 /** Max chunks generated per frame (avoid hitches). */
 export const GEN_BUDGET = 2;
-/** Max chunks meshed per frame. */
+/** Max chunks meshed per frame (unified: counts main + neighbor remeshes, P5). */
 export const MESH_BUDGET = 2;
+/** Soft per-frame wall-clock ceiling (ms) for streaming work before yielding to the next frame (P5). */
+export const FRAME_WORK_MS = 6;
 
 /** Water surface height (used by later worldgen stages; defined now for the pipeline). */
 export const SEA_LEVEL = 62;

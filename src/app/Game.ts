@@ -25,11 +25,14 @@ import type { SaveStore } from '../persistence/SaveStore';
 import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
+import { FRAME_WORK_MS } from '../core/constants';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
 import { registerInputListeners, TOOLS, toolLabel, type Tool } from './input';
+import type { FrameProfiler } from './FrameProfiler';
+import type { RoamDriver } from './RoamBench';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -95,7 +98,7 @@ export class Game {
       sink,
       SEED,
       overlays,
-      undefined,
+      { frameWorkMs: FRAME_WORK_MS }, // P5: soft per-frame time ceiling in the live app
       savedDeltas,
     );
 
@@ -221,8 +224,13 @@ export class Game {
       },
     });
 
+    // Dev-only roam profiler + scripted-roam driver (P0); set in the DEV block below.
+    let devProfiler: FrameProfiler | undefined;
+    let devRoam: RoamDriver | undefined;
+
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
+      if (import.meta.env.DEV) devRoam?.step(cdt);
       daynight.advance(cdt);
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
@@ -232,6 +240,9 @@ export class Game {
         worldToChunkCoord(Math.floor(player.position.x)),
         worldToChunkCoord(Math.floor(player.position.z)),
       );
+      if (import.meta.env.DEV) {
+        devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
+      }
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 
@@ -240,6 +251,15 @@ export class Game {
     // is excluded from production builds.
     let hudTeardown: (() => void) | undefined;
     if (import.meta.env.DEV) {
+      const [{ FrameProfiler }, { RoamDriver }] = await Promise.all([
+        import('./FrameProfiler'),
+        import('./RoamBench'),
+      ]);
+      const profiler = new FrameProfiler();
+      const roam = new RoamDriver(player);
+      devProfiler = profiler;
+      devRoam = roam;
+
       const devContext = {
         renderer,
         player,
@@ -252,6 +272,8 @@ export class Game {
         celestial,
         preset,
         worldName,
+        profiler,
+        roam,
       };
       void import('./DevControls').then((m) => m.installDevControls(devContext));
       void import('./DevHud').then((m) => {
@@ -263,6 +285,7 @@ export class Game {
           registry,
           preset,
           worldName,
+          profiler,
         });
       });
     }

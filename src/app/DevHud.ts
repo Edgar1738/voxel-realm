@@ -10,7 +10,7 @@ export interface DevHudRow {
 }
 
 export function formatDevHudRows(state: DevState): DevHudRow[] {
-  return [
+  const rows: DevHudRow[] = [
     { label: 'Pos', value: `${fmt(state.pos.x)} ${fmt(state.pos.y)} ${fmt(state.pos.z)}` },
     { label: 'Chunk', value: `${state.chunk.cx} ${state.chunk.cz}` },
     { label: 'Look', value: `${fmt(state.yaw * RAD_TO_DEG)} ${fmt(state.pitch * RAD_TO_DEG)}` },
@@ -20,6 +20,15 @@ export function formatDevHudRows(state: DevState): DevHudRow[] {
     { label: 'Chunks', value: String(state.loadedChunkCount) },
     { label: 'Mode', value: state.flyMode },
   ];
+  if (state.perf) {
+    rows.push(
+      { label: 'FPS', value: String(Math.round(state.perf.fps)) },
+      { label: 'Upd ms', value: `${fmt(state.perf.updMsP50)} / ${fmt(state.perf.updMsMax)}` },
+      { label: 'Mesh/f', value: String(state.perf.meshPeak) },
+      { label: 'Gen/f', value: String(state.perf.genPeak) },
+    );
+  }
+  return rows;
 }
 
 /** Returns a teardown function that stops the HUD update loop and removes the element. */

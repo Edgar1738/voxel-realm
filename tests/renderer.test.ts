@@ -103,4 +103,22 @@ describe('Renderer', () => {
     expect(() => r.dispose()).not.toThrow();
     expect(mockRendererDispose).toHaveBeenCalledOnce();
   });
+
+  it('clamps the device pixel ratio at construction (P4)', async () => {
+    windowStub.devicePixelRatio = 3;
+    const { Renderer } = await import('../src/render/Renderer');
+    new Renderer(fakeCanvas);
+    expect(mockSetPixelRatio).toHaveBeenCalledWith(2);
+    windowStub.devicePixelRatio = 1;
+  });
+});
+
+describe('clampPixelRatio (P4)', () => {
+  it('caps the pixel ratio at 2 to bound fragment cost on high-DPI displays', async () => {
+    const { clampPixelRatio } = await import('../src/render/Renderer');
+    expect(clampPixelRatio(1)).toBe(1);
+    expect(clampPixelRatio(1.5)).toBe(1.5);
+    expect(clampPixelRatio(2)).toBe(2);
+    expect(clampPixelRatio(3)).toBe(2);
+  });
 });

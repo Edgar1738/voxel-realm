@@ -1,5 +1,13 @@
 import { Scene, PerspectiveCamera, WebGLRenderer, Color, Object3D } from 'three';
 
+/** Upper bound on device pixel ratio: above 2x the fragment cost outweighs the visible gain (P4). */
+export const MAX_PIXEL_RATIO = 2;
+
+/** Clamps a device pixel ratio to {@link MAX_PIXEL_RATIO} to bound fragment work on high-DPI displays. */
+export function clampPixelRatio(dpr: number, max = MAX_PIXEL_RATIO): number {
+  return Math.min(dpr, max);
+}
+
 /** Owns the three.js scene/camera/renderer and the render loop. Camera is driven by CameraRig. */
 export class Renderer {
   readonly scene = new Scene();
@@ -14,7 +22,7 @@ export class Renderer {
     this.camera = new PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
 
     this.renderer = new WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(clampPixelRatio(window.devicePixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     window.addEventListener('resize', () => this.onResize(), {
@@ -67,6 +75,7 @@ export class Renderer {
   private onResize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
+    this.renderer.setPixelRatio(clampPixelRatio(window.devicePixelRatio));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 }

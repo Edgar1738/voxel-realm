@@ -42,6 +42,18 @@ export interface ChunkManagerOptions {
   viewDistance: number;
   genBudget: number;
   meshBudget: number;
+  /** Soft per-frame wall-clock ceiling (ms) for streaming work (P5). */
+  frameWorkMs: number;
+}
+
+/** Per-frame streaming work counters for the dev profiler (P0 roam-smoothness spike). */
+export interface ChunkFrameStats {
+  /** Chunks generated during the last update(). */
+  genCount: number;
+  /** meshChunk calls during the last update() (includes unbudgeted neighbor remeshes). */
+  meshCount: number;
+  /** Wall-clock time spent inside the last update() (ms). */
+  updateMs: number;
 }
 
 const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
@@ -50,6 +62,16 @@ const EDGE_NEIGHBORS: ReadonlyArray<[number, number]> = [
   [0, 1],
   [0, -1],
 ];
+
+/** Shapes handled by the shaped-mesh pass; a chunk with none can skip it (P3). */
+const SHAPED_SHAPES: ReadonlySet<string> = new Set([
+  'slab',
+  'stair',
+  'fence',
+  'wall',
+  'gate',
+  'cross',
+]);
 
 /**
  * Diffs the desired set (chunks within view distance of the camera column) against the
@@ -76,6 +98,17 @@ export class ChunkManager {
   private readonly opts: ChunkManagerOptions;
   private readonly opaquePass: MeshPass;
   private readonly transparentPass: MeshPass;
+  private frameGen = 0;
+  private frameMesh = 0;
+  private lastStats: ChunkFrameStats = { genCount: 0, meshCount: 0, updateMs: 0 };
+  // P1: the desired chunk set is rebuilt + sorted only when the center chunk changes;
+  // `hasPendingWork` keeps draining the gen/mesh backlog across same-center frames.
+  private lastCenterCx: number | undefined;
+  private lastCenterCz: number | undefined;
+  private ordered: ReadonlyArray<{ cx: number; cz: number }> = [];
+  private hasPendingWork = false;
+  // P5: legit neighbor remeshes that overflowed the per-frame budget; drained next frame(s).
+  private readonly pendingRemesh = new Set<string>();
 
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
   onChunkDeltaChanged?: (key: string, entries: ChunkDeltaEntries) => void;
@@ -97,15 +130,104 @@ export class ChunkManager {
       viewDistance: options?.viewDistance ?? VIEW_DISTANCE,
       genBudget: options?.genBudget ?? GEN_BUDGET,
       meshBudget: options?.meshBudget ?? MESH_BUDGET,
+      // Default: no wall-clock ceiling (the count budgets bound per-frame work). Production
+      // (Game.boot) opts into a soft ms ceiling; tests stay deterministic on the count budget.
+      frameWorkMs: options?.frameWorkMs ?? Infinity,
     };
     this.opaquePass = opaquePass(this.registry);
     this.transparentPass = transparentPass(this.registry);
   }
 
-  update(centerCx: number, centerCz: number): void {
-    const desired = this.desiredSet(centerCx, centerCz);
+  /** Snapshot of the most recent update()'s streaming work (dev profiler, P0). */
+  get lastFrameStats(): Readonly<ChunkFrameStats> {
+    return this.lastStats;
+  }
 
-    // Unload chunks that left range.
+  /** Whether chunks are still streaming in (generation/mesh backlog not yet drained). */
+  get streaming(): boolean {
+    return this.hasPendingWork;
+  }
+
+  update(centerCx: number, centerCz: number): void {
+    const updateStart = performance.now();
+    this.frameGen = 0;
+    this.frameMesh = 0;
+
+    const centerChanged = centerCx !== this.lastCenterCx || centerCz !== this.lastCenterCz;
+    if (centerChanged) {
+      this.lastCenterCx = centerCx;
+      this.lastCenterCz = centerCz;
+      this.recomputeDesired(centerCx, centerCz);
+      this.hasPendingWork = true;
+    } else if (!this.hasPendingWork) {
+      // Idle: center unchanged and no backlog — skip the desired-set rebuild + sort.
+      this.lastStats = { genCount: 0, meshCount: 0, updateMs: performance.now() - updateStart };
+      return;
+    }
+
+    // Generate pass (P5: also yields once the per-frame time ceiling is hit).
+    const overTime = (): boolean => performance.now() - updateStart >= this.opts.frameWorkMs;
+    let gen = 0;
+    for (const { cx, cz } of this.ordered) {
+      if (gen >= this.opts.genBudget || overTime()) break;
+      if (this.ensureGenerated(cx, cz)) gen++;
+    }
+
+    // Mesh pass. P5: a single budget (frameMesh) counts main + neighbor + drained remeshes,
+    // plus a wall-clock ceiling; overflow legit neighbor remeshes defer to pendingRemesh.
+    const meshedThisFrame = new Set<string>(); // P2a: dedup remeshes within this frame
+    const overBudget = (): boolean => this.frameMesh >= this.opts.meshBudget || overTime();
+
+    // Drain previously-deferred neighbor remeshes first (oldest seam work, FIFO).
+    for (const key of [...this.pendingRemesh]) {
+      if (overBudget()) break;
+      this.pendingRemesh.delete(key);
+      const { cx, cz } = parseChunkKey(key);
+      const nb = this.store.get(cx, cz);
+      if (!nb || nb.state !== ChunkState.Meshed) continue; // unloaded / not yet meshed -> drop
+      this.recomputeLight(nb.data);
+      this.meshChunk(cx, cz);
+      meshedThisFrame.add(key);
+    }
+
+    for (const { cx, cz } of this.ordered) {
+      if (overBudget()) break;
+      const entry = this.store.get(cx, cz);
+      if (!entry || entry.state !== ChunkState.Generated) continue;
+      this.meshChunk(cx, cz);
+      meshedThisFrame.add(chunkKey(cx, cz));
+      // A newly-meshed chunk changes the seam of its already-meshed neighbors, so they
+      // re-mesh. P2a: skip any neighbor already meshed this frame (the generate pass ran
+      // first, so it was already meshed against current neighbor data — re-meshing would
+      // be byte-identical). P2b: only re-light a neighbor when this chunk actually exports
+      // block light to it; pure terrain contributes none, so the relight is a no-op.
+      for (const [dx, dz] of EDGE_NEIGHBORS) {
+        const nbKey = chunkKey(cx + dx, cz + dz);
+        if (meshedThisFrame.has(nbKey)) continue;
+        const nb = this.store.get(cx + dx, cz + dz);
+        if (!nb || nb.state !== ChunkState.Meshed) continue;
+        if (overBudget()) {
+          this.pendingRemesh.add(nbKey); // defer the legit seam remesh to a later frame
+          continue;
+        }
+        if (this.feedsBlockLight(cx, cz)) this.recomputeLight(nb.data);
+        this.meshChunk(cx + dx, cz + dz);
+        meshedThisFrame.add(nbKey);
+      }
+    }
+
+    this.hasPendingWork = this.hasWorkRemaining();
+
+    this.lastStats = {
+      genCount: this.frameGen,
+      meshCount: this.frameMesh,
+      updateMs: performance.now() - updateStart,
+    };
+  }
+
+  /** Unloads out-of-range chunks and rebuilds the nearest-first desired order (P1). */
+  private recomputeDesired(centerCx: number, centerCz: number): void {
+    const desired = this.desiredSet(centerCx, centerCz);
     for (const key of [...this.store.keys()]) {
       if (!desired.has(key)) {
         const { cx, cz } = parseChunkKey(key);
@@ -115,40 +237,37 @@ export class ChunkManager {
         this.borderExports.delete(key);
       }
     }
-
-    // Nearest-first ordering for pleasant load-in.
-    const ordered = [...desired.values()].sort(
+    this.ordered = [...desired.values()].sort(
       (a, b) =>
         (a.cx - centerCx) ** 2 +
         (a.cz - centerCz) ** 2 -
         ((b.cx - centerCx) ** 2 + (b.cz - centerCz) ** 2),
     );
+  }
 
-    // Generate pass.
-    let gen = 0;
-    for (const { cx, cz } of ordered) {
-      if (gen >= this.opts.genBudget) break;
-      if (this.ensureGenerated(cx, cz)) gen++;
+  /** Scans a chunk for any shaped (non-cube) voxel so meshing can skip the shaped pass (P3). */
+  private scanHasShaped(data: ChunkData): boolean {
+    const ids = data.data;
+    for (let i = 0; i < ids.length; i++) {
+      if (SHAPED_SHAPES.has(this.registry.shape(ids[i]))) return true;
     }
+    return false;
+  }
 
-    // Mesh pass.
-    let meshed = 0;
-    for (const { cx, cz } of ordered) {
-      if (meshed >= this.opts.meshBudget) break;
+  /** Whether chunk (cx,cz) exports any block light to a neighbor (P2b relight guard). */
+  private feedsBlockLight(cx: number, cz: number): boolean {
+    const e = this.borderExports.get(chunkKey(cx, cz));
+    return !e || e[0] > 0 || e[1] > 0 || e[2] > 0 || e[3] > 0;
+  }
+
+  /** Whether any desired chunk still needs generation/meshing, or a deferred remesh is queued (P1/P5). */
+  private hasWorkRemaining(): boolean {
+    if (this.pendingRemesh.size > 0) return true;
+    for (const { cx, cz } of this.ordered) {
       const entry = this.store.get(cx, cz);
-      if (!entry || entry.state !== ChunkState.Generated) continue;
-      this.meshChunk(cx, cz);
-      meshed++;
-      // Re-light and re-mesh already-meshed neighbors so cross-chunk block light
-      // and geometry seams both resolve when this chunk first appears.
-      for (const [dx, dz] of EDGE_NEIGHBORS) {
-        const nb = this.store.get(cx + dx, cz + dz);
-        if (nb && nb.state === ChunkState.Meshed) {
-          this.recomputeLight(nb.data);
-          this.meshChunk(cx + dx, cz + dz);
-        }
-      }
+      if (!entry || entry.state === ChunkState.Generated) return true;
     }
+    return false;
   }
 
   /**
@@ -241,6 +360,7 @@ export class ChunkManager {
 
       entry.data.set(lx, edit.y, lz, edit.id);
       entry.data.setState(lx, edit.y, lz, nextState);
+      if (SHAPED_SHAPES.has(this.registry.shape(edit.id))) entry.data.hasShaped = true;
       this.updateDelta(cx, cz, lx, edit.y, lz, edit.id, nextState);
       changes.push({
         x: edit.x,
@@ -509,8 +629,10 @@ export class ChunkManager {
     const key = chunkKey(cx, cz);
     this.baseChunks.set(key, cloneChunk(data));
     this.applySavedDeltas(data, key);
+    data.hasShaped = this.scanHasShaped(data);
     this.recomputeLight(data);
     this.store.set(cx, cz, data, ChunkState.Generated);
+    this.frameGen++;
     return true;
   }
 
@@ -577,8 +699,9 @@ export class ChunkManager {
   private meshChunk(cx: number, cz: number): void {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
+    this.frameMesh++;
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
-    const shaped = emitShaped(view, this.registry);
+    const shaped = emitShaped(view, this.registry, entry.data.hasShaped);
     const meshes: ChunkMeshes = {
       opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass), shaped.slabs),
       transparent: this.mesher.mesh(view, this.transparentPass),

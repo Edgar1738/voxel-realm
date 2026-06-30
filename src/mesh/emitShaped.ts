@@ -432,13 +432,19 @@ function emitCross(
   }
 }
 
-/** Emits slab boxes (→ opaque mesh) and cross billboards (→ cutout mesh) for one chunk. */
+/**
+ * Emits slab boxes (→ opaque mesh) and cross billboards (→ cutout mesh) for one chunk.
+ * `hasShaped` (P3) lets the caller skip the full-chunk scan for chunks known to contain no
+ * shaped blocks — the common case — returning empty buffers immediately.
+ */
 export function emitShaped(
   view: VoxelView,
   registry: BlockRegistry,
+  hasShaped = true,
 ): { slabs: MeshData; cross: MeshData } {
   const slabs = emptyBuf();
   const cross = emptyBuf();
+  if (!hasShaped) return { slabs: toMesh(slabs), cross: toMesh(cross) };
   for (let y = 0; y < WORLD_HEIGHT; y++) {
     for (let z = 0; z < CHUNK_SIZE_Z; z++) {
       for (let x = 0; x < CHUNK_SIZE_X; x++) {

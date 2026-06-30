@@ -27,4 +27,34 @@ describe('formatDevHudRows', () => {
       { label: 'Mode', value: 'fly' },
     ]);
   });
+
+  it('appends roam perf rows when perf is present', () => {
+    const state: DevState = {
+      pos: { x: 0, y: 80, z: 0 },
+      chunk: { cx: 0, cz: 0 },
+      yaw: 0,
+      pitch: 0,
+      selectedBlock: 'stone',
+      preset: 'default',
+      worldName: 'default',
+      loadedChunkCount: 9,
+      flyMode: 'fly',
+      perf: { fps: 59.6, updMsP50: 1.2, updMsMax: 4.5, meshPeak: 3, genPeak: 2 },
+    };
+
+    expect(formatDevHudRows(state)).toEqual([
+      { label: 'Pos', value: '0.0 80.0 0.0' },
+      { label: 'Chunk', value: '0 0' },
+      { label: 'Look', value: '0.0 0.0' },
+      { label: 'Block', value: 'stone' },
+      { label: 'World', value: 'default' },
+      { label: 'Preset', value: 'default' },
+      { label: 'Chunks', value: '9' },
+      { label: 'Mode', value: 'fly' },
+      { label: 'FPS', value: '60' },
+      { label: 'Upd ms', value: '1.2 / 4.5' },
+      { label: 'Mesh/f', value: '3' },
+      { label: 'Gen/f', value: '2' },
+    ]);
+  });
 });
