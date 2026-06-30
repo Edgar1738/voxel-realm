@@ -33,8 +33,8 @@ Block faces render from a shared texture array with fixed per-block colors; the 
 
 ## Components
 
-### 1. Tint palette (`src/render/Tint.ts`)
-A pure module, no three.js:
+### 1. Tint palette (`src/mesh/Tint.ts`)
+A pure module, no three.js (lives in `src/mesh` so the meshers consume it with no `mesh → render` back-dependency; the shader needs no palette):
 - `type TintCategory = 'grass' | 'foliage'`.
 - `type RGB = readonly [number, number, number]` (0..1 multipliers).
 - Per-biome multipliers for each category (6 biomes). Example values (final numbers pinned in the plan): grass — Plains `[1,1,1]`, Forest `[0.92,1.0,0.85]`, Desert `[0.86,0.78,0.45]`, Mountains `[0.80,0.85,0.70]`, Tundra `[0.78,0.86,0.82]`, Swamp `[0.62,0.70,0.42]`; foliage — similar, slightly deeper.
