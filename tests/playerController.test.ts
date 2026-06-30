@@ -4,10 +4,30 @@ import {
   type InputState,
   type PlayerWorld,
 } from '../src/player/PlayerController';
+import type { AABB } from '../src/blocks/shapeBoxes';
+import { CUBE_BOX } from '../src/blocks/shapeBoxes';
 
-const NEVER: PlayerWorld = { isSolid: () => false, isWater: () => false };
-const FLOOR: PlayerWorld = { isSolid: (_x, y) => y < 0, isWater: () => false };
-const WATER: PlayerWorld = { isSolid: () => false, isWater: () => true };
+/** Build a PlayerWorld where voxels matching `pred` are solid full cubes. */
+function makeWorld(
+  pred: (x: number, y: number, z: number) => boolean,
+  waterPred: (x: number, y: number, z: number) => boolean = () => false,
+): PlayerWorld {
+  return {
+    collisionBoxes(x, y, z): AABB[] {
+      if (!pred(x, y, z)) return [];
+      const b = CUBE_BOX;
+      return [[x + b[0], y + b[1], z + b[2], x + b[3], y + b[4], z + b[5]]];
+    },
+    isWater: waterPred,
+  };
+}
+
+const NEVER: PlayerWorld = makeWorld(() => false);
+const FLOOR: PlayerWorld = makeWorld((_x, y) => y < 0);
+const WATER: PlayerWorld = makeWorld(
+  () => false,
+  () => true,
+);
 
 function input(partial: Partial<InputState> = {}): InputState {
   return {
@@ -86,10 +106,10 @@ describe('PlayerController (submerged detection)', () => {
   it('treats feet-in-water as submerged even when the body center is dry', () => {
     // Water only at y <= 1: the player center is at y=2 (dry), but feet are at y=2-0.9=1.1
     // which floors to voxel y=1 — that IS water. Should use swim physics (slower speed).
-    const feetWaterOnly: PlayerWorld = {
-      isSolid: () => false,
-      isWater: (_x, y) => y <= 1, // only voxels at y=0 and y=1 are water
-    };
+    const feetWaterOnly: PlayerWorld = makeWorld(
+      () => false,
+      (_x, y) => y <= 1,
+    );
     // Player center at y=2: feet at y=1.1 (voxel y=1, water), center at y=2 (voxel y=2, dry)
     const inWater = new PlayerController({ x: 0, y: 2, z: 0 }, false);
     const onLand = new PlayerController({ x: 0, y: 2, z: 0 }, false);
@@ -103,10 +123,10 @@ describe('PlayerController (submerged detection)', () => {
     // Water only at y >= 3: player center at y=2 (dry), head at y=2+0.9=2.9 which floors to y=2 (dry)
     // So head voxel at y=2 is NOT water, but let's use y=3 floor: head at y=2.9 → floor(2.9)=2, not 3.
     // Instead: center at y=2.5, head at y=3.4 → floor(3.4)=3, which IS water.
-    const headWaterOnly: PlayerWorld = {
-      isSolid: () => false,
-      isWater: (_x, y) => y >= 3, // voxels at y=3+ are water
-    };
+    const headWaterOnly: PlayerWorld = makeWorld(
+      () => false,
+      (_x, y) => y >= 3,
+    );
     const inWater = new PlayerController({ x: 0, y: 2.5, z: 0 }, false);
     const onLand = new PlayerController({ x: 0, y: 2.5, z: 0 }, false);
     inWater.update(0.1, input({ forward: true }), 0, headWaterOnly);

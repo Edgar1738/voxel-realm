@@ -14,6 +14,7 @@ import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldge
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController } from '../player/PlayerController';
+import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi } from './CreativeUi';
@@ -105,10 +106,9 @@ export class Game {
     const overlay = document.getElementById('overlay') ?? undefined;
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
     const player = new PlayerController(SPAWN, true);
-    const sampler = {
-      isSolid: (x: number, y: number, z: number) => manager.isSolid(x, y, z),
+    const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
+      collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
-      solidBox: (x: number, y: number, z: number) => manager.solidBox(x, y, z),
     };
 
     const edit = new EditService(manager);
