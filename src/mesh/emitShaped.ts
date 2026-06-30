@@ -4,6 +4,7 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
 import { unpackState, FACING, isOpen } from '../world/VoxelState';
+import { WHITE, TINT_PALETTE, tintIndexFor, type RGB } from './Tint';
 
 interface Buf {
   positions: number[];
@@ -12,6 +13,7 @@ interface Buf {
   layers: number[];
   ao: number[];
   light: number[];
+  tint: number[];
   indices: number[];
   verts: number;
 }
@@ -23,6 +25,7 @@ const emptyBuf = (): Buf => ({
   layers: [],
   ao: [],
   light: [],
+  tint: [],
   indices: [],
   verts: 0,
 });
@@ -34,6 +37,7 @@ const toMesh = (b: Buf): MeshData => ({
   layers: new Float32Array(b.layers),
   ao: new Float32Array(b.ao),
   light: new Float32Array(b.light),
+  tint: new Float32Array(b.tint),
   indices: new Uint32Array(b.indices),
 });
 
@@ -54,6 +58,7 @@ function pushBoxFace(
   hi: [number, number, number],
   layer: number,
   light: number,
+  tint: RGB,
 ): void {
   const u = (axis + 1) % 3;
   const v = (axis + 2) % 3;
@@ -89,6 +94,7 @@ function pushBoxFace(
     buf.layers.push(layer);
     buf.ao.push(1); // slabs use flat AO in E1
     buf.light.push(light);
+    buf.tint.push(tint[0], tint[1], tint[2]);
   }
   const tri = sign > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2];
   for (const t of tri) buf.indices.push(n + t);
@@ -130,7 +136,16 @@ function emitBoxCulled(
     const ny = vy + (axis === 1 ? sign : 0);
     const nz = vz + (axis === 2 ? sign : 0);
     if (onBoundary && registry.occludes(view.get(nx, ny, nz))) continue;
-    pushBoxFace(buf, axis, sign, lo, hi, registry.faceLayer(id, face), packLight(view, nx, ny, nz));
+    pushBoxFace(
+      buf,
+      axis,
+      sign,
+      lo,
+      hi,
+      registry.faceLayer(id, face),
+      packLight(view, nx, ny, nz),
+      WHITE,
+    );
   }
 }
 
@@ -401,6 +416,10 @@ function emitCross(
 ): void {
   const layer = registry.faceLayer(id, Face.PosX);
   const light = packLight(view, x, y, z);
+  const category = registry.tintCategory(id, Face.PosY);
+  const tint = category
+    ? (TINT_PALETTE[tintIndexFor(view.biomeAt(x, z), category)] ?? WHITE)
+    : WHITE;
   const quads: [number, number, number][][] = [
     [
       [x, y, z],
@@ -430,6 +449,7 @@ function emitCross(
       buf.layers.push(layer);
       buf.ao.push(1);
       buf.light.push(light);
+      buf.tint.push(tint[0], tint[1], tint[2]);
     }
     buf.indices.push(n, n + 1, n + 2, n, n + 2, n + 3);
     buf.verts += 4;
@@ -482,6 +502,7 @@ export function mergeMeshData(a: MeshData, b: MeshData): MeshData {
     layers: concatF32(a.layers, b.layers),
     ao: concatF32(a.ao, b.ao),
     light: concatF32(a.light, b.light),
+    tint: concatF32(a.tint, b.tint),
     indices,
   };
 }

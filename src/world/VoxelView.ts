@@ -40,6 +40,14 @@ export class VoxelView {
     return this.center.getState(x, y, z);
   }
 
+  /** Biome ordinal for a column; 0 (Plains) for neighbor/out-of-range columns. */
+  biomeAt(x: number, z: number): number {
+    const dcx = Math.floor(x / CHUNK_SIZE_X);
+    const dcz = Math.floor(z / CHUNK_SIZE_Z);
+    if (dcx !== 0 || dcz !== 0) return 0;
+    return this.center.getBiome(x, z);
+  }
+
   /** Baked skylight at a (possibly neighbor/out-of-range) voxel. Open sky above world / at
    * unloaded borders reads 15 so surfaces never darken at a seam; below the world reads 0. */
   skyLight(x: number, y: number, z: number): number {

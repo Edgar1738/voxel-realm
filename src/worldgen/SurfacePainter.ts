@@ -16,6 +16,7 @@ export class SurfacePainter implements TerrainStage {
         const worldX = ctx.cx * CHUNK_SIZE_X + x;
         const worldZ = ctx.cz * CHUNK_SIZE_Z + z;
         const biome = ctx.biomes.biomeAt(worldX, worldZ);
+        chunk.setBiome(x, z, biome);
 
         let cap = GRASS;
         let band = DIRT;

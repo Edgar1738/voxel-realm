@@ -1,12 +1,13 @@
 // src/blocks/BlockRegistry.ts
 import type { BlockId } from '../core/types';
 import { isOpen } from '../world/VoxelState';
+import { Face } from './blocks';
 import {
   BLOCK_DEFS,
   BLOCK_TEXTURES,
   type BlockDef,
   type BlockTextures,
-  type Face,
+  type TintCategory,
   type Shape,
   type CollisionBox,
 } from './blocks';
@@ -74,6 +75,14 @@ export class BlockRegistry {
   /** Render/collision shape of a block; 'cube' when unspecified. */
   shape(id: BlockId): Shape {
     return this.get(id).shape ?? 'cube';
+  }
+
+  /** The biome-tint category for a face of a block, or undefined if that face is untinted. */
+  tintCategory(id: BlockId, face: Face): TintCategory | undefined {
+    const def = this.get(id);
+    if (!def.tint) return undefined;
+    if (def.tintTopOnly && face !== Face.PosY) return undefined;
+    return def.tint;
   }
 
   /** True only for a full opaque cube: hides neighbour faces and casts AO. Slabs/plants do not. */

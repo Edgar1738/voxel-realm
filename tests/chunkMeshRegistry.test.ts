@@ -57,6 +57,7 @@ function emptyMeshData() {
     layers: new Float32Array(0),
     ao: new Float32Array(0),
     light: new Float32Array(0),
+    tint: new Float32Array(0),
     indices: new Uint32Array(0),
   };
 }
@@ -71,6 +72,7 @@ function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): Chu
       layers: new Float32Array(opaqueIndices > 0 ? opaqueIndices : 0),
       ao: new Float32Array(opaqueIndices > 0 ? opaqueIndices : 0),
       light: new Float32Array(opaqueIndices > 0 ? opaqueIndices : 0),
+      tint: new Float32Array(opaqueIndices > 0 ? opaqueIndices * 3 : 0),
       indices: new Uint32Array(opaqueIndices),
     },
     transparent: {
@@ -80,6 +82,7 @@ function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): Chu
       layers: new Float32Array(transparentIndices > 0 ? transparentIndices : 0),
       ao: new Float32Array(transparentIndices > 0 ? transparentIndices : 0),
       light: new Float32Array(transparentIndices > 0 ? transparentIndices : 0),
+      tint: new Float32Array(transparentIndices > 0 ? transparentIndices * 3 : 0),
       indices: new Uint32Array(transparentIndices),
     },
     cutout: emptyMeshData(),
