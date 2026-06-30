@@ -53,14 +53,11 @@ export class ServerSaveStore implements SaveStore {
   }
 
   private async fetchSnapshot(): Promise<WorldSnapshot | undefined> {
-    try {
-      const res = await fetch(this.url({}));
-      if (!res.ok) return undefined;
-      const json = (await res.json()) as unknown;
-      return parseWorldSnapshot(json, { isValidBlockId: this.isValidBlockId }).snapshot;
-    } catch (err) {
-      console.error('Voxel Realm: world load failed', err);
-      return undefined;
+    const res = await fetch(this.url({}));
+    if (!res.ok) {
+      throw new Error(`Voxel Realm: world load failed (${res.status} ${res.statusText})`);
     }
+    const json = (await res.json()) as unknown;
+    return parseWorldSnapshot(json, { isValidBlockId: this.isValidBlockId }).snapshot;
   }
 }

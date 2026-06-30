@@ -138,6 +138,8 @@ export interface CreativeUi {
   setActiveTool(tool: string): void;
   /** Shows `text` as a transient toast that fades out on its own. */
   setStatus(text: string): void;
+  /** Shows a persistent banner (e.g. a storage warning), or hides it when passed `null`. */
+  setNotice(text: string | null): void;
   renderHotbar(): void;
   /** Opens or closes the inventory modal (fade/scale; inert when closed). */
   setInventoryOpen(open: boolean): void;
@@ -255,7 +257,18 @@ export function createCreativeUi(
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
-  root.append(dock, scrim, status, hotbar);
+  // Persistent top-center banner for sticky warnings (e.g. storage unavailable). Distinct from the
+  // transient status toast so a data-loss warning can't fade away before the player notices it.
+  const notice = document.createElement('div');
+  notice.className = 'creative-notice';
+  notice.setAttribute('role', 'alert');
+  notice.style.cssText =
+    'position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:72vw;' +
+    'padding:8px 14px;border-radius:10px;background:rgba(74,34,12,0.92);' +
+    'border:1px solid rgba(255,180,90,0.55);color:#ffe6c2;font-weight:500;text-align:center;' +
+    'box-shadow:0 4px 14px rgba(0,0,0,0.45);z-index:6;display:none;';
+
+  root.append(dock, scrim, status, notice, hotbar);
   document.body.append(root);
 
   let inventoryOpen = false;
@@ -288,6 +301,11 @@ export function createCreativeUi(
     }, STATUS_VISIBLE_MS);
   };
 
+  const setNotice = (text: string | null): void => {
+    notice.textContent = text ?? '';
+    notice.style.display = text ? 'block' : 'none';
+  };
+
   const renderHotbar = (): void => {
     hotbar.replaceChildren();
     inventory.hotbar.forEach((id, index) => {
@@ -317,6 +335,7 @@ export function createCreativeUi(
     worldButton,
     setActiveTool,
     setStatus,
+    setNotice,
     renderHotbar,
     setInventoryOpen,
     isInventoryOpen,

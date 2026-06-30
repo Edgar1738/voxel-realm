@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 /**
  * CameraRig disposal tests.
@@ -36,6 +36,10 @@ vi.stubGlobal('document', fakeDocument);
 vi.stubGlobal('window', fakeWindow);
 vi.stubGlobal('KeyboardEvent', FakeKeyboardEvent);
 
+beforeEach(() => {
+  fakeDocument.pointerLockElement = null;
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -66,9 +70,12 @@ describe('CameraRig', () => {
     vi.resetModules();
     const { CameraRig } = await import('../src/render/CameraRig');
     const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
-    const rig = new CameraRig(cam, makeCanvas());
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas);
 
     // While active: KeyW → forward = true
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
     fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
     expect(rig.getInput().forward).toBe(true);
 
@@ -77,6 +84,57 @@ describe('CameraRig', () => {
     fakeWindow.dispatchEvent(new FakeKeyboardEvent('keyup', { code: 'KeyW' }));
     fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyS' }));
     expect(rig.getInput().back).toBe(false);
+  });
+
+  it('returns neutral input and drops fly toggle when pointer lock is inactive', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas);
+
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyF' }));
+
+    expect(rig.getInput()).toEqual({
+      forward: false,
+      back: false,
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      toggleFly: false,
+    });
+
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+    expect(rig.getInput().toggleFly).toBe(false);
+    fakeDocument.pointerLockElement = null;
+  });
+
+  it('returns neutral input and drops fly toggle while the UI gate is blocked', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas, undefined, () => true);
+
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyF' }));
+
+    expect(rig.getInput()).toEqual({
+      forward: false,
+      back: false,
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      toggleFly: false,
+    });
+
+    fakeDocument.pointerLockElement = null;
   });
 
   it('dispose() stops pointerlockchange from updating locked state', async () => {

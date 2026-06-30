@@ -23,6 +23,7 @@ export class CameraRig {
     private readonly camera: PerspectiveCamera,
     canvas: HTMLCanvasElement,
     private readonly overlay?: HTMLElement,
+    private readonly isInputBlocked: () => boolean = () => false,
   ) {
     const signal = this.inputController.signal;
 
@@ -40,6 +41,10 @@ export class CameraRig {
       'pointerlockchange',
       () => {
         this.locked = document.pointerLockElement === canvas;
+        if (!this.locked) {
+          this.pressed.clear();
+          this.toggleFlyQueued = false;
+        }
         if (this.overlay) this.overlay.style.display = this.locked ? 'none' : 'flex';
       },
       { signal },
@@ -74,6 +79,19 @@ export class CameraRig {
 
   /** Snapshot of input intents; consumes the one-frame fly-toggle edge. */
   getInput(): InputState {
+    if (!this.locked || this.isInputBlocked()) {
+      this.toggleFlyQueued = false;
+      return {
+        forward: false,
+        back: false,
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        toggleFly: false,
+      };
+    }
+
     const state: InputState = {
       forward: this.pressed.has('KeyW'),
       back: this.pressed.has('KeyS'),

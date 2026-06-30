@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { editMessage, toolLabel, TOOLS } from '../src/app/input';
+import { canEdit, editMessage, toolLabel, TOOLS } from '../src/app/input';
 
 describe('editMessage', () => {
   it('returns "Undid" for a successful undo', () => {
@@ -40,5 +40,23 @@ describe('toolLabel', () => {
   it('covers all entries in TOOLS', () => {
     const labels = TOOLS.map(toolLabel);
     expect(labels).toEqual(['Single', 'Tunnel', 'Sphere', 'Box Clear', 'Fill', 'Replace']);
+  });
+});
+
+describe('canEdit', () => {
+  it('allows edits when pointer is locked and the inventory is closed', () => {
+    expect(canEdit(true, false)).toBe(true);
+  });
+
+  it('blocks edits when the pointer is not locked', () => {
+    expect(canEdit(false, false)).toBe(false);
+  });
+
+  it('blocks edits when the inventory is open even if the pointer is locked', () => {
+    expect(canEdit(true, true)).toBe(false);
+  });
+
+  it('blocks edits when neither locked nor inventory-closed', () => {
+    expect(canEdit(false, true)).toBe(false);
   });
 });

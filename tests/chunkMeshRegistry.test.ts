@@ -118,6 +118,90 @@ describe('ChunkMeshRegistry — sortTransparent()', () => {
     const far = registry.transparentRenderOrder('5,5');
     expect(far).toBeLessThan(near!); // farther drawn first (smaller renderOrder)
   });
+
+  it('does NOT recompute when called twice without camera movement or entry changes', async () => {
+    vi.clearAllMocks();
+    createdMeshes.length = 0;
+
+    const { ChunkMeshRegistry } = await import('../src/render/ChunkMeshRegistry');
+    const scene = makeScene();
+    const registry = new ChunkMeshRegistry(
+      scene as unknown as import('three').Scene,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+    );
+
+    registry.upload('0,0', makeChunkMeshes(0, 6));
+    registry.sortTransparent({ x: 0, z: 0 }); // first sort runs
+
+    // Poison the renderOrder with a sentinel; a second sort that early-returns must leave it.
+    const transparent = createdMeshes[createdMeshes.length - 1] as unknown as { renderOrder: number };
+    transparent.renderOrder = 12345;
+    registry.sortTransparent({ x: 0, z: 0 }); // no movement, no entry change → early return
+
+    expect(registry.transparentRenderOrder('0,0')).toBe(12345);
+  });
+
+  it('recomputes on the next sort after a new transparent chunk is uploaded, even without camera movement', async () => {
+    vi.clearAllMocks();
+    createdMeshes.length = 0;
+
+    const { ChunkMeshRegistry } = await import('../src/render/ChunkMeshRegistry');
+    const scene = makeScene();
+    const registry = new ChunkMeshRegistry(
+      scene as unknown as import('three').Scene,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+    );
+
+    registry.upload('0,0', makeChunkMeshes(0, 6));
+    registry.sortTransparent({ x: 0, z: 0 }); // first sort
+
+    // Sentinel-poison the existing entry, then add a NEW transparent chunk (sets dirty flag).
+    const first = createdMeshes[createdMeshes.length - 1] as unknown as { renderOrder: number };
+    first.renderOrder = 12345;
+    registry.upload('5,5', makeChunkMeshes(0, 6));
+
+    registry.sortTransparent({ x: 0, z: 0 }); // dirty flag forces recompute despite no movement
+
+    // The poisoned entry was recomputed (no longer the sentinel) and the new one is correct.
+    expect(registry.transparentRenderOrder('0,0')).not.toBe(12345);
+    expect(registry.transparentRenderOrder('5,5')).not.toBeNull();
+    expect(registry.transparentRenderOrder('5,5')).toBeLessThan(
+      registry.transparentRenderOrder('0,0')!,
+    );
+  });
+
+  it('recomputes when the camera moves at least half a chunk but not for a tiny move', async () => {
+    vi.clearAllMocks();
+    createdMeshes.length = 0;
+
+    const { ChunkMeshRegistry } = await import('../src/render/ChunkMeshRegistry');
+    const scene = makeScene();
+    const registry = new ChunkMeshRegistry(
+      scene as unknown as import('three').Scene,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+      makeMaterialMock() as unknown as import('three').Material,
+    );
+
+    registry.upload('0,0', makeChunkMeshes(0, 6));
+    registry.sortTransparent({ x: 0, z: 0 }); // first sort
+
+    const mesh = createdMeshes[createdMeshes.length - 1] as unknown as { renderOrder: number };
+
+    // Tiny move (< half a chunk = 8) → early return, sentinel preserved.
+    mesh.renderOrder = 12345;
+    registry.sortTransparent({ x: 1, z: 1 });
+    expect(registry.transparentRenderOrder('0,0')).toBe(12345);
+
+    // Move >= half a chunk on the x axis → recompute, sentinel overwritten.
+    mesh.renderOrder = 12345;
+    registry.sortTransparent({ x: 8, z: 1 });
+    expect(registry.transparentRenderOrder('0,0')).not.toBe(12345);
+  });
 });
 
 describe('ChunkMeshRegistry — air-chunk opaque skip', () => {

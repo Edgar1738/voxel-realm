@@ -70,7 +70,7 @@ describe('ServerSaveStore', () => {
     await expect(store.saveChunkDelta('0,0', [[1, 2]])).rejects.toThrow('network down');
   });
 
-  it('loadDeltas degrades to empty when the fetch fails', async () => {
+  it('loadDeltas rejects when the fetch fails', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -78,7 +78,27 @@ describe('ServerSaveStore', () => {
       }),
     );
     const store = new ServerSaveStore('x', isValidBlockId);
-    await expect(store.loadDeltas()).resolves.toEqual(new Map());
+    await expect(store.loadDeltas()).rejects.toThrow('network');
+  });
+
+  it('loadMeta rejects on a non-OK response so boot can avoid clearing persisted data', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => notOk(503)),
+    );
+    const store = new ServerSaveStore('x', isValidBlockId);
+    await expect(store.loadMeta()).rejects.toThrow(/world load failed/);
+  });
+
+  it('loadMeta rejects when fetch throws so boot can switch to volatile storage', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down');
+      }),
+    );
+    const store = new ServerSaveStore('x', isValidBlockId);
+    await expect(store.loadMeta()).rejects.toThrow('network down');
   });
 
   it('server saves use keepalive so unload writes are honored', async () => {

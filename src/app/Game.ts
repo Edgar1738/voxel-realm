@@ -22,13 +22,13 @@ import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
 import { ServerSaveStore } from '../persistence/ServerSaveStore';
 import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
-import { resolveSaveAction } from '../persistence/SaveGuard';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
 import { FRAME_WORK_MS } from '../core/constants';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
+import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
 import { registerInputListeners, TOOLS, toolLabel, type Tool } from './input';
 import type { FrameProfiler } from './FrameProfiler';
@@ -57,39 +57,28 @@ export class Game {
     // Load the durable save (or start fresh / discard an incompatible one).
     // Shared storage in dev (server-owned, named worlds via ?save=); IndexedDB in production.
     const worldName = worldNameFromSearch(window.location.search);
-    const store: SaveStore = import.meta.env.DEV
+    let store: SaveStore = import.meta.env.DEV
       ? new ServerSaveStore(worldName, (id) => registry.has(id))
       : new IndexedDbSaveStore();
-    const meta = await store.loadMeta();
+    const bootMeta = await loadBootMeta(store);
+    store = bootMeta.store;
 
     // Pick the world environment. An explicit `?world=` wins; otherwise an existing save keeps its
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
     const requested = new URLSearchParams(window.location.search).get('world');
-    const preset: WorldPreset = resolveBootPreset(requested, meta);
+    const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
     const { generator, overlays } = createGenerator(preset);
 
-    let savedDeltas: WorldDeltas = new Map();
-    const action = resolveSaveAction(meta, SEED, SAVE_VERSION, preset);
-    if (action.kind === 'load') {
-      savedDeltas = await store.loadDeltas();
-    } else {
-      if (action.reason === 'incompatible') {
-        console.warn('Voxel Realm: incompatible save — discarding stored edits.');
-      }
-      // Non-fatal: if the dev server is unreachable, boot an in-memory world rather than crash.
-      try {
-        await store.clearDeltas(); // mismatch or no meta => stored deltas are orphans
-        await store.saveMeta({ seed: SEED, version: SAVE_VERSION, preset });
-      } catch (err) {
-        console.error('Voxel Realm: could not initialise save metadata', err);
-      }
-    }
+    const bootSave = await initializeBootSave(bootMeta, SEED, SAVE_VERSION, preset);
+    store = bootSave.store;
+    const savedDeltas: WorldDeltas = bootSave.savedDeltas;
 
     const sink = new ChunkMeshRegistry(
       renderer.scene,
       material,
       transparentMaterial,
       cutoutMaterial,
+      texture,
     );
     const manager = new ChunkManager(
       generator,
@@ -107,7 +96,6 @@ export class Game {
     manager.onChunkDeltaChanged = (key) => persistence.scheduleFlush(key);
 
     const overlay = document.getElementById('overlay') ?? undefined;
-    const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined);
     const player = new PlayerController(SPAWN, true);
     const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
@@ -120,6 +108,9 @@ export class Game {
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
 
     const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
+    const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined, () =>
+      ui.isInventoryOpen(),
+    );
 
     if (import.meta.env.DEV) {
       const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');
@@ -159,6 +150,14 @@ export class Game {
       setStatus(`Tool: ${toolLabel(next)}`);
     };
     setTool('single');
+
+    // Surface boot-time storage problems so the player never silently works in a world that can't
+    // be saved (volatile fallback) or assumes prior edits survived an incompatible-save reset.
+    if (!bootSave.persistent) {
+      ui.setNotice('Storage unavailable — your edits will NOT be saved.');
+    } else if (bootSave.discardedIncompatible) {
+      setStatus('Save was from an older or incompatible world — previous edits were cleared.');
+    }
 
     ui.picker.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
@@ -295,9 +294,9 @@ export class Game {
       abortInput();
       persistence.dispose();
       hudTeardown?.();
-      renderer.dispose();
       celestial.dispose();
       sink.disposeAll();
+      renderer.dispose();
       rig.dispose();
     }
 

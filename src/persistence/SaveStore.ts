@@ -3,8 +3,10 @@ import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 
 /** Durable storage for world meta + per-chunk edit deltas. */
 export interface SaveStore {
+  /** Resolves undefined only for a successfully-read store with no meta; rejects on load failure. */
   loadMeta(): Promise<WorldMeta | undefined>;
   saveMeta(meta: WorldMeta): Promise<void>;
+  /** Rejects on load failure so boot can avoid clearing or overwriting persisted data. */
   loadDeltas(): Promise<WorldDeltas>;
   saveChunkDelta(chunkKey: string, entries: ChunkDeltaEntries): Promise<void>;
   clearDeltas(): Promise<void>;

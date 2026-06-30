@@ -9,11 +9,20 @@ interface Entry {
   opaque?: Mesh;
   transparent?: Mesh;
   cutout?: Mesh;
+  /** Chunk coords parsed once at upload time so sortTransparent never re-parses the key per frame. */
+  cx: number;
+  cz: number;
 }
 
 /** Owns each chunk's opaque + (optional) transparent + (optional) cutout THREE.Meshes; positions and disposes them. */
 export class ChunkMeshRegistry implements ChunkSink {
   private readonly entries = new Map<string, Entry>();
+
+  /** Camera x/z used by the last sort that actually ran; undefined until the first sort. */
+  private lastSortX?: number;
+  private lastSortZ?: number;
+  /** Set whenever the transparent-mesh set changes (add/remove); forces the next sort to run. */
+  private transparentSetDirty = false;
 
   constructor(
     private readonly scene: Scene,
@@ -29,7 +38,7 @@ export class ChunkMeshRegistry implements ChunkSink {
     const ox = cx * CHUNK_SIZE_X;
     const oz = cz * CHUNK_SIZE_Z;
 
-    const entry: Entry = {};
+    const entry: Entry = { cx, cz };
 
     // Skip the opaque mesh entirely when the chunk is air (no indices) — avoids a
     // zero-triangle draw call, mirroring the existing transparent-pass guard below.
@@ -45,6 +54,7 @@ export class ChunkMeshRegistry implements ChunkSink {
       transparent.position.set(ox, 0, oz);
       this.scene.add(transparent);
       entry.transparent = transparent;
+      this.transparentSetDirty = true; // new transparent mesh needs a renderOrder on the next sort
     }
 
     if (meshes.cutout.indices.length > 0) {
@@ -63,13 +73,26 @@ export class ChunkMeshRegistry implements ChunkSink {
    * the scene render.
    */
   sortTransparent(camera: { x: number; z: number }): void {
-    for (const [key, entry] of this.entries) {
+    // Skip the per-frame recompute unless the transparent set changed or the camera has moved at
+    // least half a chunk on either axis since the last sort. The first sort always runs because
+    // lastSortX/Z start undefined.
+    const moved =
+      this.lastSortX === undefined ||
+      this.lastSortZ === undefined ||
+      Math.abs(camera.x - this.lastSortX) >= CHUNK_SIZE_X / 2 ||
+      Math.abs(camera.z - this.lastSortZ) >= CHUNK_SIZE_Z / 2;
+    if (!moved && !this.transparentSetDirty) return;
+
+    for (const entry of this.entries.values()) {
       if (!entry.transparent) continue;
-      const { cx, cz } = parseChunkKey(key);
-      const dx = (cx + 0.5) * CHUNK_SIZE_X - camera.x;
-      const dz = (cz + 0.5) * CHUNK_SIZE_Z - camera.z;
+      const dx = (entry.cx + 0.5) * CHUNK_SIZE_X - camera.x;
+      const dz = (entry.cz + 0.5) * CHUNK_SIZE_Z - camera.z;
       entry.transparent.renderOrder = -(dx * dx + dz * dz); // farther = smaller = drawn first
     }
+
+    this.transparentSetDirty = false;
+    this.lastSortX = camera.x;
+    this.lastSortZ = camera.z;
   }
 
   /** Test accessor: returns the transparent mesh's renderOrder for the given chunk key, or null. */
@@ -105,6 +128,7 @@ export class ChunkMeshRegistry implements ChunkSink {
     if (entry.transparent) {
       this.scene.remove(entry.transparent);
       entry.transparent.geometry.dispose();
+      this.transparentSetDirty = true; // the transparent set shrank; force the next sort to run
     }
     if (entry.cutout) {
       this.scene.remove(entry.cutout);

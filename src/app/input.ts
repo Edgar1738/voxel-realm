@@ -20,6 +20,15 @@ const SPHERE_RADIUS = 4;
 export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
 export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
 
+/**
+ * Block-edits gate. Edits are blocked while the inventory modal is open even if pointer
+ * lock somehow persists — explicit defense-in-depth rather than relying on the open-inventory
+ * → pointer-unlock coupling.
+ */
+export function canEdit(pointerLocked: boolean, inventoryOpen: boolean): boolean {
+  return pointerLocked && !inventoryOpen;
+}
+
 export function toolLabel(tool: string): string {
   return tool
     .split('-')
@@ -113,7 +122,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
   document.addEventListener(
     'mousedown',
     (e) => {
-      if (!rig.locked) return;
+      if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
       const hit = raycastVoxels(
         { getBlock: (x, y, z) => manager.getBlock(x, y, z) },
         renderer.camera.position,

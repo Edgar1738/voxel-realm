@@ -76,6 +76,32 @@ describe('ChunkManager', () => {
     // each neighbor loads, so it is uploaded more than once.
     expect(sink.uploads.get('0,0') ?? 0).toBeGreaterThan(1);
   });
+
+  it('is stable once settled: extra updates at the same center add no uploads or disposals', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 1, 64, 64);
+    settle(mgr, 0, 0);
+    const uploadsAfterSettle = [...sink.uploads.entries()];
+    const disposedAfterSettle = sink.disposed.length;
+
+    for (let i = 0; i < 20; i++) mgr.update(0, 0); // idle frames
+
+    expect(sink.disposed.length).toBe(disposedAfterSettle);
+    expect([...sink.uploads.entries()]).toEqual(uploadsAfterSettle);
+  });
+
+  it('rebuilds the desired set after returning to a previously-loaded center', () => {
+    const sink = new FakeSink();
+    const mgr = makeManager(sink, 0, 64, 64); // viewDistance 0: one chunk per center, fast
+    settle(mgr, 0, 0, 3);
+    expect(sink.uploads.has('0,0')).toBe(true);
+
+    settle(mgr, 5, 0, 3); // new center -> cached set must invalidate, dispose (0,0)
+    expect(sink.disposed).toContain('0,0');
+
+    settle(mgr, 0, 0, 3); // return -> cache invalidates again and (0,0) reloads
+    expect(sink.uploads.has('0,0')).toBe(true);
+  });
 });
 
 describe('ChunkManager.isSolid', () => {
