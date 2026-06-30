@@ -9,6 +9,8 @@ export interface MeshData {
   ao: Float32Array;
   /** Packed per-vertex light: skyLevel*16 + blockLevel (each 0..15). */
   light: Float32Array;
+  /** Per-vertex biome-tint multiplier (r,g,b in 0..1); white = no tint. */
+  tint: Float32Array;
   indices: Uint32Array;
 }
 

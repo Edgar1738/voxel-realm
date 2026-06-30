@@ -34,6 +34,7 @@ const toMesh = (b: Buf): MeshData => ({
   layers: new Float32Array(b.layers),
   ao: new Float32Array(b.ao),
   light: new Float32Array(b.light),
+  tint: new Float32Array((b.positions.length / 3) * 3).fill(1),
   indices: new Uint32Array(b.indices),
 });
 
@@ -482,6 +483,7 @@ export function mergeMeshData(a: MeshData, b: MeshData): MeshData {
     layers: concatF32(a.layers, b.layers),
     ao: concatF32(a.ao, b.ao),
     light: concatF32(a.light, b.light),
+    tint: concatF32(a.tint, b.tint),
     indices,
   };
 }

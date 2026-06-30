@@ -5,6 +5,7 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
 import type { MeshPass } from './MeshPass';
+import { TINT_PALETTE, tintIndexFor, WHITE, type RGB } from './Tint';
 
 /** Encodes four AO levels (each 0..3) into 8 bits: level[i] occupies bits 2i+1..2i. */
 function packAoLevels(l0: number, l1: number, l2: number, l3: number): number {
@@ -28,6 +29,7 @@ interface MaskCell {
   light: number;
   /**
    * Integer merge key packed as:
+   *   bits 31-24  tintIndex   (8 bits, 0 = white/untinted)
    *   bits 23-16  layer       (8 bits, 0..255)
    *   bits 15-14  ao[0]       (2 bits, AO level index 0..3)
    *   bits 13-12  ao[1]       (2 bits)
@@ -36,6 +38,8 @@ interface MaskCell {
    *   bits  7-0   light       (8 bits, sky*16+block, 0..255)
    */
   key: number;
+  /** Biome-tint RGB multiplier for this face (white = untinted). */
+  tint: RGB;
 }
 
 interface Buffers {
@@ -45,6 +49,7 @@ interface Buffers {
   layers: number[];
   ao: number[];
   light: number[];
+  tint: number[];
   indices: number[];
   vertCount: number;
 }
@@ -85,6 +90,7 @@ export class GreedyMesher {
       layers: [],
       ao: [],
       light: [],
+      tint: [],
       indices: [],
       vertCount: 0,
     };
@@ -103,6 +109,7 @@ export class GreedyMesher {
       layers: new Float32Array(buf.layers),
       ao: new Float32Array(buf.ao),
       light: new Float32Array(buf.light),
+      tint: new Float32Array(buf.tint),
       indices: new Uint32Array(buf.indices),
     };
   }
@@ -206,15 +213,23 @@ export class GreedyMesher {
           const block = view.blockLight(this._neighbor[0], this._neighbor[1], this._neighbor[2]);
           const light = sky * 16 + block;
 
+          const category = this.registry.tintCategory(id, faceFor(axis, sign));
+          const tintIndex = category
+            ? tintIndexFor(view.biomeAt(this._solid[0], this._solid[2]), category)
+            : 0;
+          const tint = TINT_PALETTE[tintIndex] ?? WHITE;
+
           // Integer merge key (no string allocation):
-          //   bits 23-16  layer  (8 bits)
-          //   bits 15-8   ao     (4×2 bits packed by packAoLevels)
-          //   bits  7-0   light  (8 bits)
+          //   bits 31-24  tintIndex  (8 bits, 0 = untinted → key unchanged vs. pre-tint)
+          //   bits 23-16  layer      (8 bits)
+          //   bits 15-8   ao         (4×2 bits packed by packAoLevels)
+          //   bits  7-0   light      (8 bits)
           const key =
+            (tintIndex << 24) |
             (layer << 16) |
             (packAoLevels(aoLevels[0], aoLevels[1], aoLevels[2], aoLevels[3]) << 8) |
             light;
-          mask[a + b * du] = { layer, ao, light, key };
+          mask[a + b * du] = { layer, ao, light, key, tint };
         }
       }
 
@@ -320,6 +335,7 @@ export class GreedyMesher {
       buf.layers.push(cell.layer);
       buf.ao.push(cell.ao[k]);
       buf.light.push(cell.light);
+      buf.tint.push(cell.tint[0], cell.tint[1], cell.tint[2]);
     }
 
     // AO seam-minimization: choose the diagonal split whose two triangles interpolate

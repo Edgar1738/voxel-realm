@@ -62,6 +62,7 @@ describe('mergeMeshData', () => {
       layers: new Float32Array(3),
       ao: new Float32Array(3),
       light: new Float32Array(3),
+      tint: new Float32Array(9).fill(1),
       indices: new Uint32Array([0, 1, 2]),
     };
     const b = {
@@ -71,6 +72,7 @@ describe('mergeMeshData', () => {
       layers: new Float32Array(3),
       ao: new Float32Array(3),
       light: new Float32Array(3),
+      tint: new Float32Array(9).fill(1),
       indices: new Uint32Array([0, 2, 1]),
     };
     const m = mergeMeshData(a, b);
