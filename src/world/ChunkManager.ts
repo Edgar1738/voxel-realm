@@ -177,7 +177,16 @@ export class ChunkManager {
     if (!entry) return 'full';
     const id = entry.data.get(worldToLocal(wx), wy, worldToLocal(wz));
     if (!this.registry.isOpaque(id)) return 'none';
-    return this.registry.collisionBox(id);
+    const state = entry.data.getState(worldToLocal(wx), wy, worldToLocal(wz));
+    return this.registry.collisionBoxFor(id, state);
+  }
+
+  /** Orientation/open state at a world coord; 0 for out-of-world or unloaded chunks. */
+  getState(wx: number, wy: number, wz: number): number {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return 0;
+    return entry.data.getState(worldToLocal(wx), wy, worldToLocal(wz));
   }
 
   /** Whether the voxel at world coords is water (true only for loaded water voxels). */
