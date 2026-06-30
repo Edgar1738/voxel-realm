@@ -9,6 +9,8 @@ import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
+import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGenerator';
+import { citadelSite } from './citadelSite';
 import {
   cottage,
   well,
@@ -21,6 +23,16 @@ import {
   bridge,
   farmPlot,
 } from './prefabs';
+import {
+  ruinedWatchtower,
+  standingStones,
+  obelisk,
+  ruinedCottage,
+  deadTree,
+  campShrine,
+  brokenBridge,
+  statue,
+} from './wildsPrefabs';
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 import type { WorldMeta } from '../persistence/SaveTypes';
@@ -36,7 +48,8 @@ export type WorldPreset =
   | 'canyon'
   | 'villages'
   | 'caverns'
-  | 'frontier';
+  | 'frontier'
+  | 'citadel';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -49,6 +62,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'villages',
   'caverns',
   'frontier',
+  'citadel',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -248,6 +262,38 @@ export function createGenerator(preset: WorldPreset): {
       };
     case 'caverns':
       return { generator: createCavernsGenerator(), overlays: [scatterTrees] };
+    case 'citadel':
+      return {
+        generator: createCitadelGenerator(),
+        overlays: [
+          // The authored fortress + dungeon, then ruins scattered only on the plains below the
+          // mesa (maxSurfaceY keeps them off the fortress) so exploring outward stays rewarding.
+          citadelSite(),
+          scatterStructures(
+            [
+              ruinedWatchtower(),
+              standingStones(),
+              obelisk(),
+              ruinedCottage(),
+              deadTree(),
+              campShrine(),
+              brokenBridge(),
+              statue(),
+            ],
+            {
+              cellSize: 72,
+              density: 0.55,
+              clusterCount: 2,
+              clusterRadius: 14,
+              clearFootprint: true,
+              surfaceAt: citadelSurfaceAt,
+              maxSurfaceY: CITADEL.groundY - 6,
+              rotate: true, // vary orientation so repeated ruins don't read as copies
+              anchor: 'min', // seat ruins on the lowest footprint column so they don't float on slopes
+            },
+          ),
+        ],
+      };
     case 'default':
     default:
       return { generator: createWorldGenerator(), overlays: [scatterTrees, scatterDecorations()] };

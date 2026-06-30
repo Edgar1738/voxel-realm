@@ -666,6 +666,37 @@ export function installDevControls(ctx: DevControlsContext): void {
     /** Force-generate + mesh chunks within `radius` chunks of world (x,z) so edits/scans work now. */
     preloadArea: (x: number, z: number, radius = 2): { generated: number; meshed: number } =>
       manager.preload(worldToChunkCoord(x), worldToChunkCoord(z), Math.max(0, Math.floor(radius))),
+    /**
+     * Like preloadArea, but spreads the work across animation frames (yielding every `perFrame`
+     * chunks) so a large preload doesn't freeze the tab. Prefer this for big regions in a live tab;
+     * the synchronous preloadArea is faster when you don't care about responsiveness.
+     */
+    preloadAreaAsync: async (
+      x: number,
+      z: number,
+      radius = 4,
+      perFrame = 4,
+    ): Promise<{ generated: number; meshed: number }> => {
+      const cx0 = worldToChunkCoord(x);
+      const cz0 = worldToChunkCoord(z);
+      const r = Math.max(0, Math.floor(radius));
+      const step = Math.max(1, Math.floor(perFrame));
+      let generated = 0;
+      let meshed = 0;
+      let sinceYield = 0;
+      for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const res = manager.preload(cx0 + dx, cz0 + dz, 0);
+          generated += res.generated;
+          meshed += res.meshed;
+          if (++sinceYield >= step) {
+            sinceYield = 0;
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          }
+        }
+      }
+      return { generated, meshed };
+    },
     /** Whether the chunk at world (x,z) is loaded (editable/scannable). */
     isLoaded: (x: number, z: number): boolean => manager.isLoaded(x, z),
 

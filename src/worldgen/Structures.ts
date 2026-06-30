@@ -1,6 +1,7 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { AIR } from '../blocks/blocks';
+import { rotateY } from '../core/Prefab';
 import type { ChunkData } from '../world/ChunkData';
 import type { Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
@@ -32,6 +33,37 @@ export interface ScatterOptions {
   streetBlock?: BlockId;
   /** Skip cells whose center surface is below this height (e.g. keep ruins off ravine floors). */
   minSurfaceY?: number;
+  /** Skip cells whose center surface is above this height (e.g. keep ruins off a fortress mesa). */
+  maxSurfaceY?: number;
+  /** Give each placement a deterministic random quarter-turn about Y, so repeats don't all align. */
+  rotate?: boolean;
+  /**
+   * How to seat a placement vertically:
+   * - 'corner' (default): the origin column's surface — matches the legacy behaviour.
+   * - 'min': the lowest surface under the footprint, so a structure on a slope never floats.
+   */
+  anchor?: 'corner' | 'min';
+}
+
+/** Resolve a placement's base Y from the chosen anchoring strategy. */
+function anchorY(
+  opts: ScatterOptions,
+  seed: WorldSeed,
+  ox: number,
+  oz: number,
+  dimX: number,
+  dimZ: number,
+): number {
+  const { surfaceAt } = opts;
+  if (opts.anchor !== 'min') return Math.round(surfaceAt(seed, ox, oz));
+  return Math.round(
+    Math.min(
+      surfaceAt(seed, ox, oz),
+      surfaceAt(seed, ox + dimX - 1, oz),
+      surfaceAt(seed, ox, oz + dimZ - 1),
+      surfaceAt(seed, ox + dimX - 1, oz + dimZ - 1),
+    ),
+  );
 }
 
 /** A resolved structure placement: which prefab, and its min-corner world position. */
@@ -72,19 +104,23 @@ export function placementsAt(
     cellX * cellSize + margin + Math.floor(rng() * Math.max(1, cellSize - 2 * margin));
   const centerZ =
     cellZ * cellSize + margin + Math.floor(rng() * Math.max(1, cellSize - 2 * margin));
-  if (opts.minSurfaceY !== undefined && surfaceAt(seed, centerX, centerZ) < opts.minSurfaceY) {
-    return [];
-  }
+  const centerSurface = surfaceAt(seed, centerX, centerZ);
+  if (opts.minSurfaceY !== undefined && centerSurface < opts.minSurfaceY) return [];
+  if (opts.maxSurfaceY !== undefined && centerSurface > opts.maxSurfaceY) return [];
   const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v);
   const placements: Placement[] = [];
   for (let i = 0; i < count; i++) {
-    const structure =
+    let structure =
       structures[Math.min(structures.length - 1, Math.floor(rng() * structures.length))];
-    const maxX = cellX * cellSize + Math.max(0, cellSize - structure.dims[0]);
-    const maxZ = cellZ * cellSize + Math.max(0, cellSize - structure.dims[2]);
+    // Only consume an rng draw for rotation when enabled, so non-rotating callers keep their
+    // exact historical placement sequence (and saved worlds stay byte-identical).
+    if (opts.rotate) structure = rotateY(structure, Math.floor(rng() * 4));
+    const [dimX, , dimZ] = structure.dims;
+    const maxX = cellX * cellSize + Math.max(0, cellSize - dimX);
+    const maxZ = cellZ * cellSize + Math.max(0, cellSize - dimZ);
     const ox = clamp(centerX + Math.round((rng() * 2 - 1) * radius), cellX * cellSize, maxX);
     const oz = clamp(centerZ + Math.round((rng() * 2 - 1) * radius), cellZ * cellSize, maxZ);
-    const oy = Math.round(surfaceAt(seed, ox, oz));
+    const oy = anchorY(opts, seed, ox, oz, dimX, dimZ);
     placements.push({ structure, ox, oy, oz });
   }
   return placements;
