@@ -43,7 +43,7 @@ export const COBBLE_WALL: BlockId = 36;
 export const STONEBRICK_WALL: BlockId = 37;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
-export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall';
+export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall' | 'gate';
 
 /** Collision footprint of a block within its voxel cell. */
 export type CollisionBox = 'none' | 'full' | 'lowerHalf';
