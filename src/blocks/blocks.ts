@@ -49,9 +49,6 @@ export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall' | 'ga
 /** Biome-tint category for a block's foliage faces. Omitted = untinted. */
 export type TintCategory = 'grass' | 'foliage';
 
-/** Collision footprint of a block within its voxel cell. */
-export type CollisionBox = 'none' | 'full' | 'lowerHalf';
-
 /** Cube face directions, indexed 0..5 and used by the mesher. */
 export enum Face {
   PosX = 0,

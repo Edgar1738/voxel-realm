@@ -33,10 +33,10 @@ function mgr(state: number) {
   return m;
 }
 
-describe('state-aware solidBox', () => {
-  it('a closed gate is full, an open gate is none', () => {
-    expect(mgr(packState(FACING.N, 0)).solidBox(2, 5, 2)).toBe('full');
-    expect(mgr(setOpen(packState(FACING.N, 0), true)).solidBox(2, 5, 2)).toBe('none');
+describe('state-aware collisionBoxesAt', () => {
+  it('a closed gate has collision boxes, an open gate is passable', () => {
+    expect(mgr(packState(FACING.N, 0)).collisionBoxesAt(2, 5, 2).length).toBeGreaterThan(0);
+    expect(mgr(setOpen(packState(FACING.N, 0), true)).collisionBoxesAt(2, 5, 2).length).toBe(0);
   });
   it('getState reads the voxel state', () => {
     const open = setOpen(packState(FACING.E, 0), true);

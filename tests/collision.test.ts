@@ -1,14 +1,34 @@
 import { describe, it, expect } from 'vitest';
 import { resolveCollision, type SoliditySampler } from '../src/player/Collision';
+import { CUBE_BOX, SLAB_BOX, TALL_BOX, stairBoxes, type AABB } from '../src/blocks/shapeBoxes';
+import { FACING } from '../src/world/VoxelState';
 
 const HALF = { x: 0.3, y: 0.9, z: 0.3 };
 
-/** Sampler solid wherever `pred(x,y,z)` is true. */
-function sampler(pred: (x: number, y: number, z: number) => boolean): SoliditySampler {
-  return { isSolid: pred };
+/** A sampler from a map of "x,y,z" -> local AABB[] (offset to world here). */
+function sampler(boxes: Record<string, AABB[]>): SoliditySampler {
+  return {
+    collisionBoxes(x, y, z) {
+      const local = boxes[`${x},${y},${z}`] ?? [];
+      return local.map((b) => [x + b[0], y + b[1], z + b[2], x + b[3], y + b[4], z + b[5]] as AABB);
+    },
+  };
 }
 
-const NEVER = sampler(() => false);
+/**
+ * Builds a sampler where all voxels matching the predicate are solid cubes.
+ * Used to migrate the old boolean-predicate tests to the new collisionBoxes interface.
+ */
+function solidWhere(pred: (x: number, y: number, z: number) => boolean): SoliditySampler {
+  return {
+    collisionBoxes(x, y, z) {
+      if (!pred(x, y, z)) return [];
+      return [[x, y, z, x + 1, y + 1, z + 1]] as AABB[];
+    },
+  };
+}
+
+const NEVER = solidWhere(() => false);
 
 describe('resolveCollision', () => {
   it('moves freely through empty space', () => {
@@ -20,14 +40,14 @@ describe('resolveCollision', () => {
 
   it('stops against a +X wall', () => {
     // Voxels with x >= 1 are solid; the wall voxel x=1 occupies [1, 2).
-    const wall = sampler((x) => x >= 1);
+    const wall = solidWhere((x) => x >= 1);
     const r = resolveCollision(wall, { x: 0, y: 10, z: 0 }, HALF, { x: 2, y: 0, z: 0 });
     expect(r.center.x).toBeCloseTo(1 - HALF.x, 2); // box max rests at x = 1
   });
 
   it('rests on the floor and reports grounded', () => {
     // Voxels with y < 0 are solid; floor top is at y = 0.
-    const floor = sampler((_x, y) => y < 0);
+    const floor = solidWhere((_x, y) => y < 0);
     const r = resolveCollision(floor, { x: 0, y: 5, z: 0 }, HALF, { x: 0, y: -10, z: 0 });
     expect(r.center.y).toBeCloseTo(HALF.y, 2); // box min rests at y = 0
     expect(r.grounded).toBe(true);
@@ -35,14 +55,14 @@ describe('resolveCollision', () => {
 
   it('stops against a ceiling without grounding', () => {
     // Voxels with y >= 3 are solid; ceiling bottom is at y = 3.
-    const ceil = sampler((_x, y) => y >= 3);
+    const ceil = solidWhere((_x, y) => y >= 3);
     const r = resolveCollision(ceil, { x: 0, y: 1, z: 0 }, HALF, { x: 0, y: 5, z: 0 });
     expect(r.center.y).toBeCloseTo(3 - HALF.y, 2);
     expect(r.grounded).toBe(false);
   });
 
   it('slides along a wall (blocked axis only)', () => {
-    const wall = sampler((x) => x >= 1);
+    const wall = solidWhere((x) => x >= 1);
     const r = resolveCollision(wall, { x: 0, y: 10, z: 0 }, HALF, { x: 2, y: 0, z: 3 });
     expect(r.center.x).toBeCloseTo(1 - HALF.x, 2); // x blocked
     expect(r.center.z).toBeCloseTo(3, 5); // z free
@@ -57,7 +77,7 @@ describe('resolveCollision step-up (walk mode)', () => {
   //
   // sampler: ground (y<0) + ledge column at x=1, y in [0,1)
   function ledgeSampler(wallHeight: number): SoliditySampler {
-    return sampler(
+    return solidWhere(
       (x, y) =>
         y < 0 || // ground
         (x >= 1 && y >= 0 && y < wallHeight), // ledge / wall
@@ -86,7 +106,7 @@ describe('resolveCollision step-up (walk mode)', () => {
 
   it('steps up onto a 1-block ledge when walking in Z', () => {
     // Same scenario but along the Z axis.
-    const world = sampler(
+    const world = solidWhere(
       (_x, y, z) =>
         y < 0 || // ground
         (z >= 1 && y >= 0 && y < 1), // ledge
@@ -105,7 +125,7 @@ describe('resolveCollision step-up (walk mode)', () => {
     //
     // Setup: ground at y < 0, ledges at x>=1 (y in [0,1)) AND z>=1 (y in [0,1)).
     // Player starts at (0, HALF.y, 0) moving diagonally toward (+X, +Z).
-    const diagonalCorner = sampler(
+    const diagonalCorner = solidWhere(
       (x, y, z) =>
         y < 0 || // ground
         (x >= 1 && y >= 0 && y < 1) || // ledge along X
@@ -127,7 +147,7 @@ describe('resolveCollision step-up (walk mode)', () => {
     // Here we just confirm the wall scenario without a floor still blocks correctly
     // (no ground means no grounded result, and wall still stops horizontal movement
     // when the clearance above is also occupied).
-    const solidEverywhere = sampler((x, y) => x >= 1 && y >= 0 && y < 5);
+    const solidEverywhere = solidWhere((x, y) => x >= 1 && y >= 0 && y < 5);
     const center = { x: 0, y: HALF.y, z: 0 };
     const r = resolveCollision(solidEverywhere, center, HALF, { x: 2, y: 0, z: 0 });
     // Solid for 5 blocks tall — step-up should not work.
@@ -136,7 +156,7 @@ describe('resolveCollision step-up (walk mode)', () => {
 });
 
 it('full-cube floor still rests the player at the integer top (regression)', () => {
-  const floor: SoliditySampler = { isSolid: (_x, y) => y < 0 };
+  const floor = solidWhere((_x, y) => y < 0);
   const r = resolveCollision(
     floor,
     { x: 0, y: 5, z: 0 },
@@ -145,4 +165,118 @@ it('full-cube floor still rests the player at the integer top (regression)', () 
   );
   expect(r.center.y).toBeCloseTo(0 + 0.9, 5); // feet at 0 (top of voxel y=-1), center at 0.9
   expect(r.grounded).toBe(true);
+});
+
+describe('collision parity (cube/slab)', () => {
+  it('rests on a cube top at y+1', () => {
+    const s = sampler({ '0,0,0': [CUBE_BOX] });
+    const r = resolveCollision(s, { x: 0.5, y: 2, z: 0.5 }, HALF, { x: 0, y: -2, z: 0 });
+    expect(r.center.y).toBeCloseTo(1 + HALF.y, 2);
+    expect(r.grounded).toBe(true);
+  });
+  it('rests on a slab top at y+0.5', () => {
+    const s = sampler({ '0,0,0': [SLAB_BOX] });
+    const r = resolveCollision(s, { x: 0.5, y: 2, z: 0.5 }, HALF, { x: 0, y: -2, z: 0 });
+    expect(r.center.y).toBeCloseTo(0.5 + HALF.y, 2);
+  });
+  it('slides along a wall (blocked X, free Z)', () => {
+    // Two-block tall wall at x=1 so step-up cannot clear it; tests axis-independent sliding.
+    const s = sampler({ '1,1,0': [CUBE_BOX], '1,2,0': [CUBE_BOX] }); // wall to the +x
+    const r = resolveCollision(s, { x: 0.5, y: 1.9, z: 0.5 }, HALF, { x: 1, y: 0, z: 0.5 });
+    expect(r.center.x).toBeLessThan(1); // stopped at the wall face (x = 1 - half - eps)
+    expect(r.center.z).toBeCloseTo(1.0, 1); // z moved freely
+  });
+  it('steps up a 1-block ledge', () => {
+    const s = sampler({ '1,1,0': [CUBE_BOX] }); // 1-tall block ahead at y=1, ground at y=1 top
+    const r = resolveCollision(s, { x: 0.5, y: 1 + HALF.y, z: 0.5 }, HALF, { x: 1, y: 0, z: 0 });
+    expect(r.center.x).toBeGreaterThan(1); // climbed onto the ledge
+  });
+});
+
+describe('collision precision (fence/stair)', () => {
+  it('cannot step over a 1-tall fence (1.5 box blocks the step-up)', () => {
+    const s = sampler({ '1,1,0': [TALL_BOX] }); // fence ahead
+    const r = resolveCollision(s, { x: 0.5, y: 1 + HALF.y, z: 0.5 }, HALF, { x: 1, y: 0, z: 0 });
+    expect(r.center.x).toBeLessThan(1); // blocked at the fence face, did NOT climb over
+  });
+  it('climbs a stair (ends above the lower step)', () => {
+    const s = sampler({ '1,1,0': stairBoxes(FACING.W, 0) }); // stair ahead, step on east (toward player)
+    const r = resolveCollision(s, { x: 0.5, y: 1 + HALF.y, z: 0.5 }, HALF, { x: 1, y: 0, z: 0 });
+    expect(r.center.x).toBeGreaterThan(1); // walked up onto the stair
+    expect(r.center.y).toBeGreaterThan(1 + HALF.y); // rose at least onto the lower half
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Gravity-path step-up (E6 task-3b): step-up must fire when grounded=true
+// even though gravity makes sd.y slightly negative each substep.
+// ---------------------------------------------------------------------------
+describe('gravity-path step-up (grounded walk)', () => {
+  // Small negative y-delta that gravity would contribute over one 60 Hz frame.
+  // This is the scenario that was broken: sd.y < 0 so the old sd.y===0 gate never fired.
+  const GRAV_DY = -28 * (1 / 60); // ~-0.467 per frame — one substep has sd.y < 0
+
+  it('grounded walk +X into 1-block ledge: climbs the ledge (gravity-path)', () => {
+    // Floor at y<1, ledge block at x=1 y=1. Player walks +X with gravity-like negative dy.
+    const s = sampler({ '1,1,0': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded
+    );
+    expect(r.center.x).toBeGreaterThan(1); // climbed the ledge
+  });
+
+  it('grounded walk +Z into 1-block ledge: climbs the ledge (gravity-path)', () => {
+    const s = sampler({ '0,1,1': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 0, y: GRAV_DY, z: 1 },
+      true, // grounded
+    );
+    expect(r.center.z).toBeGreaterThan(1); // climbed the ledge
+  });
+
+  it('airborne (grounded=false) + negative sd.y: stays blocked at ledge (not grounded)', () => {
+    // Same geometry but player is airborne — step-up must NOT fire.
+    const s = sampler({ '1,1,0': [CUBE_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      false, // NOT grounded
+    );
+    expect(r.center.x).toBeLessThan(1); // blocked — airborne, no step-up
+  });
+
+  it('grounded walk: fence (TALL_BOX) still blocks even when grounded=true', () => {
+    // tryStepUp raises by 1+EPS; the fence top is 1.5 → head still overlaps → null → blocked.
+    const s = sampler({ '1,1,0': [TALL_BOX] });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded, but fence is too tall
+    );
+    expect(r.center.x).toBeLessThan(1); // still blocked
+  });
+
+  it('grounded walk: climbs a stair when grounded=true and sd.y<0', () => {
+    const s = sampler({ '1,1,0': stairBoxes(FACING.W, 0) });
+    const r = resolveCollision(
+      s,
+      { x: 0.5, y: 1 + HALF.y, z: 0.5 },
+      HALF,
+      { x: 1, y: GRAV_DY, z: 0 },
+      true, // grounded
+    );
+    expect(r.center.x).toBeGreaterThan(1); // climbed the stair
+    expect(r.center.y).toBeGreaterThan(1 + HALF.y); // rose above lower step
+  });
 });

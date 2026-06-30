@@ -47,7 +47,7 @@ function capture(): {
   return { sink: { upload: (k, m) => meshes.set(k, m), dispose: () => {} }, meshes };
 }
 
-describe('ChunkManager shaped meshing + solidBox', () => {
+describe('ChunkManager shaped meshing + collisionBoxesAt', () => {
   it('routes a cross plant into the cutout mesh, not opaque', () => {
     const { sink, meshes } = capture();
     const mgr = new ChunkManager(
@@ -76,7 +76,7 @@ describe('ChunkManager shaped meshing + solidBox', () => {
     );
     mgr.preload(0, 0, 0);
     expect(meshes.get('0,0')!.opaque.indices.length).toBeGreaterThan(0);
-    expect(mgr.solidBox(0, 40, 0)).toBe('lowerHalf');
-    expect(mgr.solidBox(0, 41, 0)).toBe('none'); // air above
+    expect(mgr.collisionBoxesAt(0, 40, 0)).toEqual([[0, 40, 0, 1, 40.5, 1]]); // slab lowerHalf world box
+    expect(mgr.collisionBoxesAt(0, 41, 0).length).toBe(0); // air above is passable
   });
 });

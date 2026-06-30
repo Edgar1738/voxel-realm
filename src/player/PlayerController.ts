@@ -91,7 +91,7 @@ export class PlayerController {
       delta.y = this.vy * dt;
     }
 
-    const res = resolveCollision(world, this.position, HALF, delta);
+    const res = resolveCollision(world, this.position, HALF, delta, this.grounded);
     this.position.x = res.center.x;
     this.position.y = res.center.y;
     this.position.z = res.center.z;

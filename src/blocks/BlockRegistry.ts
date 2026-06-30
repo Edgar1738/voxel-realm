@@ -1,7 +1,8 @@
 // src/blocks/BlockRegistry.ts
 import type { BlockId } from '../core/types';
-import { isOpen } from '../world/VoxelState';
+import { isOpen, unpackState } from '../world/VoxelState';
 import { Face } from './blocks';
+import { stairBoxes, CUBE_BOX, SLAB_BOX, TALL_BOX, type AABB } from './shapeBoxes';
 import {
   BLOCK_DEFS,
   BLOCK_TEXTURES,
@@ -9,7 +10,6 @@ import {
   type BlockTextures,
   type TintCategory,
   type Shape,
-  type CollisionBox,
 } from './blocks';
 
 /** Single source of truth for block lookups. Built from the stable BLOCK_DEFS table. */
@@ -90,26 +90,25 @@ export class BlockRegistry {
     return this.get(id).opaque && this.shape(id) === 'cube';
   }
 
-  /** Collision footprint of a block within its cell, derived from its shape. */
-  collisionBox(id: BlockId): CollisionBox {
+  /** Sub-voxel collision boxes (local, 0..1.5) for a block in a given state. */
+  collisionAABBs(id: BlockId, state: number): AABB[] {
     switch (this.shape(id)) {
       case 'cube':
+        return [CUBE_BOX];
+      case 'slab':
+        return [SLAB_BOX];
+      case 'stair': {
+        const { facing, half } = unpackState(state);
+        return stairBoxes(facing, half);
+      }
       case 'fence':
       case 'wall':
+        return [TALL_BOX];
       case 'gate':
-        return 'full';
-      case 'slab':
-      case 'stair':
-        return 'lowerHalf';
+        return isOpen(state) ? [] : [TALL_BOX];
       case 'cross':
-        return 'none';
+        return [];
     }
-  }
-
-  /** State-aware collision: an open gate is passable; everything else ignores state. */
-  collisionBoxFor(id: BlockId, state: number): CollisionBox {
-    if (this.shape(id) === 'gate') return isOpen(state) ? 'none' : 'full';
-    return this.collisionBox(id);
   }
 
   /** True if right-click should toggle the block's `open` state instead of placing. */

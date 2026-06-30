@@ -4,6 +4,7 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
 import { unpackState, FACING, isOpen } from '../world/VoxelState';
+import { stairBoxes } from '../blocks/shapeBoxes';
 import { WHITE, TINT_PALETTE, tintIndexFor, type RGB } from './Tint';
 
 interface Buf {
@@ -161,41 +162,6 @@ function emitSlab(
   emitBoxCulled(buf, view, registry, id, x, y, z, [x, y, z], [x + 1, y + 0.5, z + 1]);
 }
 
-/** The two boxes (bottom half-box + back upper-half box) of a stair, by facing + half. */
-function stairBoxes(
-  x: number,
-  y: number,
-  z: number,
-  facing: number,
-  half: number,
-): Array<[[number, number, number], [number, number, number]]> {
-  const yFullLo = half === 1 ? y + 0.5 : y;
-  const yFullHi = half === 1 ? y + 1 : y + 0.5;
-  const yStepLo = half === 1 ? y : y + 0.5;
-  const yStepHi = half === 1 ? y + 0.5 : y + 1;
-  let sx0 = x;
-  let sx1 = x + 1;
-  let sz0 = z;
-  let sz1 = z + 1;
-  if (facing === FACING.N)
-    sz0 = z + 0.5; // N → step on the south half
-  else if (facing === FACING.S)
-    sz1 = z + 0.5; // S → north half
-  else if (facing === FACING.E)
-    sx1 = x + 0.5; // E → west half
-  else sx0 = x + 0.5; // W → east half
-  return [
-    [
-      [x, yFullLo, z],
-      [x + 1, yFullHi, z + 1],
-    ],
-    [
-      [sx0, yStepLo, sz0],
-      [sx1, yStepHi, sz1],
-    ],
-  ];
-}
-
 function emitStair(
   buf: Buf,
   view: VoxelView,
@@ -206,8 +172,18 @@ function emitStair(
   z: number,
 ): void {
   const { facing, half } = unpackState(view.getState(x, y, z));
-  for (const [lo, hi] of stairBoxes(x, y, z, facing, half)) {
-    emitBoxCulled(buf, view, registry, id, x, y, z, lo, hi);
+  for (const b of stairBoxes(facing, half)) {
+    emitBoxCulled(
+      buf,
+      view,
+      registry,
+      id,
+      x,
+      y,
+      z,
+      [x + b[0], y + b[1], z + b[2]],
+      [x + b[3], y + b[4], z + b[5]],
+    );
   }
 }
 
