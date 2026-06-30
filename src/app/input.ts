@@ -11,6 +11,7 @@ import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
 import { stairStateFromYaw } from './placement';
+import { gateToggleEdit } from './useAction';
 
 const REACH = 6;
 const TUNNEL_LENGTH = 8;
@@ -128,8 +129,14 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
+        if (registry.isToggleable(hit.id)) {
+          const state = manager.getState(hit.block.x, hit.block.y, hit.block.z);
+          callbacks.onRun([gateToggleEdit(hit.block, hit.id, state)], 'Toggled');
+          return;
+        }
         const voxel: SetVoxel = { ...hit.adjacent, id: selected };
-        if (registry.shape(selected) === 'stair') voxel.state = stairStateFromYaw(rig.yaw);
+        const shape = registry.shape(selected);
+        if (shape === 'stair' || shape === 'gate') voxel.state = stairStateFromYaw(rig.yaw);
         callbacks.onRun([voxel], 'Placed');
         return;
       }

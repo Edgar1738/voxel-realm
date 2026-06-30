@@ -1,5 +1,6 @@
 // src/blocks/BlockRegistry.ts
 import type { BlockId } from '../core/types';
+import { isOpen } from '../world/VoxelState';
 import {
   BLOCK_DEFS,
   BLOCK_TEXTURES,
@@ -86,6 +87,7 @@ export class BlockRegistry {
       case 'cube':
       case 'fence':
       case 'wall':
+      case 'gate':
         return 'full';
       case 'slab':
       case 'stair':
@@ -93,6 +95,17 @@ export class BlockRegistry {
       case 'cross':
         return 'none';
     }
+  }
+
+  /** State-aware collision: an open gate is passable; everything else ignores state. */
+  collisionBoxFor(id: BlockId, state: number): CollisionBox {
+    if (this.shape(id) === 'gate') return isOpen(state) ? 'none' : 'full';
+    return this.collisionBox(id);
+  }
+
+  /** True if right-click should toggle the block's `open` state instead of placing. */
+  isToggleable(id: BlockId): boolean {
+    return this.shape(id) === 'gate';
   }
 
   /** True if a fence/wall `self` should connect to `neighbor`: a full opaque cube, or the same shape. */
@@ -128,6 +141,7 @@ function isShape(value: string): value is Shape {
     value === 'cross' ||
     value === 'stair' ||
     value === 'fence' ||
-    value === 'wall'
+    value === 'wall' ||
+    value === 'gate'
   );
 }
