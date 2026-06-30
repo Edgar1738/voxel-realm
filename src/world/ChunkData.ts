@@ -1,4 +1,4 @@
-import { CHUNK_VOLUME } from '../core/constants';
+import { CHUNK_AREA, CHUNK_SIZE_X, CHUNK_VOLUME } from '../core/constants';
 import { voxelIndex, inChunkBounds } from '../core/coords';
 import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
@@ -13,6 +13,8 @@ export class ChunkData {
   readonly blockLight = new Uint8Array(CHUNK_VOLUME);
   /** Per-voxel orientation state (0 = unoriented). See VoxelState. */
   readonly state = new Uint8Array(CHUNK_VOLUME);
+  /** Per-column biome ordinal (0 = Plains). Regenerated, NOT serialized. */
+  readonly biomeData = new Uint8Array(CHUNK_AREA);
 
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;
@@ -54,5 +56,18 @@ export class ChunkData {
       throw new RangeError(`ChunkData.setState out of bounds: (${x}, ${y}, ${z})`);
     }
     this.state[voxelIndex(x, y, z)] = s & 0xff;
+  }
+
+  /** Biome ordinal for a column; 0 (Plains) out of bounds. */
+  getBiome(x: number, z: number): number {
+    if (x < 0 || x >= CHUNK_SIZE_X || z < 0 || z >= CHUNK_SIZE_X) return 0;
+    return this.biomeData[x + CHUNK_SIZE_X * z];
+  }
+
+  setBiome(x: number, z: number, biome: number): void {
+    if (x < 0 || x >= CHUNK_SIZE_X || z < 0 || z >= CHUNK_SIZE_X) {
+      throw new RangeError(`ChunkData.setBiome out of bounds: (${x}, ${z})`);
+    }
+    this.biomeData[x + CHUNK_SIZE_X * z] = biome & 0xff;
   }
 }
