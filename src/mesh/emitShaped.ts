@@ -196,6 +196,115 @@ function emitStair(
   }
 }
 
+/** Box dimensions for a connecting shape, in local voxel units (0..1). */
+interface ConnProfile {
+  /** Central post box [lo, hi] (local). */
+  post: [[number, number, number], [number, number, number]];
+  /** The post's low/high edge on the x/z axes (where arms start). */
+  postLo: number;
+  postHi: number;
+  /** Half-thickness of an arm on its perpendicular horizontal axis. */
+  armHalf: number;
+  /** [yLo, yHi] for each rail of an arm (fence = two rails, wall = one bar). */
+  rails: Array<[number, number]>;
+}
+
+const FENCE_PROFILE: ConnProfile = {
+  post: [
+    [0.375, 0, 0.375],
+    [0.625, 1, 0.625],
+  ],
+  postLo: 0.375,
+  postHi: 0.625,
+  armHalf: 0.1,
+  rails: [
+    [0.35, 0.55],
+    [0.7, 0.9],
+  ],
+};
+
+const WALL_PROFILE: ConnProfile = {
+  post: [
+    [0.25, 0, 0.25],
+    [0.75, 1, 0.75],
+  ],
+  postLo: 0.25,
+  postHi: 0.75,
+  armHalf: 0.2,
+  rails: [[0, 0.8]],
+};
+
+/** The 4 horizontal connection directions as (dx, dz). */
+const CONN_DIRS: ReadonlyArray<[number, number]> = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
+/** Arm rail boxes reaching from the post toward boundary (dx,dz), centred on the perpendicular axis. */
+function armBoxes(
+  x: number,
+  y: number,
+  z: number,
+  dx: number,
+  dz: number,
+  p: ConnProfile,
+): Array<[[number, number, number], [number, number, number]]> {
+  const c = 0.5; // perpendicular centre
+  return p.rails.map(([yLo, yHi]): [[number, number, number], [number, number, number]] => {
+    if (dx === 1)
+      return [
+        [x + p.postHi, y + yLo, z + c - p.armHalf],
+        [x + 1, y + yHi, z + c + p.armHalf],
+      ];
+    if (dx === -1)
+      return [
+        [x, y + yLo, z + c - p.armHalf],
+        [x + p.postLo, y + yHi, z + c + p.armHalf],
+      ];
+    if (dz === 1)
+      return [
+        [x + c - p.armHalf, y + yLo, z + p.postHi],
+        [x + c + p.armHalf, y + yHi, z + 1],
+      ];
+    return [
+      [x + c - p.armHalf, y + yLo, z],
+      [x + c + p.armHalf, y + yHi, z + p.postLo],
+    ];
+  });
+}
+
+/** Emits a fence/wall: a central post + an arm toward each connected horizontal neighbour. */
+function emitConnected(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  const p = registry.shape(id) === 'wall' ? WALL_PROFILE : FENCE_PROFILE;
+  emitBoxCulled(
+    buf,
+    view,
+    registry,
+    id,
+    x,
+    y,
+    z,
+    [x + p.post[0][0], y + p.post[0][1], z + p.post[0][2]],
+    [x + p.post[1][0], y + p.post[1][1], z + p.post[1][2]],
+  );
+  for (const [dx, dz] of CONN_DIRS) {
+    if (!registry.connectsTo(id, view.get(x + dx, y, z + dz))) continue;
+    for (const [lo, hi] of armBoxes(x, y, z, dx, dz, p)) {
+      emitBoxCulled(buf, view, registry, id, x, y, z, lo, hi);
+    }
+  }
+}
+
 /** Two crossed billboard quads spanning the voxel. Double-sided (the cutout material) + no AO. */
 function emitCross(
   buf: Buf,
@@ -257,6 +366,8 @@ export function emitShaped(
         const shape = registry.shape(id);
         if (shape === 'slab') emitSlab(slabs, view, registry, id, x, y, z);
         else if (shape === 'stair') emitStair(slabs, view, registry, id, x, y, z);
+        else if (shape === 'fence' || shape === 'wall')
+          emitConnected(slabs, view, registry, id, x, y, z);
         else if (shape === 'cross') emitCross(cross, view, registry, id, x, y, z);
       }
     }
