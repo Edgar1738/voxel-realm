@@ -1,8 +1,9 @@
 # Roam Smoothness — Streaming Pipeline (P0–P7) — Design
 
 - **Date:** 2026-06-30
-- **Status:** Proposed (planning only — no code written). Addresses observed roam lag: terrain "renders out" (pop-in) and the camera hitches while moving.
-- **Branch:** to be created fresh off `main` (one worktree per phase, torn down after merge).
+- **Status:** **P0–P5 implemented** on `claude/lucid-chaplygin-1293b5` (commits `cef9673` docs, `a444a84` impl); build + lint clean, 97 files / 626 tests green. **P6 design-doc'd and deferred** (see `2026-06-30-roam-smoothness-p6-workers-design.md`) — P5 already removed the hitch mechanism, so P6 is a diminishing-returns optimization pending a browser FPS reading. **P7 not started.**
+  - Measured before/after, identical scripted roam (headless Node — absolute ms are inflated ~50× vs a browser, so read the ratios; the counts are exact): **peak mesh ops/frame 6 → 2** (the bypass spike, eliminated), **total mesh uploads 416 → 192 (−54%)**, **update() mean −52%, p99 −63%**. Generation work unchanged (that's P6's domain).
+- **Branch:** `claude/lucid-chaplygin-1293b5` (off `main`). P6+ to be a fresh worktree after review.
 - **Origin:** Deep-dive review of the streaming pipeline. Root cause (verified): terrain generation, lighting, and meshing all run **synchronously on the render thread** inside the rAF tick, and the `MESH_BUDGET = 2` count balloons to ~10 remeshes/frame via an unbudgeted neighbor pass. There are **no Web Workers** anywhere in `src` (grep: 0 matches).
 
 ## Context
