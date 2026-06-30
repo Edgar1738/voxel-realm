@@ -1,7 +1,7 @@
 # Precise Fence + Stair Collision (Track E6) — Design
 
 - **Date:** 2026-06-30
-- **Status:** Approved (design); implementation plan pending.
+- **Status:** Implemented (PR pending) — `docs/plans/2026-06-30-precise-collision-track-e6.md`; 596 tests green. Collision generalized to per-voxel sub-voxel AABBs: cube/slab parity preserved, fences/walls/closed-gates are 1.5-tall unjumpable boxes, stairs are climbable two-box steps. **Also fixed a pre-existing bug surfaced in review:** step-up was gated on `delta.y===0` so gravity (always a small negative `delta.y` while walking) meant step-up never fired in gameplay — `resolveCollision` now takes a `grounded` flag so a grounded walk climbs ledges + stairs (reviving 1-block step-up too). Unit-test-only verification (physics can't be live-played headless); boot smoke clean.
 - **Branch:** `claude/collision-track-e6` (off `main` @ `0d0f2ae`, which includes E1–E5).
 - **Origin:** The last scoped track. Fences/walls currently collide as a **full cube** (you can jump a 1-tall fence) and stairs as a **half-slab** (`lowerHalf` — you can't actually walk up a stair; its upper step is a non-collidable ghost). Make collision **precise**: fences/walls 1.5 blocks tall (unjumpable, matching Minecraft), stairs a real **two-box** step you climb and stand on at two heights.
 
