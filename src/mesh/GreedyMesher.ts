@@ -82,7 +82,7 @@ export class GreedyMesher {
 
   constructor(private readonly registry: BlockRegistry) {}
 
-  mesh(view: VoxelView, pass: MeshPass): MeshData {
+  mesh(view: VoxelView, pass: MeshPass, maxY: number = WORLD_HEIGHT - 1): MeshData {
     const buf: Buffers = {
       positions: [],
       normals: [],
@@ -98,8 +98,8 @@ export class GreedyMesher {
     for (let axis = 0; axis < 3; axis++) {
       const u = (axis + 1) % 3;
       const v = (axis + 2) % 3;
-      this.meshDirection(view, axis, u, v, 1, pass, buf);
-      this.meshDirection(view, axis, u, v, -1, pass, buf);
+      this.meshDirection(view, axis, u, v, 1, pass, buf, maxY);
+      this.meshDirection(view, axis, u, v, -1, pass, buf, maxY);
     }
 
     return {
@@ -176,22 +176,29 @@ export class GreedyMesher {
     sign: number,
     pass: MeshPass,
     buf: Buffers,
+    maxY: number,
   ): void {
     const du = DIMS[u];
     const dv = DIMS[v];
     const dd = DIMS[axis];
 
+    // Cap whichever of the three roles maps to the Y axis (index 1) so empty air above the
+    // tallest voxel is never swept. yCount is the inclusive Y bound + 1, clamped to [0, WORLD_HEIGHT].
+    const yCount = Math.max(0, Math.min(WORLD_HEIGHT, maxY + 1));
+    const ddEff = axis === 1 ? Math.min(dd, yCount) : dd;
+    const aMax = u === 1 ? Math.min(du, yCount) : du; // bound on the a-loop (stride stays du)
+    const bMax = v === 1 ? Math.min(dv, yCount) : dv; // bound on the b-loop
+
     // Scratch for AO levels; reused each cell to avoid per-cell allocation.
     const aoLevels: [number, number, number, number] = [0, 0, 0, 0];
 
-    for (let i = 0; i < dd; i++) {
-      // Reuse the pooled mask buffer — clear only the cells we will write.
-      const sliceSize = du * dv;
-      this._mask.fill(null, 0, sliceSize);
+    for (let i = 0; i < ddEff; i++) {
+      // Reuse the pooled mask buffer — clear only the region we will write (stride du).
+      this._mask.fill(null, 0, du * bMax);
       const mask = this._mask;
 
-      for (let b = 0; b < dv; b++) {
-        for (let a = 0; a < du; a++) {
+      for (let b = 0; b < bMax; b++) {
+        for (let a = 0; a < aMax; a++) {
           // Write into pre-allocated scratch arrays instead of spreading new arrays.
           this._solid[axis] = i;
           this._solid[u] = a;
@@ -233,14 +240,15 @@ export class GreedyMesher {
         }
       }
 
-      this.emitMask(mask, du, dv, axis, u, v, sign, i, buf);
+      this.emitMask(mask, du, aMax, bMax, axis, u, v, sign, i, buf);
     }
   }
 
   private emitMask(
     mask: (MaskCell | null)[],
-    du: number,
-    dv: number,
+    stride: number,
+    aMax: number,
+    bMax: number,
     axis: number,
     u: number,
     v: number,
@@ -248,32 +256,31 @@ export class GreedyMesher {
     i: number,
     buf: Buffers,
   ): void {
-    // Reuse the pooled visited buffer — zero only the cells we will inspect.
-    const sliceSize = du * dv;
-    this._visited.fill(0, 0, sliceSize);
+    // Reuse the pooled visited buffer — zero only the region we will inspect.
+    this._visited.fill(0, 0, stride * bMax);
     const visited = this._visited;
 
-    for (let b = 0; b < dv; b++) {
-      for (let a = 0; a < du; a++) {
-        const idx = a + b * du;
+    for (let b = 0; b < bMax; b++) {
+      for (let a = 0; a < aMax; a++) {
+        const idx = a + b * stride;
         const cell = mask[idx];
         if (!cell || visited[idx]) continue;
 
         // Extend width along u.
         let w = 1;
-        while (a + w < du) {
-          const c2 = mask[a + w + b * du];
-          if (!c2 || visited[a + w + b * du] || c2.key !== cell.key) break;
+        while (a + w < aMax) {
+          const c2 = mask[a + w + b * stride];
+          if (!c2 || visited[a + w + b * stride] || c2.key !== cell.key) break;
           w++;
         }
 
         // Extend height along v.
         let h = 1;
         let stop = false;
-        while (b + h < dv && !stop) {
+        while (b + h < bMax && !stop) {
           for (let k = 0; k < w; k++) {
-            const c2 = mask[a + k + (b + h) * du];
-            if (!c2 || visited[a + k + (b + h) * du] || c2.key !== cell.key) {
+            const c2 = mask[a + k + (b + h) * stride];
+            if (!c2 || visited[a + k + (b + h) * stride] || c2.key !== cell.key) {
               stop = true;
               break;
             }
@@ -282,7 +289,7 @@ export class GreedyMesher {
         }
 
         for (let bb = 0; bb < h; bb++)
-          for (let aa = 0; aa < w; aa++) visited[a + aa + (b + bb) * du] = 1;
+          for (let aa = 0; aa < w; aa++) visited[a + aa + (b + bb) * stride] = 1;
 
         this.emitQuad(buf, axis, u, v, sign, i, a, b, w, h, cell);
       }

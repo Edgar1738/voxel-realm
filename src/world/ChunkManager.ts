@@ -148,6 +148,31 @@ export class ChunkManager {
     return this.hasPendingWork;
   }
 
+  /** Current loaded radius (Chebyshev chunk radius around the camera column). */
+  get viewDistance(): number {
+    return this.opts.viewDistance;
+  }
+
+  /**
+   * Sets the loaded radius at runtime. Forces a desired-set rebuild on the next update() so
+   * chunks that left range are disposed and newly desired chunks stream in. No-op if unchanged.
+   */
+  setViewDistance(vd: number): void {
+    const clamped = Math.max(1, Math.floor(vd));
+    if (clamped === this.opts.viewDistance) return;
+    this.opts.viewDistance = clamped;
+    this.lastCenterCx = undefined;
+    this.lastCenterCz = undefined;
+    this.hasPendingWork = true;
+  }
+
+  /** Sets the per-frame streaming budgets (used to burst the cold-start fill, then settle). */
+  setStreamingBudgets(genBudget: number, meshBudget: number, frameWorkMs: number): void {
+    this.opts.genBudget = genBudget;
+    this.opts.meshBudget = meshBudget;
+    this.opts.frameWorkMs = frameWorkMs;
+  }
+
   update(centerCx: number, centerCz: number): void {
     const updateStart = performance.now();
     this.frameGen = 0;
@@ -630,6 +655,7 @@ export class ChunkManager {
     this.baseChunks.set(key, cloneChunk(data));
     this.applySavedDeltas(data, key);
     data.hasShaped = this.scanHasShaped(data);
+    data.recomputeMaxSolidY();
     this.recomputeLight(data);
     this.store.set(cx, cz, data, ChunkState.Generated);
     this.frameGen++;
@@ -700,11 +726,12 @@ export class ChunkManager {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
     this.frameMesh++;
+    const capY = entry.data.maxSolidY; // height-cap: never sweep empty air above the tallest voxel
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
     const shaped = emitShaped(view, this.registry, entry.data.hasShaped);
     const meshes: ChunkMeshes = {
-      opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass), shaped.slabs),
-      transparent: this.mesher.mesh(view, this.transparentPass),
+      opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass, capY), shaped.slabs),
+      transparent: this.mesher.mesh(view, this.transparentPass, capY),
       cutout: shaped.cross,
     };
     this.sink.upload(chunkKey(cx, cz), meshes);

@@ -4,7 +4,7 @@ import { VoxelView, type NeighborLookup } from '../src/world/VoxelView';
 import { GreedyMesher } from '../src/mesh/GreedyMesher';
 import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
-import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '../src/core/constants';
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../src/core/constants';
 import { GRASS, STONE, WATER, AIR, Face } from '../src/blocks/blocks';
 
 const reg = new BlockRegistry();
@@ -214,6 +214,62 @@ describe('GreedyMesher exact output – multi-voxel stale-buffer regression', ()
     expect(Array.from(mesh.ao)).toEqual(new Array(72).fill(1));
     // No sky or block light → light = 0.
     expect(Array.from(mesh.light)).toEqual(new Array(72).fill(0));
+  });
+});
+
+function meshesEqual(
+  a: ReturnType<GreedyMesher['mesh']>,
+  b: ReturnType<GreedyMesher['mesh']>,
+): void {
+  expect(Array.from(a.positions)).toEqual(Array.from(b.positions));
+  expect(Array.from(a.indices)).toEqual(Array.from(b.indices));
+  expect(Array.from(a.normals)).toEqual(Array.from(b.normals));
+  expect(Array.from(a.uvs)).toEqual(Array.from(b.uvs));
+  expect(Array.from(a.layers)).toEqual(Array.from(b.layers));
+  expect(Array.from(a.ao)).toEqual(Array.from(b.ao));
+  expect(Array.from(a.light)).toEqual(Array.from(b.light));
+  expect(Array.from(a.tint)).toEqual(Array.from(b.tint));
+}
+
+describe('GreedyMesher height cap (maxY)', () => {
+  it('default maxY matches an explicit WORLD_HEIGHT-1 cap', () => {
+    const c = new ChunkData(0, 0);
+    c.set(2, 3, 4, STONE);
+    c.set(5, 30, 6, STONE);
+    meshesEqual(mesher.mesh(viewOf(c), OPAQUE), mesher.mesh(viewOf(c), OPAQUE, WORLD_HEIGHT - 1));
+  });
+
+  it('a cap at the tallest voxel is identical to the uncapped mesh', () => {
+    const c = new ChunkData(0, 0);
+    for (let x = 0; x < CHUNK_SIZE_X; x++)
+      for (let z = 0; z < CHUNK_SIZE_Z; z++) c.set(x, 0, z, GRASS); // ground
+    c.set(8, 40, 8, STONE); // a lone pillar-top at y=40
+    meshesEqual(mesher.mesh(viewOf(c), OPAQUE), mesher.mesh(viewOf(c), OPAQUE, c.maxSolidY));
+  });
+
+  it('is identical for a capped water surface', () => {
+    const c = new ChunkData(0, 0);
+    for (let x = 4; x < 7; x++)
+      for (let z = 4; z < 7; z++) {
+        c.set(x, 10, z, WATER);
+        c.set(x, 11, z, WATER);
+      }
+    const pass = transparentPass(reg);
+    meshesEqual(mesher.mesh(viewOf(c), pass), mesher.mesh(viewOf(c), pass, c.maxSolidY));
+  });
+
+  it('is identical even when a neighbor is much taller than the center (center-only cap)', () => {
+    const c = new ChunkData(0, 0);
+    const east = new ChunkData(1, 0);
+    for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+      c.set(CHUNK_SIZE_X - 1, 20, z, STONE); // center border wall to y=20
+      for (let y = 0; y <= 100; y++) east.set(0, y, z, STONE); // east neighbor to y=100
+    }
+    const nb: NeighborLookup = (dcx, dcz) => (dcx === 1 && dcz === 0 ? east : undefined);
+    meshesEqual(
+      mesher.mesh(viewOf(c, nb), OPAQUE),
+      mesher.mesh(viewOf(c, nb), OPAQUE, c.maxSolidY),
+    );
   });
 });
 

@@ -19,3 +19,13 @@ export const FRAME_WORK_MS = 6;
 
 /** Water surface height (used by later worldgen stages; defined now for the pipeline). */
 export const SEA_LEVEL = 62;
+
+/** Lower bound for the adaptive view-distance governor (also the initial radius). */
+export const MIN_VIEW_DISTANCE = 4;
+/** Hard upper bound for the adaptive view-distance governor. */
+export const MAX_VIEW_DISTANCE = 12;
+
+/** Cold-start streaming budgets: fill the spawn area fast until the first ring drains. */
+export const BURST_GEN_BUDGET = 8;
+export const BURST_MESH_BUDGET = 6;
+export const BURST_FRAME_WORK_MS = 10;

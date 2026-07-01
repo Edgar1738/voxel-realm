@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ChunkData } from '../src/world/ChunkData';
-import { CHUNK_VOLUME } from '../src/core/constants';
+import { CHUNK_VOLUME, WORLD_HEIGHT } from '../src/core/constants';
 import { AIR, STONE } from '../src/blocks/blocks';
 
 describe('ChunkData', () => {
@@ -29,5 +29,42 @@ describe('ChunkData', () => {
     const c = new ChunkData(0, 0);
     expect(() => c.set(-1, 0, 0, STONE)).toThrow();
     expect(() => c.set(0, 1000, 0, STONE)).toThrow();
+  });
+});
+
+describe('ChunkData.maxSolidY', () => {
+  it('is -1 for an all-air chunk', () => {
+    expect(new ChunkData(0, 0).maxSolidY).toBe(-1);
+  });
+
+  it('rises to the highest non-air voxel set', () => {
+    const c = new ChunkData(0, 0);
+    c.set(3, 10, 5, STONE);
+    expect(c.maxSolidY).toBe(10);
+    c.set(1, 5, 1, STONE); // lower — no change
+    expect(c.maxSolidY).toBe(10);
+    c.set(0, 20, 0, STONE); // higher — rises
+    expect(c.maxSolidY).toBe(20);
+  });
+
+  it('does not fall when a voxel is cleared to AIR (stays monotonic)', () => {
+    const c = new ChunkData(0, 0);
+    c.set(0, 20, 0, STONE);
+    c.set(0, 20, 0, AIR);
+    expect(c.maxSolidY).toBe(20);
+  });
+
+  it('recomputes the exact max after a bulk write that bypasses set()', () => {
+    const c = new ChunkData(0, 0);
+    c.data[c.data.length - 1] = STONE; // top-most voxel, written directly
+    expect(c.maxSolidY).toBe(-1); // set() was bypassed
+    c.recomputeMaxSolidY();
+    expect(c.maxSolidY).toBe(WORLD_HEIGHT - 1);
+  });
+
+  it('recomputes to -1 for an all-air chunk', () => {
+    const c = new ChunkData(0, 0);
+    c.recomputeMaxSolidY();
+    expect(c.maxSolidY).toBe(-1);
   });
 });
