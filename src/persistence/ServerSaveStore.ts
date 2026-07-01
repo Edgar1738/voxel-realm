@@ -39,10 +39,15 @@ export class ServerSaveStore implements SaveStore {
   }
 
   private async post(url: string, body: unknown): Promise<void> {
-    const init: RequestInit = { method: 'POST', keepalive: true };
+    const init: RequestInit = { method: 'POST' };
     if (body !== undefined) {
       init.headers = { 'content-type': 'application/json' };
       init.body = JSON.stringify(body);
+      // keepalive caps fetch bodies at 64KiB and rejects anything larger, which silently
+      // starves big chunk deltas (bulk edits) of persistence. Only small bodiless/meta
+      // writes can afford it, so plain fetch is used for all payloads instead.
+    } else {
+      init.keepalive = true;
     }
     // Let failures propagate (network error or non-2xx) so callers can keep the edit dirty
     // and retry instead of silently dropping it.
