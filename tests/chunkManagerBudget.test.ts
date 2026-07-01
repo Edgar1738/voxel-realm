@@ -25,6 +25,11 @@ function makeManager(viewDistance: number, genBudget: number, meshBudget: number
   );
 }
 
+function drain(mgr: ChunkManager, cx = 0, cz = 0, frames = 400): void {
+  for (let i = 0; i < frames && mgr.streaming !== false; i++) mgr.update(cx, cz);
+  mgr.update(cx, cz);
+}
+
 describe('ChunkManager unified mesh budget (P5)', () => {
   it('never exceeds the mesh budget in a single frame, including neighbor remeshes', () => {
     const meshBudget = 2;
@@ -59,5 +64,33 @@ describe('ChunkManager unified mesh budget (P5)', () => {
     expect(mgr.lastFrameStats.genCount).toBe(0);
     expect(mgr.lastFrameStats.meshCount).toBe(0);
     expect(mgr.streaming).toBe(true); // work remains, just deferred past the ceiling
+  });
+});
+
+describe('ChunkManager runtime controls', () => {
+  it('setViewDistance grows the loaded set and reports via the getter', () => {
+    const mgr = makeManager(1, 64, 64); // 3x3
+    drain(mgr);
+    expect(mgr.loadedChunkCount()).toBe(9);
+    mgr.setViewDistance(2);
+    expect(mgr.viewDistance).toBe(2);
+    drain(mgr);
+    expect(mgr.loadedChunkCount()).toBe(25); // 5x5
+  });
+
+  it('setViewDistance shrinking disposes out-of-range chunks', () => {
+    const mgr = makeManager(2, 64, 64); // 5x5
+    drain(mgr);
+    expect(mgr.loadedChunkCount()).toBe(25);
+    mgr.setViewDistance(1);
+    drain(mgr);
+    expect(mgr.loadedChunkCount()).toBe(9);
+  });
+
+  it('setStreamingBudgets raises how much streams per frame', () => {
+    const mgr = makeManager(2, 2, 2); // small budgets
+    mgr.setStreamingBudgets(64, 64, Infinity);
+    mgr.update(0, 0); // one frame
+    expect(mgr.lastFrameStats.genCount).toBeGreaterThan(2);
   });
 });

@@ -148,6 +148,31 @@ export class ChunkManager {
     return this.hasPendingWork;
   }
 
+  /** Current loaded radius (Chebyshev chunk radius around the camera column). */
+  get viewDistance(): number {
+    return this.opts.viewDistance;
+  }
+
+  /**
+   * Sets the loaded radius at runtime. Forces a desired-set rebuild on the next update() so
+   * chunks that left range are disposed and newly desired chunks stream in. No-op if unchanged.
+   */
+  setViewDistance(vd: number): void {
+    const clamped = Math.max(1, Math.floor(vd));
+    if (clamped === this.opts.viewDistance) return;
+    this.opts.viewDistance = clamped;
+    this.lastCenterCx = undefined;
+    this.lastCenterCz = undefined;
+    this.hasPendingWork = true;
+  }
+
+  /** Sets the per-frame streaming budgets (used to burst the cold-start fill, then settle). */
+  setStreamingBudgets(genBudget: number, meshBudget: number, frameWorkMs: number): void {
+    this.opts.genBudget = genBudget;
+    this.opts.meshBudget = meshBudget;
+    this.opts.frameWorkMs = frameWorkMs;
+  }
+
   update(centerCx: number, centerCz: number): void {
     const updateStart = performance.now();
     this.frameGen = 0;
