@@ -12,7 +12,7 @@ import type { ResolvedTarget } from '../app/targetPreview';
 /**
  * Two persistent, reusable scene overlays: a wireframe outline on the targeted voxel and a
  * translucent ghost on the adjacent place target. Geometry and both ghost materials are created
- * once; `apply()` only repositions, toggles visibility, and swaps between the two preallocated
+ * once; `update()` only repositions, toggles visibility, and swaps between the two preallocated
  * materials. Never allocates or disposes three.js resources per frame.
  */
 export class TargetOverlay {
@@ -31,7 +31,12 @@ export class TargetOverlay {
 
     // Valid: solid translucent green. Invalid: sparse red wireframe + lower opacity — differs by
     // more than hue so it reads correctly without relying on color alone.
-    this.validMat = new MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.35, depthWrite: false });
+    this.validMat = new MeshBasicMaterial({
+      color: 0x66ff88,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+    });
     this.invalidMat = new MeshBasicMaterial({
       color: 0xff4444,
       transparent: true,
@@ -54,7 +59,7 @@ export class TargetOverlay {
    * Positions and shows/hides both overlays for the current frame. `show=false` (pointer
    * unlocked or inventory open) hides everything. Toggle targets show the outline only.
    */
-  apply(resolved: ResolvedTarget | undefined, show: boolean): void {
+  update(resolved: ResolvedTarget | undefined, show: boolean): void {
     if (!show || !resolved) {
       this.outline.visible = false;
       this.ghost.visible = false;

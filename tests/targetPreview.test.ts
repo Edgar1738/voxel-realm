@@ -7,13 +7,18 @@ const STAIR = 2 as const;
 const GATE = 3 as const;
 const PLANT = 4 as const;
 
-function hit(id: number, block = { x: 5, y: 6, z: 7 }, adjacent = { x: 5, y: 7, z: 7 }): VoxelRaycastHit {
+function hit(
+  id: number,
+  block = { x: 5, y: 6, z: 7 },
+  adjacent = { x: 5, y: 7, z: 7 },
+): VoxelRaycastHit {
   return { block, adjacent, normal: { x: 0, y: 1, z: 0 }, id: id as never };
 }
 
 const deps: PreviewDeps = {
   isToggleable: (id) => id === GATE,
-  shapeOf: (id) => (id === STAIR ? 'stair' : id === GATE ? 'gate' : id === PLANT ? 'cross' : 'cube'),
+  shapeOf: (id) =>
+    id === STAIR ? 'stair' : id === GATE ? 'gate' : id === PLANT ? 'cross' : 'cube',
   stateFromYaw: () => 3,
   canPlaceAt: (x) => x >= 0, // simulate unloaded/out-of-range when x < 0
 };
@@ -41,7 +46,12 @@ describe('resolveTarget', () => {
   });
 
   it('unloaded/out-of-range adjacent target is marked invalid, not hidden', () => {
-    const r = resolveTarget(hit(CUBE, { x: 5, y: 6, z: 7 }, { x: -1, y: 7, z: 7 }), CUBE as never, 0, deps);
+    const r = resolveTarget(
+      hit(CUBE, { x: 5, y: 6, z: 7 }, { x: -1, y: 7, z: 7 }),
+      CUBE as never,
+      0,
+      deps,
+    );
     if (r.kind === 'place') {
       expect(r.ghost.valid).toBe(false);
       expect(r.ghost).toMatchObject({ x: -1, y: 7, z: 7 });

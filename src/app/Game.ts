@@ -238,7 +238,9 @@ export class Game {
 
     const targetOverlay = new TargetOverlay();
     targetOverlay.attach((o) => renderer.add(o));
-    const previewSampler = { getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z) };
+    const previewSampler = {
+      getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z),
+    };
 
     // Dev-only roam profiler + scripted-roam driver (P0); set in the DEV block below.
     let devProfiler: FrameProfiler | undefined;
@@ -261,13 +263,20 @@ export class Game {
       }
       const previewOn = rig.locked && !ui.isInventoryOpen();
       if (previewOn) {
-        const previewHit = raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
-        targetOverlay.apply(
-          previewHit ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps) : undefined,
+        const previewHit = raycastVoxels(
+          previewSampler,
+          renderer.camera.position,
+          rig.forward(),
+          REACH,
+        );
+        targetOverlay.update(
+          previewHit
+            ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps)
+            : undefined,
           true,
         );
       } else {
-        targetOverlay.apply(undefined, false);
+        targetOverlay.update(undefined, false);
       }
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });

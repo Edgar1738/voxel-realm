@@ -7,8 +7,15 @@ const placeValid: ResolvedTarget = {
   outline: { x: 2, y: 3, z: 4 },
   ghost: { x: 2, y: 4, z: 4, id: 1 as never, state: 0, valid: true },
 };
-const placeInvalid: ResolvedTarget = { ...placeValid, ghost: { ...placeValid.ghost, valid: false } };
-const toggle: ResolvedTarget = { kind: 'toggle', outline: { x: 2, y: 3, z: 4 }, targetId: 3 as never };
+const placeInvalid: ResolvedTarget = {
+  ...placeValid,
+  ghost: { ...placeValid.ghost, valid: false },
+};
+const toggle: ResolvedTarget = {
+  kind: 'toggle',
+  outline: { x: 2, y: 3, z: 4 },
+  targetId: 3 as never,
+};
 
 describe('TargetOverlay', () => {
   it('starts hidden', () => {
@@ -28,42 +35,44 @@ describe('TargetOverlay', () => {
 
   it('place: outline + ghost visible and centered on their voxels', () => {
     const o = new TargetOverlay();
-    o.apply(placeValid, true);
+    o.update(placeValid, true);
     expect(o.outline.visible).toBe(true);
     expect(o.ghost.visible).toBe(true);
-    expect([o.outline.position.x, o.outline.position.y, o.outline.position.z]).toEqual([2.5, 3.5, 4.5]);
+    expect([o.outline.position.x, o.outline.position.y, o.outline.position.z]).toEqual([
+      2.5, 3.5, 4.5,
+    ]);
     expect([o.ghost.position.x, o.ghost.position.y, o.ghost.position.z]).toEqual([2.5, 4.5, 4.5]);
   });
 
   it('invalid place uses a different material than valid (not color-only)', () => {
     const o = new TargetOverlay();
-    o.apply(placeValid, true);
+    o.update(placeValid, true);
     const validMat = o.ghost.material;
-    o.apply(placeInvalid, true);
+    o.update(placeInvalid, true);
     expect(o.ghost.material).not.toBe(validMat);
   });
 
   it('toggle target shows outline only, hides ghost', () => {
     const o = new TargetOverlay();
-    o.apply(toggle, true);
+    o.update(toggle, true);
     expect(o.outline.visible).toBe(true);
     expect(o.ghost.visible).toBe(false);
   });
 
   it('show=false hides everything', () => {
     const o = new TargetOverlay();
-    o.apply(placeValid, true);
-    o.apply(placeValid, false);
+    o.update(placeValid, true);
+    o.update(placeValid, false);
     expect(o.outline.visible).toBe(false);
     expect(o.ghost.visible).toBe(false);
   });
 
   it('reuses the same material instances across frames (no per-frame allocation)', () => {
     const o = new TargetOverlay();
-    o.apply(placeInvalid, true);
+    o.update(placeInvalid, true);
     const m1 = o.ghost.material;
-    o.apply(placeValid, true);
-    o.apply(placeInvalid, true);
+    o.update(placeValid, true);
+    o.update(placeInvalid, true);
     expect(o.ghost.material).toBe(m1);
   });
 });

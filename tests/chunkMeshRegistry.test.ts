@@ -136,7 +136,9 @@ describe('ChunkMeshRegistry — sortTransparent()', () => {
     registry.sortTransparent({ x: 0, z: 0 }); // first sort runs
 
     // Poison the renderOrder with a sentinel; a second sort that early-returns must leave it.
-    const transparent = createdMeshes[createdMeshes.length - 1] as unknown as { renderOrder: number };
+    const transparent = createdMeshes[createdMeshes.length - 1] as unknown as {
+      renderOrder: number;
+    };
     transparent.renderOrder = 12345;
     registry.sortTransparent({ x: 0, z: 0 }); // no movement, no entry change → early return
 
