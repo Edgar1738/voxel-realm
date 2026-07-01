@@ -126,7 +126,7 @@ describe('ServerSaveStore', () => {
     await expect(store.loadMeta()).rejects.toThrow('network down');
   });
 
-  it('server saves use keepalive so unload writes are honored', async () => {
+  it('bodied saves avoid keepalive so large chunk deltas are not capped at 64KiB', async () => {
     const calls: RequestInit[] = [];
     const fake = (async (_u: string, init: RequestInit) => {
       calls.push(init);
@@ -135,6 +135,19 @@ describe('ServerSaveStore', () => {
     vi.stubGlobal('fetch', fake);
     const store = new ServerSaveStore('w', () => true);
     await store.saveChunkDelta('0,0', [[0, 1]]);
+    expect(calls[0].keepalive).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+
+  it('bodiless posts keep keepalive so unload-time clears are honored', async () => {
+    const calls: RequestInit[] = [];
+    const fake = (async (_u: string, init: RequestInit) => {
+      calls.push(init);
+      return { ok: true, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    vi.stubGlobal('fetch', fake);
+    const store = new ServerSaveStore('w', () => true);
+    await store.clearDeltas();
     expect(calls[0].keepalive).toBe(true);
     vi.unstubAllGlobals();
   });
