@@ -6,3 +6,9 @@ dist/
 .captures/
 .blueprints/
 .saves/
+
+# Local agent / worktree / SDD process artifacts
+.agents/
+.claire/
+.claude/agent-memory/
+.superpowers/sdd/
