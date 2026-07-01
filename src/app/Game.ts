@@ -24,7 +24,20 @@ import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
-import { FRAME_WORK_MS } from '../core/constants';
+import {
+  FRAME_WORK_MS,
+  GEN_BUDGET,
+  MESH_BUDGET,
+  VIEW_DISTANCE,
+  MIN_VIEW_DISTANCE,
+  MAX_VIEW_DISTANCE,
+  BURST_GEN_BUDGET,
+  BURST_MESH_BUDGET,
+  BURST_FRAME_WORK_MS,
+  CHUNK_SIZE_X,
+} from '../core/constants';
+import { ViewDistanceGovernor } from './ViewDistanceGovernor';
+import { applyFogRange } from '../render/fog';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
@@ -98,7 +111,12 @@ export class Game {
       sink,
       SEED,
       overlays,
-      { frameWorkMs: FRAME_WORK_MS }, // P5: soft per-frame time ceiling in the live app
+      {
+        viewDistance: VIEW_DISTANCE,
+        genBudget: BURST_GEN_BUDGET,
+        meshBudget: BURST_MESH_BUDGET,
+        frameWorkMs: BURST_FRAME_WORK_MS,
+      },
       savedDeltas,
     );
 
@@ -397,6 +415,14 @@ export class Game {
     let devProfiler: FrameProfiler | undefined;
     let devRoam: RoamDriver | undefined;
 
+    const fogMaterials = [material, transparentMaterial, cutoutMaterial];
+    const governor = new ViewDistanceGovernor(
+      { minVd: MIN_VIEW_DISTANCE, maxVd: MAX_VIEW_DISTANCE },
+      VIEW_DISTANCE,
+    );
+    let burstActive = true;
+    let fogInitialized = false;
+
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
       if (import.meta.env.DEV) devRoam?.step(cdt);
@@ -409,6 +435,24 @@ export class Game {
         worldToChunkCoord(Math.floor(player.position.x)),
         worldToChunkCoord(Math.floor(player.position.z)),
       );
+      // Cold-start burst: once the first fill drains, settle to the smooth-roam budgets.
+      if (burstActive && !manager.streaming) {
+        burstActive = false;
+        manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
+      }
+
+      // Set fog for the initial radius on the first frame (before the first render).
+      if (!fogInitialized) {
+        fogInitialized = true;
+        applyFogRange(fogMaterials, manager.viewDistance * CHUNK_SIZE_X);
+      }
+
+      // Adaptive view distance (targets ~60fps); retune fog to the new boundary on change.
+      const nextVd = governor.sample(cdt * 1000, manager.streaming);
+      if (nextVd !== undefined) {
+        manager.setViewDistance(nextVd);
+        applyFogRange(fogMaterials, nextVd * CHUNK_SIZE_X);
+      }
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
       }
