@@ -79,8 +79,7 @@ export function fillBox(box: Box, id: BlockId): SetVoxel[] {
   const [az, bz] = [Math.min(box.z1, box.z2), Math.max(box.z1, box.z2)];
   const out: SetVoxel[] = [];
   for (let x = ax; x <= bx; x++)
-    for (let y = ay; y <= by; y++)
-      for (let z = az; z <= bz; z++) out.push({ x, y, z, id });
+    for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) out.push({ x, y, z, id });
   return out;
 }
 

@@ -492,10 +492,20 @@ export function installDevControls(ctx: DevControlsContext): void {
         /* region too large to auto-preload */
       }
       const captured = captureRegion((x, y, z) => manager.getBlock(x, y, z), {
-        x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz,
+        x1: ax,
+        y1: ay,
+        z1: az,
+        x2: bx,
+        y2: by,
+        z2: bz,
       });
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
-        x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz,
+        x1: ax,
+        y1: ay,
+        z1: az,
+        x2: bx,
+        y2: by,
+        z2: bz,
       });
       return { ...captured, unloaded };
     },

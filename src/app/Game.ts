@@ -266,7 +266,12 @@ export class Game {
           if (!aim) return void setStatus('Aim at the block type to replace');
           manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
           run(
-            replaceVoxels((x, y, z) => manager.getBlock(x, y, z), box, aim.id, inventory.selectedBlock),
+            replaceVoxels(
+              (x, y, z) => manager.getBlock(x, y, z),
+              box,
+              aim.id,
+              inventory.selectedBlock,
+            ),
             'Replaced',
           );
           return;
@@ -386,9 +391,16 @@ export class Game {
         pasteGhost.update(undefined, undefined, false);
         const previewOn = rig.locked && !ui.isInventoryOpen();
         if (previewOn) {
-          const previewHit = raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+          const previewHit = raycastVoxels(
+            previewSampler,
+            renderer.camera.position,
+            rig.forward(),
+            REACH,
+          );
           targetOverlay.update(
-            previewHit ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps) : undefined,
+            previewHit
+              ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps)
+              : undefined,
             true,
           );
         } else {

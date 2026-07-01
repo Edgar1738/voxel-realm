@@ -37,7 +37,13 @@ describe('BuilderState clipboard + transform', () => {
     const b = new BuilderState();
     b.setClipboard({ dims: [2, 1, 1], blocks: [[0, 0, 0, ID]] });
     expect(b.mode).toBe('pasting');
-    expect(b.transform).toEqual({ turns: 0, mirrorX: false, mirrorZ: false, arrayCount: 1, arrayAxis: 'x' });
+    expect(b.transform).toEqual({
+      turns: 0,
+      mirrorX: false,
+      mirrorZ: false,
+      arrayCount: 1,
+      arrayAxis: 'x',
+    });
   });
 
   it('rotate wraps modulo 4 in both directions', () => {

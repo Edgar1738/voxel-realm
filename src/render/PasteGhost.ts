@@ -16,7 +16,12 @@ export class PasteGhost {
   constructor() {
     this.mesh = new Mesh(
       new BoxGeometry(1, 1, 1),
-      new MeshBasicMaterial({ color: 0x5ad1ff, transparent: true, opacity: 0.25, depthWrite: false }),
+      new MeshBasicMaterial({
+        color: 0x5ad1ff,
+        transparent: true,
+        opacity: 0.25,
+        depthWrite: false,
+      }),
     );
     this.edges = new LineSegments(
       new EdgesGeometry(new BoxGeometry(1, 1, 1)),

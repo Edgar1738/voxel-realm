@@ -19,25 +19,38 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
   if (code === 'KeyB') return 'toggleMode';
   if (mode === 'selecting') {
     switch (code) {
-      case 'KeyF': return 'fill';
-      case 'KeyG': return 'clear';
-      case 'KeyR': return 'replace';
-      case 'KeyC': return 'copy';
-      case 'Escape': return 'cancel';
-      default: return 'none';
+      case 'KeyF':
+        return 'fill';
+      case 'KeyG':
+        return 'clear';
+      case 'KeyR':
+        return 'replace';
+      case 'KeyC':
+        return 'copy';
+      case 'Escape':
+        return 'cancel';
+      default:
+        return 'none';
     }
   }
   if (mode === 'pasting') {
     switch (code) {
-      case 'BracketLeft': return 'rotateCCW';
-      case 'BracketRight': return 'rotateCW';
-      case 'KeyM': return 'mirror';
+      case 'BracketLeft':
+        return 'rotateCCW';
+      case 'BracketRight':
+        return 'rotateCW';
+      case 'KeyM':
+        return 'mirror';
       case 'Equal':
-      case 'NumpadAdd': return 'arrayInc';
+      case 'NumpadAdd':
+        return 'arrayInc';
       case 'Minus':
-      case 'NumpadSubtract': return 'arrayDec';
-      case 'Escape': return 'cancel';
-      default: return 'none';
+      case 'NumpadSubtract':
+        return 'arrayDec';
+      case 'Escape':
+        return 'cancel';
+      default:
+        return 'none';
     }
   }
   return 'none';

@@ -23,7 +23,13 @@ export class BuilderState {
   cornerA?: Vec3i;
   cornerB?: Vec3i;
   clipboard?: Prefab;
-  transform: BuilderTransform = { turns: 0, mirrorX: false, mirrorZ: false, arrayCount: 1, arrayAxis: 'x' };
+  transform: BuilderTransform = {
+    turns: 0,
+    mirrorX: false,
+    mirrorZ: false,
+    arrayCount: 1,
+    arrayAxis: 'x',
+  };
   private nextCorner: 'a' | 'b' = 'a';
 
   /** off ↔ selecting. Leaving Build mode clears the selection and any paste session. */
@@ -56,8 +62,12 @@ export class BuilderState {
   selectionBox(): Box | undefined {
     if (!this.cornerA || !this.cornerB) return undefined;
     return {
-      x1: this.cornerA.x, y1: this.cornerA.y, z1: this.cornerA.z,
-      x2: this.cornerB.x, y2: this.cornerB.y, z2: this.cornerB.z,
+      x1: this.cornerA.x,
+      y1: this.cornerA.y,
+      z1: this.cornerA.z,
+      x2: this.cornerB.x,
+      y2: this.cornerB.y,
+      z2: this.cornerB.z,
     };
   }
 
@@ -97,7 +107,8 @@ export class BuilderState {
     if (n > 1) {
       const stride: [number, number, number] =
         this.transform.arrayAxis === 'x' ? [p.dims[0], 0, 0] : [0, 0, p.dims[2]];
-      p = this.transform.arrayAxis === 'x' ? repeat(p, n, 1, 1, stride) : repeat(p, 1, 1, n, stride);
+      p =
+        this.transform.arrayAxis === 'x' ? repeat(p, n, 1, 1, stride) : repeat(p, 1, 1, n, stride);
     }
     return p;
   }
