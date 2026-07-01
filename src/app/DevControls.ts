@@ -29,7 +29,15 @@ import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
-import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
+import {
+  listWorlds,
+  copyWorld,
+  deleteWorld,
+  readWorldMeta,
+  writeWorldMeta,
+} from '../persistence/ServerWorldCatalog';
+import type { WorldMeta } from '../persistence/SaveTypes';
+import { mergeMeta, appendLandmark } from './worldMeta';
 import type { WorldPreset } from '../worldgen/Presets';
 import {
   rotateY,
@@ -97,6 +105,19 @@ export function installDevControls(ctx: DevControlsContext): void {
     const u = new URL(window.location.href);
     u.searchParams.set('save', name);
     window.location.href = u.toString();
+  };
+
+  /** Read the current world's meta, apply `mutate`, and persist the complete result. */
+  const patchMeta = async (mutate: (base: WorldMeta) => WorldMeta): Promise<WorldMeta> => {
+    const current = await readWorldMeta(currentWorld);
+    if (!current) {
+      throw new Error(
+        'Voxel Realm: world has no saved meta yet — make an edit so the save is written first',
+      );
+    }
+    const next = mutate(current);
+    await writeWorldMeta(currentWorld, next);
+    return next;
   };
 
   // Push the current player eye + look into the camera so a teleport/aim is reflected
@@ -712,6 +733,49 @@ export function installDevControls(ctx: DevControlsContext): void {
       /** Reload into world `name` (creates it on first edit if absent). */
       load: (name: string): void => gotoWorld(name),
       delete: (name: string): Promise<void> => deleteWorld(name),
+
+      // --- curated-world metadata (spawn / landmarks / tour) ---
+      /** Read the current world's stored meta, or undefined if it has none yet. */
+      meta: (): Promise<WorldMeta | undefined> => readWorldMeta(currentWorld),
+      /** Merge a partial patch into the stored meta and persist the complete result. */
+      setMeta: (patch: Partial<WorldMeta>): Promise<WorldMeta> =>
+        patchMeta((base) => mergeMeta(base, patch)),
+      /** Set spawn+look from the current player pose; optionally also drop a named landmark there. */
+      setSpawn: (name?: string): Promise<WorldMeta> => {
+        const spawn = {
+          x: round(player.position.x, 2),
+          y: round(player.position.y, 2),
+          z: round(player.position.z, 2),
+        };
+        const look = { yaw: round(rig.yaw, 3), pitch: round(rig.pitch, 3) };
+        return patchMeta((base) => {
+          const merged = mergeMeta(base, { spawn, look });
+          return name ? appendLandmark(merged, { name, ...spawn }) : merged;
+        });
+      },
+      /** Append a landmark; coordinates default to the current player position. */
+      addLandmark: (name: string, x?: number, y?: number, z?: number): Promise<WorldMeta> => {
+        const point = {
+          x: round(x ?? player.position.x, 2),
+          y: round(y ?? player.position.y, 2),
+          z: round(z ?? player.position.z, 2),
+        };
+        return patchMeta((base) => appendLandmark(base, { name, ...point }));
+      },
+      /** Replace the tour waypoints. */
+      setTour: (
+        points: Array<{ name?: string; x: number; y: number; z: number }>,
+      ): Promise<WorldMeta> => patchMeta((base) => mergeMeta(base, { tour: points })),
+      /** A shareable roam URL for the current world (strips debug spawn/look overrides). */
+      roamUrl: (): string => {
+        const u = new URL(window.location.href);
+        u.searchParams.set('save', currentWorld);
+        if (preset !== 'default') u.searchParams.set('world', preset);
+        else u.searchParams.delete('world');
+        u.searchParams.delete('spawn');
+        u.searchParams.delete('look');
+        return u.toString();
+      },
     },
     bookmark: bookmarks,
 

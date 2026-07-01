@@ -11,6 +11,7 @@ import {
   copyWorld,
   deleteWorld,
   safeWorldName,
+  type DiskSnapshot,
 } from './server/worldDiskStore';
 import { isAllowedDevOrigin } from './server/devRequestGuard';
 
@@ -174,7 +175,7 @@ function devDisk(): Plugin {
           .then((body) => {
             try {
               const payload = JSON.parse(body || '{}') as {
-                meta?: { seed: number; version: number; preset?: string };
+                meta?: DiskSnapshot['meta'];
                 entries?: Array<[number, number] | [number, number, number]>;
               };
               if (url.searchParams.has('meta')) {
