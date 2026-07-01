@@ -23,6 +23,7 @@ import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
 import { routeDistance, type RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
 import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './DevShapes';
+import { stairState, stairFacingToward, type StairFacing } from './stairFacing';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
@@ -697,6 +698,47 @@ export function installDevControls(ctx: DevControlsContext): void {
       z2: number,
       id: BlockId,
     ) => applyAny(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
+    /**
+     * Place one oriented stair. `facing` is the direction the stair's low/front side points
+     * (n/e/s/w) — the way you'd walk up it; `top: true` flips it upside-down. Warns if `id` isn't a
+     * stair block (the orientation state is only meaningful for stairs).
+     */
+    stairs: (
+      x: number,
+      y: number,
+      z: number,
+      id: BlockId,
+      facing: StairFacing,
+      opts: { top?: boolean } = {},
+    ): BatchedEditResult => {
+      if (registry.shape(id) !== 'stair')
+        console.warn(
+          `Voxel Realm build: stairs() got non-stair block ${registry.get(id).name} (id ${id}); its orientation state may be ignored`,
+        );
+      return applyAny([{ x, y, z, id, state: stairState(facing, opts) }], { label: 'stairs' });
+    },
+    /**
+     * Run a line of identically-oriented stairs between two points (Bresenham): ramps, steps, or a
+     * roof edge. `facing` sets every stair's low side (see `stairs`); use `stairFacingToward(dx,dz)`
+     * to get the outward facing for a roof edge.
+     */
+    stairsRun: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      id: BlockId,
+      facing: StairFacing,
+      opts: { top?: boolean } = {},
+    ): BatchedEditResult => {
+      const state = stairState(facing, opts);
+      const voxels = lineVoxels(x1, y1, z1, x2, y2, z2, id).map((v) => ({ ...v, state }));
+      return applyAny(voxels, { label: 'stairsRun' });
+    },
+    /** The outward stair facing ('n'|'e'|'s'|'w') for a roof-edge / ramp direction vector. */
+    stairFacingToward: (dx: number, dz: number): StairFacing => stairFacingToward(dx, dz),
     /** Persist a blueprint to .blueprints/<name>.json (reusable across sessions). */
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
