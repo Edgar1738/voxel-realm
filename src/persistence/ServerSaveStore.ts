@@ -58,6 +58,14 @@ export class ServerSaveStore implements SaveStore {
       throw new Error(`Voxel Realm: world load failed (${res.status} ${res.statusText})`);
     }
     const json = (await res.json()) as unknown;
-    return parseWorldSnapshot(json, { isValidBlockId: this.isValidBlockId }).snapshot;
+    const { snapshot, dropped } = parseWorldSnapshot(json, {
+      isValidBlockId: this.isValidBlockId,
+    });
+    if (dropped > 0) {
+      console.warn(
+        `Voxel Realm: world "${this.name}" dropped ${dropped} invalid entr${dropped === 1 ? 'y' : 'ies'} on load`,
+      );
+    }
+    return snapshot;
   }
 }

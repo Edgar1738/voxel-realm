@@ -40,7 +40,7 @@ export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
 export function toolLabel(tool: string): string {
   return tool
     .split('-')
-    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(' ');
 }
 
@@ -95,6 +95,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
       // Inventory / tool shortcuts
       const n = Number(e.key);
       if (n >= 1 && n <= inventory.hotbar.length) {
+        if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
         inventory.selectSlot(n - 1);
         callbacks.onHotbarRender();
         return;

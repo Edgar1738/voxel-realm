@@ -435,17 +435,22 @@ function emitCross(
 /**
  * Emits slab boxes (→ opaque mesh) and cross billboards (→ cutout mesh) for one chunk.
  * `hasShaped` (P3) lets the caller skip the full-chunk scan for chunks known to contain no
- * shaped blocks — the common case — returning empty buffers immediately.
+ * shaped blocks — the common case — returning empty buffers immediately. `maxY` (mirrors
+ * GreedyMesher.mesh's height-cap) bounds the y-sweep to the chunk's tallest solid voxel, so
+ * a mostly-empty-above chunk doesn't dispatch registry.shape() for every air slice up to
+ * WORLD_HEIGHT.
  */
 export function emitShaped(
   view: VoxelView,
   registry: BlockRegistry,
   hasShaped = true,
+  maxY: number = WORLD_HEIGHT - 1,
 ): { slabs: MeshData; cross: MeshData } {
   const slabs = emptyBuf();
   const cross = emptyBuf();
   if (!hasShaped) return { slabs: toMesh(slabs), cross: toMesh(cross) };
-  for (let y = 0; y < WORLD_HEIGHT; y++) {
+  const yEnd = Math.max(0, Math.min(WORLD_HEIGHT, maxY + 1));
+  for (let y = 0; y < yEnd; y++) {
     for (let z = 0; z < CHUNK_SIZE_Z; z++) {
       for (let x = 0; x < CHUNK_SIZE_X; x++) {
         const id = view.get(x, y, z);
