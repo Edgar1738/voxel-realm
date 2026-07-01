@@ -39,7 +39,7 @@ import {
   type Prefab,
 } from '../core/Prefab';
 import { toggleOpen } from '../world/VoxelState';
-import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox, captureRegion } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -491,13 +491,14 @@ export function installDevControls(ctx: DevControlsContext): void {
       } catch {
         /* region too large to auto-preload */
       }
-      const blocks: Array<[number, number, number, BlockId]> = [];
-      for (let y = ay; y <= by; y++)
-        for (let z = az; z <= bz; z++)
-          for (let x = ax; x <= bx; x++) {
-            const id = manager.getBlock(x, y, z);
-            if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
-          }
+      const captured = captureRegion((x, y, z) => manager.getBlock(x, y, z), {
+        x1: ax,
+        y1: ay,
+        z1: az,
+        x2: bx,
+        y2: by,
+        z2: bz,
+      });
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
         x1: ax,
         y1: ay,
@@ -506,7 +507,7 @@ export function installDevControls(ctx: DevControlsContext): void {
         y2: by,
         z2: bz,
       });
-      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
+      return { ...captured, unloaded };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz). */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
