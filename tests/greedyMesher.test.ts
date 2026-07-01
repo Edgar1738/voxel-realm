@@ -217,7 +217,10 @@ describe('GreedyMesher exact output – multi-voxel stale-buffer regression', ()
   });
 });
 
-function meshesEqual(a: ReturnType<GreedyMesher['mesh']>, b: ReturnType<GreedyMesher['mesh']>): void {
+function meshesEqual(
+  a: ReturnType<GreedyMesher['mesh']>,
+  b: ReturnType<GreedyMesher['mesh']>,
+): void {
   expect(Array.from(a.positions)).toEqual(Array.from(b.positions));
   expect(Array.from(a.indices)).toEqual(Array.from(b.indices));
   expect(Array.from(a.normals)).toEqual(Array.from(b.normals));
@@ -263,7 +266,10 @@ describe('GreedyMesher height cap (maxY)', () => {
       for (let y = 0; y <= 100; y++) east.set(0, y, z, STONE); // east neighbor to y=100
     }
     const nb: NeighborLookup = (dcx, dcz) => (dcx === 1 && dcz === 0 ? east : undefined);
-    meshesEqual(mesher.mesh(viewOf(c, nb), OPAQUE), mesher.mesh(viewOf(c, nb), OPAQUE, c.maxSolidY));
+    meshesEqual(
+      mesher.mesh(viewOf(c, nb), OPAQUE),
+      mesher.mesh(viewOf(c, nb), OPAQUE, c.maxSolidY),
+    );
   });
 });
 

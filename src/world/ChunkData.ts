@@ -1,4 +1,10 @@
-import { CHUNK_AREA, CHUNK_SIZE_X, CHUNK_SIZE_Z, CHUNK_VOLUME, WORLD_HEIGHT } from '../core/constants';
+import {
+  CHUNK_AREA,
+  CHUNK_SIZE_X,
+  CHUNK_SIZE_Z,
+  CHUNK_VOLUME,
+  WORLD_HEIGHT,
+} from '../core/constants';
 import { voxelIndex, inChunkBounds } from '../core/coords';
 import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';

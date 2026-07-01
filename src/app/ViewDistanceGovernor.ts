@@ -42,7 +42,10 @@ export class ViewDistanceGovernor {
   private cooldown = 0;
   private current: number;
 
-  constructor(bounds: { minVd: number; maxVd: number } & Partial<GovernorOptions>, initial: number) {
+  constructor(
+    bounds: { minVd: number; maxVd: number } & Partial<GovernorOptions>,
+    initial: number,
+  ) {
     this.opts = { ...DEFAULT_GOVERNOR_OPTIONS, ...bounds };
     this.current = Math.max(this.opts.minVd, Math.min(this.opts.maxVd, initial));
   }
