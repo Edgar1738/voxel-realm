@@ -10,10 +10,10 @@ import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
-import { stairStateFromYaw } from './placement';
 import { gateToggleEdit } from './useAction';
+import { resolveTarget, type PreviewDeps } from './targetPreview';
 
-const REACH = 6;
+export const REACH = 6;
 const TUNNEL_LENGTH = 8;
 const SPHERE_RADIUS = 4;
 
@@ -56,6 +56,7 @@ export interface InputContext {
   inventory: CreativeInventory;
   registry: BlockRegistry;
   edit: EditService;
+  previewDeps: PreviewDeps;
   callbacks: InputCallbacks;
 }
 
@@ -73,7 +74,7 @@ export function editMessage(action: 'undo' | 'redo', outcome: EditOutcome): stri
 export function registerInputListeners(ctx: InputContext): () => void {
   const controller = new AbortController();
   const { signal } = controller;
-  const { canvas, rig, renderer, manager, inventory, registry, edit, callbacks } = ctx;
+  const { canvas, rig, renderer, manager, inventory, registry, edit, previewDeps, callbacks } = ctx;
 
   // Single merged keydown handler covering both tool shortcuts and undo/redo.
   window.addEventListener(
@@ -138,14 +139,19 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
-        if (registry.isToggleable(hit.id)) {
+        const resolved = resolveTarget(hit, selected, rig.yaw, previewDeps);
+        if (resolved.kind === 'toggle') {
           const state = manager.getState(hit.block.x, hit.block.y, hit.block.z);
           callbacks.onRun([gateToggleEdit(hit.block, hit.id, state)], 'Toggled');
           return;
         }
-        const voxel: SetVoxel = { ...hit.adjacent, id: selected };
-        const shape = registry.shape(selected);
-        if (shape === 'stair' || shape === 'gate') voxel.state = stairStateFromYaw(rig.yaw);
+        const voxel: SetVoxel = {
+          x: resolved.ghost.x,
+          y: resolved.ghost.y,
+          z: resolved.ghost.z,
+          id: resolved.ghost.id,
+          state: resolved.ghost.state,
+        };
         callbacks.onRun([voxel], 'Placed');
         return;
       }

@@ -31,6 +31,8 @@ import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
 import { registerInputListeners, TOOLS, toolLabel, type Tool } from './input';
+import { stairStateFromYaw } from './placement';
+import type { PreviewDeps } from './targetPreview';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 
@@ -199,6 +201,13 @@ export class Game {
       setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
+    const previewDeps: PreviewDeps = {
+      isToggleable: (id) => registry.isToggleable(id),
+      shapeOf: (id) => registry.shape(id),
+      stateFromYaw: (yaw) => stairStateFromYaw(yaw),
+      canPlaceAt: (x, y, z) => manager.canApply([{ x, y, z }]),
+    };
+
     // Register all input listeners through a single AbortController.
     const abortInput = registerInputListeners({
       canvas,
@@ -208,6 +217,7 @@ export class Game {
       inventory,
       registry,
       edit,
+      previewDeps,
       callbacks: {
         onStatusChange: setStatus,
         onToolChange: setTool,
