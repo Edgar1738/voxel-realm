@@ -29,13 +29,27 @@ export class CameraRig {
 
     // Listen on document, not the canvas: the fullscreen overlay sits on top of the
     // canvas and would otherwise swallow the click before it reaches requestPointerLock.
+    // Embedded webviews (e.g. IDE preview panels) deny pointer lock outright — surface
+    // that on the overlay instead of failing silently.
+    const showLockError = (): void => {
+      if (this.overlay) {
+        this.overlay.textContent =
+          'Mouse capture is blocked in this embedded view — open the game in a regular ' +
+          'browser tab (e.g. http://localhost:5173) to play.';
+      }
+    };
     document.addEventListener(
       'click',
       () => {
-        if (!this.locked) void canvas.requestPointerLock();
+        if (this.locked) return;
+        // Chrome returns a promise; older engines return undefined and report failures
+        // via the pointerlockerror event instead.
+        const request = canvas.requestPointerLock() as Promise<void> | undefined;
+        void request?.catch(showLockError);
       },
       { signal },
     );
+    document.addEventListener('pointerlockerror', showLockError, { signal });
 
     document.addEventListener(
       'pointerlockchange',
