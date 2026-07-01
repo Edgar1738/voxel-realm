@@ -45,10 +45,9 @@ import {
   repeat,
   validatePrefab,
   type Prefab,
-  type PrefabVoxel,
 } from '../core/Prefab';
 import { toggleOpen } from '../world/VoxelState';
-import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox, captureRegion } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -541,15 +540,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       } catch {
         /* region too large to auto-preload */
       }
-      const blocks: PrefabVoxel[] = [];
-      for (let y = ay; y <= by; y++)
-        for (let z = az; z <= bz; z++)
-          for (let x = ax; x <= bx; x++) {
-            const id = manager.getBlock(x, y, z);
-            if (id === AIR) continue;
-            const state = manager.getState(x, y, z);
-            blocks.push(state ? [x - ax, y - ay, z - az, id, state] : [x - ax, y - ay, z - az, id]);
-          }
+      // Capture state too so copied stairs/gates keep their orientation (Phase 3).
+      const captured = captureRegion(
+        (x, y, z) => manager.getBlock(x, y, z),
+        { x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz },
+        (x, y, z) => manager.getState(x, y, z),
+      );
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
         x1: ax,
         y1: ay,
@@ -558,7 +554,7 @@ export function installDevControls(ctx: DevControlsContext): void {
         y2: by,
         z2: bz,
       });
-      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
+      return { ...captured, unloaded };
     },
     /** Stamp a blueprint with its min corner at (ox,oy,oz), preserving block state. */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>

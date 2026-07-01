@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from '../src/app/RegionOps';
+import {
+  replaceVoxels,
+  prefabToVoxels,
+  unloadedChunksInBox,
+  captureRegion,
+} from '../src/app/RegionOps';
 import type { Prefab } from '../src/core/Prefab';
 
 describe('replaceVoxels', () => {
@@ -74,6 +79,28 @@ describe('prefabToVoxels', () => {
     expect(prefabToVoxels(p, 10, 20, 30)).toEqual([
       { x: 10, y: 20, z: 30, id: 5, state: 2 },
       { x: 11, y: 20, z: 30, id: 6 },
+    ]);
+  });
+});
+
+describe('captureRegion – optional block state', () => {
+  const ids: Record<string, number> = { '0,0,0': 5, '1,0,0': 6 };
+  const states: Record<string, number> = { '0,0,0': 2 };
+  const read = (x: number, y: number, z: number): number => ids[`${x},${y},${z}`] ?? 0;
+  const readState = (x: number, y: number, z: number): number => states[`${x},${y},${z}`] ?? 0;
+  const box = { x1: 0, y1: 0, z1: 0, x2: 1, y2: 0, z2: 0 };
+
+  it('captures 5-tuples for stateful voxels when a state reader is supplied', () => {
+    expect(captureRegion(read, box, readState).blocks).toEqual([
+      [0, 0, 0, 5, 2],
+      [1, 0, 0, 6],
+    ]);
+  });
+
+  it('stays stateless (4-tuples) when no state reader is supplied', () => {
+    expect(captureRegion(read, box).blocks).toEqual([
+      [0, 0, 0, 5],
+      [1, 0, 0, 6],
     ]);
   });
 });

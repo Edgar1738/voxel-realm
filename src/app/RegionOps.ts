@@ -1,7 +1,8 @@
-import type { Prefab } from '../core/Prefab';
+import { type Prefab, type PrefabVoxel } from '../core/Prefab';
 import type { BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { worldToChunkCoord, chunkKey } from '../core/coords';
+import { AIR } from '../blocks/blocks';
 
 export interface Box {
   x1: number;
@@ -53,4 +54,47 @@ export function prefabToVoxels(p: Prefab, ox: number, oy: number, oz: number): S
     if (b.length === 5 && b[4] !== 0) voxel.state = b[4];
     return voxel;
   });
+}
+
+/**
+ * Capture a region's non-air voxels into a Prefab (offsets from the box min corner; dims = box
+ * extents). When `getState` is supplied, oriented voxels are captured as 5-tuples so stairs/gates
+ * keep their facing/open state; otherwise the capture is stateless (4-tuples).
+ */
+export function captureRegion(
+  read: (x: number, y: number, z: number) => BlockId,
+  box: Box,
+  getState?: (x: number, y: number, z: number) => number,
+): Prefab {
+  const [ax, bx] = [Math.min(box.x1, box.x2), Math.max(box.x1, box.x2)];
+  const [ay, by] = [Math.min(box.y1, box.y2), Math.max(box.y1, box.y2)];
+  const [az, bz] = [Math.min(box.z1, box.z2), Math.max(box.z1, box.z2)];
+  if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
+    throw new Error('capture region too large (>200000)');
+  const blocks: PrefabVoxel[] = [];
+  for (let y = ay; y <= by; y++)
+    for (let z = az; z <= bz; z++)
+      for (let x = ax; x <= bx; x++) {
+        const id = read(x, y, z);
+        if (id === AIR) continue;
+        const state = getState ? getState(x, y, z) : 0;
+        blocks.push(state ? [x - ax, y - ay, z - az, id, state] : [x - ax, y - ay, z - az, id]);
+      }
+  return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
+}
+
+/** Every voxel in the box set to `id` (sorted x→y→z, corners order-independent). */
+export function fillBox(box: Box, id: BlockId): SetVoxel[] {
+  const [ax, bx] = [Math.min(box.x1, box.x2), Math.max(box.x1, box.x2)];
+  const [ay, by] = [Math.min(box.y1, box.y2), Math.max(box.y1, box.y2)];
+  const [az, bz] = [Math.min(box.z1, box.z2), Math.max(box.z1, box.z2)];
+  const out: SetVoxel[] = [];
+  for (let x = ax; x <= bx; x++)
+    for (let y = ay; y <= by; y++) for (let z = az; z <= bz; z++) out.push({ x, y, z, id });
+  return out;
+}
+
+/** Every voxel in the box set to AIR. */
+export function clearBox(box: Box): SetVoxel[] {
+  return fillBox(box, AIR);
 }
