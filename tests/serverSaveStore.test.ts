@@ -35,6 +35,31 @@ describe('ServerSaveStore', () => {
     expect(deltas.has('1,0')).toBe(false); // unknown block id dropped
   });
 
+  it('loadDeltas warns with the world name and count when entries are dropped', async () => {
+    const fetchMock = vi.fn(async () =>
+      ok({ meta: { seed: 1, version: 1 }, chunks: { '0,0': [[5, 13]], '1,0': [[0, 999]] } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const store = new ServerSaveStore('settlement', isValidBlockId);
+    await store.loadDeltas();
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('settlement'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1'));
+  });
+
+  it('loadDeltas does not warn when nothing is dropped', async () => {
+    const fetchMock = vi.fn(async () => ok({ meta: { seed: 1, version: 1 }, chunks: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const store = new ServerSaveStore('clean-world', isValidBlockId);
+    await store.loadDeltas();
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it('saveChunkDelta POSTs entries to the chunk URL', async () => {
     const fetchMock = vi.fn(async () => ok({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
