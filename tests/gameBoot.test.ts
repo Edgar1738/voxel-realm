@@ -10,10 +10,13 @@ type FakeUi = {
     style: Record<string, string>;
     textContent: string;
   };
+  muteButton: { addEventListener: (...args: unknown[]) => void };
+  volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setStatus: (text: string) => void;
   setNotice: (text: string | null) => void;
+  setSoundUi: (volume: number, muted: boolean) => void;
   renderHotbar: () => void;
   setInventoryOpen: (open: boolean) => void;
   isInventoryOpen: () => boolean;
@@ -25,10 +28,13 @@ function makeUi(): FakeUi {
     picker: { addEventListener: vi.fn() },
     reset: { addEventListener: vi.fn() },
     worldButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
+    muteButton: { addEventListener: vi.fn() },
+    volumeSlider: { addEventListener: vi.fn(), value: '60' },
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setStatus: vi.fn(),
     setNotice: vi.fn(),
+    setSoundUi: vi.fn(),
     renderHotbar: vi.fn(),
     setInventoryOpen: vi.fn((open: boolean) => {
       ui.inventoryOpen = open;

@@ -110,20 +110,78 @@ const TOOL_ICON_SHAPES: Record<string, ReadonlyArray<[string, Record<string, str
   ],
 };
 
-/** Builds a 14px inline-SVG icon node for a tool (no innerHTML — trusted, typed shapes). */
-function buildToolIcon(tool: string): SVGSVGElement {
+/** Speaker icon shapes: body + two arcs when audible, body + strike-through when muted. */
+const SPEAKER_SHAPES: Record<'on' | 'off', ReadonlyArray<[string, Record<string, string>]>> = {
+  on: [
+    ['path', { d: 'M2 5.5 H4.5 L7.5 3 V11 L4.5 8.5 H2 Z', fill: 'currentColor' }],
+    [
+      'path',
+      {
+        d: 'M9.5 4.8 A2.6 2.6 0 0 1 9.5 9.2',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.3',
+        'stroke-linecap': 'round',
+      },
+    ],
+    [
+      'path',
+      {
+        d: 'M11 3.2 A4.6 4.6 0 0 1 11 10.8',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.3',
+        'stroke-linecap': 'round',
+      },
+    ],
+  ],
+  off: [
+    ['path', { d: 'M2 5.5 H4.5 L7.5 3 V11 L4.5 8.5 H2 Z', fill: 'currentColor' }],
+    [
+      'line',
+      {
+        x1: '9',
+        y1: '4.5',
+        x2: '12.5',
+        y2: '9.5',
+        stroke: 'currentColor',
+        'stroke-width': '1.4',
+        'stroke-linecap': 'round',
+      },
+    ],
+    [
+      'line',
+      {
+        x1: '12.5',
+        y1: '4.5',
+        x2: '9',
+        y2: '9.5',
+        stroke: 'currentColor',
+        'stroke-width': '1.4',
+        'stroke-linecap': 'round',
+      },
+    ],
+  ],
+};
+
+/** Builds a 14px inline-SVG icon from typed shape specs (no innerHTML — trusted nodes). */
+function buildIcon(shapes: ReadonlyArray<[string, Record<string, string>]>): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('width', '14');
   svg.setAttribute('height', '14');
   svg.setAttribute('viewBox', '0 0 14 14');
   svg.setAttribute('aria-hidden', 'true');
-  const shapes = TOOL_ICON_SHAPES[tool] ?? TOOL_ICON_SHAPES.single;
   for (const [tag, attrs] of shapes) {
     const node = document.createElementNS(SVG_NS, tag);
     for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value);
     svg.append(node);
   }
   return svg;
+}
+
+/** Builds a 14px inline-SVG icon node for a tool (no innerHTML — trusted, typed shapes). */
+function buildToolIcon(tool: string): SVGSVGElement {
+  return buildIcon(TOOL_ICON_SHAPES[tool] ?? TOOL_ICON_SHAPES.single);
 }
 
 /** DOM handles for the creative HUD; pure construction, no game logic. */
@@ -134,6 +192,11 @@ export interface CreativeUi {
   reset: HTMLButtonElement;
   /** Dev world menu: a button labeled with the current world (click handled by Game). */
   worldButton: HTMLButtonElement;
+  /** Sound controls: mute toggle + volume slider (wired by Game to the AudioEngine). */
+  muteButton: HTMLButtonElement;
+  volumeSlider: HTMLInputElement;
+  /** Syncs the sound controls to the engine state (icon, slider position, dimming). */
+  setSoundUi(volume: number, muted: boolean): void;
   /** Highlights the button for `tool` and dims the rest. */
   setActiveTool(tool: string): void;
   /** Shows `text` as a transient toast that fades out on its own. */
@@ -205,7 +268,33 @@ export function createCreativeUi(
   const worldButton = button('World: default');
   worldButton.className = 'world-btn';
 
-  dock.append(toolRow, worldButton, reset);
+  // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
+  const soundGroup = document.createElement('div');
+  soundGroup.className = 'sound-group';
+  const muteButton = document.createElement('button');
+  muteButton.type = 'button';
+  muteButton.className = 'sound-btn';
+  const volumeSlider = document.createElement('input');
+  volumeSlider.type = 'range';
+  volumeSlider.className = 'sound-slider';
+  volumeSlider.min = '0';
+  volumeSlider.max = '100';
+  volumeSlider.step = '1';
+  volumeSlider.setAttribute('aria-label', 'Sound volume');
+  soundGroup.append(muteButton, volumeSlider);
+
+  const setSoundUi = (volume: number, muted: boolean): void => {
+    muteButton.replaceChildren(buildIcon(SPEAKER_SHAPES[muted ? 'off' : 'on']));
+    const label = muted ? 'Unmute sound' : 'Mute sound';
+    muteButton.title = label;
+    muteButton.setAttribute('aria-label', label);
+    muteButton.setAttribute('aria-pressed', String(muted));
+    volumeSlider.value = String(Math.round(volume * 100));
+    volumeSlider.disabled = muted;
+    soundGroup.classList.toggle('is-muted', muted);
+  };
+
+  dock.append(toolRow, soundGroup, worldButton, reset);
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
   const scrim = document.createElement('div');
@@ -333,6 +422,9 @@ export function createCreativeUi(
     picker,
     reset,
     worldButton,
+    muteButton,
+    volumeSlider,
+    setSoundUi,
     setActiveTool,
     setStatus,
     setNotice,

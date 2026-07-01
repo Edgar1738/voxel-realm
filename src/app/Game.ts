@@ -41,7 +41,7 @@ import { ViewDistanceGovernor } from './ViewDistanceGovernor';
 import { applyFogRange } from '../render/fog';
 import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
-import type { SetVoxel } from '../edit/EditTypes';
+import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
@@ -59,6 +59,11 @@ import type { BuilderIntent } from './builderInput';
 import { dominantHorizontalAxis } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
+import { BlockParticles, particleColorOf } from '../render/BlockParticles';
+import { AudioEngine } from '../audio/AudioEngine';
+import { MovementSoundTracker } from '../audio/MovementSounds';
+import { batchSound, familyOf } from '../audio/sounds';
+import { AIR } from '../blocks/blocks';
 import { fillBox, clearBox, replaceVoxels, captureRegion, prefabToVoxels } from './RegionOps';
 
 const SEED: WorldSeed = 1337;
@@ -145,6 +150,10 @@ export class Game {
 
     const edit = new EditService(manager);
     const inventory = new CreativeInventory();
+    const audio = new AudioEngine();
+    const movementSounds = new MovementSoundTracker();
+    const particles = new BlockParticles();
+    particles.attach((o) => renderer.add(o));
     let tool: Tool = 'single';
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
 
@@ -202,11 +211,33 @@ export class Game {
       setStatus('Save was from an older or incompatible world — previous edits were cleared.');
     }
 
+    // Re-renders the hotbar and ticks when the selection actually changed (key, wheel, click).
+    let lastHotbarKey = `${inventory.selectedSlot}:${inventory.selectedBlock}`;
+    const renderHotbar = (): void => {
+      ui.renderHotbar();
+      const key = `${inventory.selectedSlot}:${inventory.selectedBlock}`;
+      if (key !== lastHotbarKey) {
+        lastHotbarKey = key;
+        audio.playTick();
+      }
+    };
+
+    ui.setSoundUi(audio.volume, audio.muted);
+    ui.muteButton.addEventListener('click', () => {
+      audio.setMuted(!audio.muted);
+      ui.setSoundUi(audio.volume, audio.muted);
+      setStatus(audio.muted ? 'Sound muted' : 'Sound on');
+    });
+    ui.volumeSlider.addEventListener('input', () => {
+      audio.setVolume(Number(ui.volumeSlider.value) / 100);
+      audio.playTick(); // audible feedback while dragging
+    });
+
     ui.picker.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
       if (!btn) return;
       inventory.pickBlock(Number(btn.dataset.block) as BlockId);
-      ui.renderHotbar();
+      renderHotbar();
       setStatus(`Selected ${registry.get(inventory.selectedBlock).name}`);
       ui.setInventoryOpen(false);
     });
@@ -214,7 +245,7 @@ export class Game {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-slot]');
       if (!btn) return;
       inventory.selectSlot(Number(btn.dataset.slot));
-      ui.renderHotbar();
+      renderHotbar();
     });
     ui.reset.addEventListener('click', () => {
       if (!window.confirm('Reset the world back to generated terrain? Your edits will be lost.')) {
@@ -232,6 +263,25 @@ export class Game {
         });
     });
 
+    /** Sound + particles for what an edit batch actually changed (one sound per action). */
+    const MAX_EFFECT_VOXELS = 6;
+    const playEditEffects = (changes: readonly VoxelChange[]): void => {
+      const sound = batchSound(changes);
+      if (sound) audio.playBlock(sound.family, sound.kind);
+      let bursts = 0;
+      let pops = 0;
+      for (const c of changes) {
+        if (c.after === AIR && c.before !== AIR && bursts < MAX_EFFECT_VOXELS) {
+          particles.burst(c.x, c.y, c.z, particleColorOf(registry.get(c.before)));
+          bursts++;
+        } else if (c.after !== AIR && c.before === AIR && pops < 4) {
+          particles.pop(c.x, c.y, c.z);
+          pops++;
+        }
+        if (bursts >= MAX_EFFECT_VOXELS && pops >= 4) break;
+      }
+    };
+
     /** Applies an edit set (capped), reports the result, and clears any pending selection. */
     const run = (voxels: SetVoxel[], verb: string): void => {
       if (!withinEditCap(voxels.length, MAX_EDIT_VOXELS)) {
@@ -239,6 +289,7 @@ export class Game {
         return;
       }
       const batch = edit.apply(voxels);
+      if (batch) playEditEffects(batch.changes);
       setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
@@ -405,7 +456,7 @@ export class Game {
       callbacks: {
         onStatusChange: setStatus,
         onToolChange: setTool,
-        onHotbarRender: () => ui.renderHotbar(),
+        onHotbarRender: () => renderHotbar(),
         onInventoryToggle: (open) => ui.setInventoryOpen(open),
         isInventoryOpen: () => ui.isInventoryOpen(),
         onRun: run,
@@ -469,6 +520,30 @@ export class Game {
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
       const eye = player.eye();
       rig.applyEye(eye.x, eye.y, eye.z);
+      const move = movementSounds.update(
+        cdt,
+        player.position.x,
+        player.position.y,
+        player.position.z,
+        player.grounded,
+      );
+      if (move.stepped || move.landed > 0) {
+        // Feet sit 0.9 below body center; sample just beneath them for the surface material.
+        const surface = familyOf(
+          manager.getBlock(
+            Math.floor(player.position.x),
+            Math.floor(player.position.y - 0.95),
+            Math.floor(player.position.z),
+          ),
+        );
+        if (move.landed > 0) {
+          audio.playLanding(move.landed);
+          if (surface) audio.playBlock(surface, 'step', move.landed);
+        } else if (surface) {
+          audio.playBlock(surface, 'step');
+        }
+      }
+      particles.update(cdt);
       manager.update(
         worldToChunkCoord(Math.floor(player.position.x)),
         worldToChunkCoord(Math.floor(player.position.z)),
@@ -556,6 +631,23 @@ export class Game {
         profiler,
         roam,
         headlamp: (on: boolean) => setHeadlamp(on, false),
+        // Wraps the engine so dev-console changes keep the HUD controls in sync.
+        audio: {
+          setMuted: (m: boolean) => {
+            audio.setMuted(m);
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+          setVolume: (v: number) => {
+            audio.setVolume(v);
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+          get muted() {
+            return audio.muted;
+          },
+          get volume() {
+            return audio.volume;
+          },
+        },
       };
       void import('./DevControls').then((m) => m.installDevControls(devContext));
       void import('./DevHud').then((m) => {
@@ -575,6 +667,7 @@ export class Game {
     /** Releases all resources acquired during boot. */
     function cleanup(): void {
       abortInput();
+      audio.dispose();
       persistence.dispose();
       hudTeardown?.();
       celestial.dispose();

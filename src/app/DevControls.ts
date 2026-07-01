@@ -82,6 +82,13 @@ export interface DevControlsContext {
   roam: RoamDriver;
   /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
   headlamp: (on: boolean) => void;
+  /** Sound engine handle for the `sound` dev command. */
+  audio: {
+    setMuted(muted: boolean): void;
+    setVolume(v: number): void;
+    muted: boolean;
+    volume: number;
+  };
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
@@ -417,6 +424,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     time: 'time(t) — 0 midnight, .25 sunrise, .5 noon, .75 sunset',
     dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
     headlamp: 'headlamp(on=true) — camera-centered glow for dark caves (not persisted)',
+    sound: 'sound(on=true, volume?) — toggle audio / set volume 0..1 (persisted like the HUD)',
     view: 'view(maxWidth?, quality?) -> dataURL',
     save: 'save(name, {hud?,maxWidth?,quality?}) -> path — writes .captures/<name>.jpg',
     // build
@@ -597,6 +605,12 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     /** Camera-centered glow for dark caves — lights captures without placing blocks. */
     headlamp: (on = true): void => ctx.headlamp(on),
+    /** Toggle audio and optionally set the master volume (0..1). */
+    sound: (on = true, volume?: number): { muted: boolean; volume: number } => {
+      ctx.audio.setMuted(!on);
+      if (volume !== undefined) ctx.audio.setVolume(volume);
+      return { muted: ctx.audio.muted, volume: ctx.audio.volume };
+    },
 
     // --- see ---
     view,

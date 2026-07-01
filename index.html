@@ -122,6 +122,38 @@
         border-color: rgba(255, 255, 255, 0.4);
       }
 
+      /* ---- Sound controls (in the dock) ---- */
+      .sound-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .sound-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px;
+        border: none;
+        border-radius: 7px;
+        background: transparent;
+        color: rgba(238, 242, 246, 0.75);
+        transition: color 120ms ease, background-color 140ms ease;
+      }
+      .sound-btn:hover {
+        color: #eef2f6;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .sound-slider {
+        width: 84px;
+        accent-color: #ffd34d;
+      }
+      .sound-group.is-muted .sound-slider {
+        opacity: 0.35;
+      }
+
       /* ---- Status toast (centered, above hotbar) ---- */
       .creative-status {
         position: fixed;
