@@ -75,4 +75,17 @@ describe('TargetOverlay', () => {
     o.update(placeInvalid, true);
     expect(o.ghost.material).toBe(m1);
   });
+
+  it('ghostVisible=false hides the ghost but keeps the outline on a place target', () => {
+    const o = new TargetOverlay();
+    o.update(placeValid, true, false);
+    expect(o.outline.visible).toBe(true);
+    expect(o.ghost.visible).toBe(false);
+  });
+
+  it('ghostVisible defaults to true (ghost shows on a place target)', () => {
+    const o = new TargetOverlay();
+    o.update(placeValid, true);
+    expect(o.ghost.visible).toBe(true);
+  });
 });

@@ -57,6 +57,7 @@ export interface InputCallbacks {
   getBuildMode: () => BuilderMode;
   onBuilderIntent: (intent: BuilderIntent) => void;
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
+  onToggleGhost: () => void;
 }
 
 export interface InputContext {
@@ -111,6 +112,10 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.code === 'Escape' && callbacks.isInventoryOpen()) {
         callbacks.onInventoryToggle(false);
+        return;
+      }
+      if (e.code === 'KeyV') {
+        callbacks.onToggleGhost();
         return;
       }
 
