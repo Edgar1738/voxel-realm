@@ -238,6 +238,17 @@ export class Game {
       return aim ? { x: aim.adjacent.x, y: aim.adjacent.y, z: aim.adjacent.z } : undefined;
     };
 
+    /** Preload the chunks under a world XZ box; on the manager's over-size throw, warn and signal abort. */
+    const preloadOrWarn = (minX: number, minZ: number, maxX: number, maxZ: number): boolean => {
+      try {
+        manager.preloadBox(minX, minZ, maxX, maxZ);
+        return true;
+      } catch {
+        setStatus('Selection too large to load');
+        return false;
+      }
+    };
+
     const handleBuilderIntent = (intent: BuilderIntent): void => {
       const box = builder.selectionBox();
       switch (intent) {
@@ -245,26 +256,28 @@ export class Game {
           builder.toggleMode();
           setStatus(builder.mode === 'off' ? 'Build mode off' : 'Build mode: pick two corners');
           return;
-        case 'cancel':
+        case 'cancel': {
+          const msg = builder.mode === 'pasting' ? 'Left paste mode' : 'Selection cleared';
           if (builder.mode === 'pasting') builder.exitPaste();
           else builder.clearSelection();
-          setStatus('Selection cleared');
+          setStatus(msg);
           return;
+        }
         case 'fill':
           if (!box) return void setStatus('Select two corners first');
-          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          if (!preloadOrWarn(box.x1, box.z1, box.x2, box.z2)) return;
           run(fillBox(box, inventory.selectedBlock), 'Filled');
           return;
         case 'clear':
           if (!box) return void setStatus('Select two corners first');
-          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          if (!preloadOrWarn(box.x1, box.z1, box.x2, box.z2)) return;
           run(clearBox(box), 'Cleared');
           return;
         case 'replace': {
           if (!box) return void setStatus('Select two corners first');
           const aim = builderAim();
           if (!aim) return void setStatus('Aim at the block type to replace');
-          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          if (!preloadOrWarn(box.x1, box.z1, box.x2, box.z2)) return;
           run(
             replaceVoxels(
               (x, y, z) => manager.getBlock(x, y, z),
@@ -278,8 +291,14 @@ export class Game {
         }
         case 'copy': {
           if (!box) return void setStatus('Select two corners first');
-          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
-          const clip = captureRegion((x, y, z) => manager.getBlock(x, y, z), box);
+          if (!preloadOrWarn(box.x1, box.z1, box.x2, box.z2)) return;
+          let clip;
+          try {
+            clip = captureRegion((x, y, z) => manager.getBlock(x, y, z), box);
+          } catch {
+            setStatus('Selection too large to copy');
+            return;
+          }
           if (clip.blocks.length === 0)
             return void setStatus('Nothing to copy (selection is empty)');
           builder.setClipboard(clip);
@@ -347,12 +366,10 @@ export class Game {
             const p = builder.transformedClipboard();
             if (!p) return;
             const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
-            manager.preloadBox(
-              origin.x,
-              origin.z,
-              origin.x + p.dims[0] - 1,
-              origin.z + p.dims[2] - 1,
-            );
+            if (
+              !preloadOrWarn(origin.x, origin.z, origin.x + p.dims[0] - 1, origin.z + p.dims[2] - 1)
+            )
+              return;
             run(prefabToVoxels(p, origin.x, origin.y, origin.z), 'Pasted');
           }
         },
