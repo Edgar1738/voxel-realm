@@ -450,6 +450,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     bench: 'bench({axis,distance,speed}) — profile a straight fly-roam',
     benchRoute: 'benchRoute([{x,z}...], {speed?}) — profile a multi-waypoint route',
     benchTour: "benchTour({speed?}) — profile the world's saved meta.tour",
+    fog: 'fog(near, far) — dev-only: override distance-fog band on chunk materials (clean wide captures)',
     help: 'help(name?) -> signatures (all, or one method)',
   };
 
@@ -1276,6 +1277,23 @@ export function installDevControls(ctx: DevControlsContext): void {
         tour.map((p) => ({ x: p.x, z: p.z })),
         opts,
       );
+    },
+    /** Dev-only: override the distance-fog band on chunk materials (for clean wide captures). */
+    fog: (near: number, far: number): { patched: number } => {
+      let patched = 0;
+      renderer.scene.traverse((obj: object) => {
+        const mat = (obj as { material?: unknown }).material;
+        const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+        for (const m of mats) {
+          const u = (m as { uniforms?: Record<string, { value: unknown }> }).uniforms;
+          if (u && 'uFogNear' in u && 'uFogFar' in u) {
+            u.uFogNear.value = near;
+            u.uFogFar.value = far;
+            patched++;
+          }
+        }
+      });
+      return { patched };
     },
     /** Signatures + one-line docs for the API (pass a method name for just that one). */
     help: (name?: string): Record<string, string> | string =>
