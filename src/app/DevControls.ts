@@ -39,7 +39,7 @@ import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
-import type { SetVoxel } from '../edit/EditTypes';
+import type { EditOutcome, SetVoxel } from '../edit/EditTypes';
 import {
   listWorlds,
   copyWorld,
@@ -239,6 +239,8 @@ export function installDevControls(ctx: DevControlsContext): void {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, dataUrl }),
     });
+    if (!res.ok)
+      throw new Error(`Voxel Realm: capture save failed (${res.status} ${res.statusText})`);
     const { path } = (await res.json()) as { path: string };
     lastSavedPath = path;
     return path;
@@ -376,6 +378,8 @@ export function installDevControls(ctx: DevControlsContext): void {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, blueprint: bp }),
     });
+    if (!res.ok)
+      throw new Error(`Voxel Realm: blueprint save failed (${res.status} ${res.statusText})`);
     return ((await res.json()) as { path: string }).path;
   };
   const loadBlueprint = async (name: string): Promise<Blueprint> => {
@@ -781,10 +785,9 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
 
     /**
-     * Mirror a box in place across 'x' or 'z' (one undo).
-     * NOTE: pastes in place WITHOUT clearing the source footprint — mirroring a non-square region
-     * can leave residual original voxels outside the new footprint; clear the box first (or use
-     * square regions) if that matters.
+     * Mirror a box in place across 'x' or 'z': copy, clear the source, paste the reflection —
+     * one undo. Clearing first (like `move`) means a single undo() fully restores the original
+     * even when the reflected footprint doesn't exactly cover the source box.
      */
     mirror: (
       x1: number,
@@ -799,14 +802,19 @@ export function installDevControls(ctx: DevControlsContext): void {
       const ox = Math.min(x1, x2),
         oy = Math.min(y1, y2),
         oz = Math.min(z1, z2);
-      return applyAny(prefabToVoxels(mirrorPrefab(bp, axis), ox, oy, oz), { label: 'mirror' });
+      const clear = boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({
+        ...v,
+        id: AIR,
+      }));
+      const paste = prefabToVoxels(mirrorPrefab(bp, axis), ox, oy, oz);
+      return applyAny([...clear, ...paste], { label: 'mirror' });
     },
 
     /**
-     * Rotate a box in place about Y by `quarterTurns` * 90deg, re-anchored at the min corner (one undo).
-     * NOTE: pastes in place WITHOUT clearing the source footprint — rotating a non-square region
-     * can leave residual original voxels outside the new footprint; clear the box first (or use
-     * square regions) if that matters.
+     * Rotate a box about Y by `quarterTurns` * 90deg, re-anchored at the min corner: copy, clear
+     * the source, paste the rotated result — one undo. Clearing first (like `move`) is required
+     * for non-square regions, where the rotated footprint's x/z extents swap and no longer match
+     * the source box; without it, a single undo() couldn't restore the exact original state.
      */
     rotate: (
       x1: number,
@@ -821,7 +829,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       const ox = Math.min(x1, x2),
         oy = Math.min(y1, y2),
         oz = Math.min(z1, z2);
-      return applyAny(prefabToVoxels(rotateY(bp, quarterTurns), ox, oy, oz), { label: 'rotate' });
+      const clear = boxVoxels({ x: x1, y: y1, z: z1 }, { x: x2, y: y2, z: z2 }).map((v) => ({
+        ...v,
+        id: AIR,
+      }));
+      const paste = prefabToVoxels(rotateY(bp, quarterTurns), ox, oy, oz);
+      return applyAny([...clear, ...paste], { label: 'rotate' });
     },
 
     /** Tile a box into an nx*ny*nz grid with the given per-axis stride (one undo). */
@@ -956,8 +969,8 @@ export function installDevControls(ctx: DevControlsContext): void {
         bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id })),
       );
     },
-    undo: (): string => edit.undo(),
-    redo: (): string => edit.redo(),
+    undo: (): EditOutcome => edit.undo(),
+    redo: (): EditOutcome => edit.redo(),
     /** Force-generate + mesh chunks within `radius` chunks of world (x,z) so edits/scans work now. */
     preloadArea: (x: number, z: number, radius = 2): { generated: number; meshed: number } =>
       manager.preload(worldToChunkCoord(x), worldToChunkCoord(z), Math.max(0, Math.floor(radius))),
