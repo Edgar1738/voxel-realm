@@ -113,3 +113,64 @@ describe('parseMeta – reject corrupt numeric meta', () => {
     expect(snapshot.meta).toBeUndefined();
   });
 });
+
+describe('parseMeta – curated optional roam fields', () => {
+  it('preserves valid spawn/look/title/description/landmarks/tour', () => {
+    const meta = {
+      seed: 7,
+      version: 1,
+      preset: 'default',
+      spawn: { x: 12, y: 65, z: -8 },
+      look: { yaw: 1.57, pitch: -0.2 },
+      title: 'Moonspire Realm',
+      description: 'A curated test world.',
+      landmarks: [{ name: 'Gate', x: 0, y: 64, z: 0 }],
+      tour: [
+        { x: 0, y: 64, z: 0 },
+        { name: 'Keep', x: 20, y: 70, z: 20 },
+      ],
+    };
+    const { snapshot } = parseWorldSnapshot({ meta, chunks: {} }, { isValidBlockId });
+    expect(snapshot.meta).toEqual(meta);
+  });
+
+  it('drops malformed optional fields but keeps seed/version/preset', () => {
+    const { snapshot } = parseWorldSnapshot(
+      {
+        meta: {
+          seed: 7,
+          version: 1,
+          preset: 'default',
+          spawn: { x: 1, y: 2 }, // missing z
+          look: { yaw: NaN, pitch: 0 }, // non-finite yaw
+          title: 42, // not a string
+          landmarks: [
+            { name: 'ok', x: 1, y: 2, z: 3 },
+            { x: 1, y: 2, z: 3 }, // missing name
+          ],
+          tour: [
+            { x: 0, y: 0, z: 0 },
+            { x: Infinity, y: 0, z: 0 }, // non-finite coord
+          ],
+        },
+        chunks: {},
+      },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toEqual({
+      seed: 7,
+      version: 1,
+      preset: 'default',
+      landmarks: [{ name: 'ok', x: 1, y: 2, z: 3 }],
+      tour: [{ x: 0, y: 0, z: 0 }],
+    });
+  });
+
+  it('does not leak unknown keys and keeps legacy meta minimal', () => {
+    const { snapshot } = parseWorldSnapshot(
+      { meta: { seed: 5, version: 1, bogus: 'x' }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta).toEqual({ seed: 5, version: 1 });
+  });
+});

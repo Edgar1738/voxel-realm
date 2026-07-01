@@ -24,7 +24,7 @@ import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
-import { FRAME_WORK_MS } from '../core/constants';
+import { FRAME_WORK_MS, WORLD_HEIGHT } from '../core/constants';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
@@ -38,6 +38,7 @@ import { raycastVoxels } from '../edit/VoxelRaycast';
 import { TargetOverlay } from '../render/TargetOverlay';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
+import { resolveSpawn, parseSpawnOverrides, clampSpawnY } from './bootSpawn';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -101,7 +102,15 @@ export class Game {
     manager.onChunkDeltaChanged = (key) => persistence.scheduleFlush(key);
 
     const overlay = document.getElementById('overlay') ?? undefined;
-    const player = new PlayerController(SPAWN, true);
+    // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
+    const spawnState = clampSpawnY(
+      resolveSpawn(bootMeta.meta, parseSpawnOverrides(window.location.search), {
+        spawn: SPAWN,
+        look: { yaw: 0, pitch: 0 },
+      }),
+      WORLD_HEIGHT,
+    );
+    const player = new PlayerController(spawnState.spawn, true);
     const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
@@ -116,6 +125,8 @@ export class Game {
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined, () =>
       ui.isInventoryOpen(),
     );
+    rig.yaw = spawnState.look.yaw;
+    rig.pitch = spawnState.look.pitch;
 
     if (import.meta.env.DEV) {
       const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');

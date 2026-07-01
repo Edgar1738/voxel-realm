@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { initializeBootSave } from '../src/app/saveBootstrap';
+import { initializeBootSave, loadBootMeta } from '../src/app/saveBootstrap';
 
 type FakeUi = {
   hotbar: { addEventListener: (...args: unknown[]) => void };
@@ -51,6 +51,8 @@ const boot = vi.hoisted(() => {
     registryConstructorArgs: [] as unknown[],
     cameraRigConstructorArgs: [] as unknown[],
     chunkManagerConstructorArgs: [] as unknown[],
+    playerConstructorArgs: [] as unknown[],
+    rigInstance: undefined as { yaw: number; pitch: number } | undefined,
     ui: undefined as FakeUi | undefined,
     abortInput: vi.fn(() => order.push('abortInput')),
     persistenceDispose: vi.fn(() => order.push('persistence.dispose')),
@@ -106,8 +108,9 @@ vi.mock('../src/render/ChunkMeshRegistry', () => ({
 vi.mock('../src/render/CameraRig', () => ({
   CameraRig: vi.fn(function CameraRig(...args: unknown[]) {
     boot.cameraRigConstructorArgs = args;
-    return {
+    const rig = {
       yaw: 0,
+      pitch: 0,
       locked: false,
       getInput: vi.fn(() => ({
         forward: false,
@@ -121,6 +124,8 @@ vi.mock('../src/render/CameraRig', () => ({
       applyEye: vi.fn(),
       dispose: boot.rigDispose,
     };
+    boot.rigInstance = rig;
+    return rig;
   }),
 }));
 
@@ -161,7 +166,8 @@ vi.mock('../src/blocks/BlockRegistry', () => ({
 }));
 
 vi.mock('../src/player/PlayerController', () => ({
-  PlayerController: vi.fn(function PlayerController() {
+  PlayerController: vi.fn(function PlayerController(...args: unknown[]) {
+    boot.playerConstructorArgs = args;
     return {
       position: { x: 0, z: 0 },
       update: vi.fn(),
@@ -265,6 +271,8 @@ describe('Game.boot composition', () => {
     boot.registryConstructorArgs = [];
     boot.cameraRigConstructorArgs = [];
     boot.chunkManagerConstructorArgs = [];
+    boot.playerConstructorArgs = [];
+    boot.rigInstance = undefined;
     boot.ui = makeUi();
     vi.stubGlobal('window', {
       location: { search: '', href: 'http://localhost/' },
@@ -346,6 +354,34 @@ describe('Game.boot composition', () => {
     const cleanup = await bootGame();
 
     expect(boot.ui!.setNotice).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it('starts the player flying at the fixed fallback spawn when meta has none', async () => {
+    const cleanup = await bootGame();
+
+    expect(boot.playerConstructorArgs).toEqual([{ x: 8, y: 100, z: 8 }, true]);
+
+    cleanup();
+  });
+
+  it('spawns at and looks toward the saved world meta when present', async () => {
+    vi.mocked(loadBootMeta).mockResolvedValueOnce({
+      store: {} as never,
+      meta: {
+        seed: 1,
+        version: 1,
+        spawn: { x: 20, y: 70, z: -20 },
+        look: { yaw: 1.5, pitch: -0.3 },
+      },
+      persistent: true,
+    });
+
+    const cleanup = await bootGame();
+
+    expect(boot.playerConstructorArgs[0]).toEqual({ x: 20, y: 70, z: -20 });
+    expect(boot.rigInstance).toMatchObject({ yaw: 1.5, pitch: -0.3 });
 
     cleanup();
   });
