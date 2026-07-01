@@ -58,8 +58,9 @@ export class TargetOverlay {
   /**
    * Positions and shows/hides both overlays for the current frame. `show=false` (pointer
    * unlocked or inventory open) hides everything. Toggle targets show the outline only.
+   * `ghostVisible=false` keeps the outline but suppresses the placement ghost (user preference).
    */
-  update(resolved: ResolvedTarget | undefined, show: boolean): void {
+  update(resolved: ResolvedTarget | undefined, show: boolean, ghostVisible = true): void {
     if (!show || !resolved) {
       this.outline.visible = false;
       this.ghost.visible = false;
@@ -69,7 +70,7 @@ export class TargetOverlay {
     this.outline.position.set(o.x + 0.5, o.y + 0.5, o.z + 0.5);
     this.outline.visible = true;
 
-    if (resolved.kind === 'place') {
+    if (resolved.kind === 'place' && ghostVisible) {
       const g = resolved.ghost;
       this.ghost.position.set(g.x + 0.5, g.y + 0.5, g.z + 0.5);
       this.ghost.material = g.valid ? this.validMat : this.invalidMat;
