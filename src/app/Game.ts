@@ -30,9 +30,12 @@ import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
-import { registerInputListeners, TOOLS, toolLabel, type Tool } from './input';
+import { registerInputListeners, TOOLS, toolLabel, REACH, type Tool } from './input';
 import { stairStateFromYaw } from './placement';
 import type { PreviewDeps } from './targetPreview';
+import { resolveTarget } from './targetPreview';
+import { raycastVoxels } from '../edit/VoxelRaycast';
+import { TargetOverlay } from '../render/TargetOverlay';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 
@@ -233,6 +236,10 @@ export class Game {
       },
     });
 
+    const targetOverlay = new TargetOverlay();
+    targetOverlay.attach((o) => renderer.add(o));
+    const previewSampler = { getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z) };
+
     // Dev-only roam profiler + scripted-roam driver (P0); set in the DEV block below.
     let devProfiler: FrameProfiler | undefined;
     let devRoam: RoamDriver | undefined;
@@ -251,6 +258,16 @@ export class Game {
       );
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
+      }
+      const previewOn = rig.locked && !ui.isInventoryOpen();
+      if (previewOn) {
+        const previewHit = raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+        targetOverlay.apply(
+          previewHit ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps) : undefined,
+          true,
+        );
+      } else {
+        targetOverlay.apply(undefined, false);
       }
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
