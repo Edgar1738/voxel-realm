@@ -1,4 +1,4 @@
-import { CHUNK_AREA, CHUNK_SIZE_X, CHUNK_VOLUME } from '../core/constants';
+import { CHUNK_AREA, CHUNK_SIZE_X, CHUNK_SIZE_Z, CHUNK_VOLUME, WORLD_HEIGHT } from '../core/constants';
 import { voxelIndex, inChunkBounds } from '../core/coords';
 import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
@@ -21,6 +21,12 @@ export class ChunkData {
    * the common all-cube chunk. Monotonic: only ever set true (a stale true just costs one scan).
    */
   hasShaped = false;
+  /**
+   * Highest y that holds a non-AIR voxel, or -1 for an all-air chunk. Maintained O(1) in set()
+   * (monotonic: only ever raised, so clearing the top voxel leaves it one slice high — harmless).
+   * Used to cap meshing height so the empty air above terrain is never swept.
+   */
+  maxSolidY = -1;
 
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;
@@ -49,6 +55,22 @@ export class ChunkData {
       throw new RangeError(`ChunkData.set out of bounds: (${x}, ${y}, ${z})`);
     }
     this.data[voxelIndex(x, y, z)] = id;
+    if (id !== AIR && y > this.maxSolidY) this.maxSolidY = y;
+  }
+
+  /** Recomputes the exact maxSolidY by scanning voxels top-down; for bulk writes that bypass set(). */
+  recomputeMaxSolidY(): void {
+    for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+      for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+        for (let x = 0; x < CHUNK_SIZE_X; x++) {
+          if (this.data[voxelIndex(x, y, z)] !== AIR) {
+            this.maxSolidY = y;
+            return;
+          }
+        }
+      }
+    }
+    this.maxSolidY = -1;
   }
 
   /** Reads a voxel's orientation state; out-of-bounds returns 0. */
