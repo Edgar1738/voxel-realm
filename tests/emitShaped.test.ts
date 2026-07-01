@@ -4,6 +4,8 @@ import { VoxelView } from '../src/world/VoxelView';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { buildBlockTextures, type BlockDef } from '../src/blocks/blocks';
 import { emitShaped, mergeMeshData } from '../src/mesh/emitShaped';
+import { WORLD_HEIGHT } from '../src/core/constants';
+import type { MeshData } from '../src/mesh/MeshTypes';
 
 const stoneFaces = { pattern: 'stone' as const, colors: [[128, 128, 132] as const] };
 const DEFS: BlockDef[] = [
@@ -70,6 +72,47 @@ describe('emitShaped early-out (P3)', () => {
     d.set(2, 10, 2, 2);
     const { slabs } = emitShaped(view(d), reg, true);
     expect(slabs.positions.length / 3).toBe(24);
+  });
+});
+
+function meshesEqual(a: MeshData, b: MeshData): void {
+  expect(Array.from(a.positions)).toEqual(Array.from(b.positions));
+  expect(Array.from(a.indices)).toEqual(Array.from(b.indices));
+  expect(Array.from(a.normals)).toEqual(Array.from(b.normals));
+  expect(Array.from(a.uvs)).toEqual(Array.from(b.uvs));
+  expect(Array.from(a.layers)).toEqual(Array.from(b.layers));
+  expect(Array.from(a.ao)).toEqual(Array.from(b.ao));
+  expect(Array.from(a.light)).toEqual(Array.from(b.light));
+  expect(Array.from(a.tint)).toEqual(Array.from(b.tint));
+}
+
+describe('emitShaped height cap (maxY, P-height)', () => {
+  it('default maxY matches an explicit WORLD_HEIGHT-1 cap', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2); // slab
+    d.set(4, 12, 4, 3); // plant
+    const uncapped = emitShaped(view(d), reg);
+    const explicit = emitShaped(view(d), reg, true, WORLD_HEIGHT - 1);
+    meshesEqual(uncapped.slabs, explicit.slabs);
+    meshesEqual(uncapped.cross, explicit.cross);
+  });
+
+  it('a cap at the tallest shaped voxel is identical to the uncapped mesh', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2); // slab well below the cap
+    d.set(4, 12, 4, 3); // plant also below the cap
+    const maxSolidY = 12; // matches ChunkData.maxSolidY for this chunk
+    const uncapped = emitShaped(view(d), reg);
+    const capped = emitShaped(view(d), reg, true, maxSolidY);
+    meshesEqual(uncapped.slabs, capped.slabs);
+    meshesEqual(uncapped.cross, capped.cross);
+  });
+
+  it('a cap below the tallest shaped voxel omits geometry above the cap', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2); // slab at y=10, above a cap of 5
+    const capped = emitShaped(view(d), reg, true, 5);
+    expect(capped.slabs.positions.length).toBe(0); // capped out entirely
   });
 });
 
