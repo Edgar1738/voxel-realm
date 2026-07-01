@@ -630,6 +630,7 @@ export class ChunkManager {
     this.baseChunks.set(key, cloneChunk(data));
     this.applySavedDeltas(data, key);
     data.hasShaped = this.scanHasShaped(data);
+    data.recomputeMaxSolidY();
     this.recomputeLight(data);
     this.store.set(cx, cz, data, ChunkState.Generated);
     this.frameGen++;
@@ -700,11 +701,12 @@ export class ChunkManager {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
     this.frameMesh++;
+    const capY = entry.data.maxSolidY; // height-cap: never sweep empty air above the tallest voxel
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
     const shaped = emitShaped(view, this.registry, entry.data.hasShaped);
     const meshes: ChunkMeshes = {
-      opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass), shaped.slabs),
-      transparent: this.mesher.mesh(view, this.transparentPass),
+      opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass, capY), shaped.slabs),
+      transparent: this.mesher.mesh(view, this.transparentPass, capY),
       cutout: shaped.cross,
     };
     this.sink.upload(chunkKey(cx, cz), meshes);
