@@ -57,4 +57,12 @@ describe('ViewDistanceGovernor', () => {
     expect(g.sample(16, false)).toBeUndefined(); // window refilling (1/2)
     expect(g.sample(16, false)).toBe(3); // window full again -> grow
   });
+
+  it('does not let a streaming (load-inflated) frame pollute the decision window', () => {
+    const g = gov(1, 4, 3); // room to shrink; a polluted window would shrink here
+    expect(g.sample(100, true)).toBeUndefined(); // streaming spike must not enter the window
+    expect(g.sample(16, false)).toBeUndefined(); // window=[16], len 1 < 2 (spike absent)
+    expect(g.sample(16, false)).toBe(4); // window=[16,16] -> grow, never shrink
+    expect(g.viewDistance).toBe(4);
+  });
 });

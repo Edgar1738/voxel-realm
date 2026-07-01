@@ -62,10 +62,11 @@ export class ViewDistanceGovernor {
       return undefined;
     }
 
+    if (streaming) return undefined;
+
     this.window.push(frameMs);
     if (this.window.length > this.opts.windowFrames) this.window.shift();
 
-    if (streaming) return undefined;
     if (this.window.length < this.opts.windowFrames) return undefined;
 
     const measured = p95(this.window);
