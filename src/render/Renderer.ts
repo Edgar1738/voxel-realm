@@ -57,6 +57,17 @@ export class Renderer {
     this.rafId = requestAnimationFrame(tick);
   }
 
+  /**
+   * Forces a specific drawing-buffer size. Used by the dev capture path as a fallback when the
+   * headless preview tab reports a 0×0 viewport (where an on-demand render would otherwise
+   * produce a 0-sized canvas and a cryptic drawImage error).
+   */
+  resize(width: number, height: number): void {
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+  }
+
   /** Cancels the running animation frame loop. Safe to call if loop was never started. */
   stop(): void {
     if (this.rafId !== undefined) {

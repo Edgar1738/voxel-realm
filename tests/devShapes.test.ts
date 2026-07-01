@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from '../src/app/DevShapes';
+import {
+  lineVoxels,
+  cylinderVoxels,
+  pyramidVoxels,
+  hollowBoxVoxels,
+  inOctagon,
+  octagonVoxels,
+  ringVoxels,
+  coneVoxels,
+  hollowCylinderVoxels,
+} from '../src/app/DevShapes';
 import { STONE } from '../src/blocks/blocks';
 import type { SetVoxel } from '../src/edit/EditTypes';
+
+const key = (v: SetVoxel): string => `${v.x},${v.y},${v.z}`;
 
 // ---------------------------------------------------------------------------
 // lineVoxels
@@ -184,5 +196,124 @@ describe('hollowBoxVoxels', () => {
     const id = 7;
     const result = hollowBoxVoxels(0, 0, 0, 2, 2, 2, id);
     expect(result.every((v) => v.id === id)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// inOctagon / octagonVoxels
+// ---------------------------------------------------------------------------
+
+describe('inOctagon', () => {
+  it('bevels the corners via the manhattan cap', () => {
+    expect(inOctagon(0, 0, 5)).toBe(true);
+    expect(inOctagon(5, 0, 5)).toBe(true); // flat face
+    expect(inOctagon(5, 2, 5)).toBe(true); // edge of the bevel (sum 7 = 5 + 2)
+    expect(inOctagon(5, 5, 5)).toBe(false); // corner cut (sum 10)
+    expect(inOctagon(6, 0, 5)).toBe(false); // outside chebyshev radius
+  });
+});
+
+describe('octagonVoxels', () => {
+  it('radius-1 is the 5-cell plus shape', () => {
+    expect(octagonVoxels(0, 0, 0, 1, 1, STONE)).toHaveLength(5);
+  });
+
+  it('radius-2 filled octagon has 21 cells (25 minus the 4 cut corners)', () => {
+    expect(octagonVoxels(0, 0, 0, 2, 1, STONE)).toHaveLength(21);
+  });
+
+  it('extrudes by height', () => {
+    expect(octagonVoxels(0, 0, 0, 2, 3, STONE)).toHaveLength(21 * 3);
+  });
+
+  it('every cell satisfies inOctagon', () => {
+    const r = 4;
+    for (const v of octagonVoxels(0, 0, 0, r, 1, STONE)) expect(inOctagon(v.x, v.z, r)).toBe(true);
+  });
+
+  it('hollow keeps only the wall ring — a strict subset with no centre', () => {
+    const filled = new Set(octagonVoxels(0, 0, 0, 3, 1, STONE).map(key));
+    const hollow = octagonVoxels(0, 0, 0, 3, 1, STONE, { hollow: true });
+    expect(hollow.length).toBeLessThan(filled.size);
+    for (const v of hollow) expect(filled.has(key(v))).toBe(true);
+    expect(hollow.some((v) => v.x === 0 && v.z === 0)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ringVoxels
+// ---------------------------------------------------------------------------
+
+describe('ringVoxels', () => {
+  it('octagon ring excludes the interior (radius 1 → 4 arms, no centre)', () => {
+    const ring = ringVoxels(0, 0, 0, 1, STONE);
+    expect(ring).toHaveLength(4);
+    expect(ring.some((v) => v.x === 0 && v.z === 0)).toBe(false);
+  });
+
+  it('square ring radius 2 is the 5×5 border (16 cells)', () => {
+    expect(ringVoxels(0, 0, 0, 2, STONE, { shape: 'square' })).toHaveLength(16);
+  });
+
+  it('circle ring cells all round to the radius', () => {
+    for (const v of ringVoxels(0, 0, 0, 4, STONE, { shape: 'circle' }))
+      expect(Math.round(Math.hypot(v.x, v.z))).toBe(4);
+  });
+
+  it('is a single y-layer', () => {
+    const ys = new Set(ringVoxels(3, 9, 3, 3, STONE).map((v) => v.y));
+    expect(ys).toEqual(new Set([9]));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// coneVoxels
+// ---------------------------------------------------------------------------
+
+describe('coneVoxels', () => {
+  it('square solid cone equals the square pyramid', () => {
+    const cone = coneVoxels(0, 0, 0, 3, STONE, { shape: 'square' }).map(key).sort();
+    const pyr = pyramidVoxels(0, 0, 0, 3, STONE).map(key).sort();
+    expect(cone).toEqual(pyr);
+  });
+
+  it('octagon cone baseRadius 2 stacks 21+5+1 = 27 and tapers to a single apex', () => {
+    const cone = coneVoxels(0, 5, 0, 2, STONE);
+    expect(cone).toHaveLength(27);
+    const apex = cone.filter((v) => v.y === 7);
+    expect(apex).toHaveLength(1);
+    expect(apex[0]).toEqual({ x: 0, y: 7, z: 0, id: STONE });
+  });
+
+  it('layer counts strictly decrease with height', () => {
+    const byY = new Map<number, number>();
+    for (const v of coneVoxels(0, 0, 0, 4, STONE)) byY.set(v.y, (byY.get(v.y) ?? 0) + 1);
+    let prev = Infinity;
+    for (let level = 0; level <= 4; level++) {
+      const count = byY.get(level) ?? 0;
+      expect(count).toBeLessThan(prev);
+      prev = count;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hollowCylinderVoxels
+// ---------------------------------------------------------------------------
+
+describe('hollowCylinderVoxels', () => {
+  it('is a 1-thick tube with no centre', () => {
+    const tube = hollowCylinderVoxels(0, 0, 0, 2, 1, STONE);
+    expect(tube.some((v) => v.x === 0 && v.z === 0)).toBe(false);
+    for (const v of tube) {
+      const d2 = v.x * v.x + v.z * v.z;
+      expect(d2).toBeGreaterThan(1); // outside the (r-1) inner disk
+      expect(d2).toBeLessThanOrEqual(4); // within r²
+    }
+  });
+
+  it('extrudes by height', () => {
+    const oneLayer = hollowCylinderVoxels(0, 0, 0, 3, 1, STONE).length;
+    expect(hollowCylinderVoxels(0, 0, 0, 3, 4, STONE)).toHaveLength(oneLayer * 4);
   });
 });
