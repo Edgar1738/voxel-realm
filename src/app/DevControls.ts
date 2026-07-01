@@ -20,7 +20,7 @@ import {
 } from './DevBuildTools';
 import { collectDevState, type DevState } from './DevState';
 import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
-import type { RoamDriver } from './RoamBench';
+import { routeDistance, type RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
 import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './DevShapes';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
@@ -126,6 +126,34 @@ export function installDevControls(ctx: DevControlsContext): void {
   const syncCamera = (): void => {
     const eye = player.eye();
     rig.applyEye(eye.x, eye.y, eye.z);
+  };
+
+  // Shared bench reporting: a headline (with portable totals) plus the full percentile table,
+  // then best-effort copy the raw JSON to the clipboard. Used by both bench and benchRoute.
+  const reportBench = async (headline: string, summary: ProfilerSummary): Promise<void> => {
+    console.log(headline);
+    console.table({
+      framesSampled: summary.framesSampled,
+      meanFps: round(summary.meanFps, 1),
+      frameMsP50: round(summary.frameMs.p50, 2),
+      frameMsP95: round(summary.frameMs.p95, 2),
+      frameMsP99: round(summary.frameMs.p99, 2),
+      frameMsMax: round(summary.frameMs.max, 2),
+      updateMsP50: round(summary.updateMs.p50, 2),
+      updateMsP95: round(summary.updateMs.p95, 2),
+      updateMsMax: round(summary.updateMs.max, 2),
+      totalGens: summary.totalGens,
+      totalMeshes: summary.totalMeshes,
+      peakGensPerFrame: summary.peakGensPerFrame,
+      peakMeshesPerFrame: summary.peakMeshesPerFrame,
+      longFrames16: summary.longFrames16,
+      longFrames33: summary.longFrames33,
+    });
+    try {
+      await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
+    } catch {
+      /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
+    }
   };
 
   const downscale = (src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement => {
@@ -921,33 +949,70 @@ export function installDevControls(ctx: DevControlsContext): void {
       player.flying = prevFlying;
       syncCamera();
 
-      console.log(
+      await reportBench(
         `[vr.bench] preset=${preset} world=${currentWorld} axis=${axis} distance=${distance} ` +
           `speed=${speed} | portable: totalGens=${summary.totalGens} totalMeshes=${summary.totalMeshes}`,
+        summary,
       );
-      console.table({
-        framesSampled: summary.framesSampled,
-        meanFps: round(summary.meanFps, 1),
-        frameMsP50: round(summary.frameMs.p50, 2),
-        frameMsP95: round(summary.frameMs.p95, 2),
-        frameMsP99: round(summary.frameMs.p99, 2),
-        frameMsMax: round(summary.frameMs.max, 2),
-        updateMsP50: round(summary.updateMs.p50, 2),
-        updateMsP95: round(summary.updateMs.p95, 2),
-        updateMsMax: round(summary.updateMs.max, 2),
-        totalGens: summary.totalGens,
-        totalMeshes: summary.totalMeshes,
-        peakGensPerFrame: summary.peakGensPerFrame,
-        peakMeshesPerFrame: summary.peakMeshesPerFrame,
-        longFrames16: summary.longFrames16,
-        longFrames33: summary.longFrames33,
-      });
-      try {
-        await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
-      } catch {
-        /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
-      }
       return summary;
+    },
+    /**
+     * Route benchmark: fly through a series of x/z waypoints at a fixed speed while sampling.
+     * Warms up first and restores the prior pose/fly state afterwards. Returns the profiler
+     * summary plus route metadata. Only totalGens/totalMeshes are portable across machines;
+     * frame-time percentiles are same-machine guardrails.
+     */
+    benchRoute: async (
+      points: Array<{ x: number; z: number }>,
+      opts?: { speed?: number; warmupMs?: number },
+    ): Promise<ProfilerSummary & { waypoints: number; distance: number }> => {
+      const clean = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z));
+      if (clean.length < 2) throw new Error('benchRoute needs at least 2 finite waypoints');
+      const distance = routeDistance(clean);
+      if (distance <= 0) throw new Error('benchRoute waypoints have zero total length');
+      const speed = opts?.speed ?? 30;
+      const warmupMs = opts?.warmupMs ?? 1500;
+
+      const prevPos = { ...player.position };
+      const prevFlying = player.flying;
+      player.flying = true;
+      player.position.x = clean[0].x;
+      player.position.z = clean[0].z;
+      syncCamera();
+
+      await new Promise((resolve) => setTimeout(resolve, warmupMs));
+      profiler.reset();
+      await roam.startRoute({ points: clean, speed });
+
+      const summary = profiler.summary();
+      player.position.x = prevPos.x;
+      player.position.y = prevPos.y;
+      player.position.z = prevPos.z;
+      player.flying = prevFlying;
+      syncCamera();
+
+      await reportBench(
+        `[vr.benchRoute] preset=${preset} world=${currentWorld} waypoints=${clean.length} ` +
+          `distance=${round(distance, 1)} speed=${speed} | portable: totalGens=${summary.totalGens} ` +
+          `totalMeshes=${summary.totalMeshes} (frame percentiles are same-machine only)`,
+        summary,
+      );
+      return { ...summary, waypoints: clean.length, distance };
+    },
+    /** Route benchmark over the current world's saved `meta.tour` waypoints. */
+    benchTour: async (opts?: {
+      speed?: number;
+      warmupMs?: number;
+    }): Promise<ProfilerSummary & { waypoints: number; distance: number }> => {
+      const meta = await readWorldMeta(currentWorld);
+      const tour = meta?.tour;
+      if (!tour || tour.length < 2) {
+        throw new Error('benchTour: world meta has no tour with at least 2 points');
+      }
+      return api.benchRoute(
+        tour.map((p) => ({ x: p.x, z: p.z })),
+        opts,
+      );
     },
     /** Lists the available methods (so a fresh session can discover the API). */
     help: (): string[] => Object.keys(api),
