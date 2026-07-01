@@ -41,6 +41,14 @@ describe('toolLabel', () => {
     const labels = TOOLS.map(toolLabel);
     expect(labels).toEqual(['Single', 'Tunnel', 'Sphere', 'Box Clear', 'Fill', 'Replace']);
   });
+
+  it('does not throw on a malformed tool string with an empty hyphen-split segment', () => {
+    expect(() => toolLabel('-fill')).not.toThrow();
+    expect(toolLabel('-fill')).toBe(' Fill');
+    expect(() => toolLabel('box--clear')).not.toThrow();
+    expect(toolLabel('box--clear')).toBe('Box  Clear');
+    expect(toolLabel('')).toBe('');
+  });
 });
 
 describe('canEdit', () => {
