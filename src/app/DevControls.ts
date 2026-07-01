@@ -398,7 +398,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     // roam / camera
     pos: 'pos() -> {x,y,z}',
     look: 'look() -> {yaw,pitch}',
-    teleport: 'teleport(x,y,z) — move the player/eye',
+    teleport: 'teleport(x,y,z) — move the player/eye (y is the body CENTER; feet land at y-0.9)',
     aim: 'aim(yaw, pitch?) — set look angles',
     turn: 'turn(dyaw, dpitch?) — rotate look',
     lookAt: 'lookAt(tx,ty,tz) — face a point',

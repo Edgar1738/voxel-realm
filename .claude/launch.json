@@ -27,6 +27,13 @@
       "runtimeArgs": ["run", "dev", "--", "--port", "5205", "--strictPort"],
       "port": 5205,
       "autoPort": false
+    },
+    {
+      "name": "physics",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],
+      "port": 5199,
+      "autoPort": false
     }
   ]
 }

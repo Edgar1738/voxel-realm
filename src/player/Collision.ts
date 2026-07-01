@@ -113,13 +113,20 @@ function sweepAxis(
   const pMaxZ = moved.z + half.z;
   const loIdx = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
   const hiIdx = loIdx + 3;
+  const startLo = center[axis] - half[axis];
+  const startHi = center[axis] + half[axis];
   let hit = false;
   let limit = d > 0 ? Infinity : -Infinity;
   forEachBoxNear(sampler, pMinX, pMinY, pMinZ, pMaxX, pMaxY, pMaxZ, (b) => {
     if (
       axisOverlap(pMinX, pMaxX, b[0], b[3]) &&
       axisOverlap(pMinY, pMaxY, b[1], b[4]) &&
-      axisOverlap(pMinZ, pMaxZ, b[2], b[5])
+      axisOverlap(pMinZ, pMaxZ, b[2], b[5]) &&
+      // A box already overlapping the start interval on this axis was penetrated BEFORE the
+      // move (the other axes don't change during a single-axis sweep, so it overlapped the
+      // whole start AABB). Snapping to its near face would teleport the player backward —
+      // the embedded-start tunneling bug — so it never blocks; it can only be exited.
+      !axisOverlap(startLo, startHi, b[loIdx], b[hiIdx])
     ) {
       hit = true;
       limit = d > 0 ? Math.min(limit, b[loIdx]) : Math.max(limit, b[hiIdx]);
@@ -151,6 +158,11 @@ function tryStepUp(
  * resolving X, Z, then Y. Step-up: a blocked horizontal move with no vertical delta (or when
  * grounded with a small negative delta from gravity) retries raised by 1 voxel. `grounded` is
  * true when a downward move was blocked.
+ *
+ * Embedded starts (the AABB already overlaps solid — a teleport into geometry, or a block
+ * placed on the player) are safe: boxes overlapped before a sweep never block it, so the
+ * result always lies between the start and the target on every axis. The player holds (and
+ * reads grounded) rather than sinking, and a 1-block-deep embed self-heals via step-up.
  *
  * @param grounded - Pass `true` when the player was on the ground last frame. This broadens the
  *   step-up gate to also fire when `sd.y < 0` (gravity contribution), allowing 1-block ledge
@@ -218,7 +230,11 @@ export function resolveCollision(
       if (overlapsSolid(sampler, movedDown, half)) {
         const support = highestSupport(sampler, pos, half, feet0, feet0 + sd.y);
         if (support === -Infinity) {
-          pos.y += sd.y;
+          // No landable top in range means every blocking box was already overlapped before
+          // the move (an embedded start — e.g. a teleport into geometry). Hold position and
+          // report grounded instead of sinking through: step-up can then rescue the player,
+          // and gravity can't accumulate into a tunnel-through.
+          isGrounded = true;
         } else {
           pos.y = support + half.y;
           isGrounded = true;
