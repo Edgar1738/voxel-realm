@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roamStep, RoamDriver } from '../src/app/RoamBench';
+import { roamStep, RoamDriver, routeDistance, positionAlongRoute } from '../src/app/RoamBench';
 
 /** Runs roamStep across a dt sequence until done; returns total advance. */
 function runPath(distance: number, speed: number, dts: number[]): number {
@@ -72,5 +72,72 @@ describe('RoamDriver', () => {
     const driver = new RoamDriver(player);
     driver.step(1);
     expect(player.position.x).toBe(4);
+  });
+});
+
+describe('routeDistance', () => {
+  it('sums planar leg lengths', () => {
+    expect(
+      routeDistance([
+        { x: 0, z: 0 },
+        { x: 3, z: 0 },
+        { x: 3, z: 4 },
+      ]),
+    ).toBe(7);
+  });
+
+  it('ignores zero-length legs and returns 0 for fewer than two points', () => {
+    expect(routeDistance([{ x: 1, z: 1 }])).toBe(0);
+    expect(
+      routeDistance([
+        { x: 0, z: 0 },
+        { x: 0, z: 0 },
+        { x: 0, z: 5 },
+      ]),
+    ).toBe(5);
+  });
+});
+
+describe('positionAlongRoute', () => {
+  const route = [
+    { x: 0, z: 0 },
+    { x: 4, z: 0 },
+    { x: 4, z: 4 },
+  ];
+
+  it('returns the first point at distance 0', () => {
+    expect(positionAlongRoute(route, 0)).toEqual({ x: 0, z: 0 });
+  });
+
+  it('interpolates within a leg', () => {
+    expect(positionAlongRoute(route, 2.5)).toEqual({ x: 2.5, z: 0 });
+  });
+
+  it('crosses legs and clamps at the end', () => {
+    expect(positionAlongRoute(route, 6)).toEqual({ x: 4, z: 2 });
+    expect(positionAlongRoute(route, 999)).toEqual({ x: 4, z: 4 });
+  });
+});
+
+describe('RoamDriver.startRoute', () => {
+  it('flies the player through waypoints and resolves at the end', async () => {
+    const player = { position: { x: 0, y: 50, z: 0 } };
+    const driver = new RoamDriver(player);
+    const done = driver.startRoute({
+      points: [
+        { x: 0, z: 0 },
+        { x: 10, z: 0 },
+      ],
+      speed: 5,
+    });
+
+    expect(driver.active).toBe(true);
+    driver.step(1);
+    expect(player.position.x).toBe(5);
+    expect(player.position.y).toBe(50); // height untouched while flying
+    driver.step(1);
+    expect(player.position.x).toBe(10);
+    await done;
+    expect(driver.active).toBe(false);
   });
 });

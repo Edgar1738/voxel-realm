@@ -11,11 +11,13 @@ import {
 } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { CHUNK_VOLUME } from '../src/core/constants';
+import type { WorldMeta } from '../src/persistence/SaveTypes';
 
 export type ChunkEntry = [number, number] | [number, number, number];
 
 export interface DiskSnapshot {
-  meta?: { seed: number; version: number; preset?: string };
+  /** Stored opaquely; the client's `parseMeta` is the authoritative filter on read. */
+  meta?: WorldMeta;
   chunks: Record<string, Array<ChunkEntry>>;
 }
 

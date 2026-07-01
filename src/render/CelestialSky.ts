@@ -61,8 +61,8 @@ function starOpacity(daylight: number): number {
 
 /**
  * Sun + moon discs that traverse the sky with the time of day, plus a star field that fades in at
- * night. Tracks the existing day/night model via {@link skyState}. Everything renders behind the
- * terrain (depthTest/depthWrite off, low renderOrder) and stays centered on the camera so it reads
+ * night. Tracks the existing day/night model via {@link skyState}. Everything renders behind terrain
+ * via the depth buffer (depthTest on, depthWrite off) and stays centered on the camera so it reads
  * as fixed at the horizon-to-zenith arc.
  */
 export class CelestialSky {
@@ -81,7 +81,7 @@ export class CelestialSky {
     this.sunMat = new SpriteMaterial({
       map: discTexture('rgba(255,250,230,1)', 'rgba(255,240,200,0)'),
       color: new Color(0xfff4d6),
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
       blending: AdditiveBlending,
       transparent: true,
@@ -93,7 +93,7 @@ export class CelestialSky {
     this.moonMat = new SpriteMaterial({
       map: discTexture('rgba(235,238,245,1)', 'rgba(200,210,230,0)'),
       color: new Color(0xdfe4ef),
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
       transparent: true,
     });
@@ -110,7 +110,7 @@ export class CelestialSky {
       color: 0xffffff,
       size: 2.2,
       sizeAttenuation: false,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false,
       transparent: true,
       opacity: 0,

@@ -13,14 +13,12 @@ import {
   readdirSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import type { WorldMeta } from '../src/persistence/SaveTypes';
 
 export const DEFAULT_ROAM_PORT = 5175;
 
-export interface SnapshotMeta {
-  seed: number;
-  version: number;
-  preset?: string;
-}
+/** Snapshot meta carried into the archive; the full curated {@link WorldMeta}. */
+export type SnapshotMeta = WorldMeta;
 
 export interface GitInfo {
   branch?: string;
@@ -65,13 +63,26 @@ export function formatDate(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function roamUrl(saveName: string, port: number = DEFAULT_ROAM_PORT): string {
-  return `http://127.0.0.1:${port}/?save=${saveName}`;
+export function roamUrl(
+  saveName: string,
+  port: number = DEFAULT_ROAM_PORT,
+  preset?: string,
+): string {
+  const base = `http://127.0.0.1:${port}/?save=${saveName}`;
+  return preset && preset !== 'default' ? `${base}&world=${preset}` : base;
+}
+
+const CAPTURE_RE = /\.(jpe?g|png)$/i;
+
+/** Whether a filename is a capture image we archive (.jpg / .jpeg / .png). */
+export function isCaptureFile(file: string): boolean {
+  return CAPTURE_RE.test(file);
 }
 
 /**
  * Decide which capture files belong to a save. An explicit list wins (filtered to files
- * that actually exist); otherwise auto-match `<save>.jpg` and the `<save>-*.jpg` convention.
+ * that actually exist); otherwise auto-match `<save>.<ext>` and the `<save>-*.<ext>`
+ * convention across .jpg / .jpeg / .png.
  */
 export function matchCaptures(
   available: string[],
@@ -81,10 +92,13 @@ export function matchCaptures(
   if (explicit && explicit.length > 0) {
     return explicit.filter((file) => available.includes(file));
   }
-  const exact = `${saveName}.jpg`;
   const prefix = `${saveName}-`;
   return available
-    .filter((file) => file === exact || (file.startsWith(prefix) && file.endsWith('.jpg')))
+    .filter((file) => {
+      if (!isCaptureFile(file)) return false;
+      const base = file.replace(CAPTURE_RE, '');
+      return base === saveName || base.startsWith(prefix);
+    })
     .sort();
 }
 
@@ -158,6 +172,7 @@ export function upsertCatalog(existing: string | null, manifest: ArchiveManifest
 }
 
 export function renderReadme(manifest: ArchiveManifest, port: number = DEFAULT_ROAM_PORT): string {
+  const meta = manifest.snapshot.meta;
   const lines: string[] = [
     `# ${manifest.title}`,
     '',
@@ -169,7 +184,7 @@ export function renderReadme(manifest: ArchiveManifest, port: number = DEFAULT_R
     restoreCommand(manifest),
     '```',
     '',
-    `Then roam at: ${roamUrl(`${manifest.sourceSave}-restored`, port)}`,
+    `Then roam at: ${roamUrl(`${manifest.sourceSave}-restored`, port, meta?.preset)}`,
     '',
     '## Details',
     '',
@@ -177,9 +192,14 @@ export function renderReadme(manifest: ArchiveManifest, port: number = DEFAULT_R
     `- Archived: ${manifest.archivedAt}`,
     `- Chunks: ${manifest.snapshot.chunkCount}`,
   ];
-  if (manifest.snapshot.meta) {
-    const { seed, version, preset } = manifest.snapshot.meta;
+  if (meta) {
+    const { seed, version, preset } = meta;
     lines.push(`- Seed: ${seed} · version ${version}${preset ? ` · preset ${preset}` : ''}`);
+    if (meta.spawn) {
+      const { x, y, z } = meta.spawn;
+      const facing = meta.look ? ` · facing yaw ${meta.look.yaw} pitch ${meta.look.pitch}` : '';
+      lines.push(`- Spawn: (${x}, ${y}, ${z})${facing}`);
+    }
   }
   if (manifest.source.branch || manifest.source.commit) {
     lines.push(
@@ -187,6 +207,22 @@ export function renderReadme(manifest: ArchiveManifest, port: number = DEFAULT_R
     );
   }
   lines.push('');
+  if (meta?.landmarks?.length) {
+    lines.push('## Landmarks', '');
+    for (const landmark of meta.landmarks) {
+      lines.push(`- ${landmark.name}: (${landmark.x}, ${landmark.y}, ${landmark.z})`);
+    }
+    lines.push('');
+  }
+  if (meta?.tour?.length) {
+    lines.push('## Tour route', '');
+    meta.tour.forEach((point, i) => {
+      lines.push(
+        `${i + 1}. ${point.name ? `${point.name} ` : ''}(${point.x}, ${point.y}, ${point.z})`,
+      );
+    });
+    lines.push('');
+  }
   if (manifest.captures.length > 0) {
     lines.push('## Screenshots', '');
     for (const capture of manifest.captures) {
@@ -249,7 +285,7 @@ export function archiveWorld(opts: ArchiveWorldOptions): ArchiveWorldResult {
   writeFileSync(resolve(archiveDir, 'world.json'), raw);
 
   const available = existsSync(opts.capturesDir)
-    ? readdirSync(opts.capturesDir).filter((file) => file.endsWith('.jpg'))
+    ? readdirSync(opts.capturesDir).filter(isCaptureFile)
     : [];
   const copiedCaptures = matchCaptures(available, opts.saveName, opts.captures);
   if (copiedCaptures.length > 0) {

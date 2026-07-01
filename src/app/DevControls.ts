@@ -21,7 +21,7 @@ import {
 } from './DevBuildTools';
 import { collectDevState, type DevState } from './DevState';
 import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
-import type { RoamDriver } from './RoamBench';
+import { routeDistance, type RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
 import {
   lineVoxels,
@@ -39,7 +39,15 @@ import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
-import { listWorlds, copyWorld, deleteWorld } from '../persistence/ServerWorldCatalog';
+import {
+  listWorlds,
+  copyWorld,
+  deleteWorld,
+  readWorldMeta,
+  writeWorldMeta,
+} from '../persistence/ServerWorldCatalog';
+import type { WorldMeta } from '../persistence/SaveTypes';
+import { mergeMeta, appendLandmark } from './worldMeta';
 import type { WorldPreset } from '../worldgen/Presets';
 import {
   rotateY,
@@ -49,7 +57,7 @@ import {
   type Prefab,
 } from '../core/Prefab';
 import { toggleOpen } from '../world/VoxelState';
-import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
+import { replaceVoxels, prefabToVoxels, unloadedChunksInBox, captureRegion } from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -115,11 +123,52 @@ export function installDevControls(ctx: DevControlsContext): void {
     window.location.href = u.toString();
   };
 
+  /** Read the current world's meta, apply `mutate`, and persist the complete result. */
+  const patchMeta = async (mutate: (base: WorldMeta) => WorldMeta): Promise<WorldMeta> => {
+    const current = await readWorldMeta(currentWorld);
+    if (!current) {
+      throw new Error(
+        'Voxel Realm: world has no saved meta yet — make an edit so the save is written first',
+      );
+    }
+    const next = mutate(current);
+    await writeWorldMeta(currentWorld, next);
+    return next;
+  };
+
   // Push the current player eye + look into the camera so a teleport/aim is reflected
   // immediately on the next capture, independent of the rAF render loop's timing.
   const syncCamera = (): void => {
     const eye = player.eye();
     rig.applyEye(eye.x, eye.y, eye.z);
+  };
+
+  // Shared bench reporting: a headline (with portable totals) plus the full percentile table,
+  // then best-effort copy the raw JSON to the clipboard. Used by both bench and benchRoute.
+  const reportBench = async (headline: string, summary: ProfilerSummary): Promise<void> => {
+    console.log(headline);
+    console.table({
+      framesSampled: summary.framesSampled,
+      meanFps: round(summary.meanFps, 1),
+      frameMsP50: round(summary.frameMs.p50, 2),
+      frameMsP95: round(summary.frameMs.p95, 2),
+      frameMsP99: round(summary.frameMs.p99, 2),
+      frameMsMax: round(summary.frameMs.max, 2),
+      updateMsP50: round(summary.updateMs.p50, 2),
+      updateMsP95: round(summary.updateMs.p95, 2),
+      updateMsMax: round(summary.updateMs.max, 2),
+      totalGens: summary.totalGens,
+      totalMeshes: summary.totalMeshes,
+      peakGensPerFrame: summary.peakGensPerFrame,
+      peakMeshesPerFrame: summary.peakMeshesPerFrame,
+      longFrames16: summary.longFrames16,
+      longFrames33: summary.longFrames33,
+    });
+    try {
+      await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
+    } catch {
+      /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
+    }
   };
 
   const downscale = (src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement => {
@@ -388,7 +437,11 @@ export function installDevControls(ctx: DevControlsContext): void {
     surface: 'surface(x,z) -> {y,block,unloaded} — highest non-air',
     scan: 'scan(x1,y1,z1, x2,y2,z2) -> {dims,nonAir,counts,unloaded}',
     slice: 'slice(y, x1,z1, x2,z2) -> {rows,legend,...} — ASCII floor plan',
-    world: 'world.list()/current()/saveAs(n)/load(n)/delete(n)',
+    world:
+      'world.list()/current()/saveAs(n)/load(n)/delete(n) · meta()/setMeta/setSpawn(name?)/addLandmark/setTour/roamUrl',
+    bench: 'bench({axis,distance,speed}) — profile a straight fly-roam',
+    benchRoute: 'benchRoute([{x,z}...], {speed?}) — profile a multi-waypoint route',
+    benchTour: "benchTour({speed?}) — profile the world's saved meta.tour",
     help: 'help(name?) -> signatures (all, or one method)',
   };
 
@@ -652,13 +705,12 @@ export function installDevControls(ctx: DevControlsContext): void {
       } catch {
         /* region too large to auto-preload */
       }
-      const blocks: Array<[number, number, number, BlockId]> = [];
-      for (let y = ay; y <= by; y++)
-        for (let z = az; z <= bz; z++)
-          for (let x = ax; x <= bx; x++) {
-            const id = manager.getBlock(x, y, z);
-            if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
-          }
+      // Capture state too so copied stairs/gates keep their orientation (Phase 3).
+      const captured = captureRegion(
+        (x, y, z) => manager.getBlock(x, y, z),
+        { x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz },
+        (x, y, z) => manager.getState(x, y, z),
+      );
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
         x1: ax,
         y1: ay,
@@ -667,11 +719,11 @@ export function installDevControls(ctx: DevControlsContext): void {
         y2: by,
         z2: bz,
       });
-      return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
+      return { ...captured, unloaded };
     },
-    /** Stamp a blueprint with its min corner at (ox,oy,oz). */
+    /** Stamp a blueprint with its min corner at (ox,oy,oz), preserving block state. */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
-      applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+      applyAny(prefabToVoxels(bp, ox, oy, oz)),
 
     /** Replace every `fromId` voxel in the box with `toId` (one undo). */
     replace: (
@@ -910,6 +962,49 @@ export function installDevControls(ctx: DevControlsContext): void {
       /** Reload into world `name` (creates it on first edit if absent). */
       load: (name: string): void => gotoWorld(name),
       delete: (name: string): Promise<void> => deleteWorld(name),
+
+      // --- curated-world metadata (spawn / landmarks / tour) ---
+      /** Read the current world's stored meta, or undefined if it has none yet. */
+      meta: (): Promise<WorldMeta | undefined> => readWorldMeta(currentWorld),
+      /** Merge a partial patch into the stored meta and persist the complete result. */
+      setMeta: (patch: Partial<WorldMeta>): Promise<WorldMeta> =>
+        patchMeta((base) => mergeMeta(base, patch)),
+      /** Set spawn+look from the current player pose; optionally also drop a named landmark there. */
+      setSpawn: (name?: string): Promise<WorldMeta> => {
+        const spawn = {
+          x: round(player.position.x, 2),
+          y: round(player.position.y, 2),
+          z: round(player.position.z, 2),
+        };
+        const look = { yaw: round(rig.yaw, 3), pitch: round(rig.pitch, 3) };
+        return patchMeta((base) => {
+          const merged = mergeMeta(base, { spawn, look });
+          return name ? appendLandmark(merged, { name, ...spawn }) : merged;
+        });
+      },
+      /** Append a landmark; coordinates default to the current player position. */
+      addLandmark: (name: string, x?: number, y?: number, z?: number): Promise<WorldMeta> => {
+        const point = {
+          x: round(x ?? player.position.x, 2),
+          y: round(y ?? player.position.y, 2),
+          z: round(z ?? player.position.z, 2),
+        };
+        return patchMeta((base) => appendLandmark(base, { name, ...point }));
+      },
+      /** Replace the tour waypoints. */
+      setTour: (
+        points: Array<{ name?: string; x: number; y: number; z: number }>,
+      ): Promise<WorldMeta> => patchMeta((base) => mergeMeta(base, { tour: points })),
+      /** A shareable roam URL for the current world (strips debug spawn/look overrides). */
+      roamUrl: (): string => {
+        const u = new URL(window.location.href);
+        u.searchParams.set('save', currentWorld);
+        if (preset !== 'default') u.searchParams.set('world', preset);
+        else u.searchParams.delete('world');
+        u.searchParams.delete('spawn');
+        u.searchParams.delete('look');
+        return u.toString();
+      },
     },
     bookmark: bookmarks,
 
@@ -1059,33 +1154,70 @@ export function installDevControls(ctx: DevControlsContext): void {
       player.flying = prevFlying;
       syncCamera();
 
-      console.log(
+      await reportBench(
         `[vr.bench] preset=${preset} world=${currentWorld} axis=${axis} distance=${distance} ` +
           `speed=${speed} | portable: totalGens=${summary.totalGens} totalMeshes=${summary.totalMeshes}`,
+        summary,
       );
-      console.table({
-        framesSampled: summary.framesSampled,
-        meanFps: round(summary.meanFps, 1),
-        frameMsP50: round(summary.frameMs.p50, 2),
-        frameMsP95: round(summary.frameMs.p95, 2),
-        frameMsP99: round(summary.frameMs.p99, 2),
-        frameMsMax: round(summary.frameMs.max, 2),
-        updateMsP50: round(summary.updateMs.p50, 2),
-        updateMsP95: round(summary.updateMs.p95, 2),
-        updateMsMax: round(summary.updateMs.max, 2),
-        totalGens: summary.totalGens,
-        totalMeshes: summary.totalMeshes,
-        peakGensPerFrame: summary.peakGensPerFrame,
-        peakMeshesPerFrame: summary.peakMeshesPerFrame,
-        longFrames16: summary.longFrames16,
-        longFrames33: summary.longFrames33,
-      });
-      try {
-        await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
-      } catch {
-        /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
-      }
       return summary;
+    },
+    /**
+     * Route benchmark: fly through a series of x/z waypoints at a fixed speed while sampling.
+     * Warms up first and restores the prior pose/fly state afterwards. Returns the profiler
+     * summary plus route metadata. Only totalGens/totalMeshes are portable across machines;
+     * frame-time percentiles are same-machine guardrails.
+     */
+    benchRoute: async (
+      points: Array<{ x: number; z: number }>,
+      opts?: { speed?: number; warmupMs?: number },
+    ): Promise<ProfilerSummary & { waypoints: number; distance: number }> => {
+      const clean = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.z));
+      if (clean.length < 2) throw new Error('benchRoute needs at least 2 finite waypoints');
+      const distance = routeDistance(clean);
+      if (distance <= 0) throw new Error('benchRoute waypoints have zero total length');
+      const speed = opts?.speed ?? 30;
+      const warmupMs = opts?.warmupMs ?? 1500;
+
+      const prevPos = { ...player.position };
+      const prevFlying = player.flying;
+      player.flying = true;
+      player.position.x = clean[0].x;
+      player.position.z = clean[0].z;
+      syncCamera();
+
+      await new Promise((resolve) => setTimeout(resolve, warmupMs));
+      profiler.reset();
+      await roam.startRoute({ points: clean, speed });
+
+      const summary = profiler.summary();
+      player.position.x = prevPos.x;
+      player.position.y = prevPos.y;
+      player.position.z = prevPos.z;
+      player.flying = prevFlying;
+      syncCamera();
+
+      await reportBench(
+        `[vr.benchRoute] preset=${preset} world=${currentWorld} waypoints=${clean.length} ` +
+          `distance=${round(distance, 1)} speed=${speed} | portable: totalGens=${summary.totalGens} ` +
+          `totalMeshes=${summary.totalMeshes} (frame percentiles are same-machine only)`,
+        summary,
+      );
+      return { ...summary, waypoints: clean.length, distance };
+    },
+    /** Route benchmark over the current world's saved `meta.tour` waypoints. */
+    benchTour: async (opts?: {
+      speed?: number;
+      warmupMs?: number;
+    }): Promise<ProfilerSummary & { waypoints: number; distance: number }> => {
+      const meta = await readWorldMeta(currentWorld);
+      const tour = meta?.tour;
+      if (!tour || tour.length < 2) {
+        throw new Error('benchTour: world meta has no tour with at least 2 points');
+      }
+      return api.benchRoute(
+        tour.map((p) => ({ x: p.x, z: p.z })),
+        opts,
+      );
     },
     /** Signatures + one-line docs for the API (pass a method name for just that one). */
     help: (name?: string): Record<string, string> | string =>

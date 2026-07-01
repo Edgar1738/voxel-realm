@@ -1,7 +1,7 @@
 // src/persistence/WorldSnapshot.ts
 import { CHUNK_VOLUME } from '../core/constants';
 import { voxelId, voxelState, packVoxel } from './SaveTypes';
-import type { WorldDeltas, WorldMeta } from './SaveTypes';
+import type { WorldDeltas, WorldMeta, MetaPoint } from './SaveTypes';
 
 type Entry = [number, number] | [number, number, number];
 
@@ -92,11 +92,60 @@ export function parseWorldSnapshot(
   return { snapshot: meta ? { meta, chunks } : { chunks }, dropped };
 }
 
+function isFiniteNumber(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n);
+}
+
+/** A `{x,y,z}` object with finite coords, or undefined if malformed. */
+function parsePoint(value: unknown): MetaPoint | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const p = value as Record<string, unknown>;
+  if (isFiniteNumber(p.x) && isFiniteNumber(p.y) && isFiniteNumber(p.z)) {
+    return { x: p.x, y: p.y, z: p.z };
+  }
+  return undefined;
+}
+
 function parseMeta(value: unknown): WorldMeta | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const m = value as Record<string, unknown>;
   if (!Number.isInteger(m.seed) || !Number.isInteger(m.version)) return undefined;
   const meta: WorldMeta = { seed: m.seed as number, version: m.version as number };
   if (typeof m.preset === 'string') meta.preset = m.preset;
+
+  const spawn = parsePoint(m.spawn);
+  if (spawn) meta.spawn = spawn;
+
+  if (m.look && typeof m.look === 'object') {
+    const look = m.look as Record<string, unknown>;
+    if (isFiniteNumber(look.yaw) && isFiniteNumber(look.pitch)) {
+      meta.look = { yaw: look.yaw, pitch: look.pitch };
+    }
+  }
+
+  if (typeof m.title === 'string') meta.title = m.title;
+  if (typeof m.description === 'string') meta.description = m.description;
+
+  if (Array.isArray(m.landmarks)) {
+    const landmarks: Array<{ name: string } & MetaPoint> = [];
+    for (const raw of m.landmarks) {
+      const point = parsePoint(raw);
+      const name = (raw as Record<string, unknown> | null)?.name;
+      if (point && typeof name === 'string') landmarks.push({ name, ...point });
+    }
+    if (landmarks.length > 0) meta.landmarks = landmarks;
+  }
+
+  if (Array.isArray(m.tour)) {
+    const tour: Array<{ name?: string } & MetaPoint> = [];
+    for (const raw of m.tour) {
+      const point = parsePoint(raw);
+      if (!point) continue;
+      const name = (raw as Record<string, unknown>).name;
+      tour.push(typeof name === 'string' ? { name, ...point } : point);
+    }
+    if (tour.length > 0) meta.tour = tour;
+  }
+
   return meta;
 }

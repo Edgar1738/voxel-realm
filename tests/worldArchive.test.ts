@@ -8,6 +8,7 @@ import {
   roamUrl,
   matchCaptures,
   buildManifest,
+  renderReadme,
   upsertCatalog,
   archiveWorld,
   restoreWorld,
@@ -58,6 +59,49 @@ describe('matchCaptures', () => {
     expect(
       matchCaptures(available, 'medieval-village-roam', ['unrelated.jpg', 'missing.jpg']),
     ).toEqual(['unrelated.jpg']);
+  });
+
+  it('matches .jpg, .jpeg and .png captures for the save', () => {
+    const mixed = ['moon.jpg', 'moon-gate.jpeg', 'moon-hall.png', 'moon.gif', 'other.png'];
+    expect(matchCaptures(mixed, 'moon')).toEqual(['moon-gate.jpeg', 'moon-hall.png', 'moon.jpg']);
+  });
+});
+
+describe('roamUrl – preset', () => {
+  it('appends &world for a non-default preset', () => {
+    expect(roamUrl('citadel-world', 5175, 'citadel')).toBe(
+      'http://127.0.0.1:5175/?save=citadel-world&world=citadel',
+    );
+  });
+
+  it('omits &world for the default preset', () => {
+    expect(roamUrl('flatland', 5175, 'default')).toBe('http://127.0.0.1:5175/?save=flatland');
+  });
+});
+
+describe('renderReadme – roam metadata', () => {
+  it('lists spawn, landmarks and tour when the meta carries them', () => {
+    const manifest = buildManifest({
+      archiveId: '2026-07-01-moon',
+      title: 'Moonspire',
+      sourceSave: 'moon',
+      archivedAt: '2026-07-01T00:00:00.000Z',
+      repoPath: '/repo',
+      chunkCount: 1,
+      captures: [],
+      meta: {
+        seed: 1,
+        version: 1,
+        preset: 'default',
+        spawn: { x: 10, y: 65, z: -4 },
+        landmarks: [{ name: 'Gate', x: 0, y: 64, z: 0 }],
+        tour: [{ x: 0, y: 64, z: 0 }],
+      },
+    });
+    const readme = renderReadme(manifest);
+    expect(readme).toMatch(/spawn/i);
+    expect(readme).toContain('10');
+    expect(readme).toContain('Gate');
   });
 });
 
