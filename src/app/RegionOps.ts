@@ -46,7 +46,11 @@ export function replaceVoxels(
   return out;
 }
 
-/** Stamp a prefab's non-air blocks at a paste origin. */
+/** Stamp a prefab's non-air blocks at a paste origin, carrying orientation state through. */
 export function prefabToVoxels(p: Prefab, ox: number, oy: number, oz: number): SetVoxel[] {
-  return p.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }));
+  return p.blocks.map((b) => {
+    const voxel: SetVoxel = { x: ox + b[0], y: oy + b[1], z: oz + b[2], id: b[3] };
+    if (b.length === 5 && b[4] !== 0) voxel.state = b[4];
+    return voxel;
+  });
 }

@@ -62,4 +62,18 @@ describe('prefabToVoxels', () => {
       { x: 10, y: 20, z: 31, id: 2 },
     ]);
   });
+
+  it('emits state for 5-tuple blocks and omits it for plain 4-tuples', () => {
+    const p: Prefab = {
+      dims: [2, 1, 1],
+      blocks: [
+        [0, 0, 0, 5, 2],
+        [1, 0, 0, 6],
+      ],
+    };
+    expect(prefabToVoxels(p, 10, 20, 30)).toEqual([
+      { x: 10, y: 20, z: 30, id: 5, state: 2 },
+      { x: 11, y: 20, z: 30, id: 6 },
+    ]);
+  });
 });

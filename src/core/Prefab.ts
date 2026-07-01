@@ -1,9 +1,21 @@
 import type { BlockId } from './types';
 
-/** A non-air voxel offset from the prefab's min corner: [dx, dy, dz, id]. */
-export type PrefabVoxel = [number, number, number, BlockId];
+/** A non-air voxel offset from the prefab's min corner: [dx, dy, dz, id] or [dx, dy, dz, id, state]. */
+export type PrefabVoxel =
+  | [number, number, number, BlockId]
+  | [number, number, number, BlockId, number];
 
 const MAX_PREFAB_BLOCKS = 200000;
+
+/** The orientation state of a prefab voxel, or undefined for a plain 4-tuple. */
+function voxelStateOf(b: PrefabVoxel): number | undefined {
+  return b.length === 5 ? b[4] : undefined;
+}
+
+/** Build a prefab voxel, including the state element only when defined. */
+function prefabVoxel(dx: number, dy: number, dz: number, id: BlockId, state?: number): PrefabVoxel {
+  return state === undefined ? [dx, dy, dz, id] : [dx, dy, dz, id, state];
+}
 
 /** Structural validation for an untrusted Prefab. Returns null if valid, else a reason. */
 export function validatePrefab(p: unknown): string | null {
@@ -20,12 +32,18 @@ export function validatePrefab(p: unknown): string | null {
   if (!Array.isArray(o.blocks)) return 'blocks must be an array';
   if (o.blocks.length > MAX_PREFAB_BLOCKS) return `too many blocks (>${MAX_PREFAB_BLOCKS})`;
   for (const b of o.blocks) {
-    if (!Array.isArray(b) || b.length !== 4) return 'each block must be [dx,dy,dz,id]';
+    if (!Array.isArray(b) || (b.length !== 4 && b.length !== 5))
+      return 'each block must be [dx,dy,dz,id] or [dx,dy,dz,id,state]';
     const [dx, dy, dz, id] = b as number[];
     if (![dx, dy, dz, id].every(Number.isInteger)) return 'block fields must be integers';
     if (dx < 0 || dy < 0 || dz < 0 || dx >= sx || dy >= sy || dz >= sz)
       return `block offset out of dims range`;
     if (id < 0 || id > 255) return `block id ${id} out of 0..255`;
+    if (b.length === 5) {
+      const state = (b as number[])[4];
+      if (!Number.isInteger(state) || state < 0 || state > 255)
+        return `block state ${state} out of 0..255`;
+    }
   }
   return null;
 }
@@ -53,7 +71,9 @@ export function normalize(p: Prefab): Prefab {
     if (y > maxY) maxY = y;
     if (z > maxZ) maxZ = z;
   }
-  const blocks: PrefabVoxel[] = p.blocks.map(([x, y, z, id]) => [x - minX, y - minY, z - minZ, id]);
+  const blocks: PrefabVoxel[] = p.blocks.map((b) =>
+    prefabVoxel(b[0] - minX, b[1] - minY, b[2] - minZ, b[3], voxelStateOf(b)),
+  );
   return {
     dims: [maxX - minX + 1, maxY - minY + 1, maxZ - minZ + 1],
     blocks,
@@ -70,7 +90,7 @@ export function rotateY(p: Prefab, quarterTurns: number): Prefab {
     dimZ = sz;
   for (let t = 0; t < turns; t++) {
     const maxX = dimX - 1;
-    blocks = blocks.map(([x, y, z, id]) => [z, y, maxX - x, id]);
+    blocks = blocks.map((b) => prefabVoxel(b[2], b[1], maxX - b[0], b[3], voxelStateOf(b)));
     [dimX, dimZ] = [dimZ, dimX];
   }
   return normalize({ dims: [dimX, p.dims[1], dimZ], blocks });
@@ -79,8 +99,10 @@ export function rotateY(p: Prefab, quarterTurns: number): Prefab {
 /** Reflect across the given horizontal axis. */
 export function mirror(p: Prefab, axis: 'x' | 'z'): Prefab {
   const [sx, , sz] = p.dims;
-  const blocks: PrefabVoxel[] = p.blocks.map(([x, y, z, id]) =>
-    axis === 'x' ? [sx - 1 - x, y, z, id] : [x, y, sz - 1 - z, id],
+  const blocks: PrefabVoxel[] = p.blocks.map((b) =>
+    axis === 'x'
+      ? prefabVoxel(sx - 1 - b[0], b[1], b[2], b[3], voxelStateOf(b))
+      : prefabVoxel(b[0], b[1], sz - 1 - b[2], b[3], voxelStateOf(b)),
   );
   return normalize({ dims: p.dims, blocks });
 }
@@ -100,7 +122,15 @@ export function repeat(
   for (let iz = 0; iz < nz; iz++)
     for (let iy = 0; iy < ny; iy++)
       for (let ix = 0; ix < nx; ix++)
-        for (const [x, y, z, id] of p.blocks)
-          blocks.push([x + ix * stride[0], y + iy * stride[1], z + iz * stride[2], id]);
+        for (const b of p.blocks)
+          blocks.push(
+            prefabVoxel(
+              b[0] + ix * stride[0],
+              b[1] + iy * stride[1],
+              b[2] + iz * stride[2],
+              b[3],
+              voxelStateOf(b),
+            ),
+          );
   return normalize({ dims: p.dims, blocks });
 }

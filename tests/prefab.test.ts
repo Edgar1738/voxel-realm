@@ -102,3 +102,41 @@ describe('validatePrefab', () => {
     expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 999]] })).toMatch(/id/i);
   });
 });
+
+describe('stateful prefabs (5-tuple)', () => {
+  // id 5 carries orientation state 2 (e.g. a stair facing); id 6 is a legacy 4-tuple.
+  const STATE: Prefab = {
+    dims: [2, 1, 1],
+    blocks: [
+      [0, 0, 0, 5, 2],
+      [1, 0, 0, 6],
+    ],
+  };
+
+  const stateOfId = (p: Prefab, id: number): number | undefined => {
+    const b = p.blocks.find((v) => v[3] === id);
+    return b && b.length === 5 ? b[4] : undefined;
+  };
+
+  it('validatePrefab accepts 4- and 5-tuples but rejects an out-of-range state', () => {
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 5, 2]] })).toBeNull();
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 5]] })).toBeNull();
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 5, 999]] })).toMatch(/state/i);
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 5, -1]] })).toMatch(/state/i);
+    expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 5, 6, 7]] })).toMatch(/dx/i);
+  });
+
+  it('normalize carries the state element through the re-anchor', () => {
+    const shifted: Prefab = { dims: [1, 1, 1], blocks: [[5, 2, 5, 5, 2]] };
+    expect(normalize(shifted).blocks).toEqual([[0, 0, 0, 5, 2]]);
+  });
+
+  it('preserves per-block state through copy → rotate → mirror → repeat', () => {
+    expect(stateOfId(rotateY(STATE, 1), 5)).toBe(2);
+    expect(stateOfId(mirror(STATE, 'x'), 5)).toBe(2);
+    const tiled = repeat(STATE, 2, 1, 1, [2, 0, 0]);
+    expect(tiled.blocks.filter((v) => v[3] === 5 && v.length === 5 && v[4] === 2)).toHaveLength(2);
+    // the legacy 4-tuple stays a 4-tuple (state not fabricated)
+    expect(rotateY(STATE, 1).blocks.find((v) => v[3] === 6)?.length).toBe(4);
+  });
+});

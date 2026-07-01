@@ -45,6 +45,7 @@ import {
   repeat,
   validatePrefab,
   type Prefab,
+  type PrefabVoxel,
 } from '../core/Prefab';
 import { toggleOpen } from '../world/VoxelState';
 import { replaceVoxels, prefabToVoxels, unloadedChunksInBox } from './RegionOps';
@@ -512,12 +513,14 @@ export function installDevControls(ctx: DevControlsContext): void {
       } catch {
         /* region too large to auto-preload */
       }
-      const blocks: Array<[number, number, number, BlockId]> = [];
+      const blocks: PrefabVoxel[] = [];
       for (let y = ay; y <= by; y++)
         for (let z = az; z <= bz; z++)
           for (let x = ax; x <= bx; x++) {
             const id = manager.getBlock(x, y, z);
-            if (id !== AIR) blocks.push([x - ax, y - ay, z - az, id]);
+            if (id === AIR) continue;
+            const state = manager.getState(x, y, z);
+            blocks.push(state ? [x - ax, y - ay, z - az, id, state] : [x - ax, y - ay, z - az, id]);
           }
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
         x1: ax,
@@ -529,9 +532,9 @@ export function installDevControls(ctx: DevControlsContext): void {
       });
       return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks, unloaded };
     },
-    /** Stamp a blueprint with its min corner at (ox,oy,oz). */
+    /** Stamp a blueprint with its min corner at (ox,oy,oz), preserving block state. */
     paste: (bp: Blueprint, ox: number, oy: number, oz: number): BatchedEditResult =>
-      applyAny(bp.blocks.map(([dx, dy, dz, id]) => ({ x: ox + dx, y: oy + dy, z: oz + dz, id }))),
+      applyAny(prefabToVoxels(bp, ox, oy, oz)),
 
     /** Replace every `fromId` voxel in the box with `toId` (one undo). */
     replace: (
