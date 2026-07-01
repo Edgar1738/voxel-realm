@@ -345,8 +345,8 @@ export class Game {
           }
           if (builder.mode === 'pasting') {
             const p = builder.transformedClipboard();
-            const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
             if (!p) return;
+            const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
             manager.preloadBox(
               origin.x,
               origin.z,
