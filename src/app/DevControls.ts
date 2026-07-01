@@ -1,6 +1,7 @@
 import type { Renderer } from '../render/Renderer';
 import type { CameraRig } from '../render/CameraRig';
-import type { PlayerController } from '../player/PlayerController';
+import type { PlayerController, InputState, PlayerWorld } from '../player/PlayerController';
+import { simulateSteps, walkToward, makeInput, type WalkResult } from '../player/Simulate';
 import type { ChunkManager } from '../world/ChunkManager';
 import type { DayNight } from '../render/DayNight';
 import type { CelestialSky } from '../render/CelestialSky';
@@ -22,7 +23,16 @@ import { collectDevState, type DevState } from './DevState';
 import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
-import { lineVoxels, cylinderVoxels, pyramidVoxels, hollowBoxVoxels } from './DevShapes';
+import {
+  lineVoxels,
+  cylinderVoxels,
+  pyramidVoxels,
+  hollowBoxVoxels,
+  octagonVoxels,
+  ringVoxels,
+  coneVoxels,
+  hollowCylinderVoxels,
+} from './DevShapes';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
@@ -92,6 +102,12 @@ export function installDevControls(ctx: DevControlsContext): void {
     roam,
   } = ctx;
 
+  // Physics world for headless movement simulation (mirrors Game's live sampler).
+  const playerWorld: PlayerWorld = {
+    collisionBoxes: (x, y, z) => manager.collisionBoxesAt(x, y, z),
+    isWater: (x, y, z) => manager.isWater(x, y, z),
+  };
+
   const currentWorld = worldName;
   const gotoWorld = (name: string): void => {
     const u = new URL(window.location.href);
@@ -120,7 +136,20 @@ export function installDevControls(ctx: DevControlsContext): void {
     // Re-place the sun/moon/stars for the (possibly just-moved) camera before this one-off render,
     // since the rAF loop's update may be throttled in a headless/background tab.
     celestial.update(daynight.time, renderer.camera.position);
+    // Headless preview tabs can report a 0×0 viewport, which yields a 0-sized canvas and an opaque
+    // drawImage error downstream. Fall back to a sane size so capture still works.
+    const el = renderer.domElement;
+    if (!el.width || !el.height) {
+      renderer.resize(
+        Math.max(window.innerWidth || 0, 960),
+        Math.max(window.innerHeight || 0, 540),
+      );
+    }
     renderer.renderOnce();
+    if (!renderer.domElement.width || !renderer.domElement.height)
+      throw new Error(
+        'render canvas is 0×0 — resize the preview viewport (e.g. 1200×800) and retry',
+      );
     return downscale(renderer.domElement, maxWidth);
   };
 
@@ -308,6 +337,61 @@ export function installDevControls(ctx: DevControlsContext): void {
     return bp as Blueprint;
   };
 
+  // Signatures + one-line docs so a fresh session can discover the API without reading source.
+  const HELP: Record<string, string> = {
+    // roam / camera
+    pos: 'pos() -> {x,y,z}',
+    look: 'look() -> {yaw,pitch}',
+    teleport: 'teleport(x,y,z) — move the player/eye',
+    aim: 'aim(yaw, pitch?) — set look angles',
+    turn: 'turn(dyaw, dpitch?) — rotate look',
+    lookAt: 'lookAt(tx,ty,tz) — face a point',
+    orbit: 'orbit(cx,cy,cz, radius, angle?, height?) — camera on a circle looking in',
+    frame: 'frame(x1,y1,z1, x2,y2,z2, dir?) -> {eye,target} — fit a box to view',
+    pov: 'pov(ex,ey,ez, tx,ty,tz) — set eye + look in one call (first-person shots)',
+    forward: 'forward(dist) — fly along the look direction',
+    fly: 'fly(on=true) — toggle noclip flight',
+    // headless movement (loop is paused in preview tabs)
+    simulate:
+      'simulate(input={forward,back,left,right,up,down}, {frames?,dt?,yaw?,fly?}) -> {pos,grounded,moved} — step real physics',
+    walkTo: 'walkTo(x,y,z, {maxFrames?,arriveDist?}) -> WalkResult — walk there on foot',
+    reachable:
+      'reachable(from,to, {restore?}) -> {arrived,stuck,remaining,...} — CAN a player walk A→B (catches blocked stairs)',
+    // time / capture
+    time: 'time(t) — 0 midnight, .25 sunrise, .5 noon, .75 sunset',
+    dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
+    view: 'view(maxWidth?, quality?) -> dataURL',
+    save: 'save(name, {hud?,maxWidth?,quality?}) -> path — writes .captures/<name>.jpg',
+    // build
+    apply:
+      'apply(voxels[{x,y,z,id,state?}], {label?,maxBatchSize?}) -> EditResult — batch place (one undo)',
+    place: 'place(x,y,z,id, state?) — one voxel (state packs facing|half<<2|open<<3)',
+    toggle: 'toggle(x,y,z) — flip a gate open/closed',
+    fill: 'fill(x1,y1,z1, x2,y2,z2, id) — solid box',
+    clearBox: 'clearBox(x1,y1,z1, x2,y2,z2) — box to air',
+    sphere: 'sphere(cx,cy,cz, radius, id)',
+    cylinder: 'cylinder(cx,cy,cz, radius, height, id) — solid upright',
+    hollowCylinder: 'hollowCylinder(cx,cy,cz, radius, height, id) — 1-thick round tube',
+    pyramid: 'pyramid(cx,cy,cz, baseRadius, id) — square, tapers to a point',
+    cone: "cone(cx,cy,cz, baseRadius, id, {shape?:'octagon'|'square', solid?}) — spire/hat",
+    octagon: 'octagon(cx,cy,cz, radius, height, id, {hollow?}) — octagonal prism',
+    ring: "ring(cx,cy,cz, radius, id, {shape?:'octagon'|'circle'|'square'}) — 1-layer boundary",
+    hollowBox: 'hollowBox(x1,y1,z1, x2,y2,z2, id) — box shell',
+    line: 'line(x1,y1,z1, x2,y2,z2, id)',
+    replace: 'replace(box, fromId, toId)',
+    undo: 'undo()  /  redo: redo()',
+    preloadArea: 'preloadArea(x,z, radius=2) -> {generated,meshed} — load chunks before build/scan',
+    // perceive
+    blockAt: 'blockAt(x,y,z) -> name',
+    blockInfo: 'blockInfo(x,y,z) -> {id,name,state} — includes orientation/open state',
+    stateAt: 'stateAt(x,y,z) -> packed state byte',
+    surface: 'surface(x,z) -> {y,block,unloaded} — highest non-air',
+    scan: 'scan(x1,y1,z1, x2,y2,z2) -> {dims,nonAir,counts,unloaded}',
+    slice: 'slice(y, x1,z1, x2,z2) -> {rows,legend,...} — ASCII floor plan',
+    world: 'world.list()/current()/saveAs(n)/load(n)/delete(n)',
+    help: 'help(name?) -> signatures (all, or one method)',
+  };
+
   const api = {
     // --- roam ---
     pos: (): Vec3 => ({ ...player.position }),
@@ -361,6 +445,83 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     fly: (on = true): void => {
       player.flying = on;
+    },
+    /** First-person pose in one call: put the eye at (ex,ey,ez) and look toward (tx,ty,tz). */
+    pov: (ex: number, ey: number, ez: number, tx: number, ty: number, tz: number): void => {
+      player.position.x = ex;
+      player.position.y = ey;
+      player.position.z = ez;
+      lookAt(tx, ty, tz);
+    },
+
+    // --- headless movement (the rAF loop is paused in preview tabs; step physics on demand) ---
+    /**
+     * Step the real player physics `frames` times at fixed `dt` with the given movement intents
+     * (partial InputState; missing = false). Defaults to fly OFF so gravity + collision apply.
+     * The only way to exercise walking/gravity/collision in a headless tab. Returns net horizontal
+     * movement + whether the player ended grounded.
+     */
+    simulate: (
+      input: Partial<InputState> = {},
+      opts: { frames?: number; dt?: number; yaw?: number; fly?: boolean } = {},
+    ): { pos: Vec3; grounded: boolean; moved: number } => {
+      player.flying = opts.fly ?? false;
+      const r = simulateSteps(
+        player,
+        playerWorld,
+        makeInput(input),
+        opts.yaw ?? rig.yaw,
+        Math.max(1, Math.floor(opts.frames ?? 30)),
+        opts.dt ?? 1 / 60,
+      );
+      syncCamera();
+      return { pos: { ...player.position }, grounded: r.grounded, moved: r.moved };
+    },
+    /** Walk from the current spot toward (x,y,z) on foot under real physics. */
+    walkTo: (
+      x: number,
+      y: number,
+      z: number,
+      opts: { maxFrames?: number; dt?: number; arriveDist?: number; stuckFrames?: number } = {},
+    ): WalkResult => {
+      player.flying = false;
+      const r = walkToward(player, playerWorld, { x, y, z }, opts);
+      syncCamera();
+      return r;
+    },
+    /**
+     * Can a player walk from `from` to `to` on foot? Teleports there, beelines toward the target
+     * under real physics (re-aiming each frame), then (by default) restores the camera.
+     * `arrived:false, stuck:true` with a large `remaining` means blocked — a wall, an unclimbable
+     * ledge, or a capped exit. Catches walkability bugs no screenshot can; for winding paths
+     * (a spiral stair) check leg-by-leg with waypoints.
+     */
+    reachable: (
+      from: Vec3,
+      to: Vec3,
+      opts: {
+        maxFrames?: number;
+        dt?: number;
+        arriveDist?: number;
+        stuckFrames?: number;
+        restore?: boolean;
+      } = {},
+    ): WalkResult => {
+      const prev = { ...player.position };
+      const prevFly = player.flying;
+      player.position.x = from.x;
+      player.position.y = from.y;
+      player.position.z = from.z;
+      player.flying = false;
+      const r = walkToward(player, playerWorld, to, opts);
+      if (opts.restore ?? true) {
+        player.position.x = prev.x;
+        player.position.y = prev.y;
+        player.position.z = prev.z;
+        player.flying = prevFly;
+      }
+      syncCamera();
+      return r;
     },
     /** Set time of day (0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset). */
     time: (t: number): void => daynight.set(t),
@@ -649,6 +810,43 @@ export function installDevControls(ctx: DevControlsContext): void {
       z2: number,
       id: BlockId,
     ) => applyAny(hollowBoxVoxels(x1, y1, z1, x2, y2, z2, id)),
+    /** Octagonal prism (radius r, extruded `height` up). `opts.hollow` for walls only. */
+    octagon: (
+      cx: number,
+      cy: number,
+      cz: number,
+      radius: number,
+      height: number,
+      id: BlockId,
+      opts: { hollow?: boolean } = {},
+    ) => applyAny(octagonVoxels(cx, cy, cz, radius, height, id, opts)),
+    /** Single-layer boundary ring. `opts.shape`: 'octagon' (default) | 'circle' | 'square'. */
+    ring: (
+      cx: number,
+      cy: number,
+      cz: number,
+      radius: number,
+      id: BlockId,
+      opts: { shape?: 'octagon' | 'circle' | 'square' } = {},
+    ) => applyAny(ringVoxels(cx, cy, cz, radius, id, opts)),
+    /** Tapering cone/spire to a point (wizard-hat / turret cap). `opts`: shape, solid. */
+    cone: (
+      cx: number,
+      cy: number,
+      cz: number,
+      baseRadius: number,
+      id: BlockId,
+      opts: { shape?: 'octagon' | 'square'; solid?: boolean } = {},
+    ) => applyAny(coneVoxels(cx, cy, cz, baseRadius, id, opts)),
+    /** Hollow upright cylinder (a 1-thick round tube), extruded `height` up. */
+    hollowCylinder: (
+      cx: number,
+      cy: number,
+      cz: number,
+      radius: number,
+      height: number,
+      id: BlockId,
+    ) => applyAny(hollowCylinderVoxels(cx, cy, cz, radius, height, id)),
     /** Persist a blueprint to .blueprints/<name>.json (reusable across sessions). */
     saveBlueprint: (name: string, bp: Blueprint): Promise<string> => saveBlueprint(name, bp),
     loadBlueprint: (name: string): Promise<Blueprint> => loadBlueprint(name),
@@ -718,6 +916,13 @@ export function installDevControls(ctx: DevControlsContext): void {
     // --- introspect / structural perception ---
     blockAt: (x: number, y: number, z: number): string =>
       registry.get(manager.getBlock(x, y, z)).name,
+    /** Full voxel: id, name, and packed orientation/open state (blockAt returns the name only). */
+    blockInfo: (x: number, y: number, z: number): { id: BlockId; name: string; state: number } => {
+      const id = manager.getBlock(x, y, z);
+      return { id, name: registry.get(id).name, state: manager.getState(x, y, z) };
+    },
+    /** Packed state byte at a voxel (facing | half<<2 | open<<3). */
+    stateAt: (x: number, y: number, z: number): number => manager.getState(x, y, z),
     /** Highest non-air voxel in the (x,z) column: {y, block, unloaded}, or y=null if all air/unloaded. */
     surface: (x: number, z: number): { y: number | null; block: string; unloaded: boolean } => {
       const unloaded = !manager.isLoaded(x, z);
@@ -882,8 +1087,9 @@ export function installDevControls(ctx: DevControlsContext): void {
       }
       return summary;
     },
-    /** Lists the available methods (so a fresh session can discover the API). */
-    help: (): string[] => Object.keys(api),
+    /** Signatures + one-line docs for the API (pass a method name for just that one). */
+    help: (name?: string): Record<string, string> | string =>
+      name !== undefined ? (HELP[name] ?? `no such method: ${name}`) : HELP,
   };
 
   (window as typeof window & { __vr?: typeof api }).__vr = api;
