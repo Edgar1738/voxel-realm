@@ -38,6 +38,10 @@ import { raycastVoxels } from '../edit/VoxelRaycast';
 import { TargetOverlay } from '../render/TargetOverlay';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
+import { BuilderState } from './BuilderState';
+import type { BuilderIntent } from './builderInput';
+import { SelectionBox } from '../render/SelectionBox';
+import { fillBox, clearBox, replaceVoxels } from './RegionOps';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -211,6 +215,57 @@ export class Game {
       canPlaceAt: (x, y, z) => manager.canApply([{ x, y, z }]),
     };
 
+    const targetOverlay = new TargetOverlay();
+    targetOverlay.attach((o) => renderer.add(o));
+    const previewSampler = {
+      getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z),
+    };
+
+    const builder = new BuilderState();
+    const selectionBox = new SelectionBox();
+    selectionBox.attach((o) => renderer.add(o));
+
+    const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined =>
+      raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+
+    const handleBuilderIntent = (intent: BuilderIntent): void => {
+      const box = builder.selectionBox();
+      switch (intent) {
+        case 'toggleMode':
+          builder.toggleMode();
+          setStatus(builder.mode === 'off' ? 'Build mode off' : 'Build mode: pick two corners');
+          return;
+        case 'cancel':
+          if (builder.mode === 'pasting') builder.exitPaste();
+          else builder.clearSelection();
+          setStatus('Selection cleared');
+          return;
+        case 'fill':
+          if (!box) return void setStatus('Select two corners first');
+          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          run(fillBox(box, inventory.selectedBlock), 'Filled');
+          return;
+        case 'clear':
+          if (!box) return void setStatus('Select two corners first');
+          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          run(clearBox(box), 'Cleared');
+          return;
+        case 'replace': {
+          if (!box) return void setStatus('Select two corners first');
+          const aim = builderAim();
+          if (!aim) return void setStatus('Aim at the block type to replace');
+          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          run(
+            replaceVoxels((x, y, z) => manager.getBlock(x, y, z), box, aim.id, inventory.selectedBlock),
+            'Replaced',
+          );
+          return;
+        }
+        default:
+          return; // copy/rotate/mirror/array/paste handled in Task 7
+      }
+    };
+
     // Register all input listeners through a single AbortController.
     const abortInput = registerInputListeners({
       canvas,
@@ -233,14 +288,18 @@ export class Game {
           anchorVoxel = v;
         },
         getTool: () => tool,
+        getBuildMode: () => builder.mode,
+        onBuilderIntent: handleBuilderIntent,
+        onBuilderClick: (hit) => {
+          if (builder.mode === 'selecting') {
+            builder.setCorner(hit.block);
+            const b = builder.selectionBox();
+            setStatus(b ? 'Selection set' : 'Pick the opposite corner');
+          }
+          // pasting-mode click (stamp) added in Task 7
+        },
       },
     });
-
-    const targetOverlay = new TargetOverlay();
-    targetOverlay.attach((o) => renderer.add(o));
-    const previewSampler = {
-      getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z),
-    };
 
     // Dev-only roam profiler + scripted-roam driver (P0); set in the DEV block below.
     let devProfiler: FrameProfiler | undefined;
@@ -261,22 +320,21 @@ export class Game {
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
       }
-      const previewOn = rig.locked && !ui.isInventoryOpen();
-      if (previewOn) {
-        const previewHit = raycastVoxels(
-          previewSampler,
-          renderer.camera.position,
-          rig.forward(),
-          REACH,
-        );
-        targetOverlay.update(
-          previewHit
-            ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps)
-            : undefined,
-          true,
-        );
+      if (builder.mode !== 'off' && rig.locked && !ui.isInventoryOpen()) {
+        targetOverlay.update(undefined, false); // suspend the Phase 1 targeting overlay
+        selectionBox.update(builder.selectionBox(), true);
       } else {
-        targetOverlay.update(undefined, false);
+        selectionBox.update(undefined, false);
+        const previewOn = rig.locked && !ui.isInventoryOpen();
+        if (previewOn) {
+          const previewHit = raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+          targetOverlay.update(
+            previewHit ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps) : undefined,
+            true,
+          );
+        } else {
+          targetOverlay.update(undefined, false);
+        }
       }
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });

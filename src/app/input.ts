@@ -12,6 +12,8 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
 import { gateToggleEdit } from './useAction';
 import { resolveTarget, type PreviewDeps } from './targetPreview';
+import { resolveBuilderIntent, type BuilderIntent } from './builderInput';
+import type { BuilderMode } from './BuilderState';
 
 export const REACH = 6;
 const TUNNEL_LENGTH = 8;
@@ -52,6 +54,9 @@ export interface InputCallbacks {
   getAnchor: () => WorldVoxel | undefined;
   setAnchor: (v: WorldVoxel | undefined) => void;
   getTool: () => Tool;
+  getBuildMode: () => BuilderMode;
+  onBuilderIntent: (intent: BuilderIntent) => void;
+  onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
 }
 
 export interface InputContext {
@@ -109,6 +114,13 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
 
+      const intent = resolveBuilderIntent(e.code, callbacks.getBuildMode());
+      if (intent !== 'none') {
+        if (intent !== 'toggleMode' && !canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+        callbacks.onBuilderIntent(intent);
+        return;
+      }
+
       // Undo/redo
       if (!e.ctrlKey) return;
       if (e.code === 'KeyZ' && !e.shiftKey) {
@@ -149,6 +161,12 @@ export function registerInputListeners(ctx: InputContext): () => void {
       );
       if (!hit) return;
       const selected = inventory.selectedBlock;
+
+      if (callbacks.getBuildMode() !== 'off') {
+        if (e.button === 0) callbacks.onBuilderClick(hit);
+        else if (e.button === 2) callbacks.onBuilderIntent('cancel');
+        return; // Build mode suspends normal break/place/pick
+      }
 
       if (e.button === 1) {
         if (hit.id !== AIR) inventory.pickBlock(hit.id);
