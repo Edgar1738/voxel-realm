@@ -10,10 +10,10 @@ import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
-import { stairStateFromYaw } from './placement';
 import { gateToggleEdit } from './useAction';
+import { resolveTarget, type PreviewDeps } from './targetPreview';
 
-const REACH = 6;
+export const REACH = 6;
 const TUNNEL_LENGTH = 8;
 const SPHERE_RADIUS = 4;
 
@@ -27,6 +27,12 @@ export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill',
  */
 export function canEdit(pointerLocked: boolean, inventoryOpen: boolean): boolean {
   return pointerLocked && !inventoryOpen;
+}
+
+/** Wheel-to-hotbar-step mapping. Returns 0 when editing is blocked or there is no scroll delta. */
+export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
+  if (!canEditNow) return 0;
+  return deltaY > 0 ? 1 : deltaY < 0 ? -1 : 0;
 }
 
 export function toolLabel(tool: string): string {
@@ -56,6 +62,7 @@ export interface InputContext {
   inventory: CreativeInventory;
   registry: BlockRegistry;
   edit: EditService;
+  previewDeps: PreviewDeps;
   callbacks: InputCallbacks;
 }
 
@@ -73,7 +80,7 @@ export function editMessage(action: 'undo' | 'redo', outcome: EditOutcome): stri
 export function registerInputListeners(ctx: InputContext): () => void {
   const controller = new AbortController();
   const { signal } = controller;
-  const { canvas, rig, renderer, manager, inventory, registry, edit, callbacks } = ctx;
+  const { canvas, rig, renderer, manager, inventory, registry, edit, previewDeps, callbacks } = ctx;
 
   // Single merged keydown handler covering both tool shortcuts and undo/redo.
   window.addEventListener(
@@ -118,6 +125,17 @@ export function registerInputListeners(ctx: InputContext): () => void {
   // Right-click context menu suppressed only for the canvas (not globally).
   canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
 
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      const delta = hotbarWheelDelta(e.deltaY, canEdit(rig.locked, callbacks.isInventoryOpen()));
+      if (delta === 0) return;
+      inventory.cycleSlot(delta);
+      callbacks.onHotbarRender();
+    },
+    { signal, passive: true },
+  );
+
   // Mouse editing (placed on document so it fires while pointer is locked).
   document.addEventListener(
     'mousedown',
@@ -138,14 +156,19 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
-        if (registry.isToggleable(hit.id)) {
+        const resolved = resolveTarget(hit, selected, rig.yaw, previewDeps);
+        if (resolved.kind === 'toggle') {
           const state = manager.getState(hit.block.x, hit.block.y, hit.block.z);
           callbacks.onRun([gateToggleEdit(hit.block, hit.id, state)], 'Toggled');
           return;
         }
-        const voxel: SetVoxel = { ...hit.adjacent, id: selected };
-        const shape = registry.shape(selected);
-        if (shape === 'stair' || shape === 'gate') voxel.state = stairStateFromYaw(rig.yaw);
+        const voxel: SetVoxel = {
+          x: resolved.ghost.x,
+          y: resolved.ghost.y,
+          z: resolved.ghost.z,
+          id: resolved.ghost.id,
+          state: resolved.ghost.state,
+        };
         callbacks.onRun([voxel], 'Placed');
         return;
       }

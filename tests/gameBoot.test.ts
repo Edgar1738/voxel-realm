@@ -67,6 +67,7 @@ vi.mock('../src/render/Renderer', () => ({
     return {
       scene: boot.scene,
       camera: boot.camera,
+      add: vi.fn(),
       start: boot.rendererStart,
       dispose: boot.rendererDispose,
     };

@@ -119,3 +119,26 @@ describe('CREATIVE_BLOCKS derivation', () => {
     expect(CREATIVE_BLOCKS.length).toBeGreaterThan(0);
   });
 });
+
+describe('CreativeInventory.cycleSlot', () => {
+  it('advances by one', () => {
+    const inv = new CreativeInventory([1, 2, 3] as never);
+    inv.selectSlot(0);
+    inv.cycleSlot(1);
+    expect(inv.selectedSlot).toBe(1);
+  });
+
+  it('wraps forward past the last slot to the first', () => {
+    const inv = new CreativeInventory([1, 2, 3] as never);
+    inv.selectSlot(2);
+    inv.cycleSlot(1);
+    expect(inv.selectedSlot).toBe(0);
+  });
+
+  it('wraps backward past the first slot to the last', () => {
+    const inv = new CreativeInventory([1, 2, 3] as never);
+    inv.selectSlot(0);
+    inv.cycleSlot(-1);
+    expect(inv.selectedSlot).toBe(2);
+  });
+});
