@@ -52,6 +52,7 @@ export interface InputCallbacks {
   getAnchor: () => WorldVoxel | undefined;
   setAnchor: (v: WorldVoxel | undefined) => void;
   getTool: () => Tool;
+  onToggleGhost: () => void;
 }
 
 export interface InputContext {
@@ -106,6 +107,10 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.code === 'Escape' && callbacks.isInventoryOpen()) {
         callbacks.onInventoryToggle(false);
+        return;
+      }
+      if (e.code === 'KeyV') {
+        callbacks.onToggleGhost();
         return;
       }
 

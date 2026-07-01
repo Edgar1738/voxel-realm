@@ -211,6 +211,14 @@ export class Game {
       canPlaceAt: (x, y, z) => manager.canApply([{ x, y, z }]),
     };
 
+    // Placement-ghost visibility (the green preview cube). Toggled with V; persisted across reloads.
+    let showGhost = true;
+    try {
+      showGhost = localStorage.getItem('vr.placementGhost') !== 'off';
+    } catch {
+      /* localStorage unavailable (e.g. private mode) — default to showing the ghost */
+    }
+
     // Register all input listeners through a single AbortController.
     const abortInput = registerInputListeners({
       canvas,
@@ -233,6 +241,15 @@ export class Game {
           anchorVoxel = v;
         },
         getTool: () => tool,
+        onToggleGhost: () => {
+          showGhost = !showGhost;
+          try {
+            localStorage.setItem('vr.placementGhost', showGhost ? 'on' : 'off');
+          } catch {
+            /* ignore persistence failure */
+          }
+          setStatus(`Placement ghost ${showGhost ? 'on' : 'off'}`);
+        },
       },
     });
 
@@ -274,6 +291,7 @@ export class Game {
             ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps)
             : undefined,
           true,
+          showGhost,
         );
       } else {
         targetOverlay.update(undefined, false);
