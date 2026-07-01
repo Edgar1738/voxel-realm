@@ -42,6 +42,7 @@ describe('resolveTarget', () => {
 
   it('stair/gate selected block gets yaw-derived state', () => {
     const r = resolveTarget(hit(CUBE), STAIR as never, 1.2, deps);
+    expect(r.kind).toBe('place');
     if (r.kind === 'place') expect(r.ghost.state).toBe(3);
   });
 
@@ -52,6 +53,7 @@ describe('resolveTarget', () => {
       0,
       deps,
     );
+    expect(r.kind).toBe('place');
     if (r.kind === 'place') {
       expect(r.ghost.valid).toBe(false);
       expect(r.ghost).toMatchObject({ x: -1, y: 7, z: 7 });
