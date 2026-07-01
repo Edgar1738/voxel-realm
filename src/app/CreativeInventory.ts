@@ -29,6 +29,13 @@ export class CreativeInventory {
     this.selectedSlot = index;
   }
 
+  /** Moves the selection by `delta` slots, wrapping around both ends. */
+  cycleSlot(delta: number): void {
+    const n = this.slots.length;
+    if (n === 0) return;
+    this.selectedSlot = (((this.selectedSlot + delta) % n) + n) % n;
+  }
+
   /** Puts a block id into the currently selected slot. */
   pickBlock(id: BlockId): void {
     this.slots[this.selectedSlot] = id;

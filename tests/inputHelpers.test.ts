@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canEdit, editMessage, toolLabel, TOOLS } from '../src/app/input';
+import { canEdit, editMessage, toolLabel, TOOLS, hotbarWheelDelta } from '../src/app/input';
 
 describe('editMessage', () => {
   it('returns "Undid" for a successful undo', () => {
@@ -58,5 +58,21 @@ describe('canEdit', () => {
 
   it('blocks edits when neither locked nor inventory-closed', () => {
     expect(canEdit(false, true)).toBe(false);
+  });
+});
+
+describe('hotbarWheelDelta', () => {
+  it('returns 0 when editing is blocked (pointer unlocked or inventory open)', () => {
+    expect(hotbarWheelDelta(120, false)).toBe(0);
+    expect(hotbarWheelDelta(-120, false)).toBe(0);
+  });
+
+  it('maps positive deltaY to +1 and negative to -1 when editing is allowed', () => {
+    expect(hotbarWheelDelta(120, true)).toBe(1);
+    expect(hotbarWheelDelta(-120, true)).toBe(-1);
+  });
+
+  it('returns 0 for zero delta', () => {
+    expect(hotbarWheelDelta(0, true)).toBe(0);
   });
 });

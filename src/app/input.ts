@@ -29,6 +29,12 @@ export function canEdit(pointerLocked: boolean, inventoryOpen: boolean): boolean
   return pointerLocked && !inventoryOpen;
 }
 
+/** Wheel-to-hotbar-step mapping. Returns 0 when editing is blocked or there is no scroll delta. */
+export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
+  if (!canEditNow) return 0;
+  return deltaY > 0 ? 1 : deltaY < 0 ? -1 : 0;
+}
+
 export function toolLabel(tool: string): string {
   return tool
     .split('-')
@@ -118,6 +124,17 @@ export function registerInputListeners(ctx: InputContext): () => void {
 
   // Right-click context menu suppressed only for the canvas (not globally).
   canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      const delta = hotbarWheelDelta(e.deltaY, canEdit(rig.locked, callbacks.isInventoryOpen()));
+      if (delta === 0) return;
+      inventory.cycleSlot(delta);
+      callbacks.onHotbarRender();
+    },
+    { signal, passive: true },
+  );
 
   // Mouse editing (placed on document so it fires while pointer is locked).
   document.addEventListener(
