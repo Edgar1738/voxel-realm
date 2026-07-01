@@ -80,6 +80,8 @@ export interface DevControlsContext {
   worldName: string;
   profiler: FrameProfiler;
   roam: RoamDriver;
+  /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
+  headlamp: (on: boolean) => void;
 }
 
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
@@ -414,6 +416,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     // time / capture
     time: 'time(t) — 0 midnight, .25 sunrise, .5 noon, .75 sunset',
     dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
+    headlamp: 'headlamp(on=true) — camera-centered glow for dark caves (not persisted)',
     view: 'view(maxWidth?, quality?) -> dataURL',
     save: 'save(name, {hud?,maxWidth?,quality?}) -> path — writes .captures/<name>.jpg',
     // build
@@ -591,6 +594,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     dayLength: (seconds: number): void => {
       daynight.dayLengthSec = Math.max(1, seconds);
     },
+    /** Camera-centered glow for dark caves — lights captures without placing blocks. */
+    headlamp: (on = true): void => ctx.headlamp(on),
 
     // --- see ---
     view,

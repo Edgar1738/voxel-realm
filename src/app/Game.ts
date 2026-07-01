@@ -39,6 +39,7 @@ import {
 } from '../core/constants';
 import { ViewDistanceGovernor } from './ViewDistanceGovernor';
 import { applyFogRange } from '../render/fog';
+import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
@@ -77,7 +78,8 @@ export class Game {
     const material = createChunkMaterial(texture);
     const transparentMaterial = createTransparentMaterial(texture);
     const cutoutMaterial = createCutoutMaterial(texture);
-    const daynight = new DayNight(renderer.scene, [material, transparentMaterial, cutoutMaterial]);
+    const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
+    const daynight = new DayNight(renderer.scene, chunkMaterials);
     const celestial = new CelestialSky(renderer.scene);
 
     // Load the durable save (or start fresh / discard an incompatible one).
@@ -369,6 +371,27 @@ export class Game {
       /* localStorage unavailable (e.g. private mode) — default to showing the ghost */
     }
 
+    // Headlamp: camera-centered shader glow for cave roaming. Toggled with L; persisted
+    // across reloads. Dev toggles (__vr.headlamp) skip persistence so agent capture tabs
+    // don't leave the lamp on for the next session.
+    let headlampOn = false;
+    try {
+      headlampOn = localStorage.getItem('vr.headlamp') === 'on';
+    } catch {
+      /* localStorage unavailable — default to off */
+    }
+    const setHeadlamp = (on: boolean, persist: boolean): void => {
+      headlampOn = on;
+      applyHeadlamp(chunkMaterials, on);
+      if (!persist) return;
+      try {
+        localStorage.setItem('vr.headlamp', on ? 'on' : 'off');
+      } catch {
+        /* ignore persistence failure */
+      }
+    };
+    applyHeadlamp(chunkMaterials, headlampOn);
+
     // Register all input listeners through a single AbortController.
     const abortInput = registerInputListeners({
       canvas,
@@ -420,6 +443,10 @@ export class Game {
           }
           setStatus(`Placement ghost ${showGhost ? 'on' : 'off'}`);
         },
+        onToggleHeadlamp: () => {
+          setHeadlamp(!headlampOn, true);
+          setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
+        },
       },
     });
 
@@ -427,7 +454,6 @@ export class Game {
     let devProfiler: FrameProfiler | undefined;
     let devRoam: RoamDriver | undefined;
 
-    const fogMaterials = [material, transparentMaterial, cutoutMaterial];
     const governor = new ViewDistanceGovernor(
       { minVd: MIN_VIEW_DISTANCE, maxVd: MAX_VIEW_DISTANCE },
       VIEW_DISTANCE,
@@ -456,14 +482,14 @@ export class Game {
       // Set fog for the initial radius on the first frame (before the first render).
       if (!fogInitialized) {
         fogInitialized = true;
-        applyFogRange(fogMaterials, manager.viewDistance * CHUNK_SIZE_X);
+        applyFogRange(chunkMaterials, manager.viewDistance * CHUNK_SIZE_X);
       }
 
       // Adaptive view distance (targets ~60fps); retune fog to the new boundary on change.
       const nextVd = governor.sample(cdt * 1000, manager.streaming);
       if (nextVd !== undefined) {
         manager.setViewDistance(nextVd);
-        applyFogRange(fogMaterials, nextVd * CHUNK_SIZE_X);
+        applyFogRange(chunkMaterials, nextVd * CHUNK_SIZE_X);
       }
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
@@ -529,6 +555,7 @@ export class Game {
         worldName,
         profiler,
         roam,
+        headlamp: (on: boolean) => setHeadlamp(on, false),
       };
       void import('./DevControls').then((m) => m.installDevControls(devContext));
       void import('./DevHud').then((m) => {

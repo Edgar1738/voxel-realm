@@ -1,5 +1,8 @@
 import { RawShaderMaterial, GLSL3, Vector3, DoubleSide, type DataArrayTexture } from 'three';
 
+/** Headlamp reach in blocks; the glow fades to zero at this distance from the eye. */
+export const HEADLAMP_RADIUS = 13;
+
 const vertexShader = /* glsl */ `
 precision highp float;
 precision highp int;
@@ -50,6 +53,8 @@ uniform float uFogFar;
 uniform float uAlpha;
 uniform float uDayLight;
 uniform float uAlphaTest;
+uniform float uTorch;
+uniform float uTorchRadius;
 
 in vec2 vUv;
 in float vLayer;
@@ -69,10 +74,15 @@ void main() {
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
   float block = mod(vLight, 16.0) / 15.0;
-  float level = max(max(sky * uDayLight, block), 0.06);
+  float dist = length(vViewPos);
+  // headlamp: camera-centered glow, quantized to the 15 baked-light steps so it
+  // reads as voxel light. The camera is the emitter, so every visible fragment
+  // has line-of-sight to it — no shadowing needed.
+  float torch = uTorch * clamp(1.0 - dist / uTorchRadius, 0.0, 1.0);
+  torch = floor(torch * 15.0) / 15.0;
+  float level = max(max(sky * uDayLight, max(block, torch)), 0.06);
   float shade = (0.45 + 0.55 * diff) * vAo;
   vec3 color = base * shade * level;
-  float dist = length(vViewPos);
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
   fragColor = vec4(color, uAlpha);
@@ -99,6 +109,8 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
       uAlpha: { value: alpha },
       uDayLight: { value: 1.0 },
       uAlphaTest: { value: alphaTest },
+      uTorch: { value: 0.0 },
+      uTorchRadius: { value: HEADLAMP_RADIUS },
     },
     vertexShader,
     fragmentShader,

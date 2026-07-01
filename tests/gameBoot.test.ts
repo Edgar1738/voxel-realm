@@ -86,6 +86,11 @@ vi.mock('../src/render/ChunkMaterial', () => ({
   createCutoutMaterial: vi.fn(() => boot.cutoutMaterial),
 }));
 
+// applyHeadlamp writes material uniforms during boot; the stub materials have none.
+vi.mock('../src/render/headlamp', () => ({
+  applyHeadlamp: vi.fn(),
+}));
+
 vi.mock('../src/render/DayNight', () => ({
   DayNight: vi.fn(function DayNight() {
     return { time: 0, advance: vi.fn() };

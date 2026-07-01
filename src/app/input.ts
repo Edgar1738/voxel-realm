@@ -58,6 +58,7 @@ export interface InputCallbacks {
   onBuilderIntent: (intent: BuilderIntent) => void;
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
+  onToggleHeadlamp: () => void;
 }
 
 export interface InputContext {
@@ -117,6 +118,10 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.code === 'KeyV') {
         callbacks.onToggleGhost();
+        return;
+      }
+      if (e.code === 'KeyL') {
+        callbacks.onToggleHeadlamp();
         return;
       }
 
