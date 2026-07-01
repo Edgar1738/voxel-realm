@@ -40,8 +40,10 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
+import { dominantHorizontalAxis } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
-import { fillBox, clearBox, replaceVoxels } from './RegionOps';
+import { PasteGhost } from '../render/PasteGhost';
+import { fillBox, clearBox, replaceVoxels, captureRegion, prefabToVoxels } from './RegionOps';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -224,9 +226,17 @@ export class Game {
     const builder = new BuilderState();
     const selectionBox = new SelectionBox();
     selectionBox.attach((o) => renderer.add(o));
+    const pasteGhost = new PasteGhost();
+    pasteGhost.attach((o) => renderer.add(o));
 
     const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined =>
       raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+
+    /** Paste origin (min corner) = the empty cell adjacent to the aimed face. */
+    const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
+      const aim = builderAim();
+      return aim ? { x: aim.adjacent.x, y: aim.adjacent.y, z: aim.adjacent.z } : undefined;
+    };
 
     const handleBuilderIntent = (intent: BuilderIntent): void => {
       const box = builder.selectionBox();
@@ -261,8 +271,39 @@ export class Game {
           );
           return;
         }
+        case 'copy': {
+          if (!box) return void setStatus('Select two corners first');
+          manager.preloadBox(box.x1, box.z1, box.x2, box.z2);
+          const clip = captureRegion((x, y, z) => manager.getBlock(x, y, z), box);
+          if (clip.blocks.length === 0)
+            return void setStatus('Nothing to copy (selection is empty)');
+          builder.setClipboard(clip);
+          setStatus(`Copied ${clip.blocks.length} block(s) — aim and click to paste`);
+          return;
+        }
+        case 'rotateCW':
+          builder.rotate(1);
+          setStatus(`Rotated (${builder.transform.turns * 90}°)`);
+          return;
+        case 'rotateCCW':
+          builder.rotate(-1);
+          setStatus(`Rotated (${builder.transform.turns * 90}°)`);
+          return;
+        case 'mirror': {
+          const f = rig.forward();
+          builder.mirrorAxis(dominantHorizontalAxis(f.x, f.z));
+          setStatus('Mirrored');
+          return;
+        }
+        case 'arrayInc':
+        case 'arrayDec': {
+          const f = rig.forward();
+          builder.arrayAdjust(intent === 'arrayInc' ? 1 : -1, dominantHorizontalAxis(f.x, f.z));
+          setStatus(`Array x${builder.transform.arrayCount}`);
+          return;
+        }
         default:
-          return; // copy/rotate/mirror/array/paste handled in Task 7
+          return;
       }
     };
 
@@ -295,8 +336,20 @@ export class Game {
             builder.setCorner(hit.block);
             const b = builder.selectionBox();
             setStatus(b ? 'Selection set' : 'Pick the opposite corner');
+            return;
           }
-          // pasting-mode click (stamp) added in Task 7
+          if (builder.mode === 'pasting') {
+            const p = builder.transformedClipboard();
+            const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
+            if (!p) return;
+            manager.preloadBox(
+              origin.x,
+              origin.z,
+              origin.x + p.dims[0] - 1,
+              origin.z + p.dims[2] - 1,
+            );
+            run(prefabToVoxels(p, origin.x, origin.y, origin.z), 'Pasted');
+          }
         },
       },
     });
@@ -321,10 +374,16 @@ export class Game {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
       }
       if (builder.mode !== 'off' && rig.locked && !ui.isInventoryOpen()) {
-        targetOverlay.update(undefined, false); // suspend the Phase 1 targeting overlay
+        targetOverlay.update(undefined, false);
         selectionBox.update(builder.selectionBox(), true);
+        if (builder.mode === 'pasting') {
+          pasteGhost.update(builder.transformedClipboard()?.dims, pasteOrigin(), true);
+        } else {
+          pasteGhost.update(undefined, undefined, false);
+        }
       } else {
         selectionBox.update(undefined, false);
+        pasteGhost.update(undefined, undefined, false);
         const previewOn = rig.locked && !ui.isInventoryOpen();
         if (previewOn) {
           const previewHit = raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
