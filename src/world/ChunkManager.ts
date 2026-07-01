@@ -193,10 +193,21 @@ export class ChunkManager {
     // Generate pass (P5: also yields once the per-frame time ceiling is hit).
     const overTime = (): boolean => performance.now() - updateStart >= this.opts.frameWorkMs;
     let gen = 0;
+    const generatedThisFrame: Array<{ cx: number; cz: number }> = [];
+    const generatedThisFrameKeys = new Set<string>();
     for (const { cx, cz } of this.ordered) {
       if (gen >= this.opts.genBudget || overTime()) break;
-      if (this.ensureGenerated(cx, cz)) gen++;
+      if (this.ensureGenerated(cx, cz)) {
+        gen++;
+        generatedThisFrame.push({ cx, cz });
+        generatedThisFrameKeys.add(chunkKey(cx, cz));
+      }
     }
+    // Light-settling: chunks generated earlier in the loop above never saw a sibling
+    // generated later in the same pass (and any emitter it holds), since `ensureGenerated`
+    // lights each chunk as it's created, one at a time. Re-light the whole same-frame
+    // batch now that they all exist, before any of them mesh.
+    this.relightSettled(generatedThisFrame);
 
     // Mesh pass. P5: a single budget (frameMesh) counts main + neighbor + drained remeshes,
     // plus a wall-clock ceiling; overflow legit neighbor remeshes defer to pendingRemesh.
@@ -222,19 +233,24 @@ export class ChunkManager {
       this.meshChunk(cx, cz);
       meshedThisFrame.add(chunkKey(cx, cz));
       // A newly-meshed chunk changes the seam of its already-meshed neighbors, so they
-      // re-mesh. P2a: skip any neighbor already meshed this frame (the generate pass ran
-      // first, so it was already meshed against current neighbor data — re-meshing would
-      // be byte-identical). P2b: only re-light a neighbor when this chunk actually exports
-      // block light to it; pure terrain contributes none, so the relight is a no-op.
+      // re-mesh. P2a: skip a neighbor already meshed this frame IF it was also generated
+      // this frame — the pre-mesh light-settling pass above already relit this frame's
+      // newly-generated chunks against each other, so re-meshing it here would be
+      // byte-identical. A neighbor meshed this frame but generated in an EARLIER frame
+      // (drained from pendingRemesh) was never settled against this chunk, since it
+      // didn't exist at settle time — P2b: only re-light such a neighbor when this chunk
+      // actually exports block light to it; pure terrain contributes none, so the
+      // relight is a no-op.
       for (const [dx, dz] of EDGE_NEIGHBORS) {
         const nbKey = chunkKey(cx + dx, cz + dz);
-        if (meshedThisFrame.has(nbKey)) continue;
+        if (meshedThisFrame.has(nbKey) && generatedThisFrameKeys.has(nbKey)) continue;
         const nb = this.store.get(cx + dx, cz + dz);
         if (!nb || nb.state !== ChunkState.Meshed) continue;
         if (overBudget()) {
           this.pendingRemesh.add(nbKey); // defer the legit seam remesh to a later frame
           continue;
         }
+        // Not part of this frame's settled batch, so only relight if light can actually change.
         if (this.feedsBlockLight(cx, cz)) this.recomputeLight(nb.data);
         this.meshChunk(cx + dx, cz + dz);
         meshedThisFrame.add(nbKey);
@@ -521,11 +537,22 @@ export class ChunkManager {
     radius: number,
   ): { generated: number; meshed: number } {
     let generated = 0;
+    const newlyGenerated: Array<{ cx: number; cz: number }> = [];
     for (let dz = -radius; dz <= radius; dz++) {
       for (let dx = -radius; dx <= radius; dx++) {
-        if (this.ensureGenerated(centerCx + dx, centerCz + dz)) generated++;
+        const cx = centerCx + dx;
+        const cz = centerCz + dz;
+        if (this.ensureGenerated(cx, cz)) {
+          generated++;
+          newlyGenerated.push({ cx, cz });
+        }
       }
     }
+    // Light-settling pass: a chunk generated early in the loop above computed its light
+    // before later-generated neighbors (and any emitters they hold) existed, so its border
+    // seed may have missed light arriving from them. Re-light every newly-generated chunk
+    // now that all of them exist, mirroring applyEdits' two-pass approach.
+    this.relightSettled(newlyGenerated);
     let meshed = 0;
     for (let dz = -radius; dz <= radius; dz++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -556,11 +583,20 @@ export class ChunkManager {
     }
     // Pass 1: generate every chunk in the box so all neighbors exist before any mesh runs.
     let generated = 0;
+    const newlyGenerated: Array<{ cx: number; cz: number }> = [];
     for (let cz = cz0; cz <= cz1; cz++) {
       for (let cx = cx0; cx <= cx1; cx++) {
-        if (this.ensureGenerated(cx, cz)) generated++;
+        if (this.ensureGenerated(cx, cz)) {
+          generated++;
+          newlyGenerated.push({ cx, cz });
+        }
       }
     }
+    // Light-settling pass: a chunk generated earlier in the cz/cx scan above never saw a
+    // later emitter's light (its border seed ran before that neighbor existed). Re-light
+    // every newly-generated chunk now that the whole box is present, mirroring applyEdits'
+    // two-pass approach, before meshing.
+    this.relightSettled(newlyGenerated);
     // Pass 2: mesh every now-generated chunk (neighbors are all present, so no stale seams).
     let meshed = 0;
     for (let cz = cz0; cz <= cz1; cz++) {
@@ -722,13 +758,30 @@ export class ChunkManager {
     }
   }
 
+  /**
+   * Re-lights a batch of just-generated chunks (preload/preloadBox) so emitters placed in
+   * a chunk generated later in the scan still reach a neighbor generated earlier in the
+   * scan. `ensureGenerated` computes each chunk's light (incl. border-seed) as it's
+   * generated, one at a time — so a chunk generated first never sees a same-batch
+   * neighbor's emitter, since that neighbor didn't exist yet. Cheap in the common case
+   * (no emitters in the batch): skips entirely unless some chunk in the batch actually
+   * exports block light.
+   */
+  private relightSettled(batch: ReadonlyArray<{ cx: number; cz: number }>): void {
+    if (!batch.some(({ cx, cz }) => this.feedsBlockLight(cx, cz))) return;
+    for (const { cx, cz } of batch) {
+      const entry = this.store.get(cx, cz);
+      if (entry) this.recomputeLight(entry.data);
+    }
+  }
+
   private meshChunk(cx: number, cz: number): void {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
     this.frameMesh++;
     const capY = entry.data.maxSolidY; // height-cap: never sweep empty air above the tallest voxel
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
-    const shaped = emitShaped(view, this.registry, entry.data.hasShaped);
+    const shaped = emitShaped(view, this.registry, entry.data.hasShaped, capY);
     const meshes: ChunkMeshes = {
       opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass, capY), shaped.slabs),
       transparent: this.mesher.mesh(view, this.transparentPass, capY),
