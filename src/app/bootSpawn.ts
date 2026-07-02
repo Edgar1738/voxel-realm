@@ -53,6 +53,24 @@ export function resolveSpawn(
 }
 
 /**
+ * Body-center Y for a player standing on the highest solid block of the (x, z) column, or
+ * undefined when the column has no solid block. Used to settle the default hovering spawn
+ * onto the terrain once the initial chunk burst has loaded it.
+ */
+export function groundSpawnY(
+  isSolid: (x: number, y: number, z: number) => boolean,
+  x: number,
+  z: number,
+  worldHeight: number,
+  halfHeight: number,
+): number | undefined {
+  for (let y = worldHeight - 1; y >= 0; y--) {
+    if (isSolid(x, y, z)) return y + 1 + halfHeight;
+  }
+  return undefined;
+}
+
+/**
  * Clamp the spawn `y` into `[0, worldHeight]` so a wild curated `y` can't fling the
  * camera into the void. Boot starts the player flying, so no solidity check is needed.
  */

@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { archiveWorld, roamUrl, type GitInfo } from './archiveCore.ts';
 import { validatePackage, summarizePackage } from './packageCore.ts';
+import { auditWorldMeta } from '../src/app/worldMeta.ts';
 import { WORLD_HEIGHT } from '../src/core/constants.ts';
 import type { WorldMeta } from '../src/persistence/SaveTypes.ts';
 
@@ -65,11 +66,22 @@ const snapshot = JSON.parse(readFileSync(saveFile, 'utf8')) as {
   chunks?: Record<string, Array<[number, number] | [number, number, number]>>;
 };
 
+// Two readiness levels share this gate: validatePackage is the STRUCTURAL contract (finite,
+// in-bounds meta — a broken save must not archive; fatal), auditWorldMeta is the CURATION
+// contract (title/description/landmarks/tour — a bare save may still package; warn only).
 const problems = validatePackage(snapshot.meta, WORLD_HEIGHT);
 if (problems.length > 0) {
   console.error(`world:package: "${saveName}" is not roam-ready:`);
   for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
+}
+
+const audit = auditWorldMeta(snapshot.meta);
+if (!audit.ready) {
+  console.warn(`world:package: "${saveName}" packages, but is not player-ready:`);
+  for (const field of audit.missing) console.warn(`  - missing: ${field}`);
+  for (const warning of audit.warnings) console.warn(`  - ${warning}`);
+  for (const suggestion of audit.suggestions) console.warn(`  - fix: ${suggestion}`);
 }
 
 const summary = summarizePackage(snapshot);

@@ -7,8 +7,15 @@ export interface PreviewDeps {
   isToggleable(id: BlockId): boolean;
   /** Shape name of a block id ('cube' | 'slab' | 'stair' | 'gate' | 'cross' | ...). */
   shapeOf(id: BlockId): string;
-  /** Orientation/open state derived from the player yaw (for stairs/gates). */
-  stateFromYaw(yaw: number): number;
+  /** Orientation state for a placement: yaw facing + hit-derived half (stairs/slabs/gates). */
+  placementState(
+    shape: string,
+    yaw: number,
+    hit: {
+      normal: { x: number; y: number; z: number };
+      point: { x: number; y: number; z: number };
+    },
+  ): number;
   /** Whether an edit at (x,y,z) would land in a loaded, in-range chunk (mirrors the edit path). */
   canPlaceAt(x: number, y: number, z: number): boolean;
 }
@@ -38,7 +45,7 @@ export function resolveTarget(
     return { kind: 'toggle', outline, targetId: hit.id };
   }
   const shape = deps.shapeOf(selected);
-  const state = shape === 'stair' || shape === 'gate' ? deps.stateFromYaw(yaw) : 0;
+  const state = deps.placementState(shape, yaw, { normal: hit.normal, point: hit.point });
   const g = hit.adjacent;
   return {
     kind: 'place',

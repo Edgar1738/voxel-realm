@@ -335,9 +335,16 @@ export class ChunkManager {
     const id = entry.data.get(lx, wy, lz);
     if (!this.registry.isOpaque(id)) return [];
     const state = entry.data.getState(lx, wy, lz);
-    return this.registry
-      .collisionAABBs(id, state)
-      .map((b) => [wx + b[0], wy + b[1], wz + b[2], wx + b[3], wy + b[4], wz + b[5]] as AABB);
+    const shape = this.registry.shape(id);
+    const boxes =
+      shape === 'fence' || shape === 'wall'
+        ? this.registry.connectedCollisionAABBs(id, state, (dx, dz) =>
+            this.getBlock(wx + dx, wy, wz + dz),
+          )
+        : this.registry.collisionAABBs(id, state);
+    return boxes.map(
+      (b) => [wx + b[0], wy + b[1], wz + b[2], wx + b[3], wy + b[4], wz + b[5]] as AABB,
+    );
   }
 
   /** Orientation/open state at a world coord; 0 for out-of-world or unloaded chunks. */

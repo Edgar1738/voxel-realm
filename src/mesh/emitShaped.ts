@@ -159,7 +159,8 @@ function emitSlab(
   y: number,
   z: number,
 ): void {
-  emitBoxCulled(buf, view, registry, id, x, y, z, [x, y, z], [x + 1, y + 0.5, z + 1]);
+  const yLo = unpackState(view.getState(x, y, z)).half === 1 ? y + 0.5 : y;
+  emitBoxCulled(buf, view, registry, id, x, y, z, [x, yLo, z], [x + 1, yLo + 0.5, z + 1]);
 }
 
 function emitStair(

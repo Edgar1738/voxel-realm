@@ -2,7 +2,17 @@
 import type { BlockId } from '../core/types';
 import { isOpen, unpackState } from '../world/VoxelState';
 import { Face } from './blocks';
-import { stairBoxes, CUBE_BOX, SLAB_BOX, TALL_BOX, type AABB } from './shapeBoxes';
+import {
+  stairBoxes,
+  connectedBoxes,
+  CUBE_BOX,
+  SLAB_BOX,
+  SLAB_TOP_BOX,
+  TALL_BOX,
+  FENCE_POST,
+  WALL_POST,
+  type AABB,
+} from './shapeBoxes';
 import {
   BLOCK_DEFS,
   BLOCK_TEXTURES,
@@ -96,7 +106,7 @@ export class BlockRegistry {
       case 'cube':
         return [CUBE_BOX];
       case 'slab':
-        return [SLAB_BOX];
+        return unpackState(state).half === 1 ? [SLAB_TOP_BOX] : [SLAB_BOX];
       case 'stair': {
         const { facing, half } = unpackState(state);
         return stairBoxes(facing, half);
@@ -111,9 +121,38 @@ export class BlockRegistry {
     }
   }
 
+  /**
+   * Neighbor-aware collision boxes: fences/walls collide as a post + arms toward connected
+   * neighbours (mirroring the rendered connections); every other shape defers to
+   * {@link collisionAABBs}. `neighbor` reads the block one voxel away horizontally.
+   */
+  connectedCollisionAABBs(
+    id: BlockId,
+    state: number,
+    neighbor: (dx: number, dz: number) => BlockId,
+  ): AABB[] {
+    const shape = this.shape(id);
+    if (shape !== 'fence' && shape !== 'wall') return this.collisionAABBs(id, state);
+    return connectedBoxes(shape === 'fence' ? FENCE_POST : WALL_POST, {
+      px: this.connectsTo(id, neighbor(1, 0)),
+      nx: this.connectsTo(id, neighbor(-1, 0)),
+      pz: this.connectsTo(id, neighbor(0, 1)),
+      nz: this.connectsTo(id, neighbor(0, -1)),
+    });
+  }
+
   /** True if right-click should toggle the block's `open` state instead of placing. */
   isToggleable(id: BlockId): boolean {
     return this.shape(id) === 'gate';
+  }
+
+  /**
+   * True for shapes whose facing bits are meaningful (stairs, gates). Copy paths must keep
+   * even a ZERO state for these — facing N packs to 0 — or rotate/mirror cannot turn them.
+   */
+  hasFacing(id: BlockId): boolean {
+    const shape = this.shape(id);
+    return shape === 'stair' || shape === 'gate';
   }
 
   /** True if a fence/wall `self` should connect to `neighbor`: a full opaque cube, or the same shape. */

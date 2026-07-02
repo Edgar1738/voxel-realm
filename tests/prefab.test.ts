@@ -7,6 +7,8 @@ import {
   validatePrefab,
   type Prefab,
 } from '../src/core/Prefab';
+import { packState, unpackState, setOpen, rotateStateY, FACING } from '../src/world/VoxelState';
+import { stairBoxes } from '../src/blocks/shapeBoxes';
 
 const L: Prefab = {
   // An L-shape footprint (y=0): (0,0),(1,0),(0,1). dims 2x1x2.
@@ -131,12 +133,47 @@ describe('stateful prefabs (5-tuple)', () => {
     expect(normalize(shifted).blocks).toEqual([[0, 0, 0, 5, 2]]);
   });
 
-  it('preserves per-block state through copy → rotate → mirror → repeat', () => {
-    expect(stateOfId(rotateY(STATE, 1), 5)).toBe(2);
-    expect(stateOfId(mirror(STATE, 'x'), 5)).toBe(2);
+  it('rotates the facing with the blocks: state 2 (S) → 1 (E) after one clockwise turn', () => {
+    // State 2 = packState(FACING.S, 0); one CW turn maps N→W→S→E, so S becomes E (1).
+    expect(stateOfId(rotateY(STATE, 1), 5)).toBe(packState(FACING.E, 0));
+    expect(stateOfId(rotateY(STATE, 4), 5)).toBe(2); // full rotation is the identity
+    // half + open bits ride along untouched while the facing rotates
+    const tall: Prefab = {
+      dims: [1, 1, 1],
+      blocks: [[0, 0, 0, 5, setOpen(packState(FACING.N, 1), true)]],
+    };
+    expect(stateOfId(rotateY(tall, 1), 5)).toBe(setOpen(packState(FACING.W, 1), true));
+  });
+
+  it('mirror flips the facing across the axis (x: E↔W, z: N↔S)', () => {
+    expect(stateOfId(mirror(STATE, 'x'), 5)).toBe(packState(FACING.S, 0)); // S unchanged by x-mirror
+    expect(stateOfId(mirror(STATE, 'z'), 5)).toBe(packState(FACING.N, 0)); // S → N across z
+    const east: Prefab = { dims: [1, 1, 1], blocks: [[0, 0, 0, 5, packState(FACING.E, 0)]] };
+    expect(stateOfId(mirror(east, 'x'), 5)).toBe(packState(FACING.W, 0));
+    expect(stateOfId(mirror(mirror(STATE, 'z'), 'z'), 5)).toBe(2); // double mirror is the identity
+  });
+
+  it('repeat preserves state; 4-tuples stay 4-tuples through every transform', () => {
     const tiled = repeat(STATE, 2, 1, 1, [2, 0, 0]);
     expect(tiled.blocks.filter((v) => v[3] === 5 && v.length === 5 && v[4] === 2)).toHaveLength(2);
     // the legacy 4-tuple stays a 4-tuple (state not fabricated)
     expect(rotateY(STATE, 1).blocks.find((v) => v[3] === 6)?.length).toBe(4);
+    expect(mirror(STATE, 'x').blocks.find((v) => v[3] === 6)?.length).toBe(4);
+  });
+
+  it('rotated stair state matches the rigidly rotated stair geometry', () => {
+    // The proof the direction convention is right: rotating the collision boxes of a
+    // north-facing stair by the same (x,z) → (z, 1−x) map used for block positions must
+    // yield exactly the boxes of a stair whose state went through rotateStateY.
+    const rot = (b: readonly number[]): number[] => [b[2], b[1], 1 - b[3], b[5], b[4], 1 - b[0]];
+    const sort = (boxes: number[][]): number[][] =>
+      [...boxes].sort((a, b) => a[1] - b[1] || a[0] - b[0] || a[2] - b[2]);
+    for (const facing of [FACING.N, FACING.E, FACING.S, FACING.W]) {
+      for (const half of [0, 1]) {
+        const rotatedGeometry = sort(stairBoxes(facing, half).map(rot));
+        const { facing: f2, half: h2 } = unpackState(rotateStateY(packState(facing, half), 1));
+        expect(sort(stairBoxes(f2, h2).map((b) => [...b]))).toEqual(rotatedGeometry);
+      }
+    }
   });
 });

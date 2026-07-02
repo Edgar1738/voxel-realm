@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   clampSpawnY,
+  groundSpawnY,
   parseSpawnOverrides,
   resolveSpawn,
   type SpawnState,
@@ -67,5 +68,24 @@ describe('clampSpawnY – keep spawn inside world bounds', () => {
   it('clamps an above-ceiling y down to WORLD_HEIGHT', () => {
     const state: SpawnState = { spawn: { x: 5, y: 99999, z: -5 }, look: { yaw: 0, pitch: 0 } };
     expect(clampSpawnY(state, WORLD_HEIGHT).spawn.y).toBe(WORLD_HEIGHT);
+  });
+});
+
+describe('groundSpawnY – settle the default spawn onto terrain', () => {
+  const HALF = 0.9;
+
+  it('rests the body center on the highest solid block of the column', () => {
+    const isSolid = (_x: number, y: number, _z: number) => y <= 63;
+    expect(groundSpawnY(isSolid, 8, 8, 192, HALF)).toBe(64 + HALF);
+  });
+
+  it('ignores solids in other columns', () => {
+    const isSolid = (x: number, y: number, z: number) => x === 0 && z === 0 && y <= 10;
+    expect(groundSpawnY(isSolid, 0, 0, 192, HALF)).toBe(11 + HALF);
+    expect(groundSpawnY(isSolid, 5, 5, 192, HALF)).toBeUndefined();
+  });
+
+  it('returns undefined for an all-air column', () => {
+    expect(groundSpawnY(() => false, 8, 8, 192, HALF)).toBeUndefined();
   });
 });

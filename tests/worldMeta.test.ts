@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeMeta, appendLandmark } from '../src/app/worldMeta';
+import { mergeMeta, appendLandmark, auditWorldMeta } from '../src/app/worldMeta';
 import type { WorldMeta } from '../src/persistence/SaveTypes';
 
 const base: WorldMeta = { seed: 7, version: 1, preset: 'default' };
@@ -50,5 +50,45 @@ describe('appendLandmark', () => {
       { name: 'B', x: 1, y: 1, z: 1 },
     ]);
     expect(one.landmarks).toHaveLength(1);
+  });
+});
+
+describe('auditWorldMeta', () => {
+  it('reports a missing metadata document as not ready', () => {
+    expect(auditWorldMeta(undefined)).toEqual({
+      ready: false,
+      missing: ['meta'],
+      warnings: ['No world metadata is saved yet.'],
+      suggestions: ['Make an edit or call world.setMeta() before curating this world.'],
+    });
+  });
+
+  it('flags missing player-facing curation fields', () => {
+    const audit = auditWorldMeta(base);
+    expect(audit.ready).toBe(false);
+    expect(audit.missing).toEqual(['title', 'description', 'spawn', 'look', 'landmarks', 'tour']);
+    expect(audit.suggestions).toContain(
+      'Move to a good first-player view and call world.setSpawn("Arrival").',
+    );
+  });
+
+  it('passes a curated world with enough landmarks and tour waypoints', () => {
+    const audit = auditWorldMeta({
+      ...base,
+      title: 'Moonspire Realm',
+      description: 'A castle approach with a spire route.',
+      spawn: { x: 8, y: 72, z: 126 },
+      look: { yaw: 0, pitch: -0.1 },
+      landmarks: [
+        { name: 'Arrival Road', x: 8, y: 72, z: 126 },
+        { name: 'Gatehouse', x: 8, y: 64, z: 47 },
+        { name: 'Moonspire', x: 68, y: 118, z: 72 },
+      ],
+      tour: [
+        { name: 'Arrival Road', x: 8, y: 72, z: 126 },
+        { name: 'Gatehouse', x: 8, y: 64, z: 47 },
+      ],
+    });
+    expect(audit).toEqual({ ready: true, missing: [], warnings: [], suggestions: [] });
   });
 });

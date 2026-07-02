@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { resolveTarget, type PreviewDeps } from '../src/app/targetPreview';
 import type { VoxelRaycastHit } from '../src/edit/VoxelRaycast';
+import { placementState } from '../src/app/placement';
+import { packState } from '../src/world/VoxelState';
 
 const CUBE = 1 as const;
 const STAIR = 2 as const;
@@ -12,14 +14,20 @@ function hit(
   block = { x: 5, y: 6, z: 7 },
   adjacent = { x: 5, y: 7, z: 7 },
 ): VoxelRaycastHit {
-  return { block, adjacent, normal: { x: 0, y: 1, z: 0 }, id: id as never };
+  return {
+    block,
+    adjacent,
+    normal: { x: 0, y: 1, z: 0 },
+    point: { x: block.x + 0.5, y: block.y + 1, z: block.z + 0.5 },
+    id: id as never,
+  };
 }
 
 const deps: PreviewDeps = {
   isToggleable: (id) => id === GATE,
   shapeOf: (id) =>
     id === STAIR ? 'stair' : id === GATE ? 'gate' : id === PLANT ? 'cross' : 'cube',
-  stateFromYaw: () => 3,
+  placementState: (shape) => (shape === 'stair' || shape === 'gate' ? 3 : 0),
   canPlaceAt: (x) => x >= 0, // simulate unloaded/out-of-range when x < 0
 };
 
@@ -58,6 +66,25 @@ describe('resolveTarget', () => {
       expect(r.ghost.valid).toBe(false);
       expect(r.ghost).toMatchObject({ x: -1, y: 7, z: 7 });
     }
+  });
+
+  it('threads the hit face/point through placementState (underside → top slab)', () => {
+    const SLAB = 5;
+    const realDeps: PreviewDeps = {
+      ...deps,
+      shapeOf: () => 'slab',
+      placementState: (shape, yaw, h) => placementState(shape, yaw, h),
+    };
+    const underside: VoxelRaycastHit = {
+      block: { x: 5, y: 6, z: 7 },
+      adjacent: { x: 5, y: 5, z: 7 },
+      normal: { x: 0, y: -1, z: 0 },
+      point: { x: 5.5, y: 6, z: 7.5 },
+      id: CUBE as never,
+    };
+    const r = resolveTarget(underside, SLAB as never, 0, realDeps);
+    expect(r.kind).toBe('place');
+    if (r.kind === 'place') expect(r.ghost.state).toBe(packState(0, 1));
   });
 
   it('zero-collision block (plant) still yields a usable outline + ghost', () => {

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { validatePackage, summarizePackage } from '../scripts/packageCore';
+import { auditWorldMeta } from '../src/app/worldMeta';
 import type { WorldMeta } from '../src/persistence/SaveTypes';
+import { REGULAR_USER_MOONSPIRE_META } from './fixtures/curatedMeta';
 
 const WORLD_HEIGHT = 192;
 
@@ -48,6 +50,27 @@ describe('validatePackage', () => {
     expect(problems).toMatch(/spawn/i);
     expect(problems).toMatch(/landmark/i);
     expect(problems).toMatch(/tour/i);
+  });
+});
+
+describe('readiness contract alignment (structural + curation)', () => {
+  it('regular-user-moonspire meta passes both classifiers cleanly', () => {
+    expect(validatePackage(REGULAR_USER_MOONSPIRE_META, WORLD_HEIGHT)).toEqual([]);
+    expect(auditWorldMeta(REGULAR_USER_MOONSPIRE_META)).toEqual({
+      ready: true,
+      missing: [],
+      warnings: [],
+      suggestions: [],
+    });
+  });
+
+  it('the classifiers disagree on purpose for a bare-but-sound save: packageable, not player-ready', () => {
+    // Structurally fine (finite spawn, sane points) but uncurated — world:package archives it
+    // with curation warnings rather than refusing.
+    expect(validatePackage(roamReady, WORLD_HEIGHT)).toEqual([]);
+    const audit = auditWorldMeta(roamReady);
+    expect(audit.ready).toBe(false);
+    expect(audit.missing).toContain('title');
   });
 });
 
