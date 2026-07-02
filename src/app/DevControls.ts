@@ -94,6 +94,8 @@ export interface DevControlsContext {
   weather?: (kind: 'clear' | 'rain' | 'storm' | 'snow' | 'auto') => string;
   /** Live ambient-creature census; pass a dt to step the swarm once headlessly. */
   life?: (dtSeconds?: number) => Record<string, number>;
+  /** Block-physics ticker introspection + headless stepping. */
+  flow?: { queued(): number; tick(dtSeconds?: number): number };
   /** Sound engine handle for the `sound` dev command. */
   audio: {
     setMuted(muted: boolean): void;
@@ -622,6 +624,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     tourHud: ctx.tour,
     weather: ctx.weather,
     life: ctx.life,
+    flow: ctx.flow,
     /** Toggle audio and optionally set the master volume (0..1). */
     sound: (on = true, volume?: number): { muted: boolean; volume: number } => {
       ctx.audio.setMuted(!on);

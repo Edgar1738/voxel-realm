@@ -12,6 +12,7 @@ import { Weather } from '../render/Weather';
 import { AmbientLife } from '../render/AmbientLife';
 import { skyState } from '../render/Sky';
 import { WeatherClock, type WeatherKind } from './weatherSchedule';
+import { BlockTicker } from '../world/BlockTicker';
 import { DayNight } from '../render/DayNight';
 import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
@@ -180,6 +181,18 @@ export class Game {
     // Debounced per-chunk persistence.
     const persistence = createPersistence(store, manager);
     manager.onChunkDeltaChanged = (key) => persistence.scheduleFlush(key);
+
+    // Block physics: water flows, sand falls. Every edit batch (player, builder,
+    // undo, or the ticker's own writes) re-activates the touched cells.
+    const ticker = new BlockTicker(
+      {
+        getBlock: (x, y, z) => manager.getBlock(x, y, z),
+        getState: (x, y, z) => manager.getState(x, y, z),
+        isLoaded: (x, z) => manager.isLoaded(x, z),
+      },
+      (edits) => manager.applyEdits(edits),
+    );
+    manager.onEditsApplied = (changes) => ticker.notifyChanges(changes);
 
     const overlay = document.getElementById('overlay') ?? undefined;
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
@@ -794,6 +807,7 @@ export class Game {
       ambientLife.update(cdt, eye, skyState(daynight.time).daylight, (x, y, z) =>
         manager.getBlock(x, y, z),
       );
+      ticker.update(cdt);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
@@ -938,6 +952,14 @@ export class Game {
             );
           }
           return ambientLife.census();
+        },
+        // Headless block-physics driving (hidden tabs suspend rAF): tick advances the sim clock.
+        flow: {
+          queued: () => ticker.queued,
+          tick: (dtSeconds = 0.2) => {
+            ticker.update(dtSeconds);
+            return ticker.queued;
+          },
         },
         // Pins the weather for testing/captures ('auto' resumes the natural cycle).
         weather: (kind: WeatherKind | 'auto') => {

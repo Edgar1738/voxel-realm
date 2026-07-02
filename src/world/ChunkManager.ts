@@ -113,6 +113,9 @@ export class ChunkManager {
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
   onChunkDeltaChanged?: (key: string, entries: ChunkDeltaEntries) => void;
 
+  /** Notified after every non-empty edit batch with the voxels that actually changed (drives the block ticker). */
+  onEditsApplied?: (changes: readonly VoxelChange[]) => void;
+
   constructor(
     private readonly generator: Generator,
     private readonly mesher: GreedyMesher,
@@ -514,6 +517,7 @@ export class ChunkManager {
     for (const key of editedChunks) {
       this.onChunkDeltaChanged?.(key, this.getChunkDelta(key));
     }
+    if (changes.length > 0) this.onEditsApplied?.(changes);
     return changes;
   }
 
