@@ -7,9 +7,12 @@ const vertexShader = /* glsl */ `
 precision highp float;
 precision highp int;
 
-uniform mat4 modelViewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 uniform mat3 normalMatrix;
+uniform float uTime;
+uniform float uSwayAmp;
 
 in vec3 position;
 in vec3 normal;
@@ -26,6 +29,7 @@ out float vLight;
 out vec3 vTint;
 out vec3 vNormal;
 out vec3 vViewPos;
+out vec3 vWorldPos;
 
 void main() {
   vUv = uv;
@@ -34,7 +38,14 @@ void main() {
   vLight = light;
   vTint = tint;
   vNormal = normalize(normalMatrix * normal);
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+  // Wind sway for cutout plants: tops (uv.y=1) lean, roots stay planted. World-position
+  // phase keeps neighboring plants out of lockstep. uSwayAmp is 0 on non-plant passes.
+  float sway = uSwayAmp * uv.y;
+  worldPos.x += sway * sin(uTime * 1.7 + worldPos.x * 0.9 + worldPos.z * 1.3);
+  worldPos.z += sway * cos(uTime * 1.3 + worldPos.z * 0.8 + worldPos.x * 1.1);
+  vWorldPos = worldPos;
+  vec4 mv = viewMatrix * vec4(worldPos, 1.0);
   vViewPos = mv.xyz;
   gl_Position = projectionMatrix * mv;
 }
@@ -55,6 +66,8 @@ uniform float uDayLight;
 uniform float uAlphaTest;
 uniform float uTorch;
 uniform float uTorchRadius;
+uniform float uTime;
+uniform float uWaveAmp;
 
 in vec2 vUv;
 in float vLayer;
@@ -63,6 +76,7 @@ in float vLight;
 in vec3 vTint;
 in vec3 vNormal;
 in vec3 vViewPos;
+in vec3 vWorldPos;
 
 out vec4 fragColor;
 
@@ -70,6 +84,13 @@ void main() {
   vec4 texel = texture(uTex, vec3(vUv, vLayer));
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
   vec3 base = texel.rgb * vTint;
+  // Water shimmer: two drifting sine fields brighten/darken the surface so still water
+  // reads as liquid. uWaveAmp is 0 on every pass except the transparent (water) one.
+  if (uWaveAmp > 0.0) {
+    float wave = sin(vWorldPos.x * 1.6 + vWorldPos.z * 0.7 + uTime * 1.4) *
+                 sin(vWorldPos.z * 1.9 - vWorldPos.x * 0.5 + uTime * 1.1);
+    base *= 1.0 + uWaveAmp * wave;
+  }
   float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
@@ -89,15 +110,29 @@ void main() {
 }
 `;
 
+/** Plant-top lean in blocks; subtle — a breeze, not a gale. */
+export const PLANT_SWAY_AMP = 0.05;
+/** Water brightness ripple amplitude (fraction of base color). */
+export const WATER_WAVE_AMP = 0.1;
+
 interface MaterialOpts {
   alpha?: number;
   transparent?: boolean;
   doubleSide?: boolean;
   alphaTest?: number;
+  swayAmp?: number;
+  waveAmp?: number;
 }
 
 function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShaderMaterial {
-  const { alpha = 1.0, transparent = false, doubleSide = false, alphaTest = 0 } = opts;
+  const {
+    alpha = 1.0,
+    transparent = false,
+    doubleSide = false,
+    alphaTest = 0,
+    swayAmp = 0,
+    waveAmp = 0,
+  } = opts;
   const material = new RawShaderMaterial({
     glslVersion: GLSL3,
     uniforms: {
@@ -111,6 +146,9 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
       uAlphaTest: { value: alphaTest },
       uTorch: { value: 0.0 },
       uTorchRadius: { value: HEADLAMP_RADIUS },
+      uTime: { value: 0.0 },
+      uSwayAmp: { value: swayAmp },
+      uWaveAmp: { value: waveAmp },
     },
     vertexShader,
     fragmentShader,
@@ -127,10 +165,27 @@ export function createChunkMaterial(tex: DataArrayTexture): RawShaderMaterial {
 
 /** Translucent material for the transparent pass (water/glass; drawn after opaque, no depth write). */
 export function createTransparentMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, { alpha: 0.72, transparent: true, doubleSide: true });
+  return buildMaterial(tex, {
+    alpha: 0.72,
+    transparent: true,
+    doubleSide: true,
+    waveAmp: WATER_WAVE_AMP,
+  });
 }
 
 /** Cutout material for plants: opaque + depth-writing, double-sided, with an alpha-test discard. */
 export function createCutoutMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, { alpha: 1.0, doubleSide: true, alphaTest: 0.5 });
+  return buildMaterial(tex, {
+    alpha: 1.0,
+    doubleSide: true,
+    alphaTest: 0.5,
+    swayAmp: PLANT_SWAY_AMP,
+  });
+}
+
+/** Advances the shared animation clock (plant sway, water shimmer). Call once per frame. */
+export function applyTime(materials: readonly RawShaderMaterial[], seconds: number): void {
+  for (const m of materials) {
+    m.uniforms.uTime.value = seconds;
+  }
 }

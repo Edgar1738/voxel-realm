@@ -1,6 +1,9 @@
 import { parseVolume, type SoundFamily, type SoundKind } from './sounds';
 
 const VOLUME_KEY = 'vr.volume';
+/** Muffle-filter cutoffs: fully open in air, telephone-under-a-blanket underwater. */
+const OPEN_CUTOFF = 20000;
+const UNDERWATER_CUTOFF = 700;
 const MUTED_KEY = 'vr.muted';
 const DEFAULT_VOLUME = 0.6;
 
@@ -64,9 +67,14 @@ const KIND_MODS: Record<SoundKind, { pitch: number; gain: number; dur: number }>
 export class AudioEngine {
   private ctx: AudioContext | undefined;
   private master: GainNode | undefined;
+  private muffle: BiquadFilterNode | undefined;
   private noise: AudioBuffer | undefined;
   private volumeLevel: number;
   private mutedState: boolean;
+  private underwaterState = false;
+  private rainLevel = 0;
+  private rainSource: AudioBufferSourceNode | undefined;
+  private rainGain: GainNode | undefined;
   private readonly unlock = (): void => {
     void this.ensureContext()?.resume();
   };
@@ -201,12 +209,105 @@ export class AudioEngine {
     src.start(now, Math.random(), 0.14);
   }
 
+  /**
+   * Muffles or restores the whole mix for a submerged camera. Safe to call every frame;
+   * only ramps the filter when the state flips.
+   */
+  setUnderwater(submerged: boolean): void {
+    if (submerged === this.underwaterState) return;
+    this.underwaterState = submerged;
+    if (!this.muffle || !this.ctx) return;
+    this.muffle.frequency.setTargetAtTime(
+      submerged ? UNDERWATER_CUTOFF : OPEN_CUTOFF,
+      this.ctx.currentTime,
+      0.08,
+    );
+  }
+
+  /**
+   * Sets the ambient rain-loop volume in [0,1] (0 stops the loop). Safe to call every
+   * frame — no-ops until the level changes or the AudioContext unlocks.
+   */
+  setRainLevel(level: number): void {
+    const target = Math.max(0, Math.min(1, level));
+    if (target === this.rainLevel && (target === 0 || this.rainSource)) return;
+    this.rainLevel = target;
+    const ctx = this.ensureContext();
+    if (!ctx || !this.master || ctx.state !== 'running') return; // retried on later frames
+
+    if (target === 0) {
+      if (this.rainSource && this.rainGain) {
+        const src = this.rainSource;
+        this.rainGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
+        src.stop(ctx.currentTime + 1.5);
+        this.rainSource = undefined;
+        this.rainGain = undefined;
+      }
+      return;
+    }
+    if (!this.rainSource) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuffer(ctx);
+      src.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 1400;
+      filter.Q.value = 0.4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      src.connect(filter).connect(gain).connect(this.master);
+      src.start(ctx.currentTime, Math.random());
+      this.rainSource = src;
+      this.rainGain = gain;
+    }
+    this.rainGain?.gain.setTargetAtTime(0.16 * target, ctx.currentTime, 0.8);
+  }
+
+  /** Distant thunder: a delayed low rumble with a pitch-falling sub tone. */
+  playThunder(intensity: number): void {
+    const ctx = this.playableContext();
+    if (!ctx || !this.master) return;
+    const at = ctx.currentTime + 0.4 + Math.random() * 1.6; // light first, sound later
+    const dur = 1.4 + Math.random() * 0.8;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer(ctx);
+    src.loop = true;
+    src.playbackRate.value = 0.4;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(240, at);
+    filter.frequency.exponentialRampToValueAtTime(60, at + dur);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(0.55 * intensity, at + 0.08);
+    env.gain.exponentialRampToValueAtTime(0.001, at + dur);
+    src.connect(filter).connect(env).connect(this.master);
+    src.start(at);
+    src.stop(at + dur + 0.05);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, at);
+    osc.frequency.exponentialRampToValueAtTime(28, at + dur);
+    const oscEnv = ctx.createGain();
+    oscEnv.gain.setValueAtTime(0.0001, at);
+    oscEnv.gain.exponentialRampToValueAtTime(0.3 * intensity, at + 0.1);
+    oscEnv.gain.exponentialRampToValueAtTime(0.001, at + dur);
+    osc.connect(oscEnv).connect(this.master);
+    osc.start(at);
+    osc.stop(at + dur + 0.05);
+  }
+
   dispose(): void {
     window.removeEventListener('pointerdown', this.unlock);
     window.removeEventListener('keydown', this.unlock);
     void this.ctx?.close();
     this.ctx = undefined;
     this.master = undefined;
+    this.muffle = undefined;
+    this.rainSource = undefined;
+    this.rainGain = undefined;
   }
 
   private applyMaster(): void {
@@ -221,7 +322,11 @@ export class AudioEngine {
     if (typeof AudioContext === 'undefined') return undefined;
     this.ctx = new AudioContext();
     this.master = this.ctx.createGain();
-    this.master.connect(this.ctx.destination);
+    // Everything routes through one lowpass so submerging muffles the whole mix at once.
+    this.muffle = this.ctx.createBiquadFilter();
+    this.muffle.type = 'lowpass';
+    this.muffle.frequency.value = this.underwaterState ? UNDERWATER_CUTOFF : OPEN_CUTOFF;
+    this.master.connect(this.muffle).connect(this.ctx.destination);
     this.applyMaster();
     return this.ctx;
   }
