@@ -14,6 +14,7 @@ import { gateToggleEdit } from './useAction';
 import { resolveTarget, type PreviewDeps } from './targetPreview';
 import { resolveBuilderIntent, type BuilderIntent } from './builderInput';
 import type { BuilderMode } from './BuilderState';
+import type { ExperienceMode } from './experienceMode';
 
 export const REACH = 6;
 const TUNNEL_LENGTH = 8;
@@ -29,6 +30,15 @@ export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill',
  */
 export function canEdit(pointerLocked: boolean, inventoryOpen: boolean): boolean {
   return pointerLocked && !inventoryOpen;
+}
+
+/**
+ * Play-mode gate for creative inputs (edits, hotbar, tools, inventory, builder, undo/redo).
+ * In `play` every world-changing input is inert; only movement/look/fly (CameraRig), sound,
+ * the headlamp, and the B key (enter build mode) pass through.
+ */
+export function creativeInputAllowed(mode: ExperienceMode): boolean {
+  return mode === 'build';
 }
 
 /** Wheel-to-hotbar-step mapping. Returns 0 when editing is blocked or there is no scroll delta. */
@@ -55,6 +65,10 @@ export interface InputCallbacks {
   setAnchor: (v: WorldVoxel | undefined) => void;
   getTool: () => Tool;
   getBuildMode: () => BuilderMode;
+  /** Current experience mode; `play` gates every creative input below. */
+  getExperienceMode: () => ExperienceMode;
+  /** Invoked when B is pressed in play mode (switch to build). */
+  onEnterBuild: () => void;
   onBuilderIntent: (intent: BuilderIntent) => void;
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
@@ -93,6 +107,14 @@ export function registerInputListeners(ctx: InputContext): () => void {
   window.addEventListener(
     'keydown',
     (e) => {
+      // Play mode: creative shortcuts are inert. B enters build mode; L (headlamp) passes
+      // through below; movement/look/fly live in CameraRig and are untouched.
+      if (!creativeInputAllowed(callbacks.getExperienceMode())) {
+        if (e.code === 'KeyB') callbacks.onEnterBuild();
+        else if (e.code === 'KeyL') callbacks.onToggleHeadlamp();
+        return;
+      }
+
       // Inventory / tool shortcuts
       const n = Number(e.key);
       if (n >= 1 && n <= inventory.hotbar.length) {
@@ -151,6 +173,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
   canvas.addEventListener(
     'wheel',
     (e) => {
+      if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       const delta = hotbarWheelDelta(e.deltaY, canEdit(rig.locked, callbacks.isInventoryOpen()));
       if (delta === 0) return;
       inventory.cycleSlot(delta);
@@ -163,6 +186,8 @@ export function registerInputListeners(ctx: InputContext): () => void {
   document.addEventListener(
     'mousedown',
     (e) => {
+      // Play mode: no click edits at all — break/place/pick/builder are all world-mutating.
+      if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
       const hit = raycastVoxels(
         { getBlock: (x, y, z) => manager.getBlock(x, y, z) },

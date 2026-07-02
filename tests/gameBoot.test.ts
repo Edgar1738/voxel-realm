@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeBootSave, loadBootMeta } from '../src/app/saveBootstrap';
+import { registerInputListeners } from '../src/app/input';
 
 type FakeUi = {
   hotbar: { addEventListener: (...args: unknown[]) => void };
@@ -10,11 +11,24 @@ type FakeUi = {
     style: Record<string, string>;
     textContent: string;
   };
+  blueprintButton: { addEventListener: (...args: unknown[]) => void };
+  infoButton: { addEventListener: (...args: unknown[]) => void };
+  modeButton: {
+    addEventListener: (...args: unknown[]) => void;
+    style: Record<string, string>;
+    textContent: string;
+  };
+  tourPrev: { addEventListener: (...args: unknown[]) => void };
+  tourNext: { addEventListener: (...args: unknown[]) => void };
+  tourEnd: { addEventListener: (...args: unknown[]) => void };
   muteButton: { addEventListener: (...args: unknown[]) => void };
   volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
-  setStatus: (text: string) => void;
+  setStatus: ReturnType<typeof vi.fn>;
+  setExperienceMode: ReturnType<typeof vi.fn>;
+  setTourHud: (status: unknown) => void;
+  showWorldInfoDialog: (info: unknown) => Promise<unknown>;
   setNotice: (text: string | null) => void;
   setSoundUi: (volume: number, muted: boolean) => void;
   renderHotbar: () => void;
@@ -28,6 +42,12 @@ function makeUi(): FakeUi {
     picker: { addEventListener: vi.fn() },
     reset: { addEventListener: vi.fn() },
     worldButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
+    blueprintButton: { addEventListener: vi.fn() },
+    infoButton: { addEventListener: vi.fn() },
+    modeButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
+    tourPrev: { addEventListener: vi.fn() },
+    tourNext: { addEventListener: vi.fn() },
+    tourEnd: { addEventListener: vi.fn() },
     muteButton: { addEventListener: vi.fn() },
     volumeSlider: { addEventListener: vi.fn(), value: '60' },
     inventoryOpen: false,
@@ -40,6 +60,12 @@ function makeUi(): FakeUi {
       ui.inventoryOpen = open;
     }),
     isInventoryOpen: () => ui.inventoryOpen,
+    showDialog: vi.fn().mockResolvedValue('cancel'),
+    showWorldDialog: vi.fn().mockResolvedValue(undefined),
+    showBlueprintDialog: vi.fn().mockResolvedValue(undefined),
+    setExperienceMode: vi.fn(),
+    setTourHud: vi.fn(),
+    showWorldInfoDialog: vi.fn().mockResolvedValue(undefined),
   };
   return ui;
 }
@@ -393,6 +419,86 @@ describe('Game.boot composition', () => {
 
     expect(boot.playerConstructorArgs[0]).toEqual({ x: 20, y: 70, z: -20 });
     expect(boot.rigInstance).toMatchObject({ yaw: 1.5, pitch: -0.3 });
+
+    cleanup();
+  });
+
+  const curatedMeta = {
+    seed: 1,
+    version: 1,
+    preset: 'flat',
+    title: 'Moonspire Realm',
+    description: 'A castle approach.',
+    spawn: { x: 8, y: 72, z: 94 },
+    look: { yaw: 0, pitch: 0 },
+    landmarks: [{ name: 'Gatehouse', x: 8, y: 64, z: 47 }],
+    tour: [
+      { name: 'Road', x: 8, y: 72, z: 94 },
+      { name: 'Gatehouse', x: 8, y: 64, z: 47 },
+    ],
+  };
+
+  function inputCtx(): {
+    getExperienceMode: () => 'play' | 'build';
+    onEnterBuild: () => void;
+    onRun: (voxels: unknown[], verb: string) => void;
+  } {
+    const call = vi.mocked(registerInputListeners).mock.calls[0][0] as {
+      callbacks: ReturnType<typeof inputCtx>;
+    };
+    return call.callbacks;
+  }
+
+  it('a curated world boots into play mode; B enters build', async () => {
+    vi.mocked(loadBootMeta).mockResolvedValueOnce({
+      store: {} as never,
+      meta: curatedMeta,
+      persistent: true,
+    });
+
+    const cleanup = await bootGame();
+    const callbacks = inputCtx();
+
+    expect(boot.ui!.setExperienceMode).toHaveBeenLastCalledWith('play');
+    expect(callbacks.getExperienceMode()).toBe('play');
+
+    callbacks.onEnterBuild();
+    expect(callbacks.getExperienceMode()).toBe('build');
+    expect(boot.ui!.setExperienceMode).toHaveBeenLastCalledWith('build');
+
+    cleanup();
+  });
+
+  it('uncurated worlds keep creative build mode', async () => {
+    const cleanup = await bootGame(); // default boot: meta undefined
+
+    expect(boot.ui!.setExperienceMode).toHaveBeenLastCalledWith('build');
+    expect(inputCtx().getExperienceMode()).toBe('build');
+
+    cleanup();
+  });
+
+  it('play mode blocks edits end-to-end: onRun becomes a no-op with a hint', async () => {
+    vi.mocked(loadBootMeta).mockResolvedValueOnce({
+      store: {} as never,
+      meta: curatedMeta,
+      persistent: true,
+    });
+
+    const cleanup = await bootGame();
+    const { EditService } = await import('../src/edit/EditService');
+    const editInstance = vi.mocked(EditService).mock.results[0].value as {
+      apply: ReturnType<typeof vi.fn>;
+    };
+
+    inputCtx().onRun([{ x: 0, y: 0, z: 0, id: 0 }], 'Broke');
+    expect(editInstance.apply).not.toHaveBeenCalled();
+    expect(boot.ui!.setStatus).toHaveBeenCalledWith(expect.stringContaining('press B to build'));
+
+    // Entering build mode re-enables the same path.
+    inputCtx().onEnterBuild();
+    inputCtx().onRun([{ x: 0, y: 0, z: 0, id: 0 }], 'Broke');
+    expect(editInstance.apply).toHaveBeenCalledTimes(1);
 
     cleanup();
   });

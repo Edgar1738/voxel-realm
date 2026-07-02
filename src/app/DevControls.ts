@@ -48,7 +48,7 @@ import {
   writeWorldMeta,
 } from '../persistence/ServerWorldCatalog';
 import type { WorldMeta } from '../persistence/SaveTypes';
-import { mergeMeta, appendLandmark } from './worldMeta';
+import { mergeMeta, appendLandmark, auditWorldMeta } from './worldMeta';
 import type { WorldPreset } from '../worldgen/Presets';
 import {
   rotateY,
@@ -58,7 +58,13 @@ import {
   type Prefab,
 } from '../core/Prefab';
 import { toggleOpen } from '../world/VoxelState';
-import { replaceVoxels, prefabToVoxels, unloadedChunksInBox, captureRegion } from './RegionOps';
+import {
+  replaceVoxels,
+  prefabToVoxels,
+  unloadedChunksInBox,
+  captureRegion,
+  orientedStateReader,
+} from './RegionOps';
 
 /**
  * Dev-only "roam studio" exposed as `window.__vr`: pose the camera, roam, build, capture, and
@@ -82,6 +88,8 @@ export interface DevControlsContext {
   roam: RoamDriver;
   /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
   headlamp: (on: boolean) => void;
+  /** Play-mode tour HUD controls; `tick` steps the loop path once (hidden tabs suspend rAF). */
+  tour?: { start(): void; end(): void; tick(): void };
   /** Sound engine handle for the `sound` dev command. */
   audio: {
     setMuted(muted: boolean): void;
@@ -457,7 +465,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     scan: 'scan(x1,y1,z1, x2,y2,z2) -> {dims,nonAir,counts,unloaded}',
     slice: 'slice(y, x1,z1, x2,z2) -> {rows,legend,...} — ASCII floor plan',
     world:
-      'world.list()/current()/saveAs(n)/load(n)/delete(n) · meta()/setMeta/setSpawn(name?)/addLandmark/setTour/roamUrl',
+      'world.list()/current()/saveAs(n)/load(n)/delete(n) · meta()/audit()/setMeta/setSpawn(name?)/addLandmark/setTour/roamUrl',
     bench: 'bench({axis,distance,speed}) — profile a straight fly-roam',
     benchRoute: 'benchRoute([{x,z}...], {speed?}) — profile a multi-waypoint route',
     benchTour: "benchTour({speed?}) — profile the world's saved meta.tour",
@@ -605,6 +613,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     /** Camera-centered glow for dark caves — lights captures without placing blocks. */
     headlamp: (on = true): void => ctx.headlamp(on),
+    /** Play-mode tour HUD: start()/end()/tick() — tick after moving (hidden tabs suspend rAF). */
+    tourHud: ctx.tour,
     /** Toggle audio and optionally set the master volume (0..1). */
     sound: (on = true, volume?: number): { muted: boolean; volume: number } => {
       ctx.audio.setMuted(!on);
@@ -733,11 +743,16 @@ export function installDevControls(ctx: DevControlsContext): void {
       } catch {
         /* region too large to auto-preload */
       }
-      // Capture state too so copied stairs/gates keep their orientation (Phase 3).
+      // Capture state too so copied stairs/gates keep their orientation (Phase 3). The
+      // oriented reader keeps even a zero state for facing shapes (N stair packs to 0).
       const captured = captureRegion(
         (x, y, z) => manager.getBlock(x, y, z),
         { x1: ax, y1: ay, z1: az, x2: bx, y2: by, z2: bz },
-        (x, y, z) => manager.getState(x, y, z),
+        orientedStateReader(
+          (x, y, z) => manager.getBlock(x, y, z),
+          (x, y, z) => manager.getState(x, y, z),
+          (id) => registry.hasFacing(id),
+        ),
       );
       const unloaded = unloadedChunksInBox((x, z) => manager.isLoaded(x, z), {
         x1: ax,
@@ -1044,6 +1059,8 @@ export function installDevControls(ctx: DevControlsContext): void {
       // --- curated-world metadata (spawn / landmarks / tour) ---
       /** Read the current world's stored meta, or undefined if it has none yet. */
       meta: (): Promise<WorldMeta | undefined> => readWorldMeta(currentWorld),
+      /** Check whether player-facing curation metadata is complete enough for a first visit. */
+      audit: async () => auditWorldMeta(await readWorldMeta(currentWorld)),
       /** Merge a partial patch into the stored meta and persist the complete result. */
       setMeta: (patch: Partial<WorldMeta>): Promise<WorldMeta> =>
         patchMeta((base) => mergeMeta(base, patch)),

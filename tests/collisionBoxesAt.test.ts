@@ -18,6 +18,13 @@ class Fixture implements Generator {
       d.set(3, 5, 2, OAK_FENCE);
       d.set(4, 5, 2, OAK_FENCE_GATE);
       d.setState(4, 5, 2, setOpen(packState(FACING.N, 0), true)); // open gate
+      d.set(8, 5, 8, OAK_FENCE); // isolated fence (no connectable neighbours)
+      d.set(10, 5, 8, OAK_FENCE); // straight run: fence–fence along x
+      d.set(11, 5, 8, OAK_FENCE);
+      d.set(12, 5, 8, OAK_FENCE);
+      d.set(6, 5, 12, OAK_FENCE); // corner: arms east + south
+      d.set(7, 5, 12, OAK_FENCE);
+      d.set(6, 5, 13, OAK_FENCE);
     }
     return d;
   }
@@ -32,8 +39,29 @@ describe('ChunkManager.collisionBoxesAt', () => {
   it('offsets local boxes to world coords', () => {
     expect(mgr().collisionBoxesAt(2, 5, 2)).toEqual([[2, 5, 2, 3, 6, 3]]); // stone cube
   });
-  it('a fence is a 1.5-tall world box', () => {
-    expect(mgr().collisionBoxesAt(3, 5, 2)).toEqual([[3, 5, 2, 4, 6.5, 3]]);
+  it('an isolated fence collides only as its central post', () => {
+    expect(mgr().collisionBoxesAt(8, 5, 8)).toEqual([[8.375, 5, 8.375, 8.625, 6.5, 8.625]]);
+  });
+  it('a fence next to a solid cube grows an arm toward it (but none toward a gate)', () => {
+    // Stone to the west (arm), open gate to the east (no arm — gates do not connect).
+    expect(mgr().collisionBoxesAt(3, 5, 2)).toEqual([
+      [3.375, 5, 2.375, 3.625, 6.5, 2.625], // post
+      [3, 5, 2.375, 3.375, 6.5, 2.625], // west arm toward the stone
+    ]);
+  });
+  it('a straight fence run grows arms on both x sides', () => {
+    expect(mgr().collisionBoxesAt(11, 5, 8)).toEqual([
+      [11.375, 5, 8.375, 11.625, 6.5, 8.625], // post
+      [11.625, 5, 8.375, 12, 6.5, 8.625], // east arm
+      [11, 5, 8.375, 11.375, 6.5, 8.625], // west arm
+    ]);
+  });
+  it('a corner fence grows arms east and south only', () => {
+    expect(mgr().collisionBoxesAt(6, 5, 12)).toEqual([
+      [6.375, 5, 12.375, 6.625, 6.5, 12.625], // post
+      [6.625, 5, 12.375, 7, 6.5, 12.625], // east arm
+      [6.375, 5, 12.625, 6.625, 6.5, 13], // south arm
+    ]);
   });
   it('an open gate has no boxes; air has none', () => {
     expect(mgr().collisionBoxesAt(4, 5, 2)).toEqual([]);

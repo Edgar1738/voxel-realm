@@ -17,7 +17,7 @@ import { PlayerController } from '../player/PlayerController';
 import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
-import { createCreativeUi } from './CreativeUi';
+import { createCreativeUi, type DialogAction } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
 import { ServerSaveStore } from '../persistence/ServerSaveStore';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -46,14 +46,16 @@ import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
 import { registerInputListeners, TOOLS, toolLabel, REACH, type Tool } from './input';
-import { stairStateFromYaw } from './placement';
+import { placementState } from './placement';
 import type { PreviewDeps } from './targetPreview';
 import { resolveTarget } from './targetPreview';
 import { raycastVoxels } from '../edit/VoxelRaycast';
 import { TargetOverlay } from '../render/TargetOverlay';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
-import { resolveSpawn, parseSpawnOverrides, clampSpawnY } from './bootSpawn';
+import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
+import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
+import { tourRoute, tourTick, tourStep } from './tour';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
 import { dominantHorizontalAxis } from './builderInput';
@@ -64,7 +66,46 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { MovementSoundTracker } from '../audio/MovementSounds';
 import { batchSound, familyOf } from '../audio/sounds';
 import { AIR } from '../blocks/blocks';
-import { fillBox, clearBox, replaceVoxels, captureRegion, prefabToVoxels } from './RegionOps';
+import {
+  fillBox,
+  clearBox,
+  replaceVoxels,
+  captureRegion,
+  prefabToVoxels,
+  orientedStateReader,
+} from './RegionOps';
+import {
+  ServerBlueprintStore,
+  LocalStorageBlueprintStore,
+  type BlueprintStore,
+} from './BlueprintStore';
+import type { Prefab } from '../core/Prefab';
+import {
+  cottage,
+  well,
+  lampPost,
+  ruinedTower,
+  barn,
+  watchtower,
+  marketStall,
+  brokenWall,
+  bridge,
+  farmPlot,
+} from '../worldgen/prefabs';
+
+/** Built-in structures offered read-only in the blueprint dialog alongside saved blueprints. */
+const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
+  cottage,
+  well,
+  'lamp-post': lampPost,
+  'ruined-tower': ruinedTower,
+  barn,
+  watchtower,
+  'market-stall': marketStall,
+  'broken-wall': brokenWall,
+  bridge,
+  'farm-plot': farmPlot,
+};
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -135,13 +176,18 @@ export class Game {
 
     const overlay = document.getElementById('overlay') ?? undefined;
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
+    const spawnOverrides = parseSpawnOverrides(window.location.search);
     const spawnState = clampSpawnY(
-      resolveSpawn(bootMeta.meta, parseSpawnOverrides(window.location.search), {
+      resolveSpawn(bootMeta.meta, spawnOverrides, {
         spawn: SPAWN,
         look: { yaw: 0, pitch: 0 },
       }),
       WORLD_HEIGHT,
     );
+    // Only the fixed default spawn hovers waiting for terrain; curated/overridden spawns are
+    // intentional vantage points and must not be settled onto the ground.
+    const usingDefaultSpawn =
+      spawnOverrides.spawn === undefined && bootMeta.meta?.spawn === undefined;
     const player = new PlayerController(spawnState.spawn, true);
     const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
@@ -158,33 +204,32 @@ export class Game {
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
 
     const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
+
+    // Experience mode: curated worlds (title/description/spawn/look) open explore-first in
+    // `play` (creative UI hidden, edit inputs gated in input.ts); `build` is full creative.
+    const curated = isCuratedWorld(bootMeta.meta);
+    let experience: ExperienceMode = initialExperienceMode(bootMeta.meta);
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined, () =>
       ui.isInventoryOpen(),
     );
     rig.yaw = spawnState.look.yaw;
     rig.pitch = spawnState.look.pitch;
 
+    // Dev world catalog (named server saves). `copyWorldFn` doubles as the reset dialog's
+    // "duplicate first" capability; undefined in production (single IndexedDB world).
+    let copyWorldFn: ((from: string, to: string) => Promise<void>) | undefined;
     if (import.meta.env.DEV) {
       const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');
+      copyWorldFn = copyWorld;
       ui.worldButton.textContent = `World: ${worldName}`;
       ui.worldButton.addEventListener('click', () => {
         void (async () => {
           const worlds = await listWorlds();
-          const choice = window.prompt(
-            `Worlds: ${worlds.join(', ') || '(none yet)'}\n` +
-              `Type a name to switch/create, or "save:NEW" to copy "${worldName}" to NEW:`,
-            worldName,
-          );
+          const choice = await ui.showWorldDialog(worldName, worlds);
           if (!choice) return;
+          if (choice.kind === 'duplicate') await copyWorld(worldName, choice.name);
           const u = new URL(window.location.href);
-          if (choice.startsWith('save:')) {
-            const target = choice.slice('save:'.length).trim();
-            if (!target) return;
-            await copyWorld(worldName, target);
-            u.searchParams.set('save', target);
-          } else {
-            u.searchParams.set('save', choice.trim());
-          }
+          u.searchParams.set('save', choice.name);
           window.location.href = u.toString();
         })();
       });
@@ -248,19 +293,40 @@ export class Game {
       renderHotbar();
     });
     ui.reset.addEventListener('click', () => {
-      if (!window.confirm('Reset the world back to generated terrain? Your edits will be lost.')) {
-        return;
-      }
-      // suppressAndClear cancels the debounce, clears dirty set, and drains in-flight writes
-      // so the pagehide flush can't resurrect stale deltas after clearDeltas().
-      void persistence
-        .suppressAndClear()
-        .then(() => store.clearDeltas())
-        .then(() => window.location.reload())
-        .catch((err) => {
-          console.error('Voxel Realm: reset failed', err);
-          window.location.reload();
+      void (async () => {
+        const actions: DialogAction[] = [{ id: 'cancel', label: 'Cancel' }];
+        // Offer a backup copy first when the world catalog supports it (dev server saves).
+        if (copyWorldFn) actions.push({ id: 'duplicate', label: 'Copy, then reset' });
+        actions.push({ id: 'reset', label: 'Reset world', kind: 'danger' });
+        const choice = await ui.showDialog({
+          title: 'Reset world',
+          message:
+            `Reset "${worldName}" back to generated terrain? ` +
+            'All edits in this world will be lost.',
+          actions,
         });
+        if (choice !== 'reset' && choice !== 'duplicate') return;
+        if (choice === 'duplicate' && copyWorldFn) {
+          const backup = `${worldName}-backup-${new Date().toISOString().slice(0, 10)}`;
+          try {
+            await copyWorldFn(worldName, backup);
+            setStatus(`Copied to "${backup}"`);
+          } catch (err) {
+            console.error('Voxel Realm: backup copy failed — reset aborted', err);
+            setStatus('Backup copy failed — world NOT reset');
+            return;
+          }
+        }
+        // suppressAndClear cancels the debounce, clears dirty set, and drains in-flight writes
+        // so the pagehide flush can't resurrect stale deltas after clearDeltas().
+        try {
+          await persistence.suppressAndClear();
+          await store.clearDeltas();
+        } catch (err) {
+          console.error('Voxel Realm: reset failed', err);
+        }
+        window.location.reload();
+      })();
     });
 
     /** Sound + particles for what an edit batch actually changed (one sound per action). */
@@ -284,6 +350,11 @@ export class Game {
 
     /** Applies an edit set (capped), reports the result, and clears any pending selection. */
     const run = (voxels: SetVoxel[], verb: string): void => {
+      // Defense-in-depth behind the input gating: play mode never mutates the world.
+      if (experience === 'play') {
+        setStatus('Play mode — press B to build');
+        return;
+      }
       if (!withinEditCap(voxels.length, MAX_EDIT_VOXELS)) {
         setStatus(`Selection too large (${voxels.length} > ${MAX_EDIT_VOXELS})`);
         return;
@@ -296,7 +367,7 @@ export class Game {
     const previewDeps: PreviewDeps = {
       isToggleable: (id) => registry.isToggleable(id),
       shapeOf: (id) => registry.shape(id),
-      stateFromYaw: (yaw) => stairStateFromYaw(yaw),
+      placementState: (shape, yaw, hit) => placementState(shape, yaw, hit),
       canPlaceAt: (x, y, z) => manager.canApply([{ x, y, z }]),
     };
 
@@ -307,6 +378,143 @@ export class Game {
     };
 
     const builder = new BuilderState();
+
+    // Blueprint library: named clipboard saves (dev: shared .blueprints/ on the vite server —
+    // the same files as __vr.saveBlueprint; prod: this browser's localStorage).
+    const blueprints: BlueprintStore = import.meta.env.DEV
+      ? new ServerBlueprintStore()
+      : new LocalStorageBlueprintStore();
+    const openBlueprints = async (): Promise<void> => {
+      let saved: string[] = [];
+      try {
+        saved = await blueprints.list();
+      } catch (err) {
+        console.error('Voxel Realm: blueprint list failed', err);
+      }
+      const choice = await ui.showBlueprintDialog({
+        saved,
+        curated: Object.keys(CURATED_BLUEPRINTS),
+        canSave: builder.clipboard !== undefined,
+      });
+      if (!choice) return;
+      if (choice.kind === 'load') {
+        try {
+          const p = choice.curated
+            ? CURATED_BLUEPRINTS[choice.name]()
+            : await blueprints.load(choice.name);
+          builder.setClipboard(p);
+          setStatus(`Blueprint "${choice.name}" loaded — aim and click to paste`);
+        } catch (err) {
+          console.error('Voxel Realm: blueprint load failed', err);
+          setStatus(`Could not load blueprint "${choice.name}"`);
+        }
+        return;
+      }
+      if (choice.kind === 'save') {
+        const clip = builder.clipboard;
+        if (!clip)
+          return void setStatus('Nothing to save — copy a selection first (B, corners, C)');
+        try {
+          await blueprints.save(choice.name, clip);
+          setStatus(`Saved blueprint "${choice.name}"`);
+        } catch (err) {
+          console.error('Voxel Realm: blueprint save failed', err);
+          setStatus('Blueprint save failed');
+        }
+        return;
+      }
+      try {
+        await blueprints.remove(choice.name);
+      } catch (err) {
+        console.error('Voxel Realm: blueprint delete failed', err);
+        setStatus('Blueprint delete failed');
+      }
+      void openBlueprints(); // reopen with the refreshed list
+    };
+    ui.blueprintButton.addEventListener('click', () => void openBlueprints());
+
+    const applyExperience = (mode: ExperienceMode): void => {
+      experience = mode;
+      if (mode === 'play') {
+        ui.setInventoryOpen(false);
+        if (builder.mode !== 'off') builder.toggleMode(); // leave build tools; keep clipboard
+        anchorVoxel = undefined;
+      }
+      ui.setExperienceMode(mode);
+      // The world button is dev-only; play mode hides it, build restores the dev-only state.
+      ui.worldButton.style.display = import.meta.env.DEV && mode === 'build' ? '' : 'none';
+      ui.modeButton.style.display = curated ? '' : 'none';
+    };
+    ui.modeButton.addEventListener('click', () => {
+      applyExperience(experience === 'play' ? 'build' : 'play');
+      setStatus(experience === 'play' ? 'Play mode — exploring' : 'Build mode');
+    });
+
+    // Guided tour (meta.tour): active waypoint + distance in the HUD, advancing on arrival.
+    const route = tourRoute(bootMeta.meta);
+    let tourIndex: number | undefined;
+    const endTour = (message: string): void => {
+      tourIndex = undefined;
+      ui.setTourHud(undefined);
+      setStatus(message);
+    };
+    const startTour = (): void => {
+      if (!route) return void setStatus('This world has no tour');
+      tourIndex = 0;
+      setStatus('Tour started — follow the marker distance');
+    };
+    ui.tourPrev.addEventListener('click', () => {
+      if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, -1);
+    });
+    ui.tourNext.addEventListener('click', () => {
+      if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, 1);
+    });
+    ui.tourEnd.addEventListener('click', () => endTour('Tour ended'));
+    /** One tour tick: advance from the player position and refresh the HUD (loop + dev hook). */
+    const updateTour = (): void => {
+      if (!route || tourIndex === undefined) return;
+      const s = tourTick(route, tourIndex, player.position.x, player.position.z);
+      tourIndex = s.index;
+      if (s.done) endTour(`Tour complete — ${s.name}`);
+      else ui.setTourHud(s);
+    };
+
+    // World intro/info panel: shown once per save on a curated first visit, reopenable via Info.
+    const introKey = `vr.introSeen.${worldName}`;
+    const introSeen = (): boolean => {
+      try {
+        return localStorage.getItem(introKey) === '1';
+      } catch {
+        return true; // storage unavailable — never nag on every boot
+      }
+    };
+    const openWorldInfo = async (): Promise<void> => {
+      const meta = bootMeta.meta;
+      const action = await ui.showWorldInfoDialog({
+        title: meta?.title?.trim() || `World: ${worldName}`,
+        description: meta?.description ?? '',
+        landmarks: (meta?.landmarks ?? []).map((l) => l.name),
+        tourCount: meta?.tour?.length ?? 0,
+      });
+      try {
+        localStorage.setItem(introKey, '1');
+      } catch {
+        /* ignore persistence failure */
+      }
+      if (action === 'build') {
+        applyExperience('build');
+        setStatus('Build mode');
+      } else if (action === 'tour') {
+        startTour();
+      } else if (action === 'explore' && curated && experience !== 'play') {
+        applyExperience('play');
+        setStatus('Play mode — exploring');
+      }
+    };
+    ui.infoButton.addEventListener('click', () => void openWorldInfo());
+    applyExperience(experience);
+    if (curated && !introSeen()) void openWorldInfo();
+
     const selectionBox = new SelectionBox();
     selectionBox.attach((o) => renderer.add(o));
     const pasteGhost = new PasteGhost();
@@ -377,7 +585,15 @@ export class Game {
           if (!preloadOrWarn(box.x1, box.z1, box.x2, box.z2)) return;
           let clip;
           try {
-            clip = captureRegion((x, y, z) => manager.getBlock(x, y, z), box);
+            clip = captureRegion(
+              (x, y, z) => manager.getBlock(x, y, z),
+              box,
+              orientedStateReader(
+                (x, y, z) => manager.getBlock(x, y, z),
+                (x, y, z) => manager.getState(x, y, z),
+                (id) => registry.hasFacing(id),
+              ),
+            );
           } catch {
             setStatus('Selection too large to copy');
             return;
@@ -466,6 +682,11 @@ export class Game {
         },
         getTool: () => tool,
         getBuildMode: () => builder.mode,
+        getExperienceMode: () => experience,
+        onEnterBuild: () => {
+          applyExperience('build');
+          setStatus('Build mode — E inventory, T tools, B build tools');
+        },
         onBuilderIntent: handleBuilderIntent,
         onBuilderClick: (hit) => {
           if (builder.mode === 'selecting') {
@@ -511,6 +732,7 @@ export class Game {
     );
     let burstActive = true;
     let fogInitialized = false;
+    let settlePending = usingDefaultSpawn;
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
@@ -554,6 +776,34 @@ export class Game {
         manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
       }
 
+      // Enter the world on the ground: the default spawn hovers while chunks stream in. As
+      // soon as the spawn column has real terrain, drop a player who is still hovering near
+      // spawn onto it and start walking (Minecraft-style) instead of a debug fly camera.
+      // (Unloaded chunks read solid at the world ceiling, which fails the <= check, so this
+      // keeps retrying until the column is actually generated.)
+      if (settlePending) {
+        if (
+          !player.flying ||
+          Math.abs(player.position.x - SPAWN.x) >= 4 ||
+          Math.abs(player.position.z - SPAWN.z) >= 4
+        ) {
+          settlePending = false; // the player took over (flew away or toggled fly)
+        } else {
+          const groundY = groundSpawnY(
+            (x, y, z) => manager.isSolid(x, y, z),
+            Math.floor(player.position.x),
+            Math.floor(player.position.z),
+            WORLD_HEIGHT,
+            0.9, // player half-height (feet sit 0.9 below body center)
+          );
+          if (groundY !== undefined && groundY <= player.position.y) {
+            player.position.y = groundY + 0.001;
+            player.flying = false;
+            settlePending = false;
+          }
+        }
+      }
+
       // Set fog for the initial radius on the first frame (before the first render).
       if (!fogInitialized) {
         fogInitialized = true;
@@ -580,7 +830,8 @@ export class Game {
       } else {
         selectionBox.update(undefined, false);
         pasteGhost.update(undefined, undefined, false);
-        const previewOn = rig.locked && !ui.isInventoryOpen();
+        // Play mode: no targeting outline/ghost — the world reads as scenery, not edit targets.
+        const previewOn = rig.locked && !ui.isInventoryOpen() && experience === 'build';
         if (previewOn) {
           const previewHit = raycastVoxels(
             previewSampler,
@@ -599,6 +850,8 @@ export class Game {
           targetOverlay.update(undefined, false);
         }
       }
+      // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
+      updateTour();
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 
@@ -631,6 +884,9 @@ export class Game {
         profiler,
         roam,
         headlamp: (on: boolean) => setHeadlamp(on, false),
+        // Headless tour driving: rAF is suspended in hidden capture tabs, so agents step the
+        // same loop path (`tick`) after moving the player.
+        tour: { start: startTour, end: () => endTour('Tour ended'), tick: updateTour },
         // Wraps the engine so dev-console changes keep the HUD controls in sync.
         audio: {
           setMuted: (m: boolean) => {

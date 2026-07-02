@@ -19,7 +19,12 @@ function pointProblems(label: string, point: MetaPoint, worldHeight: number): st
   return out;
 }
 
-/** Return a list of roam-readiness problems (empty means the save is ready to package). */
+/**
+ * Return a list of roam-readiness problems (empty means the save is ready to package).
+ * This is the STRUCTURAL contract (finite, in-bounds meta). The player-facing CURATION
+ * contract (title/description/landmarks/tour) is `auditWorldMeta` in src/app/worldMeta.ts;
+ * `world:package` enforces this one and warns on the other.
+ */
 export function validatePackage(meta: WorldMeta | undefined, worldHeight: number): string[] {
   if (!meta) return ['save has no meta'];
 

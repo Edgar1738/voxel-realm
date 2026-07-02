@@ -9,6 +9,8 @@ export interface VoxelRaycastHit {
   block: { x: number; y: number; z: number };
   adjacent: { x: number; y: number; z: number };
   normal: { x: number; y: number; z: number };
+  /** World-space point where the ray crossed into the hit voxel (placement half selection). */
+  point: { x: number; y: number; z: number };
   id: BlockId;
 }
 
@@ -48,7 +50,12 @@ export function raycastVoxels(
   while (traveled <= maxDistance) {
     const id = sampler.getBlock(vx, vy, vz);
     if (id !== AIR) {
-      return { block: { x: vx, y: vy, z: vz }, adjacent, normal, id };
+      const point = {
+        x: origin.x + dx * traveled,
+        y: origin.y + dy * traveled,
+        z: origin.z + dz * traveled,
+      };
+      return { block: { x: vx, y: vy, z: vz }, adjacent, normal, point, id };
     }
 
     // Record last empty cell before stepping.

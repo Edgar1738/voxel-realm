@@ -184,6 +184,43 @@ function buildToolIcon(tool: string): SVGSVGElement {
   return buildIcon(TOOL_ICON_SHAPES[tool] ?? TOOL_ICON_SHAPES.single);
 }
 
+/** One button in a confirm dialog; `danger` renders in the destructive style. */
+export interface DialogAction {
+  id: string;
+  label: string;
+  kind?: 'danger';
+}
+
+/** Outcome of the world dialog: switch to (or create) a world, or duplicate the current one. */
+export interface WorldChoice {
+  kind: 'switch' | 'duplicate';
+  name: string;
+}
+
+/** Outcome of the blueprint dialog: load one into paste mode, save the clipboard, or delete. */
+export type BlueprintChoice =
+  | { kind: 'load'; name: string; curated: boolean }
+  | { kind: 'save'; name: string }
+  | { kind: 'delete'; name: string };
+
+/** Player-facing world info shown by the intro/info dialog (fallbacks applied by the caller). */
+export interface WorldInfo {
+  title: string;
+  description?: string;
+  landmarks: string[];
+  /** Number of tour waypoints; the Start Tour action shows only when this is >= 2. */
+  tourCount: number;
+}
+
+/** What the tour HUD displays for the active waypoint. */
+export interface TourHudStatus {
+  name: string;
+  distance: number;
+  index: number;
+  total: number;
+  done: boolean;
+}
+
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
   hotbar: HTMLDivElement;
@@ -192,6 +229,16 @@ export interface CreativeUi {
   reset: HTMLButtonElement;
   /** Dev world menu: a button labeled with the current world (click handled by Game). */
   worldButton: HTMLButtonElement;
+  /** Blueprint library button (click handled by Game). */
+  blueprintButton: HTMLButtonElement;
+  /** World info trigger (click handled by Game); visible in both experience modes. */
+  infoButton: HTMLButtonElement;
+  /** Play↔build switch (click handled by Game; Game hides it for uncurated worlds). */
+  modeButton: HTMLButtonElement;
+  /** Tour HUD skip controls (click handled by Game). */
+  tourPrev: HTMLButtonElement;
+  tourNext: HTMLButtonElement;
+  tourEnd: HTMLButtonElement;
   /** Sound controls: mute toggle + volume slider (wired by Game to the AudioEngine). */
   muteButton: HTMLButtonElement;
   volumeSlider: HTMLInputElement;
@@ -208,6 +255,25 @@ export interface CreativeUi {
   setInventoryOpen(open: boolean): void;
   /** Whether the inventory modal is currently open. */
   isInventoryOpen(): boolean;
+  /** Small in-app confirm dialog; resolves the clicked action id ('cancel' on Escape/backdrop). */
+  showDialog(opts: { title: string; message: string; actions: DialogAction[] }): Promise<string>;
+  /** World switch/create/duplicate dialog; resolves undefined on cancel. */
+  showWorldDialog(current: string, worlds: string[]): Promise<WorldChoice | undefined>;
+  /** Blueprint library dialog: load/save/delete; resolves undefined on cancel. */
+  showBlueprintDialog(opts: {
+    saved: string[];
+    curated: string[];
+    canSave: boolean;
+  }): Promise<BlueprintChoice | undefined>;
+  /**
+   * Play mode hides the creative chrome (tools, hotbar, world/blueprint/reset); build mode
+   * restores it. Purely visual — input gating lives in input.ts, not here.
+   */
+  setExperienceMode(mode: 'play' | 'build'): void;
+  /** Shows/updates the tour HUD, or hides it when passed undefined. */
+  setTourHud(status: TourHudStatus | undefined): void;
+  /** World intro/info dialog; resolves the chosen action or undefined on dismiss. */
+  showWorldInfoDialog(info: WorldInfo): Promise<'explore' | 'tour' | 'build' | undefined>;
 }
 
 const STATUS_VISIBLE_MS = 1600;
@@ -268,6 +334,16 @@ export function createCreativeUi(
   const worldButton = button('World: default');
   worldButton.className = 'world-btn';
 
+  const blueprintButton = button('Blueprints');
+  blueprintButton.className = 'world-btn';
+
+  const infoButton = button('Info');
+  infoButton.className = 'world-btn';
+  infoButton.title = 'About this world';
+
+  const modeButton = button('Play mode');
+  modeButton.className = 'world-btn';
+
   // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
   const soundGroup = document.createElement('div');
   soundGroup.className = 'sound-group';
@@ -294,7 +370,7 @@ export function createCreativeUi(
     soundGroup.classList.toggle('is-muted', muted);
   };
 
-  dock.append(toolRow, soundGroup, worldButton, reset);
+  dock.append(toolRow, soundGroup, infoButton, modeButton, blueprintButton, worldButton, reset);
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
   const scrim = document.createElement('div');
@@ -357,8 +433,325 @@ export function createCreativeUi(
     'border:1px solid rgba(255,180,90,0.55);color:#ffe6c2;font-weight:500;text-align:center;' +
     'box-shadow:0 4px 14px rgba(0,0,0,0.45);z-index:6;display:none;';
 
-  root.append(dock, scrim, status, notice, hotbar);
+  // Dialog scrim: shared host for the confirm and world dialogs (one dialog at a time).
+  const dialogScrim = document.createElement('div');
+  dialogScrim.className = 'dialog-scrim';
+  dialogScrim.setAttribute('aria-hidden', 'true');
+
+  // Tour HUD: a top-center strip naming the active waypoint with its distance and skip controls.
+  const tourHud = document.createElement('div');
+  tourHud.className = 'tour-hud';
+  tourHud.setAttribute('role', 'status');
+  tourHud.style.display = 'none';
+  const tourLabel = document.createElement('span');
+  tourLabel.className = 'tour-label';
+  const tourPrev = button('◀');
+  tourPrev.className = 'tour-btn';
+  tourPrev.title = 'Previous waypoint';
+  tourPrev.setAttribute('aria-label', 'Previous waypoint');
+  const tourNext = button('▶');
+  tourNext.className = 'tour-btn';
+  tourNext.title = 'Next waypoint';
+  tourNext.setAttribute('aria-label', 'Next waypoint');
+  const tourEnd = button('✕');
+  tourEnd.className = 'tour-btn';
+  tourEnd.title = 'End tour';
+  tourEnd.setAttribute('aria-label', 'End tour');
+  tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
+
+  const setTourHud = (s: TourHudStatus | undefined): void => {
+    if (!s) {
+      tourHud.style.display = 'none';
+      return;
+    }
+    tourHud.style.display = 'flex';
+    tourLabel.textContent = s.done
+      ? `Tour complete — ${s.name}`
+      : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
+  };
+
+  root.append(dock, scrim, status, notice, hotbar, tourHud, dialogScrim);
   document.body.append(root);
+
+  const setExperienceMode = (mode: 'play' | 'build'): void => {
+    const play = mode === 'play';
+    toolRow.style.display = play ? 'none' : '';
+    hotbar.style.display = play ? 'none' : '';
+    reset.style.display = play ? 'none' : '';
+    blueprintButton.style.display = play ? 'none' : '';
+    // worldButton visibility stays owned by Game (dev-only button); Game re-applies it on
+    // every mode change so play hides it and build restores the dev-only state.
+    modeButton.textContent = play ? 'Build (B)' : 'Play mode';
+    modeButton.title = play
+      ? 'Switch to build mode (creative tools)'
+      : 'Back to play mode (explore only)';
+  };
+
+  /**
+   * Mounts `panel` in the dialog scrim: focuses its first button, swallows game keyboard
+   * shortcuts while open (capture-phase), closes on Escape/backdrop, and restores focus on
+   * close. Returns the close function.
+   */
+  const openDialogPanel = (panel: HTMLDivElement, onCancel: () => void): (() => void) => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogScrim.replaceChildren(panel);
+    dialogScrim.classList.add('is-open');
+    dialogScrim.setAttribute('aria-hidden', 'false');
+    const onKey = (e: KeyboardEvent): void => {
+      e.stopPropagation(); // keep game shortcuts (E inventory, B build, tools) inert
+      if (e.code === 'Escape') onCancel();
+    };
+    const onScrimClick = (e: MouseEvent): void => {
+      if (e.target === dialogScrim) onCancel();
+    };
+    window.addEventListener('keydown', onKey, true);
+    dialogScrim.addEventListener('click', onScrimClick);
+    panel.querySelector('button')?.focus();
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      dialogScrim.removeEventListener('click', onScrimClick);
+      dialogScrim.classList.remove('is-open');
+      dialogScrim.setAttribute('aria-hidden', 'true');
+      dialogScrim.replaceChildren();
+      previousFocus?.focus();
+    };
+  };
+
+  const dialogPanel = (label: string): HTMLDivElement => {
+    const panel = document.createElement('div');
+    panel.className = 'dialog-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-label', label);
+    return panel;
+  };
+
+  const showDialog = (opts: {
+    title: string;
+    message: string;
+    actions: DialogAction[];
+  }): Promise<string> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel(opts.title);
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = opts.title;
+      const message = document.createElement('p');
+      message.className = 'dialog-message';
+      message.textContent = opts.message;
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      const finish = (id: string): void => {
+        close();
+        resolve(id);
+      };
+      for (const action of opts.actions) {
+        const b = button(action.label);
+        b.className = action.kind === 'danger' ? 'dialog-btn danger' : 'dialog-btn';
+        b.addEventListener('click', () => finish(action.id));
+        actions.append(b);
+      }
+      panel.append(title, message, actions);
+      const close = openDialogPanel(panel, () => finish('cancel'));
+    });
+
+  const showWorldDialog = (current: string, worlds: string[]): Promise<WorldChoice | undefined> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('Worlds');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'Worlds';
+      const message = document.createElement('p');
+      message.className = 'dialog-message';
+      message.textContent = `Current world: ${current}`;
+
+      const finish = (choice: WorldChoice | undefined): void => {
+        close();
+        resolve(choice);
+      };
+
+      const list = document.createElement('div');
+      list.className = 'world-list';
+      for (const w of worlds) {
+        const b = button(w === current ? `${w} (current)` : w);
+        b.className = 'dialog-btn world-item';
+        b.disabled = w === current;
+        b.addEventListener('click', () => finish({ kind: 'switch', name: w }));
+        list.append(b);
+      }
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'world-input';
+      nameInput.placeholder = 'new world name';
+      nameInput.setAttribute('aria-label', 'World name');
+      const typedName = (): string => nameInput.value.trim();
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && typedName()) finish({ kind: 'switch', name: typedName() });
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      const switchBtn = button('Switch / create');
+      switchBtn.className = 'dialog-btn';
+      switchBtn.addEventListener('click', () => {
+        if (typedName()) finish({ kind: 'switch', name: typedName() });
+      });
+      const duplicateBtn = button('Duplicate current →');
+      duplicateBtn.className = 'dialog-btn';
+      duplicateBtn.title = `Copy "${current}" to the typed name, then open it`;
+      duplicateBtn.addEventListener('click', () => {
+        if (typedName()) finish({ kind: 'duplicate', name: typedName() });
+      });
+      const cancelBtn = button('Cancel');
+      cancelBtn.className = 'dialog-btn';
+      cancelBtn.addEventListener('click', () => finish(undefined));
+      actions.append(switchBtn, duplicateBtn, cancelBtn);
+
+      panel.append(title, message, list, nameInput, actions);
+      const close = openDialogPanel(panel, () => finish(undefined));
+    });
+
+  const showBlueprintDialog = (opts: {
+    saved: string[];
+    curated: string[];
+    canSave: boolean;
+  }): Promise<BlueprintChoice | undefined> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('Blueprints');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'Blueprints';
+      const message = document.createElement('p');
+      message.className = 'dialog-message';
+      message.textContent = opts.canSave
+        ? 'Load a blueprint into paste mode, or save the current clipboard.'
+        : 'Load a blueprint into paste mode. (Copy a selection in build mode to save one.)';
+
+      const finish = (choice: BlueprintChoice | undefined): void => {
+        close();
+        resolve(choice);
+      };
+
+      const list = document.createElement('div');
+      list.className = 'world-list';
+      for (const name of opts.saved) {
+        const row = document.createElement('div');
+        row.className = 'blueprint-row';
+        const loadBtn = button(name);
+        loadBtn.className = 'dialog-btn world-item';
+        loadBtn.addEventListener('click', () => finish({ kind: 'load', name, curated: false }));
+        const deleteBtn = button('✕');
+        deleteBtn.className = 'dialog-btn blueprint-delete';
+        deleteBtn.title = `Delete blueprint "${name}"`;
+        deleteBtn.setAttribute('aria-label', `Delete blueprint ${name}`);
+        deleteBtn.addEventListener('click', () => finish({ kind: 'delete', name }));
+        row.append(loadBtn, deleteBtn);
+        list.append(row);
+      }
+      for (const name of opts.curated) {
+        const b = button(`${name} (built-in)`);
+        b.className = 'dialog-btn world-item';
+        b.addEventListener('click', () => finish({ kind: 'load', name, curated: true }));
+        list.append(b);
+      }
+      if (opts.saved.length === 0 && opts.curated.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'dialog-message';
+        empty.textContent = 'No blueprints yet.';
+        list.append(empty);
+      }
+
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'world-input';
+      nameInput.placeholder = 'blueprint name';
+      nameInput.setAttribute('aria-label', 'Blueprint name');
+      const typedName = (): string => nameInput.value.trim();
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && opts.canSave && typedName())
+          finish({ kind: 'save', name: typedName() });
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      const saveBtn = button('Save clipboard');
+      saveBtn.className = 'dialog-btn';
+      saveBtn.disabled = !opts.canSave;
+      saveBtn.title = opts.canSave
+        ? 'Save the current clipboard under the typed name'
+        : 'Copy a selection first (B, pick corners, C)';
+      saveBtn.addEventListener('click', () => {
+        if (typedName()) finish({ kind: 'save', name: typedName() });
+      });
+      const cancelBtn = button('Cancel');
+      cancelBtn.className = 'dialog-btn';
+      cancelBtn.addEventListener('click', () => finish(undefined));
+      actions.append(saveBtn, cancelBtn);
+
+      panel.append(title, message, list, nameInput, actions);
+      const close = openDialogPanel(panel, () => finish(undefined));
+    });
+
+  const showWorldInfoDialog = (
+    info: WorldInfo,
+  ): Promise<'explore' | 'tour' | 'build' | undefined> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel(info.title);
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = info.title;
+      const message = document.createElement('p');
+      message.className = 'dialog-message';
+      message.textContent = info.description?.trim() || 'No description yet.';
+      panel.append(title, message);
+
+      if (info.landmarks.length > 0) {
+        const heading = document.createElement('div');
+        heading.className = 'info-heading';
+        heading.textContent = 'Landmarks';
+        const list = document.createElement('ul');
+        list.className = 'info-landmarks';
+        for (const name of info.landmarks) {
+          const li = document.createElement('li');
+          li.textContent = name;
+          list.append(li);
+        }
+        panel.append(heading, list);
+      }
+
+      const tourLine = document.createElement('p');
+      tourLine.className = 'dialog-message';
+      tourLine.textContent =
+        info.tourCount >= 2
+          ? `A guided tour with ${info.tourCount} stops is available.`
+          : 'No guided tour for this world.';
+      panel.append(tourLine);
+
+      const finish = (action: 'explore' | 'tour' | 'build' | undefined): void => {
+        close();
+        resolve(action);
+      };
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      const explore = button('Explore');
+      explore.className = 'dialog-btn';
+      explore.addEventListener('click', () => finish('explore'));
+      actions.append(explore);
+      if (info.tourCount >= 2) {
+        const tourBtn = button('Start Tour');
+        tourBtn.className = 'dialog-btn';
+        tourBtn.addEventListener('click', () => finish('tour'));
+        actions.append(tourBtn);
+      }
+      const buildBtn = button('Build');
+      buildBtn.className = 'dialog-btn';
+      buildBtn.addEventListener('click', () => finish('build'));
+      actions.append(buildBtn);
+      panel.append(actions);
+
+      const close = openDialogPanel(panel, () => finish(undefined));
+    });
 
   let inventoryOpen = false;
   const isInventoryOpen = (): boolean => inventoryOpen;
@@ -422,6 +815,12 @@ export function createCreativeUi(
     picker,
     reset,
     worldButton,
+    blueprintButton,
+    infoButton,
+    modeButton,
+    tourPrev,
+    tourNext,
+    tourEnd,
     muteButton,
     volumeSlider,
     setSoundUi,
@@ -431,5 +830,11 @@ export function createCreativeUi(
     renderHotbar,
     setInventoryOpen,
     isInventoryOpen,
+    showDialog,
+    showWorldDialog,
+    showBlueprintDialog,
+    setExperienceMode,
+    setTourHud,
+    showWorldInfoDialog,
   };
 }

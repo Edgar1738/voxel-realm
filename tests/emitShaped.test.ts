@@ -6,6 +6,7 @@ import { buildBlockTextures, type BlockDef } from '../src/blocks/blocks';
 import { emitShaped, mergeMeshData } from '../src/mesh/emitShaped';
 import { WORLD_HEIGHT } from '../src/core/constants';
 import type { MeshData } from '../src/mesh/MeshTypes';
+import { packState } from '../src/world/VoxelState';
 
 const stoneFaces = { pattern: 'stone' as const, colors: [[128, 128, 132] as const] };
 const DEFS: BlockDef[] = [
@@ -34,6 +35,31 @@ describe('emitShaped slabs', () => {
     let maxY = -Infinity;
     for (let i = 1; i < slabs.positions.length; i += 3) maxY = Math.max(maxY, slabs.positions[i]);
     expect(maxY).toBeCloseTo(10.5, 5);
+  });
+
+  it('a top slab (half bit set) occupies y+0.5..y+1', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2);
+    d.setState(2, 10, 2, packState(0, 1));
+    const { slabs } = emitShaped(view(d), reg);
+    expect(slabs.positions.length / 3).toBe(24);
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 1; i < slabs.positions.length; i += 3) {
+      minY = Math.min(minY, slabs.positions[i]);
+      maxY = Math.max(maxY, slabs.positions[i]);
+    }
+    expect(minY).toBeCloseTo(10.5, 5);
+    expect(maxY).toBeCloseTo(11, 5);
+  });
+
+  it('a top slab under a full cube culls its top face (20 verts)', () => {
+    const d = new ChunkData(0, 0);
+    d.set(2, 10, 2, 2); // top slab
+    d.setState(2, 10, 2, packState(0, 1));
+    d.set(2, 11, 2, 1); // cube above
+    const { slabs } = emitShaped(view(d), reg);
+    expect(slabs.positions.length / 3).toBe(20); // top face culled → 5 faces
   });
 
   it('a slab sitting on a full cube culls its bottom face (20 verts)', () => {

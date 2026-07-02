@@ -1,5 +1,12 @@
 import { defineConfig, type Plugin } from 'vite';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+  unlinkSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
@@ -117,8 +124,31 @@ function devDisk(): Plugin {
             });
           return;
         }
+        const url = new URL(req.url ?? '', 'http://x');
+        if (req.method === 'DELETE') {
+          if (!isAllowedDevOrigin(req.headers.origin, req.headers.host)) {
+            res.statusCode = 403;
+            return res.end('forbidden: cross-origin request rejected');
+          }
+          const target = safeName(url.searchParams.get('name'), '');
+          const targetFile = resolve(blueprintDir, `${target}.json`);
+          if (!target || !existsSync(targetFile)) {
+            res.statusCode = 404;
+            return res.end('not found');
+          }
+          unlinkSync(targetFile);
+          return sendJson(res, { ok: true });
+        }
+        // GET ?list -> saved blueprint names (sorted, .json stripped)
+        if (url.searchParams.has('list')) {
+          const names = readdirSync(blueprintDir)
+            .filter((f) => f.endsWith('.json'))
+            .map((f) => f.slice(0, -'.json'.length))
+            .sort();
+          return sendJson(res, { blueprints: names });
+        }
         // GET ?name=foo -> the stored blueprint JSON
-        const name = safeName(new URL(req.url ?? '', 'http://x').searchParams.get('name'), '');
+        const name = safeName(url.searchParams.get('name'), '');
         const file = resolve(blueprintDir, `${name}.json`);
         if (!name || !existsSync(file)) {
           res.statusCode = 404;

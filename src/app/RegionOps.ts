@@ -57,14 +57,31 @@ export function prefabToVoxels(p: Prefab, ox: number, oy: number, oz: number): S
 }
 
 /**
+ * State reader for {@link captureRegion}: keeps any nonzero state, and keeps a ZERO state only
+ * for facing-bearing shapes. A north-facing stair packs to state 0, so without this a copied
+ * N stair is indistinguishable from a stateless block and rotate/mirror cannot turn it.
+ */
+export function orientedStateReader(
+  getBlock: (x: number, y: number, z: number) => BlockId,
+  getState: (x: number, y: number, z: number) => number,
+  hasFacing: (id: BlockId) => boolean,
+): (x: number, y: number, z: number) => number | undefined {
+  return (x, y, z) => {
+    const state = getState(x, y, z);
+    return state !== 0 || hasFacing(getBlock(x, y, z)) ? state : undefined;
+  };
+}
+
+/**
  * Capture a region's non-air voxels into a Prefab (offsets from the box min corner; dims = box
- * extents). When `getState` is supplied, oriented voxels are captured as 5-tuples so stairs/gates
- * keep their facing/open state; otherwise the capture is stateless (4-tuples).
+ * extents). When `getState` is supplied, voxels whose state it reports (a number, including 0 —
+ * see {@link orientedStateReader}) are captured as 5-tuples so stairs/gates keep their
+ * facing/half/open state through paste and rotate/mirror; `undefined` captures a plain 4-tuple.
  */
 export function captureRegion(
   read: (x: number, y: number, z: number) => BlockId,
   box: Box,
-  getState?: (x: number, y: number, z: number) => number,
+  getState?: (x: number, y: number, z: number) => number | undefined,
 ): Prefab {
   const [ax, bx] = [Math.min(box.x1, box.x2), Math.max(box.x1, box.x2)];
   const [ay, by] = [Math.min(box.y1, box.y2), Math.max(box.y1, box.y2)];
@@ -77,8 +94,10 @@ export function captureRegion(
       for (let x = ax; x <= bx; x++) {
         const id = read(x, y, z);
         if (id === AIR) continue;
-        const state = getState ? getState(x, y, z) : 0;
-        blocks.push(state ? [x - ax, y - ay, z - az, id, state] : [x - ax, y - ay, z - az, id]);
+        const state = getState?.(x, y, z);
+        blocks.push(
+          state !== undefined ? [x - ax, y - ay, z - az, id, state] : [x - ax, y - ay, z - az, id],
+        );
       }
   return { dims: [bx - ax + 1, by - ay + 1, bz - az + 1], blocks };
 }

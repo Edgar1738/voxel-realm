@@ -23,6 +23,34 @@ export function toggleOpen(state: number): number {
 }
 
 /**
+ * Rotate the facing bits by clockwise-from-above quarter turns (half/open bits preserved).
+ * Matches Prefab.rotateY's position map (x,z) → (z, maxX−x): one turn sends N→W→S→E.
+ */
+export function rotateStateY(state: number, quarterTurns: number): number {
+  const turns = ((quarterTurns % 4) + 4) % 4;
+  const facing = ((state & 0b11) + 3 * turns) % 4;
+  return (state & ~0b11) | facing;
+}
+
+/** Swap the facing across a horizontal mirror axis: 'x' flips E↔W, 'z' flips N↔S. */
+export function mirrorStateAcross(state: number, axis: 'x' | 'z'): number {
+  const facing = state & 0b11;
+  const flipped =
+    axis === 'x'
+      ? facing === FACING.E
+        ? FACING.W
+        : facing === FACING.W
+          ? FACING.E
+          : facing
+      : facing === FACING.N
+        ? FACING.S
+        : facing === FACING.S
+          ? FACING.N
+          : facing;
+  return (state & ~0b11) | flipped;
+}
+
+/**
  * Horizontal facing (N/E/S/W) the player is looking toward, from camera yaw (radians).
  * Quadrant rounding; the exact N/E/S/W assignment is confirmed visually in the live smoke.
  */

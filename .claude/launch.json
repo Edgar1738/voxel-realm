@@ -29,6 +29,13 @@
       "autoPort": false
     },
     {
+      "name": "mcalign",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5212", "--strictPort"],
+      "port": 5212,
+      "autoPort": false
+    },
+    {
       "name": "physics",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],

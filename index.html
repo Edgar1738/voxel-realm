@@ -324,6 +324,164 @@
         border-color: rgba(255, 255, 255, 0.4);
       }
 
+      /* ---- Confirm / world dialogs: scrim + compact centered panel ---- */
+      .dialog-scrim {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          opacity 150ms ease,
+          visibility 0s linear 150ms;
+      }
+      .dialog-scrim.is-open {
+        pointer-events: auto;
+        opacity: 1;
+        visibility: visible;
+        transition:
+          opacity 150ms ease,
+          visibility 0s;
+      }
+      .dialog-panel {
+        width: 100%;
+        max-width: 380px;
+        padding: 16px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+      .dialog-title {
+        margin-bottom: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #eef2f6;
+      }
+      .dialog-message {
+        margin: 0 0 14px;
+        color: rgba(238, 242, 246, 0.78);
+        line-height: 1.45;
+      }
+      .dialog-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .dialog-btn {
+        padding: 7px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #eef2f6;
+        transition:
+          background-color 140ms ease,
+          border-color 140ms ease;
+      }
+      .dialog-btn:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+      .dialog-btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .dialog-btn.danger {
+        border-color: rgba(255, 120, 100, 0.55);
+        background: rgba(150, 70, 58, 0.35);
+      }
+      .dialog-btn.danger:hover {
+        background: rgba(150, 70, 58, 0.55);
+      }
+      .world-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 220px;
+        margin-bottom: 12px;
+        overflow-y: auto;
+      }
+      .world-list .world-item {
+        text-align: left;
+      }
+      .world-input {
+        width: 100%;
+        margin-bottom: 12px;
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        color: #eef2f6;
+        font: inherit;
+        box-sizing: border-box;
+      }
+      #creative-ui .world-input {
+        pointer-events: auto;
+      }
+      /* ---- Tour HUD (top-center strip) ---- */
+      .tour-hud {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        background: rgba(18, 22, 28, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #eef2f6;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        z-index: 5;
+      }
+      .tour-label {
+        min-width: 140px;
+        text-align: center;
+        font-weight: 500;
+      }
+      .tour-btn {
+        padding: 3px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #eef2f6;
+      }
+      .tour-btn:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      /* ---- World info dialog extras ---- */
+      .info-heading {
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(238, 242, 246, 0.85);
+      }
+      .info-landmarks {
+        margin: 0 0 12px;
+        padding-left: 18px;
+        color: rgba(238, 242, 246, 0.78);
+        line-height: 1.5;
+      }
+
+      .blueprint-row {
+        display: flex;
+        gap: 6px;
+      }
+      .blueprint-row .world-item {
+        flex: 1;
+      }
+      .blueprint-delete {
+        flex: none;
+        padding: 7px 10px;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .tool-btn,
         .reset-btn,
@@ -354,9 +512,11 @@
     <canvas id="app"></canvas>
     <div id="crosshair"></div>
     <div id="overlay">
-      Click to play — WASD move, mouse look, Space/Shift up·down, F toggle fly · LMB use tool, RMB
-      place, MMB pick · 1-9 hotbar slot, E inventory, T cycle tool (box tools: click two corners) ·
-      L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
+      Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use
+      tool, RMB place, MMB pick · 1-9 hotbar slot, E inventory, T cycle tool (box tools: click two
+      corners) · B build mode: click two corners, then F fill · G clear · R replace · C copy, click
+      to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · V placement ghost · L headlamp ·
+      Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
     </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>

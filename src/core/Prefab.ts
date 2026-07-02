@@ -1,4 +1,5 @@
 import type { BlockId } from './types';
+import { rotateStateY, mirrorStateAcross } from '../world/VoxelState';
 
 /** A non-air voxel offset from the prefab's min corner: [dx, dy, dz, id] or [dx, dy, dz, id, state]. */
 export type PrefabVoxel =
@@ -80,7 +81,16 @@ export function normalize(p: Prefab): Prefab {
   };
 }
 
-/** Rotate about the Y axis in 90-degree steps (positive = clockwise viewed from +Y). */
+/** Transform a voxel's state (facing rotation/flip), leaving stateless 4-tuples untouched. */
+function mapState(b: PrefabVoxel, f: (state: number) => number): number | undefined {
+  const state = voxelStateOf(b);
+  return state === undefined ? undefined : f(state);
+}
+
+/**
+ * Rotate about the Y axis in 90-degree steps (positive = clockwise viewed from +Y).
+ * Oriented voxels (stairs/gates) rotate their facing bits along with their position.
+ */
 export function rotateY(p: Prefab, quarterTurns: number): Prefab {
   const turns = ((quarterTurns % 4) + 4) % 4;
   if (turns === 0) return normalize(p);
@@ -90,19 +100,42 @@ export function rotateY(p: Prefab, quarterTurns: number): Prefab {
     dimZ = sz;
   for (let t = 0; t < turns; t++) {
     const maxX = dimX - 1;
-    blocks = blocks.map((b) => prefabVoxel(b[2], b[1], maxX - b[0], b[3], voxelStateOf(b)));
+    blocks = blocks.map((b) =>
+      prefabVoxel(
+        b[2],
+        b[1],
+        maxX - b[0],
+        b[3],
+        mapState(b, (s) => rotateStateY(s, 1)),
+      ),
+    );
     [dimX, dimZ] = [dimZ, dimX];
   }
   return normalize({ dims: [dimX, p.dims[1], dimZ], blocks });
 }
 
-/** Reflect across the given horizontal axis. */
+/**
+ * Reflect across the given horizontal axis. Oriented voxels flip their facing with the
+ * reflection (x flips E↔W, z flips N↔S).
+ */
 export function mirror(p: Prefab, axis: 'x' | 'z'): Prefab {
   const [sx, , sz] = p.dims;
   const blocks: PrefabVoxel[] = p.blocks.map((b) =>
     axis === 'x'
-      ? prefabVoxel(sx - 1 - b[0], b[1], b[2], b[3], voxelStateOf(b))
-      : prefabVoxel(b[0], b[1], sz - 1 - b[2], b[3], voxelStateOf(b)),
+      ? prefabVoxel(
+          sx - 1 - b[0],
+          b[1],
+          b[2],
+          b[3],
+          mapState(b, (s) => mirrorStateAcross(s, 'x')),
+        )
+      : prefabVoxel(
+          b[0],
+          b[1],
+          sz - 1 - b[2],
+          b[3],
+          mapState(b, (s) => mirrorStateAcross(s, 'z')),
+        ),
   );
   return normalize({ dims: p.dims, blocks });
 }
