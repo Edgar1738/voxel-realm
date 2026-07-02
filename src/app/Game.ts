@@ -10,6 +10,7 @@ import {
 import { applyUnderwater, stepUnderwaterFactor, type FogParams } from '../render/underwater';
 import { Weather } from '../render/Weather';
 import { AmbientLife } from '../render/AmbientLife';
+import { Critters } from '../render/Critters';
 import { skyState } from '../render/Sky';
 import { WeatherClock, type WeatherKind } from './weatherSchedule';
 import { BlockTicker } from '../world/BlockTicker';
@@ -227,6 +228,8 @@ export class Game {
     const weatherClock = new WeatherClock();
     const ambientLife = new AmbientLife();
     ambientLife.attach((o) => renderer.add(o));
+    const critters = new Critters(() => audio.playChirp());
+    critters.attach((o) => renderer.add(o));
     const RAIN_LEVEL: Record<WeatherKind, number> = { clear: 0, rain: 0.6, storm: 1, snow: 0 };
     let underwaterFactor = 0;
     let animTime = 0;
@@ -808,6 +811,10 @@ export class Game {
         manager.getBlock(x, y, z),
       );
       ticker.update(cdt);
+      critters.update(cdt, eye, {
+        getBlock: (x, y, z) => manager.getBlock(x, y, z),
+        player: player.position,
+      });
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
@@ -952,6 +959,16 @@ export class Game {
             );
           }
           return ambientLife.census();
+        },
+        // Optional dt steps the critters once headlessly (hidden capture tabs suspend rAF).
+        critters: (dtSeconds?: number) => {
+          if (dtSeconds && dtSeconds > 0) {
+            critters.update(dtSeconds, player.eye(), {
+              getBlock: (x, y, z) => manager.getBlock(x, y, z),
+              player: player.position,
+            });
+          }
+          return critters.census();
         },
         // Headless block-physics driving (hidden tabs suspend rAF): tick advances the sim clock.
         flow: {

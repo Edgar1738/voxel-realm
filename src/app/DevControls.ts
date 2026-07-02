@@ -96,6 +96,8 @@ export interface DevControlsContext {
   life?: (dtSeconds?: number) => Record<string, number>;
   /** Block-physics ticker introspection + headless stepping. */
   flow?: { queued(): number; tick(dtSeconds?: number): number };
+  /** Critter census (birds/fish/rabbits); pass a dt to step them once headlessly. */
+  critters?: (dtSeconds?: number) => Record<string, number>;
   /** Sound engine handle for the `sound` dev command. */
   audio: {
     setMuted(muted: boolean): void;
@@ -625,6 +627,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     weather: ctx.weather,
     life: ctx.life,
     flow: ctx.flow,
+    critters: ctx.critters,
     /** Toggle audio and optionally set the master volume (0..1). */
     sound: (on = true, volume?: number): { muted: boolean; volume: number } => {
       ctx.audio.setMuted(!on);

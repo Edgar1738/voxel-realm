@@ -263,6 +263,31 @@ export class AudioEngine {
     this.rainGain?.gain.setTargetAtTime(0.16 * target, ctx.currentTime, 0.8);
   }
 
+  /** Two-note bird chirp with per-play pitch variation. */
+  playChirp(): void {
+    const ctx = this.playableContext();
+    if (!ctx || !this.master) return;
+    const base = 2400 * (0.85 + Math.random() * 0.4);
+    let at = ctx.currentTime;
+    for (const [ratio, dur] of [
+      [1, 0.06],
+      [1.25, 0.09],
+    ] as const) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(base * ratio, at);
+      osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.8, at + dur);
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.0001, at);
+      env.gain.exponentialRampToValueAtTime(0.12, at + 0.015);
+      env.gain.exponentialRampToValueAtTime(0.001, at + dur);
+      osc.connect(env).connect(this.master);
+      osc.start(at);
+      osc.stop(at + dur + 0.02);
+      at += dur + 0.05;
+    }
+  }
+
   /** Distant thunder: a delayed low rumble with a pitch-falling sub tone. */
   playThunder(intensity: number): void {
     const ctx = this.playableContext();
