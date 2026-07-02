@@ -9,18 +9,20 @@ describe('resolveBuilderIntent', () => {
   });
 
   it('off mode ignores every key except KeyB', () => {
-    for (const code of ['KeyF', 'KeyG', 'KeyR', 'KeyC', 'BracketLeft', 'Escape']) {
+    for (const code of ['KeyX', 'KeyG', 'KeyR', 'KeyC', 'BracketLeft', 'Escape']) {
       expect(resolveBuilderIntent(code, 'off')).toBe('none');
     }
   });
 
   it('selecting mode maps fill/clear/replace/copy and cancel', () => {
-    expect(resolveBuilderIntent('KeyF', 'selecting')).toBe('fill');
+    expect(resolveBuilderIntent('KeyX', 'selecting')).toBe('fill');
     expect(resolveBuilderIntent('KeyG', 'selecting')).toBe('clear');
     expect(resolveBuilderIntent('KeyR', 'selecting')).toBe('replace');
     expect(resolveBuilderIntent('KeyC', 'selecting')).toBe('copy');
     expect(resolveBuilderIntent('Escape', 'selecting')).toBe('cancel');
     expect(resolveBuilderIntent('BracketLeft', 'selecting')).toBe('none');
+    // F is reserved for fly (CameraRig), never bound to a builder intent.
+    expect(resolveBuilderIntent('KeyF', 'selecting')).toBe('none');
   });
 
   it('pasting mode maps rotate/mirror/array and cancel; ignores selecting-only keys', () => {
@@ -32,7 +34,7 @@ describe('resolveBuilderIntent', () => {
     expect(resolveBuilderIntent('Minus', 'pasting')).toBe('arrayDec');
     expect(resolveBuilderIntent('NumpadSubtract', 'pasting')).toBe('arrayDec');
     expect(resolveBuilderIntent('Escape', 'pasting')).toBe('cancel');
-    expect(resolveBuilderIntent('KeyF', 'pasting')).toBe('none');
+    expect(resolveBuilderIntent('KeyX', 'pasting')).toBe('none');
   });
 });
 

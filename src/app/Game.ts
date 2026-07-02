@@ -26,7 +26,7 @@ import { PlayerController } from '../player/PlayerController';
 import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
-import { createCreativeUi, type DialogAction } from './CreativeUi';
+import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
 import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
 import { ServerSaveStore } from '../persistence/ServerSaveStore';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -54,7 +54,16 @@ import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
-import { registerInputListeners, TOOLS, toolLabel, REACH, type Tool } from './input';
+import {
+  registerInputListeners,
+  TOOLS,
+  toolLabel,
+  getReach,
+  setReach,
+  loadReach,
+  saveReach,
+  type Tool,
+} from './input';
 import { placementState } from './placement';
 import type { PreviewDeps } from './targetPreview';
 import { resolveTarget } from './targetPreview';
@@ -88,33 +97,7 @@ import {
   LocalStorageBlueprintStore,
   type BlueprintStore,
 } from './BlueprintStore';
-import type { Prefab } from '../core/Prefab';
-import {
-  cottage,
-  well,
-  lampPost,
-  ruinedTower,
-  barn,
-  watchtower,
-  marketStall,
-  brokenWall,
-  bridge,
-  farmPlot,
-} from '../worldgen/prefabs';
-
-/** Built-in structures offered read-only in the blueprint dialog alongside saved blueprints. */
-const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
-  cottage,
-  well,
-  'lamp-post': lampPost,
-  'ruined-tower': ruinedTower,
-  barn,
-  watchtower,
-  'market-stall': marketStall,
-  'broken-wall': brokenWall,
-  bridge,
-  'farm-plot': farmPlot,
-};
+import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -254,7 +237,7 @@ export class Game {
     if (import.meta.env.DEV) {
       const { listWorlds, copyWorld } = await import('../persistence/ServerWorldCatalog');
       copyWorldFn = copyWorld;
-      ui.worldButton.textContent = `World: ${worldName}`;
+      ui.worldButton.title = `Current world: ${worldName}`;
       ui.worldButton.addEventListener('click', () => {
         void (async () => {
           const worlds = await listWorlds();
@@ -412,6 +395,13 @@ export class Game {
 
     const builder = new BuilderState();
 
+    // Adjustable build reach (Shift+wheel in build mode), persisted across sessions.
+    try {
+      setReach(loadReach(localStorage));
+    } catch {
+      /* ignore persistence failure — falls back to DEFAULT_REACH */
+    }
+
     // Blueprint library: named clipboard saves (dev: shared .blueprints/ on the vite server —
     // the same files as __vr.saveBlueprint; prod: this browser's localStorage).
     const blueprints: BlueprintStore = import.meta.env.DEV
@@ -424,9 +414,26 @@ export class Game {
       } catch (err) {
         console.error('Voxel Realm: blueprint list failed', err);
       }
+      const entries: BlueprintEntry[] = [
+        ...saved.map(
+          (name): BlueprintEntry => ({
+            name,
+            curated: false,
+            category: 'Saved',
+            load: () => blueprints.load(name),
+          }),
+        ),
+        ...Object.keys(CURATED_BLUEPRINTS).map(
+          (name): BlueprintEntry => ({
+            name,
+            curated: true,
+            category: curatedCategory(name),
+            load: () => CURATED_BLUEPRINTS[name](),
+          }),
+        ),
+      ];
       const choice = await ui.showBlueprintDialog({
-        saved,
-        curated: Object.keys(CURATED_BLUEPRINTS),
+        entries,
         canSave: builder.clipboard !== undefined,
       });
       if (!choice) return;
@@ -523,12 +530,15 @@ export class Game {
     };
     const openWorldInfo = async (): Promise<void> => {
       const meta = bootMeta.meta;
-      const action = await ui.showWorldInfoDialog({
-        title: meta?.title?.trim() || `World: ${worldName}`,
-        description: meta?.description ?? '',
-        landmarks: (meta?.landmarks ?? []).map((l) => l.name),
-        tourCount: meta?.tour?.length ?? 0,
-      });
+      const action = await ui.showWorldInfoDialog(
+        {
+          title: meta?.title?.trim() || `World: ${worldName}`,
+          description: meta?.description ?? '',
+          landmarks: (meta?.landmarks ?? []).map((l) => l.name),
+          tourCount: meta?.tour?.length ?? 0,
+        },
+        worldName,
+      );
       try {
         localStorage.setItem(introKey, '1');
       } catch {
@@ -554,7 +564,7 @@ export class Game {
     pasteGhost.attach((o) => renderer.add(o));
 
     const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined =>
-      raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), REACH);
+      raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), getReach());
 
     /** Paste origin (min corner) = the empty cell adjacent to the aimed face. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
@@ -718,7 +728,7 @@ export class Game {
         getExperienceMode: () => experience,
         onEnterBuild: () => {
           applyExperience('build');
-          setStatus('Build mode — E inventory, T tools, B build tools');
+          setStatus('Build mode — I inventory, T tools, B build tools');
         },
         onBuilderIntent: handleBuilderIntent,
         onBuilderClick: (hit) => {
@@ -751,6 +761,14 @@ export class Game {
         onToggleHeadlamp: () => {
           setHeadlamp(!headlampOn, true);
           setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
+        },
+        onReachChange: (reach) => {
+          try {
+            saveReach(localStorage, reach);
+          } catch {
+            /* ignore persistence failure */
+          }
+          setStatus(`Build reach: ${reach} blocks`);
         },
       },
     });
@@ -900,7 +918,7 @@ export class Game {
             previewSampler,
             renderer.camera.position,
             rig.forward(),
-            REACH,
+            getReach(),
           );
           targetOverlay.update(
             previewHit

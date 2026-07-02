@@ -15,6 +15,8 @@ import {
   BRICK,
 } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
+import type { Prefab } from '../core/Prefab';
+import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
 
 /**
  * Display-only swatch colors for hotbar/picker slots (an app/UI concern — the pure block
@@ -45,11 +47,20 @@ function isGlass(id: BlockId): boolean {
   return id === GLASS;
 }
 
-/** Builds the soft "block face" background for a slot from its block id. */
-function swatchBackground(id: BlockId): string {
+/**
+ * Builds the soft "block face" background for a slot from its block id. Exported so blueprint
+ * thumbnails can reuse the same per-block color mapping instead of inventing a second palette.
+ */
+export function swatchBackground(id: BlockId): string {
   if (isGlass(id)) return GLASS_SWATCH;
   const hex = SWATCH_COLORS[id] ?? FALLBACK_SWATCH;
   return `linear-gradient(160deg, rgba(255,255,255,0.14), rgba(0,0,0,0.18)), ${hex}`;
+}
+
+/** Flat CSS color for a block id, suitable for canvas fills (no gradients/patterns). */
+export function swatchFlatColor(id: BlockId): string {
+  if (isGlass(id)) return 'rgba(205,232,240,0.7)';
+  return SWATCH_COLORS[id] ?? FALLBACK_SWATCH;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -203,6 +214,19 @@ export type BlueprintChoice =
   | { kind: 'save'; name: string }
   | { kind: 'delete'; name: string };
 
+/** One catalog tab. `Saved` lists the player's own blueprints; the rest are curated/read-only. */
+export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility';
+
+/** A single catalog entry: enough to render a thumbnail + label and to resolve a load/delete. */
+export interface BlueprintEntry {
+  name: string;
+  curated: boolean;
+  /** Saved user blueprints are always 'Saved'; curated entries carry their fixed category. */
+  category: BlueprintCategory;
+  /** Resolves the prefab geometry lazily (curated builders are cheap; saved loads are async). */
+  load: () => Prefab | Promise<Prefab>;
+}
+
 /** Player-facing world info shown by the intro/info dialog (fallbacks applied by the caller). */
 export interface WorldInfo {
   title: string;
@@ -211,6 +235,25 @@ export interface WorldInfo {
   /** Number of tour waypoints; the Start Tour action shows only when this is >= 2. */
   tourCount: number;
 }
+
+/** One row of the Menu's grouped hotkey reference. */
+export interface HotkeyGroup {
+  heading: string;
+  lines: string[];
+}
+
+/** The Menu's fixed hotkey reference, grouped per the controls-audit spec. */
+export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
+  { heading: 'Roam', lines: ['WASD move', 'Mouse look', 'Space up / jump', 'Shift down', 'F fly', 'L headlamp'] },
+  { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
+  { heading: 'Blocks', lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory'] },
+  { heading: 'Build tools', lines: ['X fill', 'G clear', 'R replace', 'C copy'] },
+  {
+    heading: 'Blueprint paste',
+    lines: ['Click to paste', '[ ] rotate', 'M mirror', '+/- array count'],
+  },
+  { heading: 'Reach', lines: ['Shift + wheel adjusts reach'] },
+];
 
 /** What the tour HUD displays for the active waypoint. */
 export interface TourHudStatus {
@@ -231,7 +274,7 @@ export interface CreativeUi {
   worldButton: HTMLButtonElement;
   /** Blueprint library button (click handled by Game). */
   blueprintButton: HTMLButtonElement;
-  /** World info trigger (click handled by Game); visible in both experience modes. */
+  /** Menu trigger — world info + grouped hotkey reference (click handled by Game). */
   infoButton: HTMLButtonElement;
   /** Play↔build switch (click handled by Game; Game hides it for uncurated worlds). */
   modeButton: HTMLButtonElement;
@@ -259,10 +302,12 @@ export interface CreativeUi {
   showDialog(opts: { title: string; message: string; actions: DialogAction[] }): Promise<string>;
   /** World switch/create/duplicate dialog; resolves undefined on cancel. */
   showWorldDialog(current: string, worlds: string[]): Promise<WorldChoice | undefined>;
-  /** Blueprint library dialog: load/save/delete; resolves undefined on cancel. */
+  /**
+   * Categorized blueprint catalog (Saved/Village/Adventure/Utility tabs) with real thumbnails.
+   * Resolves undefined on cancel.
+   */
   showBlueprintDialog(opts: {
-    saved: string[];
-    curated: string[];
+    entries: readonly BlueprintEntry[];
     canSave: boolean;
   }): Promise<BlueprintChoice | undefined>;
   /**
@@ -272,8 +317,14 @@ export interface CreativeUi {
   setExperienceMode(mode: 'play' | 'build'): void;
   /** Shows/updates the tour HUD, or hides it when passed undefined. */
   setTourHud(status: TourHudStatus | undefined): void;
-  /** World intro/info dialog; resolves the chosen action or undefined on dismiss. */
-  showWorldInfoDialog(info: WorldInfo): Promise<'explore' | 'tour' | 'build' | undefined>;
+  /**
+   * Menu dialog: world title/description/landmarks + "Current world" + the grouped hotkey
+   * reference. Resolves the chosen action or undefined on dismiss.
+   */
+  showWorldInfoDialog(
+    info: WorldInfo,
+    worldName: string,
+  ): Promise<'explore' | 'tour' | 'build' | undefined>;
 }
 
 const STATUS_VISIBLE_MS = 1600;
@@ -331,15 +382,15 @@ export function createCreativeUi(
   const reset = button('Reset world');
   reset.className = 'reset-btn';
 
-  const worldButton = button('World: default');
+  const worldButton = button('World');
   worldButton.className = 'world-btn';
 
   const blueprintButton = button('Blueprints');
   blueprintButton.className = 'world-btn';
 
-  const infoButton = button('Info');
+  const infoButton = button('Menu');
   infoButton.className = 'world-btn';
-  infoButton.title = 'About this world';
+  infoButton.title = 'Menu — world info and controls';
 
   const modeButton = button('Play mode');
   modeButton.className = 'world-btn';
@@ -498,7 +549,7 @@ export function createCreativeUi(
     dialogScrim.classList.add('is-open');
     dialogScrim.setAttribute('aria-hidden', 'false');
     const onKey = (e: KeyboardEvent): void => {
-      e.stopPropagation(); // keep game shortcuts (E inventory, B build, tools) inert
+      e.stopPropagation(); // keep game shortcuts (I inventory, B build, tools) inert
       if (e.code === 'Escape') onCancel();
     };
     const onScrimClick = (e: MouseEvent): void => {
@@ -612,55 +663,35 @@ export function createCreativeUi(
       const close = openDialogPanel(panel, () => finish(undefined));
     });
 
+  const BLUEPRINT_CATEGORIES: BlueprintCategory[] = ['Saved', 'Village', 'Adventure', 'Utility'];
+
   const showBlueprintDialog = (opts: {
-    saved: string[];
-    curated: string[];
+    entries: readonly BlueprintEntry[];
     canSave: boolean;
   }): Promise<BlueprintChoice | undefined> =>
     new Promise((resolve) => {
       const panel = dialogPanel('Blueprints');
+      panel.classList.add('blueprint-panel');
       const title = document.createElement('div');
       title.className = 'dialog-title';
       title.textContent = 'Blueprints';
-      const message = document.createElement('p');
-      message.className = 'dialog-message';
-      message.textContent = opts.canSave
-        ? 'Load a blueprint into paste mode, or save the current clipboard.'
-        : 'Load a blueprint into paste mode. (Copy a selection in build mode to save one.)';
 
       const finish = (choice: BlueprintChoice | undefined): void => {
         close();
         resolve(choice);
       };
 
-      const list = document.createElement('div');
-      list.className = 'world-list';
-      for (const name of opts.saved) {
-        const row = document.createElement('div');
-        row.className = 'blueprint-row';
-        const loadBtn = button(name);
-        loadBtn.className = 'dialog-btn world-item';
-        loadBtn.addEventListener('click', () => finish({ kind: 'load', name, curated: false }));
-        const deleteBtn = button('✕');
-        deleteBtn.className = 'dialog-btn blueprint-delete';
-        deleteBtn.title = `Delete blueprint "${name}"`;
-        deleteBtn.setAttribute('aria-label', `Delete blueprint ${name}`);
-        deleteBtn.addEventListener('click', () => finish({ kind: 'delete', name }));
-        row.append(loadBtn, deleteBtn);
-        list.append(row);
-      }
-      for (const name of opts.curated) {
-        const b = button(`${name} (built-in)`);
-        b.className = 'dialog-btn world-item';
-        b.addEventListener('click', () => finish({ kind: 'load', name, curated: true }));
-        list.append(b);
-      }
-      if (opts.saved.length === 0 && opts.curated.length === 0) {
-        const empty = document.createElement('p');
-        empty.className = 'dialog-message';
-        empty.textContent = 'No blueprints yet.';
-        list.append(empty);
-      }
+      const byCategory = new Map<BlueprintCategory, BlueprintEntry[]>(
+        BLUEPRINT_CATEGORIES.map((c) => [c, []]),
+      );
+      for (const entry of opts.entries) byCategory.get(entry.category)?.push(entry);
+
+      const tabRow = document.createElement('div');
+      tabRow.className = 'blueprint-tabs';
+      tabRow.setAttribute('role', 'tablist');
+
+      const body = document.createElement('div');
+      body.className = 'blueprint-body';
 
       const nameInput = document.createElement('input');
       nameInput.type = 'text';
@@ -673,8 +704,6 @@ export function createCreativeUi(
           finish({ kind: 'save', name: typedName() });
       });
 
-      const actions = document.createElement('div');
-      actions.className = 'dialog-actions';
       const saveBtn = button('Save clipboard');
       saveBtn.className = 'dialog-btn';
       saveBtn.disabled = !opts.canSave;
@@ -687,24 +716,115 @@ export function createCreativeUi(
       const cancelBtn = button('Cancel');
       cancelBtn.className = 'dialog-btn';
       cancelBtn.addEventListener('click', () => finish(undefined));
-      actions.append(saveBtn, cancelBtn);
 
-      panel.append(title, message, list, nameInput, actions);
+      const saveRow = document.createElement('div');
+      saveRow.className = 'dialog-actions';
+      saveRow.append(nameInput, saveBtn, cancelBtn);
+
+      const tabButtons = new Map<BlueprintCategory, HTMLButtonElement>();
+
+      const renderCategory = (category: BlueprintCategory): void => {
+        for (const [c, btn] of tabButtons) {
+          btn.classList.toggle('active', c === category);
+          btn.setAttribute('aria-selected', String(c === category));
+        }
+        body.replaceChildren();
+        const entries = byCategory.get(category) ?? [];
+        if (entries.length === 0) {
+          const empty = document.createElement('p');
+          empty.className = 'dialog-message';
+          empty.textContent =
+            category === 'Saved' ? 'No saved blueprints yet.' : 'No structures in this category.';
+          body.append(empty);
+          return;
+        }
+        const grid = document.createElement('div');
+        grid.className = 'blueprint-grid';
+        for (const entry of entries) {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'blueprint-card';
+          card.title = entry.curated ? `${entry.name} (built-in)` : entry.name;
+
+          const canvas = document.createElement('canvas');
+          canvas.className = 'blueprint-thumb';
+          canvas.width = THUMBNAIL_SIZE;
+          canvas.height = THUMBNAIL_SIZE;
+          card.append(canvas);
+          void Promise.resolve(entry.load()).then((prefab) => {
+            renderBlueprintThumbnail(canvas, prefab, swatchFlatColor);
+          });
+
+          const label = document.createElement('span');
+          label.className = 'blueprint-card-name';
+          label.textContent = entry.name;
+          card.append(label);
+
+          card.addEventListener('click', () =>
+            finish({ kind: 'load', name: entry.name, curated: entry.curated }),
+          );
+
+          if (!entry.curated) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'blueprint-delete';
+            deleteBtn.textContent = '✕';
+            deleteBtn.title = `Delete blueprint "${entry.name}"`;
+            deleteBtn.setAttribute('aria-label', `Delete blueprint ${entry.name}`);
+            deleteBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              void showDialog({
+                title: 'Delete blueprint?',
+                message: `Delete "${entry.name}"? This can't be undone.`,
+                actions: [
+                  { id: 'cancel', label: 'Cancel' },
+                  { id: 'delete', label: 'Delete', kind: 'danger' },
+                ],
+              }).then((id) => {
+                if (id === 'delete') finish({ kind: 'delete', name: entry.name });
+              });
+            });
+            card.append(deleteBtn);
+          }
+
+          grid.append(card);
+        }
+        body.append(grid);
+      };
+
+      for (const category of BLUEPRINT_CATEGORIES) {
+        const tab = button(category);
+        tab.type = 'button';
+        tab.className = 'blueprint-tab';
+        tab.setAttribute('role', 'tab');
+        tab.addEventListener('click', () => renderCategory(category));
+        tabButtons.set(category, tab);
+        tabRow.append(tab);
+      }
+
+      panel.append(title, tabRow, body);
+      if (opts.canSave || opts.entries.some((e) => !e.curated)) panel.append(saveRow);
+      renderCategory('Saved');
       const close = openDialogPanel(panel, () => finish(undefined));
     });
 
   const showWorldInfoDialog = (
     info: WorldInfo,
+    worldName: string,
   ): Promise<'explore' | 'tour' | 'build' | undefined> =>
     new Promise((resolve) => {
       const panel = dialogPanel(info.title);
+      panel.classList.add('menu-panel');
       const title = document.createElement('div');
       title.className = 'dialog-title';
       title.textContent = info.title;
+      const worldLine = document.createElement('p');
+      worldLine.className = 'dialog-message menu-world-line';
+      worldLine.textContent = `Current world: ${worldName}`;
       const message = document.createElement('p');
       message.className = 'dialog-message';
       message.textContent = info.description?.trim() || 'No description yet.';
-      panel.append(title, message);
+      panel.append(title, worldLine, message);
 
       if (info.landmarks.length > 0) {
         const heading = document.createElement('div');
@@ -727,6 +847,32 @@ export function createCreativeUi(
           ? `A guided tour with ${info.tourCount} stops is available.`
           : 'No guided tour for this world.';
       panel.append(tourLine);
+
+      // Grouped hotkey reference — the renamed "Menu" button's second job (Section 6).
+      const controlsHeading = document.createElement('div');
+      controlsHeading.className = 'info-heading';
+      controlsHeading.textContent = 'Controls';
+      panel.append(controlsHeading);
+      const controlsGrid = document.createElement('div');
+      controlsGrid.className = 'menu-controls-grid';
+      for (const group of MENU_HOTKEY_GROUPS) {
+        const box = document.createElement('div');
+        box.className = 'menu-controls-group';
+        const groupHeading = document.createElement('div');
+        groupHeading.className = 'menu-controls-heading';
+        groupHeading.textContent = group.heading;
+        box.append(groupHeading);
+        const list = document.createElement('ul');
+        list.className = 'menu-controls-list';
+        for (const line of group.lines) {
+          const li = document.createElement('li');
+          li.textContent = line;
+          list.append(li);
+        }
+        box.append(list);
+        controlsGrid.append(box);
+      }
+      panel.append(controlsGrid);
 
       const finish = (action: 'explore' | 'tour' | 'build' | undefined): void => {
         close();
