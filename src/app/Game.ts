@@ -1,10 +1,19 @@
+import { Color } from 'three';
 import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
 import {
   createChunkMaterial,
   createTransparentMaterial,
   createCutoutMaterial,
+  applyTime,
 } from '../render/ChunkMaterial';
+import { applyUnderwater, stepUnderwaterFactor, type FogParams } from '../render/underwater';
+import { Weather } from '../render/Weather';
+import { AmbientLife } from '../render/AmbientLife';
+import { Critters } from '../render/Critters';
+import { skyState } from '../render/Sky';
+import { WeatherClock, type WeatherKind } from './weatherSchedule';
+import { BlockTicker } from '../world/BlockTicker';
 import { DayNight } from '../render/DayNight';
 import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
@@ -174,6 +183,18 @@ export class Game {
     const persistence = createPersistence(store, manager);
     manager.onChunkDeltaChanged = (key) => persistence.scheduleFlush(key);
 
+    // Block physics: water flows, sand falls. Every edit batch (player, builder,
+    // undo, or the ticker's own writes) re-activates the touched cells.
+    const ticker = new BlockTicker(
+      {
+        getBlock: (x, y, z) => manager.getBlock(x, y, z),
+        getState: (x, y, z) => manager.getState(x, y, z),
+        isLoaded: (x, z) => manager.isLoaded(x, z),
+      },
+      (edits) => manager.applyEdits(edits),
+    );
+    manager.onEditsApplied = (changes) => ticker.notifyChanges(changes);
+
     const overlay = document.getElementById('overlay') ?? undefined;
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
     const spawnOverrides = parseSpawnOverrides(window.location.search);
@@ -200,6 +221,18 @@ export class Game {
     const movementSounds = new MovementSoundTracker();
     const particles = new BlockParticles();
     particles.attach((o) => renderer.add(o));
+
+    // Ambience: weather cycles on its own clock; __vr.weather() pins a kind for testing.
+    const weather = new Weather((intensity) => audio.playThunder(intensity));
+    weather.attach((o) => renderer.add(o));
+    const weatherClock = new WeatherClock();
+    const ambientLife = new AmbientLife();
+    ambientLife.attach((o) => renderer.add(o));
+    const critters = new Critters(() => audio.playChirp());
+    critters.attach((o) => renderer.add(o));
+    const RAIN_LEVEL: Record<WeatherKind, number> = { clear: 0, rain: 0.6, storm: 1, snow: 0 };
+    let underwaterFactor = 0;
+    let animTime = 0;
     let tool: Tool = 'single';
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
 
@@ -766,6 +799,36 @@ export class Game {
         }
       }
       particles.update(cdt);
+
+      // Ambience: weather cycle, precipitation, animated shaders, underwater fog/audio.
+      animTime += cdt;
+      applyTime(chunkMaterials, animTime);
+      const rolled = weatherClock.advance(cdt);
+      if (rolled !== undefined) weather.setKind(rolled);
+      // Drops die on solids *and* water surfaces — rain must not streak through lakes.
+      weather.update(cdt, eye, (x, y, z) => manager.isSolid(x, y, z) || manager.isWater(x, y, z));
+      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, (x, y, z) =>
+        manager.getBlock(x, y, z),
+      );
+      ticker.update(cdt);
+      critters.update(cdt, eye, {
+        getBlock: (x, y, z) => manager.getBlock(x, y, z),
+        player: player.position,
+      });
+      audio.setRainLevel(RAIN_LEVEL[weather.kind]);
+      const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
+      underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
+      const skyBg = renderer.scene.background;
+      const fogFar = Math.max(1, manager.viewDistance * CHUNK_SIZE_X);
+      const surfaceFog: FogParams = {
+        color: skyBg instanceof Color ? [skyBg.r, skyBg.g, skyBg.b] : [0.529, 0.725, 0.91],
+        near: fogFar * 0.55,
+        far: fogFar,
+      };
+      applyUnderwater(chunkMaterials, renderer.scene, surfaceFog, underwaterFactor);
+      weather.applyFlash(chunkMaterials, renderer.scene);
+      audio.setUnderwater(underwaterFactor > 0.5);
+
       manager.update(
         worldToChunkCoord(Math.floor(player.position.x)),
         worldToChunkCoord(Math.floor(player.position.z)),
@@ -887,6 +950,44 @@ export class Game {
         // Headless tour driving: rAF is suspended in hidden capture tabs, so agents step the
         // same loop path (`tick`) after moving the player.
         tour: { start: startTour, end: () => endTour('Tour ended'), tick: updateTour },
+        // Optional dt steps the swarm once headlessly (hidden capture tabs suspend rAF).
+        life: (dtSeconds?: number) => {
+          if (dtSeconds && dtSeconds > 0) {
+            const e = player.eye();
+            ambientLife.update(dtSeconds, e, skyState(daynight.time).daylight, (x, y, z) =>
+              manager.getBlock(x, y, z),
+            );
+          }
+          return ambientLife.census();
+        },
+        // Optional dt steps the critters once headlessly (hidden capture tabs suspend rAF).
+        critters: (dtSeconds?: number) => {
+          if (dtSeconds && dtSeconds > 0) {
+            critters.update(dtSeconds, player.eye(), {
+              getBlock: (x, y, z) => manager.getBlock(x, y, z),
+              player: player.position,
+            });
+          }
+          return critters.census();
+        },
+        // Headless block-physics driving (hidden tabs suspend rAF): tick advances the sim clock.
+        flow: {
+          queued: () => ticker.queued,
+          tick: (dtSeconds = 0.2) => {
+            ticker.update(dtSeconds);
+            return ticker.queued;
+          },
+        },
+        // Pins the weather for testing/captures ('auto' resumes the natural cycle).
+        weather: (kind: WeatherKind | 'auto') => {
+          if (kind === 'auto') {
+            weatherClock.resume();
+          } else {
+            weatherClock.force(kind);
+            weather.setKind(kind);
+          }
+          return weather.kind;
+        },
         // Wraps the engine so dev-console changes keep the HUD controls in sync.
         audio: {
           setMuted: (m: boolean) => {

@@ -90,6 +90,14 @@ export interface DevControlsContext {
   headlamp: (on: boolean) => void;
   /** Play-mode tour HUD controls; `tick` steps the loop path once (hidden tabs suspend rAF). */
   tour?: { start(): void; end(): void; tick(): void };
+  /** Pins the weather ('auto' resumes the natural cycle); returns the active kind. */
+  weather?: (kind: 'clear' | 'rain' | 'storm' | 'snow' | 'auto') => string;
+  /** Live ambient-creature census; pass a dt to step the swarm once headlessly. */
+  life?: (dtSeconds?: number) => Record<string, number>;
+  /** Block-physics ticker introspection + headless stepping. */
+  flow?: { queued(): number; tick(dtSeconds?: number): number };
+  /** Critter census (birds/fish/rabbits); pass a dt to step them once headlessly. */
+  critters?: (dtSeconds?: number) => Record<string, number>;
   /** Sound engine handle for the `sound` dev command. */
   audio: {
     setMuted(muted: boolean): void;
@@ -432,6 +440,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     time: 'time(t) — 0 midnight, .25 sunrise, .5 noon, .75 sunset',
     dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
     headlamp: 'headlamp(on=true) — camera-centered glow for dark caves (not persisted)',
+    weather: "weather(kind) — pin 'clear'|'rain'|'storm'|'snow', or 'auto' to resume the cycle",
     sound: 'sound(on=true, volume?) — toggle audio / set volume 0..1 (persisted like the HUD)',
     view: 'view(maxWidth?, quality?) -> dataURL',
     save: 'save(name, {hud?,maxWidth?,quality?}) -> path — writes .captures/<name>.jpg',
@@ -615,6 +624,10 @@ export function installDevControls(ctx: DevControlsContext): void {
     headlamp: (on = true): void => ctx.headlamp(on),
     /** Play-mode tour HUD: start()/end()/tick() — tick after moving (hidden tabs suspend rAF). */
     tourHud: ctx.tour,
+    weather: ctx.weather,
+    life: ctx.life,
+    flow: ctx.flow,
+    critters: ctx.critters,
     /** Toggle audio and optionally set the master volume (0..1). */
     sound: (on = true, volume?: number): { muted: boolean; volume: number } => {
       ctx.audio.setMuted(!on);

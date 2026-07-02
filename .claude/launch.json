@@ -36,6 +36,13 @@
       "autoPort": false
     },
     {
+      "name": "ambience",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5215", "--strictPort"],
+      "port": 5215,
+      "autoPort": false
+    },
+    {
       "name": "physics",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5199", "--strictPort"],
