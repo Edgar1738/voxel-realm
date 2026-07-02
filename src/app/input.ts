@@ -16,9 +16,57 @@ import { resolveBuilderIntent, type BuilderIntent } from './builderInput';
 import type { BuilderMode } from './BuilderState';
 import type { ExperienceMode } from './experienceMode';
 
-export const REACH = 6;
+export const DEFAULT_REACH = 6;
+export const MIN_REACH = 4;
+export const MAX_REACH = 32;
+export const REACH_STEP = 2;
+const REACH_STORAGE_KEY = 'vr.buildReach';
 const TUNNEL_LENGTH = 8;
 const SPHERE_RADIUS = 4;
+
+/** Clamps a reach value to the valid range, snapping to the step grid from MIN_REACH. */
+export function clampReach(value: number): number {
+  const steps = Math.round((value - MIN_REACH) / REACH_STEP);
+  const snapped = MIN_REACH + steps * REACH_STEP;
+  return Math.min(MAX_REACH, Math.max(MIN_REACH, snapped));
+}
+
+/** Reach adjustment from a shift+wheel delta: positive deltaY (scroll down) decreases reach. */
+export function reachWheelDelta(deltaY: number): number {
+  return deltaY > 0 ? -REACH_STEP : deltaY < 0 ? REACH_STEP : 0;
+}
+
+/** Minimal Storage surface, matching BlueprintStore's StringStore, for persisting reach. */
+export interface ReachStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/** Loads the persisted reach, or DEFAULT_REACH if absent/invalid. */
+export function loadReach(storage: ReachStorage): number {
+  const raw = storage.getItem(REACH_STORAGE_KEY);
+  const n = raw === null ? NaN : Number(raw);
+  return Number.isFinite(n) ? clampReach(n) : DEFAULT_REACH;
+}
+
+/** Persists the reach value. */
+export function saveReach(storage: ReachStorage, value: number): void {
+  storage.setItem(REACH_STORAGE_KEY, String(value));
+}
+
+/** Mutable current build reach, module-scoped so preview/paste/selection/click share one value. */
+let currentReach = DEFAULT_REACH;
+
+export function getReach(): number {
+  return currentReach;
+}
+
+export function setReach(value: number): void {
+  currentReach = clampReach(value);
+}
+
+/** Back-compat alias for call sites/tests expecting the old constant name. */
+export const REACH = DEFAULT_REACH;
 
 export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
 export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
@@ -73,6 +121,8 @@ export interface InputCallbacks {
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
   onToggleHeadlamp: () => void;
+  /** Invoked after a Shift+wheel reach change, with the new reach value. */
+  onReachChange: (reach: number) => void;
 }
 
 export interface InputContext {
@@ -128,12 +178,13 @@ export function registerInputListeners(ctx: InputContext): () => void {
         callbacks.onToolChange(next);
         return;
       }
-      if (e.code === 'KeyE') {
+      if (e.code === 'KeyI') {
         const open = !callbacks.isInventoryOpen();
         if (open && rig.locked) document.exitPointerLock();
         callbacks.onInventoryToggle(open);
         return;
       }
+      // KeyE is intentionally reserved for a future interact/use action — no binding today.
       if (e.code === 'Escape' && callbacks.isInventoryOpen()) {
         callbacks.onInventoryToggle(false);
         return;
@@ -174,7 +225,15 @@ export function registerInputListeners(ctx: InputContext): () => void {
     'wheel',
     (e) => {
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
-      const delta = hotbarWheelDelta(e.deltaY, canEdit(rig.locked, callbacks.isInventoryOpen()));
+      if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+      if (e.shiftKey) {
+        const delta = reachWheelDelta(e.deltaY);
+        if (delta === 0) return;
+        setReach(getReach() + delta);
+        callbacks.onReachChange(getReach());
+        return;
+      }
+      const delta = hotbarWheelDelta(e.deltaY, true);
       if (delta === 0) return;
       inventory.cycleSlot(delta);
       callbacks.onHotbarRender();
@@ -193,7 +252,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
         { getBlock: (x, y, z) => manager.getBlock(x, y, z) },
         renderer.camera.position,
         rig.forward(),
-        REACH,
+        getReach(),
       );
       if (!hit) return;
       const selected = inventory.selectedBlock;

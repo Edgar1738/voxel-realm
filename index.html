@@ -176,63 +176,63 @@
         opacity: 1;
       }
 
-      /* ---- Hotbar (bottom-center hero) ---- */
+      /* ---- Hotbar (bottom-center, compact — build mode only) ---- */
       .creative-hotbar {
         position: fixed;
         left: 50%;
         bottom: 16px;
         transform: translateX(-50%);
         display: flex;
-        gap: 8px;
+        gap: 5px;
         max-width: 96vw;
-        padding: 8px;
-        border-radius: 14px;
+        padding: 6px;
+        border-radius: 12px;
         background: rgba(18, 22, 28, 0.82);
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       }
       .creative-hotbar .slot {
         position: relative;
-        width: 52px;
-        height: 52px;
+        width: 40px;
+        height: 40px;
         padding: 0;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
         box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.18),
-          inset 0 -6px 10px rgba(0, 0, 0, 0.22);
+          inset 0 1px 0 rgba(255, 255, 255, 0.16),
+          inset 0 -4px 7px rgba(0, 0, 0, 0.2);
         transition:
           transform 120ms ease,
           box-shadow 160ms ease,
           border-color 140ms ease;
       }
       .creative-hotbar .slot:hover {
-        transform: translateY(-2px);
-        border-color: rgba(255, 255, 255, 0.35);
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.32);
       }
       .creative-hotbar .slot.selected {
-        transform: translateY(-3px);
+        transform: translateY(-2px);
         box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.18),
-          inset 0 -6px 10px rgba(0, 0, 0, 0.22),
-          0 0 0 2px #ffd34d,
-          0 0 14px 2px rgba(255, 211, 77, 0.45);
+          inset 0 1px 0 rgba(255, 255, 255, 0.16),
+          inset 0 -4px 7px rgba(0, 0, 0, 0.2),
+          0 0 0 1.5px rgba(255, 211, 77, 0.8),
+          0 0 6px 1px rgba(255, 211, 77, 0.28);
       }
       .slot-badge {
         position: absolute;
-        top: 3px;
-        left: 3px;
-        padding: 0 4px;
-        border-radius: 5px;
-        background: rgba(0, 0, 0, 0.35);
+        top: 2px;
+        left: 2px;
+        padding: 0 3px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.4);
         color: #eef2f6;
         font-family: ui-monospace, 'Courier New', monospace;
-        font-size: 11px;
-        line-height: 16px;
+        font-size: 9px;
+        line-height: 14px;
         text-shadow: 0 1px 2px #000;
       }
 
-      /* ---- Inventory modal (E to toggle): scrim + centered "Blocks" panel ---- */
+      /* ---- Inventory modal (I to toggle): scrim + centered "Blocks" panel ---- */
       .inventory-scrim {
         position: fixed;
         inset: 0;
@@ -470,16 +470,136 @@
         line-height: 1.5;
       }
 
-      .blueprint-row {
+      /* ---- Blueprint catalog: category tabs + fixed-size thumbnail cards ---- */
+      .blueprint-panel {
+        max-width: 460px;
+      }
+      .blueprint-tabs {
         display: flex;
-        gap: 6px;
+        gap: 4px;
+        margin-bottom: 10px;
       }
-      .blueprint-row .world-item {
+      .blueprint-tab {
         flex: 1;
+        padding: 6px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(238, 242, 246, 0.7);
+        font-size: 12px;
+        transition:
+          background-color 140ms ease,
+          color 120ms ease,
+          box-shadow 160ms ease;
       }
-      .blueprint-delete {
-        flex: none;
-        padding: 7px 10px;
+      .blueprint-tab:hover {
+        background: rgba(255, 255, 255, 0.09);
+        color: #eef2f6;
+      }
+      .blueprint-tab.active {
+        color: #fff;
+        background: rgba(255, 211, 77, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.5);
+      }
+      .blueprint-body {
+        max-height: 320px;
+        margin-bottom: 12px;
+        overflow-y: auto;
+      }
+      .blueprint-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .blueprint-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        color: inherit;
+        text-align: center;
+        position: relative;
+        transition:
+          border-color 140ms ease,
+          background-color 140ms ease;
+      }
+      .blueprint-card:hover {
+        border-color: rgba(255, 255, 255, 0.32);
+        background: rgba(255, 255, 255, 0.07);
+      }
+      .blueprint-thumb {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.25);
+      }
+      .blueprint-card-name {
+        max-width: 100%;
+        overflow: hidden;
+        font-size: 11px;
+        color: rgba(238, 242, 246, 0.85);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      .blueprint-card-badge {
+        font-size: 9px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: rgba(238, 242, 246, 0.45);
+      }
+      .blueprint-card .blueprint-delete,
+      .blueprint-card-delete {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        padding: 2px 6px;
+        font-size: 10px;
+        border: 1px solid rgba(255, 120, 100, 0.5);
+        border-radius: 6px;
+        background: rgba(150, 70, 58, 0.55);
+        color: #ffe4de;
+      }
+      .blueprint-card .blueprint-delete:hover,
+      .blueprint-card-delete:hover {
+        background: rgba(150, 70, 58, 0.8);
+      }
+
+      /* ---- Menu dialog: world line + grouped hotkey reference ---- */
+      .menu-panel {
+        max-width: 460px;
+      }
+      .menu-world-line {
+        font-weight: 500;
+        color: rgba(238, 242, 246, 0.92);
+      }
+      .menu-controls-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px 16px;
+        margin: 4px 0 14px;
+      }
+      .menu-controls-group {
+        min-width: 0;
+      }
+      .menu-controls-heading {
+        margin-bottom: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: rgba(255, 211, 77, 0.85);
+      }
+      .menu-controls-list {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: rgba(238, 242, 246, 0.78);
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -513,10 +633,11 @@
     <div id="crosshair"></div>
     <div id="overlay">
       Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use
-      tool, RMB place, MMB pick · 1-9 hotbar slot, E inventory, T cycle tool (box tools: click two
-      corners) · B build mode: click two corners, then F fill · G clear · R replace · C copy, click
-      to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · V placement ghost · L headlamp ·
-      Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
+      tool, RMB place, MMB pick · 1-9 hotbar slot, wheel cycle, I inventory, T cycle tool (box
+      tools: click two corners) · B build mode: click two corners, then X fill · G clear · R
+      replace · C copy, click to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · Shift+wheel
+      adjust reach · V placement ghost · L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use
+      the menus
     </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>

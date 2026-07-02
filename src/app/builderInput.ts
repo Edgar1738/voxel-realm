@@ -19,7 +19,7 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
   if (code === 'KeyB') return 'toggleMode';
   if (mode === 'selecting') {
     switch (code) {
-      case 'KeyF':
+      case 'KeyX':
         return 'fill';
       case 'KeyG':
         return 'clear';

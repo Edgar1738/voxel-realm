@@ -1,0 +1,108 @@
+import type { Prefab } from '../core/Prefab';
+import {
+  cottage,
+  well,
+  lampPost,
+  ruinedTower,
+  barn,
+  watchtower,
+  marketStall,
+  brokenWall,
+  bridge,
+  farmPlot,
+  stable,
+  blacksmith,
+  tavern,
+  townGate,
+  roadStraight,
+  roadCorner,
+  wallSegment,
+  stairsRamp,
+  dock,
+} from '../worldgen/prefabs';
+import {
+  ruinedWatchtower,
+  standingStones,
+  obelisk,
+  ruinedCottage,
+  deadTree,
+  campShrine,
+  brokenBridge,
+  statue,
+} from '../worldgen/wildsPrefabs';
+
+/** Built-in structures offered read-only in the blueprint dialog alongside saved blueprints. */
+export const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
+  cottage,
+  well,
+  'lamp-post': lampPost,
+  barn,
+  'market-stall': marketStall,
+  'farm-plot': farmPlot,
+  stable,
+  blacksmith,
+  tavern,
+  'town-gate': townGate,
+  watchtower,
+  'ruined-tower': ruinedTower,
+  ruinedWatchtower,
+  ruinedCottage,
+  standingStones,
+  obelisk,
+  campShrine,
+  brokenBridge,
+  statue,
+  deadTree,
+  bridge,
+  'broken-wall': brokenWall,
+  'road-straight': roadStraight,
+  'road-corner': roadCorner,
+  'wall-segment': wallSegment,
+  'stairs-ramp': stairsRamp,
+  dock,
+};
+
+/** The four blueprint catalog tabs; `Saved` holds only user blueprints. */
+export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility';
+export const BLUEPRINT_CATEGORIES: BlueprintCategory[] = [
+  'Saved',
+  'Village',
+  'Adventure',
+  'Utility',
+];
+
+/** Curated-name → category, per the spec's fixed assignment. */
+const CATEGORY_BY_NAME: Record<string, Exclude<BlueprintCategory, 'Saved'>> = {
+  cottage: 'Village',
+  well: 'Village',
+  'lamp-post': 'Village',
+  barn: 'Village',
+  'market-stall': 'Village',
+  'farm-plot': 'Village',
+  stable: 'Village',
+  blacksmith: 'Village',
+  tavern: 'Village',
+  'town-gate': 'Village',
+  watchtower: 'Village',
+  'ruined-tower': 'Adventure',
+  ruinedWatchtower: 'Adventure',
+  ruinedCottage: 'Adventure',
+  standingStones: 'Adventure',
+  obelisk: 'Adventure',
+  campShrine: 'Adventure',
+  brokenBridge: 'Adventure',
+  statue: 'Adventure',
+  deadTree: 'Adventure',
+  bridge: 'Utility',
+  'broken-wall': 'Utility',
+  'road-straight': 'Utility',
+  'road-corner': 'Utility',
+  'wall-segment': 'Utility',
+  'stairs-ramp': 'Utility',
+  dock: 'Utility',
+};
+
+/** The category a curated blueprint belongs to (defaults to Utility for anything unlisted). */
+export function curatedCategory(name: string): Exclude<BlueprintCategory, 'Saved'> {
+  return CATEGORY_BY_NAME[name] ?? 'Utility';
+}

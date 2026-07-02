@@ -1,5 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import { canEdit, editMessage, toolLabel, TOOLS, hotbarWheelDelta } from '../src/app/input';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  canEdit,
+  editMessage,
+  toolLabel,
+  TOOLS,
+  hotbarWheelDelta,
+  clampReach,
+  reachWheelDelta,
+  loadReach,
+  saveReach,
+  getReach,
+  setReach,
+  DEFAULT_REACH,
+  MIN_REACH,
+  MAX_REACH,
+  REACH_STEP,
+  type ReachStorage,
+} from '../src/app/input';
 
 describe('editMessage', () => {
   it('returns "Undid" for a successful undo', () => {
@@ -82,5 +99,85 @@ describe('hotbarWheelDelta', () => {
 
   it('returns 0 for zero delta', () => {
     expect(hotbarWheelDelta(0, true)).toBe(0);
+  });
+});
+
+describe('clampReach', () => {
+  it('clamps to MIN_REACH..MAX_REACH', () => {
+    expect(clampReach(0)).toBe(MIN_REACH);
+    expect(clampReach(1000)).toBe(MAX_REACH);
+  });
+
+  it('snaps to the step grid from MIN_REACH', () => {
+    expect(clampReach(4.9)).toBe(4);
+    expect(clampReach(7)).toBe(8);
+    expect(clampReach(6)).toBe(6);
+  });
+
+  it('keeps the default reach unchanged', () => {
+    expect(clampReach(DEFAULT_REACH)).toBe(DEFAULT_REACH);
+  });
+});
+
+describe('reachWheelDelta', () => {
+  it('scrolling down (positive deltaY) decreases reach by one step', () => {
+    expect(reachWheelDelta(120)).toBe(-REACH_STEP);
+  });
+
+  it('scrolling up (negative deltaY) increases reach by one step', () => {
+    expect(reachWheelDelta(-120)).toBe(REACH_STEP);
+  });
+
+  it('returns 0 for zero delta', () => {
+    expect(reachWheelDelta(0)).toBe(0);
+  });
+});
+
+function fakeStorage(initial: Record<string, string> = {}): ReachStorage {
+  const map = new Map(Object.entries(initial));
+  return {
+    getItem: (key) => (map.has(key) ? map.get(key)! : null),
+    setItem: (key, value) => {
+      map.set(key, value);
+    },
+  };
+}
+
+describe('loadReach / saveReach', () => {
+  it('returns DEFAULT_REACH when nothing is stored', () => {
+    expect(loadReach(fakeStorage())).toBe(DEFAULT_REACH);
+  });
+
+  it('returns DEFAULT_REACH for invalid stored values', () => {
+    expect(loadReach(fakeStorage({ 'vr.buildReach': 'not-a-number' }))).toBe(DEFAULT_REACH);
+  });
+
+  it('round-trips a saved value through clamping', () => {
+    const storage = fakeStorage();
+    saveReach(storage, 14);
+    expect(loadReach(storage)).toBe(14);
+  });
+
+  it('clamps an out-of-range stored value on load', () => {
+    expect(loadReach(fakeStorage({ 'vr.buildReach': '999' }))).toBe(MAX_REACH);
+  });
+});
+
+describe('getReach / setReach', () => {
+  beforeEach(() => {
+    setReach(DEFAULT_REACH);
+  });
+
+  it('defaults to DEFAULT_REACH', () => {
+    expect(getReach()).toBe(DEFAULT_REACH);
+  });
+
+  it('setReach clamps and getReach reflects the new value', () => {
+    setReach(20);
+    expect(getReach()).toBe(20);
+    setReach(1);
+    expect(getReach()).toBe(MIN_REACH);
+    setReach(1000);
+    expect(getReach()).toBe(MAX_REACH);
   });
 });
