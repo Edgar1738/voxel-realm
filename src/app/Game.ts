@@ -62,6 +62,10 @@ import {
   DEFAULT_TUNNEL_CONFIG,
   REACH_STEP,
   voxelIntersectsPlayer,
+  getHoldRepeat,
+  setHoldRepeat,
+  loadHoldRepeat,
+  saveHoldRepeat,
   getReach,
   setReach,
   loadReach,
@@ -237,7 +241,21 @@ export class Game {
         },
       },
       (direction) => applyReachStep(direction),
+      () => toggleHoldRepeat(),
     );
+
+    // Dock hold-to-repeat toggle: flip, persist, and reflect in the UI + status toast.
+    const toggleHoldRepeat = (): void => {
+      setHoldRepeat(!getHoldRepeat());
+      const enabled = getHoldRepeat();
+      try {
+        saveHoldRepeat(localStorage, enabled);
+      } catch {
+        /* ignore persistence failure */
+      }
+      ui.setHoldRepeatUi(enabled);
+      ui.setStatus(enabled ? 'Hold-to-repeat on' : 'Hold-to-repeat off — one edit per click');
+    };
 
     // Dock +/- reach buttons: apply one Shift+wheel-sized step and persist/report it.
     const applyReachStep = (direction: 1 | -1): void => {
@@ -433,6 +451,14 @@ export class Game {
       /* ignore persistence failure — falls back to DEFAULT_REACH */
     }
     ui.setReachValue(getReach());
+
+    // Hold-to-repeat (dock toggle), persisted across sessions.
+    try {
+      setHoldRepeat(loadHoldRepeat(localStorage));
+    } catch {
+      /* ignore persistence failure — falls back to enabled */
+    }
+    ui.setHoldRepeatUi(getHoldRepeat());
 
     // Blueprint library: named clipboard saves (dev: shared .blueprints/ on the vite server —
     // the same files as __vr.saveBlueprint; prod: this browser's localStorage).

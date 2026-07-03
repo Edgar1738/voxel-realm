@@ -16,8 +16,48 @@ import {
   MAX_REACH,
   REACH_STEP,
   voxelIntersectsPlayer,
+  getHoldRepeat,
+  setHoldRepeat,
+  loadHoldRepeat,
+  saveHoldRepeat,
   type ReachStorage,
 } from '../src/app/input';
+
+describe('hold-to-repeat setting', () => {
+  const fakeStore = (
+    init: Record<string, string> = {},
+  ): ReachStorage & {
+    data: Record<string, string>;
+  } => {
+    const data = { ...init };
+    return {
+      data,
+      getItem: (k) => data[k] ?? null,
+      setItem: (k, v) => {
+        data[k] = v;
+      },
+    };
+  };
+
+  it('defaults to enabled when nothing is stored', () => {
+    expect(loadHoldRepeat(fakeStore())).toBe(true);
+  });
+
+  it('round-trips off and on through storage', () => {
+    const store = fakeStore();
+    saveHoldRepeat(store, false);
+    expect(loadHoldRepeat(store)).toBe(false);
+    saveHoldRepeat(store, true);
+    expect(loadHoldRepeat(store)).toBe(true);
+  });
+
+  it('get/set mirror the module state', () => {
+    setHoldRepeat(false);
+    expect(getHoldRepeat()).toBe(false);
+    setHoldRepeat(true);
+    expect(getHoldRepeat()).toBe(true);
+  });
+});
 
 describe('voxelIntersectsPlayer', () => {
   const HALF = { x: 0.3, y: 0.9, z: 0.3 };

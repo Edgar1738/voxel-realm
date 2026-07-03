@@ -75,6 +75,29 @@ export function setReach(value: number): void {
 /** Back-compat alias for call sites/tests expecting the old constant name. */
 export const REACH = DEFAULT_REACH;
 
+const HOLD_REPEAT_STORAGE_KEY = 'vr.holdRepeat';
+
+/** Mutable hold-to-repeat switch; when off, a held button only ever edits once. */
+let holdRepeatEnabled = true;
+
+export function getHoldRepeat(): boolean {
+  return holdRepeatEnabled;
+}
+
+export function setHoldRepeat(enabled: boolean): void {
+  holdRepeatEnabled = enabled;
+}
+
+/** Loads the persisted hold-to-repeat setting; defaults to enabled. */
+export function loadHoldRepeat(storage: ReachStorage): boolean {
+  return storage.getItem(HOLD_REPEAT_STORAGE_KEY) !== 'off';
+}
+
+/** Persists the hold-to-repeat setting. */
+export function saveHoldRepeat(storage: ReachStorage, enabled: boolean): void {
+  storage.setItem(HOLD_REPEAT_STORAGE_KEY, enabled ? 'on' : 'off');
+}
+
 export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
 export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
 
@@ -422,16 +445,22 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
-        startRepeat(2, PLACE_REPEAT_MS);
-        lastTargetKey = performPlace(hit);
+        if (getHoldRepeat()) {
+          startRepeat(2, PLACE_REPEAT_MS);
+          lastTargetKey = performPlace(hit);
+        } else {
+          performPlace(hit);
+        }
         return;
       }
       if (e.button !== 0) return;
 
       const tool = callbacks.getTool();
       if (tool === 'single' || tool === 'tunnel') {
-        startRepeat(0, tool === 'single' ? SINGLE_REPEAT_MS : TUNNEL_REPEAT_MS);
-        lastTargetKey = targetKey(hit.block);
+        if (getHoldRepeat()) {
+          startRepeat(0, tool === 'single' ? SINGLE_REPEAT_MS : TUNNEL_REPEAT_MS);
+          lastTargetKey = targetKey(hit.block);
+        }
         performDig(hit);
       } else if (tool === 'sphere') {
         callbacks.onRun(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');

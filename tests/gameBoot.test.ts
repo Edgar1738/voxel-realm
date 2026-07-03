@@ -26,6 +26,7 @@ type FakeUi = {
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setReachValue: (reach: number) => void;
+  setHoldRepeatUi: (enabled: boolean) => void;
   setStatus: ReturnType<typeof vi.fn>;
   setExperienceMode: ReturnType<typeof vi.fn>;
   setTourHud: (status: unknown) => void;
@@ -54,6 +55,7 @@ function makeUi(): FakeUi {
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setReachValue: vi.fn(),
+    setHoldRepeatUi: vi.fn(),
     setStatus: vi.fn(),
     setNotice: vi.fn(),
     setSoundUi: vi.fn(),
@@ -289,6 +291,10 @@ vi.mock('../src/app/input', () => ({
   setReach: vi.fn(),
   loadReach: vi.fn(() => 6),
   saveReach: vi.fn(),
+  getHoldRepeat: vi.fn(() => true),
+  setHoldRepeat: vi.fn(),
+  loadHoldRepeat: vi.fn(() => true),
+  saveHoldRepeat: vi.fn(),
 }));
 
 vi.mock('../src/persistence/ServerWorldCatalog', () => ({

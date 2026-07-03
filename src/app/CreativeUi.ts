@@ -288,6 +288,8 @@ export interface CreativeUi {
   setActiveTool(tool: string): void;
   /** Updates the dock's reach readout (the +/- buttons report steps via onReachStep). */
   setReachValue(reach: number): void;
+  /** Syncs the dock's hold-to-repeat toggle button to the current setting. */
+  setHoldRepeatUi(enabled: boolean): void;
   /** Shows `text` as a transient toast that fades out on its own. */
   setStatus(text: string): void;
   /** Shows a persistent banner (e.g. a storage warning), or hides it when passed `null`. */
@@ -354,6 +356,7 @@ export function createCreativeUi(
   onSelectTool: (tool: string) => void,
   tunnel?: { initial: TunnelConfig; onChange: (config: TunnelConfig) => void },
   onReachStep?: (direction: 1 | -1) => void,
+  onHoldRepeatToggle?: () => void,
 ): CreativeUi {
   const root = document.createElement('div');
   root.id = 'creative-ui';
@@ -495,6 +498,18 @@ export function createCreativeUi(
   };
   setReachValue(0); // placeholder; Game reports the real value right after boot
 
+  // Hold-to-repeat toggle: when off, holding a mouse button only ever edits once.
+  const holdButton = button('Hold');
+  holdButton.className = 'hold-btn';
+  holdButton.title = 'Hold-to-repeat: keep digging/placing while a mouse button is held';
+  holdButton.addEventListener('click', () => onHoldRepeatToggle?.());
+  const setHoldRepeatUi = (enabled: boolean): void => {
+    holdButton.textContent = enabled ? 'Hold: On' : 'Hold: Off';
+    holdButton.classList.toggle('active', enabled);
+    holdButton.setAttribute('aria-pressed', String(enabled));
+  };
+  setHoldRepeatUi(true);
+
   // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
   const soundGroup = document.createElement('div');
   soundGroup.className = 'sound-group';
@@ -525,6 +540,7 @@ export function createCreativeUi(
   dock.append(
     toolRow,
     reachGroup,
+    holdButton,
     soundGroup,
     infoButton,
     modeButton,
@@ -641,6 +657,7 @@ export function createCreativeUi(
     refreshTunnelStrip();
     toolRow.style.display = play ? 'none' : '';
     reachGroup.style.display = play ? 'none' : '';
+    holdButton.style.display = play ? 'none' : '';
     hotbar.style.display = play ? 'none' : '';
     reset.style.display = play ? 'none' : '';
     blueprintButton.style.display = play ? 'none' : '';
@@ -1101,6 +1118,7 @@ export function createCreativeUi(
     setSoundUi,
     setActiveTool,
     setReachValue,
+    setHoldRepeatUi,
     setStatus,
     setNotice,
     renderHotbar,
