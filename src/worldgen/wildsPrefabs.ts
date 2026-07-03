@@ -9,6 +9,10 @@ import {
   LANTERN,
   OAK_FENCE,
   COBBLE_WALL,
+  DEEPSLATE,
+  WATER,
+  GRASS,
+  TALL_GRASS,
 } from '../blocks/blocks';
 import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { BlockId } from '../core/types';
@@ -350,4 +354,152 @@ export function statue(): Prefab {
   put(1, 7, 2, STONE);
 
   return { dims: [3, 8, 3], blocks };
+}
+
+// ---------------------------------------------------------------------------
+// 9. boulderCluster — a small huddle of rounded stone/gravel boulders
+// ---------------------------------------------------------------------------
+export function boulderCluster(): Prefab {
+  const { put, blocks } = builder();
+
+  // Three roughly-round boulders of varying size, each built from a stone core
+  // with a gravel "scree" skirt at the base — scattered across a 7x7 footprint.
+  const boulders: Array<{ cx: number; cz: number; r: number }> = [
+    { cx: 2, cz: 2, r: 1 },
+    { cx: 5, cz: 3, r: 2 },
+    { cx: 2, cz: 5, r: 1 },
+  ];
+
+  for (const { cx, cz, r } of boulders) {
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x > 6 || z > 6) continue;
+        const dist = Math.abs(dx) + Math.abs(dz);
+        if (dist > r) continue; // rounded diamond footprint
+        // height falls off toward the edge for a domed look
+        const h = r - dist + 1;
+        for (let y = 0; y < h; y++) put(x, y, z, STONE);
+      }
+    }
+    // gravel scree ring around the base
+    for (let dz = -r - 1; dz <= r + 1; dz++) {
+      for (let dx = -r - 1; dx <= r + 1; dx++) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x > 6 || z > 6) continue;
+        const dist = Math.abs(dx) + Math.abs(dz);
+        if (dist !== r + 1) continue;
+        put(x, 0, z, GRAVEL);
+      }
+    }
+  }
+
+  return { dims: [7, 4, 7], blocks };
+}
+
+// ---------------------------------------------------------------------------
+// 10. rockOutcrop — a tall jagged granite spire, angular and asymmetric
+// ---------------------------------------------------------------------------
+export function rockOutcrop(): Prefab {
+  const { put, blocks } = builder();
+
+  // Wide deepslate base tapering up through a stone spire, with an overhang
+  // formed by offsetting upper layers away from the trunk centreline.
+  const layers: Array<{ y: number; cells: Array<[number, number]>; id: BlockId }> = [
+    { y: 0, cells: [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2]], id: DEEPSLATE },
+    { y: 1, cells: [[0,0],[1,0],[2,0],[1,1],[2,1],[0,2],[1,2]], id: DEEPSLATE },
+    { y: 2, cells: [[1,0],[2,0],[1,1],[0,2],[1,2]], id: STONE },
+    { y: 3, cells: [[2,0],[1,1],[0,2]], id: STONE },
+    { y: 4, cells: [[2,0],[1,1]], id: STONE }, // overhang: shifted from trunk below
+    { y: 5, cells: [[2,1]], id: STONE },
+    { y: 6, cells: [[1,1]], id: STONE },
+    { y: 7, cells: [[1,0]], id: STONE }, // jagged asymmetric tip
+  ];
+  for (const { y, cells, id } of layers) {
+    for (const [x, z] of cells) put(x, y, z, id);
+  }
+
+  return { dims: [3, 8, 3], blocks };
+}
+
+// ---------------------------------------------------------------------------
+// 11. stoneShelf — a tilted, layered rock ledge jutting out from the ground
+// ---------------------------------------------------------------------------
+export function stoneShelf(): Prefab {
+  const W = 6; // along the ledge's rise
+  const D = 5; // width of the shelf
+  const { put, blocks } = builder();
+
+  // Anchored bedrock block at the back (x=0), stepping down in height toward
+  // the front (x=W-1) so the shelf reads as tilted/jutting rather than flat.
+  for (let x = 0; x < W; x++) {
+    const h = Math.max(1, 3 - Math.floor(x / 2)); // 3,3,2,2,1,1
+    for (let z = 0; z < D; z++) {
+      for (let y = 0; y < h; y++) {
+        put(x, y, z, y === h - 1 ? STONE : DEEPSLATE);
+      }
+    }
+  }
+  // A thin overhanging cap layer on the front lip for a jutting-ledge look
+  put(W - 1, 1, 1, STONE);
+  put(W - 1, 1, 2, STONE);
+  put(W - 1, 1, 3, STONE);
+
+  return { dims: [W, 4, D], blocks };
+}
+
+// ---------------------------------------------------------------------------
+// 12. pondSmall — modest round pool recessed into the ground, grass fringe
+// ---------------------------------------------------------------------------
+export function pondSmall(): Prefab {
+  const SIZE = 7;
+  const { put, blocks } = builder();
+  const center = 3;
+  const radius = 2;
+
+  for (let z = 0; z < SIZE; z++) {
+    for (let x = 0; x < SIZE; x++) {
+      const dist = Math.max(Math.abs(x - center), Math.abs(z - center)); // oval-ish via chebyshev
+      if (dist <= radius - 1) {
+        put(x, 0, z, WATER); // recessed pool basin
+      } else if (dist === radius) {
+        put(x, 0, z, GRASS); // fringe ring
+        if ((x + z) % 3 === 0) put(x, 1, z, TALL_GRASS); // reed-like accents
+      }
+    }
+  }
+
+  return { dims: [SIZE, 2, SIZE], blocks };
+}
+
+// ---------------------------------------------------------------------------
+// 13. pondLarge — bigger irregular pool with a rockier shoreline
+// ---------------------------------------------------------------------------
+export function pondLarge(): Prefab {
+  const SIZE = 11;
+  const { put, blocks } = builder();
+  const cx = 5;
+  const cz = 5;
+
+  for (let z = 0; z < SIZE; z++) {
+    for (let x = 0; x < SIZE; x++) {
+      // irregular shoreline: elliptical distance perturbed by a deterministic wobble
+      const dx = x - cx;
+      const dz = z - cz;
+      const wobble = ((x * 3 + z * 5) % 3) - 1; // -1..1
+      const dist = Math.sqrt(dx * dx * 0.7 + dz * dz) + wobble * 0.5;
+      if (dist <= 3.5) {
+        put(x, 0, z, WATER);
+      } else if (dist <= 4.3) {
+        // rocky shoreline: mix of gravel/stone rather than plain grass
+        const rocky = (x + z * 2) % 2 === 0;
+        put(x, 0, z, rocky ? GRAVEL : STONE);
+        if (!rocky && (x * 7 + z) % 5 === 0) put(x, 1, z, TALL_GRASS);
+      }
+    }
+  }
+
+  return { dims: [SIZE, 2, SIZE], blocks };
 }

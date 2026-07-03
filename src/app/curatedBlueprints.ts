@@ -29,6 +29,11 @@ import {
   campShrine,
   brokenBridge,
   statue,
+  boulderCluster,
+  rockOutcrop,
+  stoneShelf,
+  pondSmall,
+  pondLarge,
 } from '../worldgen/wildsPrefabs';
 
 /** Built-in structures offered read-only in the blueprint dialog alongside saved blueprints. */
@@ -60,15 +65,21 @@ export const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
   'wall-segment': wallSegment,
   'stairs-ramp': stairsRamp,
   dock,
+  'boulder-cluster': boulderCluster,
+  'rock-outcrop': rockOutcrop,
+  'stone-shelf': stoneShelf,
+  'pond-small': pondSmall,
+  'pond-large': pondLarge,
 };
 
-/** The four blueprint catalog tabs; `Saved` holds only user blueprints. */
-export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility';
+/** The five blueprint catalog tabs; `Saved` holds only user blueprints. */
+export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility' | 'Nature';
 export const BLUEPRINT_CATEGORIES: BlueprintCategory[] = [
   'Saved',
   'Village',
   'Adventure',
   'Utility',
+  'Nature',
 ];
 
 /** Curated-name → category, per the spec's fixed assignment. */
@@ -100,6 +111,11 @@ const CATEGORY_BY_NAME: Record<string, Exclude<BlueprintCategory, 'Saved'>> = {
   'wall-segment': 'Utility',
   'stairs-ramp': 'Utility',
   dock: 'Utility',
+  'boulder-cluster': 'Nature',
+  'rock-outcrop': 'Nature',
+  'stone-shelf': 'Nature',
+  'pond-small': 'Nature',
+  'pond-large': 'Nature',
 };
 
 /** The category a curated blueprint belongs to (defaults to Utility for anything unlisted). */
