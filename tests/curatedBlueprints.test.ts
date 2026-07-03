@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { CURATED_BLUEPRINTS, curatedCategory, BLUEPRINT_CATEGORIES } from '../src/app/curatedBlueprints';
+import {
+  CURATED_BLUEPRINTS,
+  curatedCategory,
+  BLUEPRINT_CATEGORIES,
+} from '../src/app/curatedBlueprints';
 import { validatePrefab } from '../src/core/Prefab';
 
 describe('curatedBlueprints — categorization', () => {

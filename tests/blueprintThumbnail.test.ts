@@ -71,7 +71,11 @@ describe('renderBlueprintThumbnail', () => {
   });
 
   it('does nothing when the canvas has no 2D context available', () => {
-    const canvas = { width: 0, height: 0, getContext: vi.fn(() => null) } as unknown as HTMLCanvasElement;
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => null),
+    } as unknown as HTMLCanvasElement;
     const prefab: Prefab = { dims: [1, 1, 1], blocks: [[0, 0, 0, 1]] };
     expect(() => renderBlueprintThumbnail(canvas, prefab, swatch)).not.toThrow();
   });

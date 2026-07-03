@@ -409,14 +409,65 @@ export function rockOutcrop(): Prefab {
   // Wide deepslate base tapering up through a stone spire, with an overhang
   // formed by offsetting upper layers away from the trunk centreline.
   const layers: Array<{ y: number; cells: Array<[number, number]>; id: BlockId }> = [
-    { y: 0, cells: [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2]], id: DEEPSLATE },
-    { y: 1, cells: [[0,0],[1,0],[2,0],[1,1],[2,1],[0,2],[1,2]], id: DEEPSLATE },
-    { y: 2, cells: [[1,0],[2,0],[1,1],[0,2],[1,2]], id: STONE },
-    { y: 3, cells: [[2,0],[1,1],[0,2]], id: STONE },
-    { y: 4, cells: [[2,0],[1,1]], id: STONE }, // overhang: shifted from trunk below
-    { y: 5, cells: [[2,1]], id: STONE },
-    { y: 6, cells: [[1,1]], id: STONE },
-    { y: 7, cells: [[1,0]], id: STONE }, // jagged asymmetric tip
+    {
+      y: 0,
+      cells: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [0, 1],
+        [1, 1],
+        [2, 1],
+        [0, 2],
+        [1, 2],
+        [2, 2],
+      ],
+      id: DEEPSLATE,
+    },
+    {
+      y: 1,
+      cells: [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [1, 1],
+        [2, 1],
+        [0, 2],
+        [1, 2],
+      ],
+      id: DEEPSLATE,
+    },
+    {
+      y: 2,
+      cells: [
+        [1, 0],
+        [2, 0],
+        [1, 1],
+        [0, 2],
+        [1, 2],
+      ],
+      id: STONE,
+    },
+    {
+      y: 3,
+      cells: [
+        [2, 0],
+        [1, 1],
+        [0, 2],
+      ],
+      id: STONE,
+    },
+    {
+      y: 4,
+      cells: [
+        [2, 0],
+        [1, 1],
+      ],
+      id: STONE,
+    }, // overhang: shifted from trunk below
+    { y: 5, cells: [[2, 1]], id: STONE },
+    { y: 6, cells: [[1, 1]], id: STONE },
+    { y: 7, cells: [[1, 0]], id: STONE }, // jagged asymmetric tip
   ];
   for (const { y, cells, id } of layers) {
     for (const [x, z] of cells) put(x, y, z, id);
