@@ -1,4 +1,5 @@
 import {
+  AIR,
   COBBLESTONE,
   STONE,
   BRICK,
@@ -464,6 +465,7 @@ export function pondSmall(): Prefab {
       const dist = Math.max(Math.abs(x - center), Math.abs(z - center)); // oval-ish via chebyshev
       if (dist <= radius - 1) {
         put(x, 0, z, WATER); // recessed pool basin
+        put(x, 1, z, AIR); // clear whatever ground sat above so the water is visible
       } else if (dist === radius) {
         put(x, 0, z, GRASS); // fringe ring
         if ((x + z) % 3 === 0) put(x, 1, z, TALL_GRASS); // reed-like accents
@@ -492,6 +494,7 @@ export function pondLarge(): Prefab {
       const dist = Math.sqrt(dx * dx * 0.7 + dz * dz) + wobble * 0.5;
       if (dist <= 3.5) {
         put(x, 0, z, WATER);
+        put(x, 1, z, AIR); // clear whatever ground sat above so the water is visible
       } else if (dist <= 4.3) {
         // rocky shoreline: mix of gravel/stone rather than plain grass
         const rocky = (x + z * 2) % 2 === 0;
