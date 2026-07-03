@@ -479,6 +479,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     benchRoute: 'benchRoute([{x,z}...], {speed?}) — profile a multi-waypoint route',
     benchTour: "benchTour({speed?}) — profile the world's saved meta.tour",
     fog: 'fog(near, far) — dev-only: override distance-fog band on chunk materials (clean wide captures)',
+    ao: 'ao(strength=1) — dev-only: scale vertex-AO corner shading (0 = off, 1 = normal, >1 exaggerated)',
     help: 'help(name?) -> signatures (all, or one method)',
   };
 
@@ -1338,6 +1339,22 @@ export function installDevControls(ctx: DevControlsContext): void {
           if (u && 'uFogNear' in u && 'uFogFar' in u) {
             u.uFogNear.value = near;
             u.uFogFar.value = far;
+            patched++;
+          }
+        }
+      });
+      return { patched };
+    },
+    /** Dev-only: scale vertex-AO corner shading (0 = off, 1 = baked value, >1 exaggerated). */
+    ao: (strength = 1): { patched: number } => {
+      let patched = 0;
+      renderer.scene.traverse((obj: object) => {
+        const mat = (obj as { material?: unknown }).material;
+        const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+        for (const m of mats) {
+          const u = (m as { uniforms?: Record<string, { value: unknown }> }).uniforms;
+          if (u && 'uAoStrength' in u) {
+            u.uAoStrength.value = strength;
             patched++;
           }
         }

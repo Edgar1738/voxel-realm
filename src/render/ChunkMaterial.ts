@@ -68,6 +68,7 @@ uniform float uTorch;
 uniform float uTorchRadius;
 uniform float uTime;
 uniform float uWaveAmp;
+uniform float uAoStrength;
 
 in vec2 vUv;
 in float vLayer;
@@ -102,7 +103,9 @@ void main() {
   float torch = uTorch * clamp(1.0 - dist / uTorchRadius, 0.0, 1.0);
   torch = floor(torch * 15.0) / 15.0;
   float level = max(max(sky * uDayLight, max(block, torch)), 0.06);
-  float shade = (0.45 + 0.55 * diff) * vAo;
+  // uAoStrength: dev-tunable AO intensity (0 = off, 1 = baked value, >1 exaggerated).
+  float aoFactor = clamp(mix(1.0, vAo, uAoStrength), 0.0, 1.0);
+  float shade = (0.45 + 0.55 * diff) * aoFactor;
   vec3 color = base * shade * level;
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
@@ -149,6 +152,7 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
       uTime: { value: 0.0 },
       uSwayAmp: { value: swayAmp },
       uWaveAmp: { value: waveAmp },
+      uAoStrength: { value: 1.0 },
     },
     vertexShader,
     fragmentShader,
