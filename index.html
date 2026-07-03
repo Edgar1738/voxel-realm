@@ -107,6 +107,110 @@
         background: rgba(255, 211, 77, 0.16);
         box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.55);
       }
+      /* Primary dig controls (Single, Tunnel) read larger; the rest are secondary. */
+      .tool-btn.primary {
+        padding: 8px 14px;
+        font-size: 14px;
+        color: rgba(238, 242, 246, 0.85);
+      }
+      .tool-btn.primary svg {
+        width: 16px;
+        height: 16px;
+      }
+      .tool-btn.secondary {
+        padding: 5px 8px;
+        font-size: 12px;
+      }
+      .tool-divider {
+        width: 1px;
+        align-self: stretch;
+        margin: 3px 4px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+      /* Reach control: − / value / + pill next to the tool rail. */
+      .reach-group {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 4px 6px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .reach-btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: rgba(238, 242, 246, 0.75);
+        font-size: 14px;
+        line-height: 1;
+        transition:
+          color 120ms ease,
+          background-color 140ms ease;
+      }
+      .reach-btn:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .reach-value {
+        min-width: 60px;
+        text-align: center;
+        font-size: 12px;
+        color: rgba(238, 242, 246, 0.8);
+      }
+      /* Tunnel settings strip: wraps onto its own dock row below the tool rail. */
+      .tunnel-settings {
+        flex-basis: 100%;
+        display: flex;
+      }
+      .tunnel-settings-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+        padding: 6px 12px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .tunnel-group {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .tunnel-group-label {
+        margin-right: 4px;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: rgba(238, 242, 246, 0.5);
+      }
+      .tunnel-opt {
+        padding: 3px 9px;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: rgba(238, 242, 246, 0.62);
+        font-size: 12px;
+        transition:
+          color 120ms ease,
+          background-color 140ms ease,
+          box-shadow 160ms ease;
+      }
+      .tunnel-opt:hover {
+        color: #eef2f6;
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .tunnel-opt.active {
+        color: #fff;
+        background: rgba(255, 211, 77, 0.16);
+        box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.55);
+      }
       .reset-btn {
         padding: 7px 12px;
         border: 1px solid rgba(255, 255, 255, 0.28);
@@ -265,6 +369,9 @@
       .inventory-panel {
         width: 100%;
         max-width: 440px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
         padding: 16px;
         border-radius: 12px;
         background: rgba(18, 22, 28, 0.92);
@@ -292,6 +399,8 @@
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 10px;
+        overflow-y: auto;
+        min-height: 0;
       }
       .inventory-tile {
         display: flex;

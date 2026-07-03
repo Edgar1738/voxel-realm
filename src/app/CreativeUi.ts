@@ -18,6 +18,7 @@ import type { BlockId } from '../core/types';
 import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
 import { renderBlockIcon } from './blockIcon';
+import { TUNNEL_SIZES, TUNNEL_LENGTHS, TUNNEL_PATHS, type TunnelConfig } from '../edit/Brushes';
 
 /**
  * Display-only swatch colors for hotbar/picker slots (an app/UI concern — the pure block
@@ -285,6 +286,8 @@ export interface CreativeUi {
   setSoundUi(volume: number, muted: boolean): void;
   /** Highlights the button for `tool` and dims the rest. */
   setActiveTool(tool: string): void;
+  /** Updates the dock's reach readout (the +/- buttons report steps via onReachStep). */
+  setReachValue(reach: number): void;
   /** Shows `text` as a transient toast that fades out on its own. */
   setStatus(text: string): void;
   /** Shows a persistent banner (e.g. a storage warning), or hides it when passed `null`. */
@@ -338,6 +341,10 @@ function button(text: string): HTMLButtonElement {
  * triggers pointer-lock or an edit.
  *
  * @param onSelectTool invoked with the tool id when a tool button is clicked.
+ * @param tunnel initial tunnel settings + change callback; the strip shows only while
+ *   the Tunnel tool is active in build mode.
+ * @param onReachStep invoked with +1/-1 when the dock's reach +/- buttons are clicked;
+ *   the caller applies the step and reports the new value via {@link CreativeUi.setReachValue}.
  */
 export function createCreativeUi(
   registry: BlockRegistry,
@@ -345,6 +352,8 @@ export function createCreativeUi(
   tools: readonly string[],
   toolLabel: (tool: string) => string,
   onSelectTool: (tool: string) => void,
+  tunnel?: { initial: TunnelConfig; onChange: (config: TunnelConfig) => void },
+  onReachStep?: (direction: 1 | -1) => void,
 ): CreativeUi {
   const root = document.createElement('div');
   root.id = 'creative-ui';
@@ -359,11 +368,22 @@ export function createCreativeUi(
   toolRow.className = 'creative-tools';
   toolRow.setAttribute('role', 'group');
   toolRow.setAttribute('aria-label', 'Edit tool');
+  // Two-tier rail: Single + Tunnel are the primary dig controls; the rest are secondary.
+  const PRIMARY_TOOLS = new Set(['single', 'tunnel']);
   const toolButtons = new Map<string, HTMLButtonElement>();
+  let dividerAdded = false;
   for (const t of tools) {
+    const primary = PRIMARY_TOOLS.has(t);
+    if (!primary && !dividerAdded) {
+      const divider = document.createElement('span');
+      divider.className = 'tool-divider';
+      divider.setAttribute('aria-hidden', 'true');
+      toolRow.append(divider);
+      dividerAdded = true;
+    }
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'tool-btn';
+    b.className = primary ? 'tool-btn primary' : 'tool-btn secondary';
     b.dataset.tool = t;
     const label = toolLabel(t);
     const text = document.createElement('span');
@@ -374,6 +394,68 @@ export function createCreativeUi(
     toolButtons.set(t, b);
     toolRow.append(b);
   }
+
+  // Tunnel settings strip: Size / Length / Path segmented controls, on its own dock row.
+  let tunnelConfig: TunnelConfig = {
+    ...(tunnel?.initial ?? { size: 3, length: 8, path: 'straight' }),
+  };
+  const tunnelSettings = document.createElement('div');
+  tunnelSettings.className = 'tunnel-settings';
+  const tunnelPanel = document.createElement('div');
+  tunnelPanel.className = 'tunnel-settings-panel';
+  tunnelPanel.setAttribute('role', 'group');
+  tunnelPanel.setAttribute('aria-label', 'Tunnel settings');
+  tunnelSettings.append(tunnelPanel);
+
+  function tunnelGroup<K extends keyof TunnelConfig>(
+    label: string,
+    key: K,
+    values: readonly TunnelConfig[K][],
+    format: (v: TunnelConfig[K]) => string,
+  ): HTMLDivElement {
+    const group = document.createElement('div');
+    group.className = 'tunnel-group';
+    const caption = document.createElement('span');
+    caption.className = 'tunnel-group-label';
+    caption.textContent = label;
+    group.append(caption);
+    const buttons: HTMLButtonElement[] = [];
+    const refresh = (): void => {
+      buttons.forEach((b, i) => {
+        const on = tunnelConfig[key] === values[i];
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', String(on));
+      });
+    };
+    for (const v of values) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tunnel-opt';
+      b.textContent = format(v);
+      b.addEventListener('click', () => {
+        tunnelConfig = { ...tunnelConfig, [key]: v };
+        refresh();
+        tunnel?.onChange({ ...tunnelConfig });
+      });
+      buttons.push(b);
+      group.append(b);
+    }
+    refresh();
+    return group;
+  }
+
+  tunnelPanel.append(
+    tunnelGroup('Size', 'size', TUNNEL_SIZES, String),
+    tunnelGroup('Length', 'length', TUNNEL_LENGTHS, String),
+    tunnelGroup('Path', 'path', TUNNEL_PATHS, (v) => v[0].toUpperCase() + v.slice(1)),
+  );
+
+  let activeToolId = '';
+  let playModeUi = false;
+  const refreshTunnelStrip = (): void => {
+    tunnelSettings.style.display = activeToolId === 'tunnel' && !playModeUi ? '' : 'none';
+  };
+  refreshTunnelStrip();
 
   const reset = button('Reset world');
   reset.className = 'reset-btn';
@@ -390,6 +472,28 @@ export function createCreativeUi(
 
   const modeButton = button('Play mode');
   modeButton.className = 'world-btn';
+
+  // Reach control: − / value / + mirroring Shift+wheel, for players who forget the hotkey.
+  const reachGroup = document.createElement('div');
+  reachGroup.className = 'reach-group';
+  reachGroup.setAttribute('role', 'group');
+  reachGroup.setAttribute('aria-label', 'Build reach');
+  const reachMinus = button('−');
+  reachMinus.className = 'reach-btn';
+  reachMinus.title = 'Shorter build reach (Shift+wheel down)';
+  const reachValue = document.createElement('span');
+  reachValue.className = 'reach-value';
+  const reachPlus = button('+');
+  reachPlus.className = 'reach-btn';
+  reachPlus.title = 'Longer build reach (Shift+wheel up)';
+  reachMinus.addEventListener('click', () => onReachStep?.(-1));
+  reachPlus.addEventListener('click', () => onReachStep?.(1));
+  reachGroup.append(reachMinus, reachValue, reachPlus);
+
+  const setReachValue = (reach: number): void => {
+    reachValue.textContent = `Reach ${reach}`;
+  };
+  setReachValue(0); // placeholder; Game reports the real value right after boot
 
   // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
   const soundGroup = document.createElement('div');
@@ -417,7 +521,18 @@ export function createCreativeUi(
     soundGroup.classList.toggle('is-muted', muted);
   };
 
-  dock.append(toolRow, soundGroup, infoButton, modeButton, blueprintButton, worldButton, reset);
+  // tunnelSettings goes last with flex-basis 100% so it wraps onto its own dock row.
+  dock.append(
+    toolRow,
+    reachGroup,
+    soundGroup,
+    infoButton,
+    modeButton,
+    blueprintButton,
+    worldButton,
+    reset,
+    tunnelSettings,
+  );
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
   const scrim = document.createElement('div');
@@ -522,7 +637,10 @@ export function createCreativeUi(
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
     const play = mode === 'play';
+    playModeUi = play;
+    refreshTunnelStrip();
     toolRow.style.display = play ? 'none' : '';
+    reachGroup.style.display = play ? 'none' : '';
     hotbar.style.display = play ? 'none' : '';
     reset.style.display = play ? 'none' : '';
     blueprintButton.style.display = play ? 'none' : '';
@@ -916,6 +1034,8 @@ export function createCreativeUi(
   });
 
   const setActiveTool = (tool: string): void => {
+    activeToolId = tool;
+    refreshTunnelStrip();
     for (const [id, btn] of toolButtons) {
       btn.classList.toggle('active', id === tool);
       btn.setAttribute('aria-pressed', String(id === tool));
@@ -980,6 +1100,7 @@ export function createCreativeUi(
     volumeSlider,
     setSoundUi,
     setActiveTool,
+    setReachValue,
     setStatus,
     setNotice,
     renderHotbar,

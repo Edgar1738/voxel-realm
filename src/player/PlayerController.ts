@@ -17,7 +17,9 @@ export interface PlayerWorld extends SoliditySampler {
   isWater(x: number, y: number, z: number): boolean;
 }
 
-const HALF: Vec3 = { x: 0.3, y: 0.9, z: 0.3 };
+/** Player collision half-extents around the body center (exported for placement guards). */
+export const PLAYER_HALF: Vec3 = { x: 0.3, y: 0.9, z: 0.3 };
+const HALF = PLAYER_HALF;
 const EYE_OFFSET = 0.7; // eye height above body center (~1.6 above feet)
 
 const WALK_SPEED = 5.5;

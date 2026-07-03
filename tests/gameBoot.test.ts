@@ -25,6 +25,7 @@ type FakeUi = {
   volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
+  setReachValue: (reach: number) => void;
   setStatus: ReturnType<typeof vi.fn>;
   setExperienceMode: ReturnType<typeof vi.fn>;
   setTourHud: (status: unknown) => void;
@@ -52,6 +53,7 @@ function makeUi(): FakeUi {
     volumeSlider: { addEventListener: vi.fn(), value: '60' },
     inventoryOpen: false,
     setActiveTool: vi.fn(),
+    setReachValue: vi.fn(),
     setStatus: vi.fn(),
     setNotice: vi.fn(),
     setSoundUi: vi.fn(),
@@ -281,6 +283,12 @@ vi.mock('../src/app/input', () => ({
   TOOLS: ['single'],
   toolLabel: vi.fn((tool: string) => tool),
   registerInputListeners: vi.fn(() => boot.abortInput),
+  DEFAULT_TUNNEL_CONFIG: { size: 3, length: 8, path: 'straight' },
+  REACH_STEP: 2,
+  getReach: vi.fn(() => 6),
+  setReach: vi.fn(),
+  loadReach: vi.fn(() => 6),
+  saveReach: vi.fn(),
 }));
 
 vi.mock('../src/persistence/ServerWorldCatalog', () => ({

@@ -22,7 +22,7 @@ import { ChunkManager } from '../world/ChunkManager';
 import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldgen/Presets';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
-import { PlayerController } from '../player/PlayerController';
+import { PlayerController, PLAYER_HALF } from '../player/PlayerController';
 import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
@@ -54,10 +54,14 @@ import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
+import type { TunnelConfig } from '../edit/Brushes';
 import {
   registerInputListeners,
   TOOLS,
   toolLabel,
+  DEFAULT_TUNNEL_CONFIG,
+  REACH_STEP,
+  voxelIntersectsPlayer,
   getReach,
   setReach,
   loadReach,
@@ -218,8 +222,35 @@ export class Game {
     let animTime = 0;
     let tool: Tool = 'single';
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
+    let tunnelConfig: TunnelConfig = { ...DEFAULT_TUNNEL_CONFIG };
 
-    const ui = createCreativeUi(registry, inventory, TOOLS, toolLabel, (t) => setTool(t as Tool));
+    const ui = createCreativeUi(
+      registry,
+      inventory,
+      TOOLS,
+      toolLabel,
+      (t) => setTool(t as Tool),
+      {
+        initial: tunnelConfig,
+        onChange: (config) => {
+          tunnelConfig = config;
+        },
+      },
+      (direction) => applyReachStep(direction),
+    );
+
+    // Dock +/- reach buttons: apply one Shift+wheel-sized step and persist/report it.
+    const applyReachStep = (direction: 1 | -1): void => {
+      setReach(getReach() + direction * REACH_STEP);
+      const reach = getReach();
+      try {
+        saveReach(localStorage, reach);
+      } catch {
+        /* ignore persistence failure */
+      }
+      ui.setReachValue(reach);
+      ui.setStatus(`Build reach: ${reach} blocks`);
+    };
 
     // Experience mode: curated worlds (title/description/spawn/look) open explore-first in
     // `play` (creative UI hidden, edit inputs gated in input.ts); `build` is full creative.
@@ -401,6 +432,7 @@ export class Game {
     } catch {
       /* ignore persistence failure — falls back to DEFAULT_REACH */
     }
+    ui.setReachValue(getReach());
 
     // Blueprint library: named clipboard saves (dev: shared .blueprints/ on the vite server —
     // the same files as __vr.saveBlueprint; prod: this browser's localStorage).
@@ -724,6 +756,8 @@ export class Game {
           anchorVoxel = v;
         },
         getTool: () => tool,
+        getTunnelConfig: () => tunnelConfig,
+        intersectsPlayer: (x, y, z) => voxelIntersectsPlayer(x, y, z, player.position, PLAYER_HALF),
         getBuildMode: () => builder.mode,
         getExperienceMode: () => experience,
         onEnterBuild: () => {
@@ -768,6 +802,7 @@ export class Game {
           } catch {
             /* ignore persistence failure */
           }
+          ui.setReachValue(reach);
           setStatus(`Build reach: ${reach} blocks`);
         },
       },

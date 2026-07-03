@@ -15,8 +15,32 @@ import {
   MIN_REACH,
   MAX_REACH,
   REACH_STEP,
+  voxelIntersectsPlayer,
   type ReachStorage,
 } from '../src/app/input';
+
+describe('voxelIntersectsPlayer', () => {
+  const HALF = { x: 0.3, y: 0.9, z: 0.3 };
+  // Player centered mid-voxel at (8.5, 64, 8.5): body spans y 63.1..64.9, x/z 8.2..8.8.
+  const center = { x: 8.5, y: 64, z: 8.5 };
+
+  it('refuses the voxels overlapping the body column', () => {
+    expect(voxelIntersectsPlayer(8, 63, 8, center, HALF)).toBe(true); // feet
+    expect(voxelIntersectsPlayer(8, 64, 8, center, HALF)).toBe(true); // head
+  });
+
+  it('allows voxels beside, above, and below the player', () => {
+    expect(voxelIntersectsPlayer(9, 63, 8, center, HALF)).toBe(false); // beside (x 9..10 vs 8.2..8.8)
+    expect(voxelIntersectsPlayer(8, 65, 8, center, HALF)).toBe(false); // above head (y 65..66 vs ..64.9)
+    expect(voxelIntersectsPlayer(8, 62, 8, center, HALF)).toBe(false); // below feet (y 62..63 vs 63.1..)
+  });
+
+  it('treats exact face contact as non-intersecting', () => {
+    // Player at x-center 8.0 spans x 7.7..8.3; voxel 7 spans 7..8 → overlaps. Voxel at
+    // x 8.3 boundary: center 8.3 - 0.3 = 8.0 exactly → voxel 7..8 touches, not overlaps.
+    expect(voxelIntersectsPlayer(7, 63, 8, { x: 8.3, y: 64, z: 8.5 }, HALF)).toBe(false);
+  });
+});
 
 describe('editMessage', () => {
   it('returns "Undid" for a successful undo', () => {

@@ -4,8 +4,8 @@ import type { CreativeInventory } from './CreativeInventory';
 import type { CameraRig } from '../render/CameraRig';
 import type { Renderer } from '../render/Renderer';
 import type { ChunkManager } from '../world/ChunkManager';
-import { raycastVoxels } from '../edit/VoxelRaycast';
-import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
+import { raycastVoxels, type VoxelRaycastHit } from '../edit/VoxelRaycast';
+import { boxVoxels, sphereVoxels, tunnelConfigVoxels, type TunnelConfig } from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
@@ -18,11 +18,18 @@ import type { ExperienceMode } from './experienceMode';
 
 export const DEFAULT_REACH = 6;
 export const MIN_REACH = 4;
-export const MAX_REACH = 32;
+export const MAX_REACH = 64;
 export const REACH_STEP = 2;
 const REACH_STORAGE_KEY = 'vr.buildReach';
-const TUNNEL_LENGTH = 8;
 const SPHERE_RADIUS = 4;
+
+/** Default tunnel shape: a walkable 3x3 bore, 8 blocks deep, straight ahead. */
+export const DEFAULT_TUNNEL_CONFIG: TunnelConfig = { size: 3, length: 8, path: 'straight' };
+
+/** Hold-to-repeat cadence per action (ms between edits while the button is held). */
+export const SINGLE_REPEAT_MS = 100; // 10 digs/sec
+export const PLACE_REPEAT_MS = 100; // 10 places/sec
+export const TUNNEL_REPEAT_MS = 250; // 4 tunnel digs/sec — each dig moves many voxels
 
 /** Clamps a reach value to the valid range, snapping to the step grid from MIN_REACH. */
 export function clampReach(value: number): number {
@@ -95,6 +102,27 @@ export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
   return deltaY > 0 ? 1 : deltaY < 0 ? -1 : 0;
 }
 
+/**
+ * True when the unit voxel at (x,y,z) overlaps a player AABB of `half` extents centered
+ * at `center`. Used to refuse placements that would embed the player in a block.
+ */
+export function voxelIntersectsPlayer(
+  x: number,
+  y: number,
+  z: number,
+  center: { x: number; y: number; z: number },
+  half: { x: number; y: number; z: number },
+): boolean {
+  return (
+    x < center.x + half.x &&
+    x + 1 > center.x - half.x &&
+    y < center.y + half.y &&
+    y + 1 > center.y - half.y &&
+    z < center.z + half.z &&
+    z + 1 > center.z - half.z
+  );
+}
+
 export function toolLabel(tool: string): string {
   return tool
     .split('-')
@@ -112,6 +140,10 @@ export interface InputCallbacks {
   getAnchor: () => WorldVoxel | undefined;
   setAnchor: (v: WorldVoxel | undefined) => void;
   getTool: () => Tool;
+  /** Current tunnel shape settings (size/length/path), owned by the game state. */
+  getTunnelConfig: () => TunnelConfig;
+  /** True when placing a block at this voxel would embed the player (placement refused). */
+  intersectsPlayer: (x: number, y: number, z: number) => boolean;
   getBuildMode: () => BuilderMode;
   /** Current experience mode; `play` gates every creative input below. */
   getExperienceMode: () => ExperienceMode;
@@ -174,11 +206,13 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.code === 'KeyT') {
+        stopRepeat();
         const next = TOOLS[(TOOLS.indexOf(callbacks.getTool()) + 1) % TOOLS.length];
         callbacks.onToolChange(next);
         return;
       }
       if (e.code === 'KeyI') {
+        stopRepeat();
         const open = !callbacks.isInventoryOpen();
         if (open && rig.locked) document.exitPointerLock();
         callbacks.onInventoryToggle(open);
@@ -201,6 +235,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
       const intent = resolveBuilderIntent(e.code, callbacks.getBuildMode());
       if (intent !== 'none') {
         if (intent !== 'toggleMode' && !canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+        stopRepeat();
         callbacks.onBuilderIntent(intent);
         return;
       }
@@ -214,6 +249,130 @@ export function registerInputListeners(ctx: InputContext): () => void {
         e.preventDefault();
         callbacks.onStatusChange(editMessage('redo', edit.redo()));
       }
+    },
+    { signal },
+  );
+
+  // ---- Hold-to-repeat engine ----
+  // Holding LMB (Single/Tunnel) or RMB (place) re-fires at a capped, action-specific rate.
+  // A held stroke groups its edits into one undo batch via EditService.beginGroup/endGroup,
+  // and targets are deduped so holding still never re-edits the same voxel.
+  let repeatTimer: number | undefined;
+  let repeatButton: 0 | 2 | undefined;
+  let lastTargetKey = '';
+  let strokeOpen = false;
+
+  const stopRepeat = (): void => {
+    if (repeatTimer !== undefined) {
+      window.clearInterval(repeatTimer);
+      repeatTimer = undefined;
+    }
+    repeatButton = undefined;
+    lastTargetKey = '';
+    if (strokeOpen) {
+      strokeOpen = false;
+      edit.endGroup();
+    }
+  };
+
+  const targetKey = (v: { x: number; y: number; z: number }): string => `${v.x},${v.y},${v.z}`;
+
+  const raycastHit = (): VoxelRaycastHit | undefined =>
+    raycastVoxels(
+      { getBlock: (x, y, z) => manager.getBlock(x, y, z) },
+      renderer.camera.position,
+      rig.forward(),
+      getReach(),
+    );
+
+  /** Digs with the active primary tool (single break or configured tunnel). */
+  const performDig = (hit: VoxelRaycastHit): void => {
+    if (callbacks.getTool() === 'single') {
+      callbacks.onRun([{ ...hit.block, id: AIR }], 'Broke');
+      return;
+    }
+    const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
+    const voxels = tunnelConfigVoxels(hit.adjacent, dir, callbacks.getTunnelConfig());
+    callbacks.onRun(asAir(voxels), 'Tunneled');
+  };
+
+  /**
+   * Places (or toggles) at the resolved target. Returns the target's dedupe key; when
+   * `skipKey` matches the resolved target, the edit is skipped (repeat dedupe).
+   */
+  const performPlace = (hit: VoxelRaycastHit, skipKey?: string): string => {
+    const resolved = resolveTarget(hit, inventory.selectedBlock, rig.yaw, previewDeps);
+    const key = targetKey(resolved.kind === 'toggle' ? hit.block : resolved.ghost);
+    if (skipKey !== undefined && key === skipKey) return key;
+    if (resolved.kind === 'toggle') {
+      const state = manager.getState(hit.block.x, hit.block.y, hit.block.z);
+      callbacks.onRun([gateToggleEdit(hit.block, hit.id, state)], 'Toggled');
+      return key;
+    }
+    // Never place a block that would embed the player — a held RMB otherwise walls the
+    // camera in (the column marches back into your head and the screen goes dark).
+    // Returning the previous key keeps the repeat retrying once the player moves clear.
+    if (callbacks.intersectsPlayer(resolved.ghost.x, resolved.ghost.y, resolved.ghost.z)) {
+      return skipKey ?? '';
+    }
+    const voxel: SetVoxel = {
+      x: resolved.ghost.x,
+      y: resolved.ghost.y,
+      z: resolved.ghost.z,
+      id: resolved.ghost.id,
+      state: resolved.ghost.state,
+    };
+    callbacks.onRun([voxel], 'Placed');
+    return key;
+  };
+
+  const repeatTick = (): void => {
+    if (repeatButton === undefined) return;
+    if (
+      !creativeInputAllowed(callbacks.getExperienceMode()) ||
+      !canEdit(rig.locked, callbacks.isInventoryOpen()) ||
+      callbacks.getBuildMode() !== 'off'
+    ) {
+      stopRepeat();
+      return;
+    }
+    const tool = callbacks.getTool();
+    if (repeatButton === 0 && tool !== 'single' && tool !== 'tunnel') {
+      stopRepeat();
+      return;
+    }
+    const hit = raycastHit();
+    if (!hit) return; // keep holding — the aim may sweep back onto blocks
+    if (repeatButton === 0) {
+      const key = targetKey(hit.block);
+      if (key === lastTargetKey) return;
+      lastTargetKey = key;
+      performDig(hit);
+    } else {
+      lastTargetKey = performPlace(hit, lastTargetKey);
+    }
+  };
+
+  /** Opens a one-undo-batch stroke and starts the repeat clock for the held button. */
+  const startRepeat = (button: 0 | 2, intervalMs: number): void => {
+    stopRepeat();
+    repeatButton = button;
+    strokeOpen = true;
+    edit.beginGroup();
+    repeatTimer = window.setInterval(repeatTick, intervalMs);
+  };
+
+  document.addEventListener(
+    'mouseup',
+    (e) => {
+      if (e.button === repeatButton) stopRepeat();
+    },
+    { signal },
+  );
+  document.addEventListener(
+    'pointerlockchange',
+    () => {
+      if (!document.pointerLockElement) stopRepeat();
     },
     { signal },
   );
@@ -248,14 +407,8 @@ export function registerInputListeners(ctx: InputContext): () => void {
       // Play mode: no click edits at all — break/place/pick/builder are all world-mutating.
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
-      const hit = raycastVoxels(
-        { getBlock: (x, y, z) => manager.getBlock(x, y, z) },
-        renderer.camera.position,
-        rig.forward(),
-        getReach(),
-      );
+      const hit = raycastHit();
       if (!hit) return;
-      const selected = inventory.selectedBlock;
 
       if (callbacks.getBuildMode() !== 'off') {
         if (e.button === 0) callbacks.onBuilderClick(hit);
@@ -269,40 +422,30 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
       if (e.button === 2) {
-        const resolved = resolveTarget(hit, selected, rig.yaw, previewDeps);
-        if (resolved.kind === 'toggle') {
-          const state = manager.getState(hit.block.x, hit.block.y, hit.block.z);
-          callbacks.onRun([gateToggleEdit(hit.block, hit.id, state)], 'Toggled');
-          return;
-        }
-        const voxel: SetVoxel = {
-          x: resolved.ghost.x,
-          y: resolved.ghost.y,
-          z: resolved.ghost.z,
-          id: resolved.ghost.id,
-          state: resolved.ghost.state,
-        };
-        callbacks.onRun([voxel], 'Placed');
+        startRepeat(2, PLACE_REPEAT_MS);
+        lastTargetKey = performPlace(hit);
         return;
       }
       if (e.button !== 0) return;
 
       const tool = callbacks.getTool();
-      if (tool === 'single') {
-        callbacks.onRun([{ ...hit.block, id: AIR }], 'Broke');
-      } else if (tool === 'tunnel') {
-        const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
-        callbacks.onRun(asAir(tunnelVoxels(hit.adjacent, dir, TUNNEL_LENGTH, 1)), 'Tunneled');
+      if (tool === 'single' || tool === 'tunnel') {
+        startRepeat(0, tool === 'single' ? SINGLE_REPEAT_MS : TUNNEL_REPEAT_MS);
+        lastTargetKey = targetKey(hit.block);
+        performDig(hit);
       } else if (tool === 'sphere') {
         callbacks.onRun(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');
       } else {
-        handleSelection(hit.block, selected, tool, manager, registry, callbacks);
+        handleSelection(hit.block, inventory.selectedBlock, tool, manager, registry, callbacks);
       }
     },
     { signal },
   );
 
-  return () => controller.abort();
+  return () => {
+    stopRepeat();
+    controller.abort();
+  };
 }
 
 function handleSelection(

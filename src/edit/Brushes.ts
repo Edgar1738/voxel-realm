@@ -39,6 +39,89 @@ export function sphereVoxels(center: WorldVoxel, radius: number): WorldVoxel[] {
   return result.sort(sortVoxels);
 }
 
+export type TunnelSize = 1 | 2 | 3;
+export type TunnelLength = 4 | 8 | 16;
+export type TunnelPath = 'straight' | 'up' | 'down';
+
+/** Player-configurable tunnel shape: cross-section size, forward length, and stair path. */
+export interface TunnelConfig {
+  size: TunnelSize;
+  length: TunnelLength;
+  path: TunnelPath;
+}
+
+export const TUNNEL_SIZES: readonly TunnelSize[] = [1, 2, 3];
+export const TUNNEL_LENGTHS: readonly TunnelLength[] = [4, 8, 16];
+export const TUNNEL_PATHS: readonly TunnelPath[] = ['straight', 'up', 'down'];
+
+/** Centered lateral offsets for a cross-section of `size` blocks (size 2 biases positive). */
+function lateralOffsets(size: number): number[] {
+  const first = -Math.floor((size - 1) / 2);
+  return Array.from({ length: size }, (_, i) => first + i);
+}
+
+/**
+ * Config-driven tunnel volume starting one step beyond `start` along the dominant axis of
+ * `direction`. Horizontal tunnels are `size` wide (centered) and `size` tall with their floor
+ * at the entry level, so the result is walkable. `path: 'up' | 'down'` shifts each forward
+ * step one block vertically after the first, carving a traversable stair ramp. Vertical
+ * tunnels (looking straight up/down) use a centered square cross-section and ignore `path`.
+ */
+export function tunnelConfigVoxels(
+  start: WorldVoxel,
+  direction: WorldVoxel,
+  config: TunnelConfig,
+): WorldVoxel[] {
+  const absX = Math.abs(direction.x);
+  const absY = Math.abs(direction.y);
+  const absZ = Math.abs(direction.z);
+
+  let dominantAxis: 'x' | 'y' | 'z';
+  if (absX >= absY && absX >= absZ) {
+    dominantAxis = 'x';
+  } else if (absY >= absZ) {
+    dominantAxis = 'y';
+  } else {
+    dominantAxis = 'z';
+  }
+
+  const axisValue = direction[dominantAxis];
+  const step = axisValue === 0 ? 1 : Math.sign(axisValue);
+  const offsets = lateralOffsets(config.size);
+  const result: WorldVoxel[] = [];
+
+  if (dominantAxis === 'y') {
+    // Straight vertical shaft; stair paths are meaningless when digging up/down.
+    for (let i = 1; i <= config.length; i++) {
+      const y = start.y + step * i;
+      for (const dx of offsets) {
+        for (const dz of offsets) {
+          result.push({ x: start.x + dx, y, z: start.z + dz });
+        }
+      }
+    }
+    return result.sort(sortVoxels);
+  }
+
+  const lateralAxis = dominantAxis === 'x' ? 'z' : 'x';
+  const yDelta = config.path === 'up' ? 1 : config.path === 'down' ? -1 : 0;
+
+  for (let i = 1; i <= config.length; i++) {
+    const along = start[dominantAxis] + step * i;
+    const floorY = start.y + yDelta * (i - 1);
+    for (const lat of offsets) {
+      const lateral = start[lateralAxis] + lat;
+      for (let v = 0; v < config.size; v++) {
+        const voxel = { x: 0, y: floorY + v, z: 0 };
+        voxel[dominantAxis] = along;
+        voxel[lateralAxis] = lateral;
+        result.push(voxel);
+      }
+    }
+  }
+  return result.sort(sortVoxels);
+}
+
 export function tunnelVoxels(
   start: WorldVoxel,
   direction: WorldVoxel,
