@@ -50,6 +50,18 @@ describe('curatedBlueprints — categorization', () => {
     }
   });
 
+  it('assigns every Nature structure from the spec to Nature', () => {
+    for (const name of [
+      'boulder-cluster',
+      'rock-outcrop',
+      'stone-shelf',
+      'pond-small',
+      'pond-large',
+    ]) {
+      expect(curatedCategory(name)).toBe('Nature');
+    }
+  });
+
   it('every curated blueprint has a category and produces a valid prefab', () => {
     for (const name of Object.keys(CURATED_BLUEPRINTS)) {
       expect(BLUEPRINT_CATEGORIES).toContain(curatedCategory(name));

@@ -215,7 +215,7 @@ export type BlueprintChoice =
   | { kind: 'delete'; name: string };
 
 /** One catalog tab. `Saved` lists the player's own blueprints; the rest are curated/read-only. */
-export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility';
+export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility' | 'Nature';
 
 /** A single catalog entry: enough to render a thumbnail + label and to resolve a load/delete. */
 export interface BlueprintEntry {
@@ -303,7 +303,7 @@ export interface CreativeUi {
   /** World switch/create/duplicate dialog; resolves undefined on cancel. */
   showWorldDialog(current: string, worlds: string[]): Promise<WorldChoice | undefined>;
   /**
-   * Categorized blueprint catalog (Saved/Village/Adventure/Utility tabs) with real thumbnails.
+   * Categorized blueprint catalog (Saved/Village/Adventure/Utility/Nature tabs) with real thumbnails.
    * Resolves undefined on cancel.
    */
   showBlueprintDialog(opts: {
@@ -663,7 +663,13 @@ export function createCreativeUi(
       const close = openDialogPanel(panel, () => finish(undefined));
     });
 
-  const BLUEPRINT_CATEGORIES: BlueprintCategory[] = ['Saved', 'Village', 'Adventure', 'Utility'];
+  const BLUEPRINT_CATEGORIES: BlueprintCategory[] = [
+    'Saved',
+    'Village',
+    'Adventure',
+    'Utility',
+    'Nature',
+  ];
 
   const showBlueprintDialog = (opts: {
     entries: readonly BlueprintEntry[];

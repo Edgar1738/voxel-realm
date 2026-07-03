@@ -8,9 +8,24 @@ import {
   campShrine,
   brokenBridge,
   statue,
+  boulderCluster,
+  rockOutcrop,
+  stoneShelf,
+  pondSmall,
+  pondLarge,
 } from '../src/worldgen/wildsPrefabs';
 import { validatePrefab } from '../src/core/Prefab';
-import { GLOWSTONE, CRYSTAL, LANTERN } from '../src/blocks/blocks';
+import {
+  GLOWSTONE,
+  CRYSTAL,
+  LANTERN,
+  STONE,
+  GRAVEL,
+  DEEPSLATE,
+  WATER,
+  GRASS,
+  TALL_GRASS,
+} from '../src/blocks/blocks';
 
 // ---------------------------------------------------------------------------
 // Structural invariant: every prefab must pass validatePrefab (null = valid)
@@ -25,6 +40,11 @@ describe('wildsPrefabs — validatePrefab', () => {
     ['campShrine', campShrine],
     ['brokenBridge', brokenBridge],
     ['statue', statue],
+    ['boulderCluster', boulderCluster],
+    ['rockOutcrop', rockOutcrop],
+    ['stoneShelf', stoneShelf],
+    ['pondSmall', pondSmall],
+    ['pondLarge', pondLarge],
   ] as const) {
     it(`${name}: validatePrefab returns null (fully valid)`, () => {
       expect(validatePrefab(make())).toBeNull();
@@ -45,6 +65,11 @@ describe('wildsPrefabs — all blocks within dims', () => {
     ['campShrine', campShrine],
     ['brokenBridge', brokenBridge],
     ['statue', statue],
+    ['boulderCluster', boulderCluster],
+    ['rockOutcrop', rockOutcrop],
+    ['stoneShelf', stoneShelf],
+    ['pondSmall', pondSmall],
+    ['pondLarge', pondLarge],
   ] as const) {
     it(`${name}: blocks.length > 0 and all within dims`, () => {
       const p = make();
@@ -99,5 +124,40 @@ describe('wildsPrefabs — targeted properties', () => {
     const { blocks } = deadTree();
     // id 6 = LEAVES — must be absent
     expect(blocks.some(([, , , id]) => id === 6)).toBe(false);
+  });
+
+  it('boulderCluster uses only stone/gravel blocks', () => {
+    const { blocks } = boulderCluster();
+    const validIds = new Set([STONE, GRAVEL]);
+    expect(blocks.every(([, , , id]) => validIds.has(id))).toBe(true);
+  });
+
+  it('rockOutcrop is a tall spire (dims[1] >= 6) using stone/deepslate', () => {
+    const p = rockOutcrop();
+    expect(p.dims[1]).toBeGreaterThanOrEqual(6);
+    const validIds = new Set([STONE, DEEPSLATE]);
+    expect(p.blocks.every(([, , , id]) => validIds.has(id))).toBe(true);
+  });
+
+  it('stoneShelf is wider than tall (a flatter ledge, dims[0] > dims[1])', () => {
+    const p = stoneShelf();
+    expect(p.dims[0]).toBeGreaterThan(p.dims[1]);
+    const validIds = new Set([STONE, DEEPSLATE]);
+    expect(p.blocks.every(([, , , id]) => validIds.has(id))).toBe(true);
+  });
+
+  it('pondSmall contains water and a grass/reed fringe', () => {
+    const { blocks } = pondSmall();
+    expect(blocks.some(([, , , id]) => id === WATER)).toBe(true);
+    expect(blocks.some(([, , , id]) => id === GRASS || id === TALL_GRASS)).toBe(true);
+  });
+
+  it('pondLarge is bigger than pondSmall and has a rockier shoreline', () => {
+    const small = pondSmall();
+    const large = pondLarge();
+    expect(large.dims[0]).toBeGreaterThan(small.dims[0]);
+    const { blocks } = large;
+    expect(blocks.some(([, , , id]) => id === WATER)).toBe(true);
+    expect(blocks.some(([, , , id]) => id === GRAVEL || id === STONE)).toBe(true);
   });
 });
