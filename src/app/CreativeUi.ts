@@ -215,7 +215,14 @@ export type BlueprintChoice =
   | { kind: 'delete'; name: string };
 
 /** One catalog tab. `Saved` lists the player's own blueprints; the rest are curated/read-only. */
-export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility' | 'Nature';
+export type BlueprintCategory =
+  | 'Saved'
+  | 'Village'
+  | 'Adventure'
+  | 'Utility'
+  | 'Nature'
+  | 'Coastal'
+  | 'Dungeon';
 
 /** A single catalog entry: enough to render a thumbnail + label and to resolve a load/delete. */
 export interface BlueprintEntry {
@@ -669,6 +676,8 @@ export function createCreativeUi(
     'Adventure',
     'Utility',
     'Nature',
+    'Coastal',
+    'Dungeon',
   ];
 
   const showBlueprintDialog = (opts: {
