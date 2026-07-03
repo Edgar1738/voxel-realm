@@ -62,6 +62,38 @@ describe('curatedBlueprints — categorization', () => {
     }
   });
 
+  it('assigns every Coastal structure from the spec to Coastal', () => {
+    for (const name of ['lighthouse', 'rowboat', 'shipwreck', 'fishing-hut', 'buoy']) {
+      expect(curatedCategory(name)).toBe('Coastal');
+      expect(CURATED_BLUEPRINTS[name]).toBeTypeOf('function');
+    }
+  });
+
+  it('assigns every Dungeon structure from the spec to Dungeon', () => {
+    for (const name of [
+      'crypt',
+      'dungeon-cell',
+      'collapsed-hall',
+      'treasure-vault',
+      'catacomb-nook',
+    ]) {
+      expect(curatedCategory(name)).toBe('Dungeon');
+      expect(CURATED_BLUEPRINTS[name]).toBeTypeOf('function');
+    }
+  });
+
+  it('exposes seven tabs ending with the Coastal and Dungeon categories', () => {
+    expect(BLUEPRINT_CATEGORIES).toEqual([
+      'Saved',
+      'Village',
+      'Adventure',
+      'Utility',
+      'Nature',
+      'Coastal',
+      'Dungeon',
+    ]);
+  });
+
   it('every curated blueprint has a category and produces a valid prefab', () => {
     for (const name of Object.keys(CURATED_BLUEPRINTS)) {
       expect(BLUEPRINT_CATEGORIES).toContain(curatedCategory(name));

@@ -35,6 +35,14 @@ import {
   pondSmall,
   pondLarge,
 } from '../worldgen/wildsPrefabs';
+import {
+  crypt,
+  dungeonCell,
+  collapsedHall,
+  treasureVault,
+  catacombNook,
+} from '../worldgen/dungeonPrefabs';
+import { lighthouse, rowboat, shipwreck, fishingHut, buoy } from '../worldgen/coastalPrefabs';
 
 /** Built-in structures offered read-only in the blueprint dialog alongside saved blueprints. */
 export const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
@@ -70,16 +78,35 @@ export const CURATED_BLUEPRINTS: Record<string, () => Prefab> = {
   'stone-shelf': stoneShelf,
   'pond-small': pondSmall,
   'pond-large': pondLarge,
+  lighthouse,
+  rowboat,
+  shipwreck,
+  'fishing-hut': fishingHut,
+  buoy,
+  crypt,
+  'dungeon-cell': dungeonCell,
+  'collapsed-hall': collapsedHall,
+  'treasure-vault': treasureVault,
+  'catacomb-nook': catacombNook,
 };
 
-/** The five blueprint catalog tabs; `Saved` holds only user blueprints. */
-export type BlueprintCategory = 'Saved' | 'Village' | 'Adventure' | 'Utility' | 'Nature';
+/** The blueprint catalog tabs; `Saved` holds only user blueprints. */
+export type BlueprintCategory =
+  | 'Saved'
+  | 'Village'
+  | 'Adventure'
+  | 'Utility'
+  | 'Nature'
+  | 'Coastal'
+  | 'Dungeon';
 export const BLUEPRINT_CATEGORIES: BlueprintCategory[] = [
   'Saved',
   'Village',
   'Adventure',
   'Utility',
   'Nature',
+  'Coastal',
+  'Dungeon',
 ];
 
 /** Curated-name → category, per the spec's fixed assignment. */
@@ -116,6 +143,16 @@ const CATEGORY_BY_NAME: Record<string, Exclude<BlueprintCategory, 'Saved'>> = {
   'stone-shelf': 'Nature',
   'pond-small': 'Nature',
   'pond-large': 'Nature',
+  lighthouse: 'Coastal',
+  rowboat: 'Coastal',
+  shipwreck: 'Coastal',
+  'fishing-hut': 'Coastal',
+  buoy: 'Coastal',
+  crypt: 'Dungeon',
+  'dungeon-cell': 'Dungeon',
+  'collapsed-hall': 'Dungeon',
+  'treasure-vault': 'Dungeon',
+  'catacomb-nook': 'Dungeon',
 };
 
 /** The category a curated blueprint belongs to (defaults to Utility for anything unlisted). */
