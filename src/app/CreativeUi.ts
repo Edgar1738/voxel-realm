@@ -17,6 +17,7 @@ import {
 import type { BlockId } from '../core/types';
 import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
+import { renderBlockIcon } from './blockIcon';
 
 /**
  * Display-only swatch colors for hotbar/picker slots (an app/UI concern — the pure block
@@ -36,25 +37,10 @@ const SWATCH_COLORS: Partial<Record<BlockId, string>> = {
   [BRICK]: '#96463a',
 };
 
-const GLASS_SWATCH =
-  'repeating-conic-gradient(rgba(255,255,255,0.10) 0% 25%, transparent 0% 50%) 0 0 / 12px 12px,' +
-  'linear-gradient(160deg, rgba(255,255,255,0.2), rgba(0,0,0,0.05)),' +
-  'rgba(205,232,240,0.45)';
-
 const FALLBACK_SWATCH = '#5a5a60';
 
 function isGlass(id: BlockId): boolean {
   return id === GLASS;
-}
-
-/**
- * Builds the soft "block face" background for a slot from its block id. Exported so blueprint
- * thumbnails can reuse the same per-block color mapping instead of inventing a second palette.
- */
-export function swatchBackground(id: BlockId): string {
-  if (isGlass(id)) return GLASS_SWATCH;
-  const hex = SWATCH_COLORS[id] ?? FALLBACK_SWATCH;
-  return `linear-gradient(160deg, rgba(255,255,255,0.14), rgba(0,0,0,0.18)), ${hex}`;
 }
 
 /** Flat CSS color for a block id, suitable for canvas fills (no gradients/patterns). */
@@ -251,7 +237,10 @@ export interface HotkeyGroup {
 
 /** The Menu's fixed hotkey reference, grouped per the controls-audit spec. */
 export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
-  { heading: 'Roam', lines: ['WASD move', 'Mouse look', 'Space up / jump', 'Shift down', 'F fly', 'L headlamp'] },
+  {
+    heading: 'Roam',
+    lines: ['WASD move', 'Mouse look', 'Space up / jump', 'Shift down', 'F fly', 'L headlamp'],
+  },
   { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
   { heading: 'Blocks', lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory'] },
   { heading: 'Build tools', lines: ['X fill', 'G clear', 'R replace', 'C copy'] },
@@ -456,10 +445,10 @@ export function createCreativeUi(
     tile.title = name;
     tile.setAttribute('aria-label', name);
 
-    const swatch = document.createElement('span');
+    const swatch = document.createElement('canvas');
     swatch.className = 'inventory-swatch';
-    swatch.style.background = swatchBackground(id);
     swatch.setAttribute('aria-hidden', 'true');
+    renderBlockIcon(swatch, id, registry.shape(id), swatchFlatColor(id));
 
     const caption = document.createElement('span');
     caption.className = 'inventory-name';
@@ -956,10 +945,15 @@ export function createCreativeUi(
       slot.type = 'button';
       slot.className = index === inventory.selectedSlot ? 'slot selected' : 'slot';
       slot.dataset.slot = String(index);
-      slot.style.background = swatchBackground(id);
       const name = registry.get(id).name;
       slot.title = name;
       slot.setAttribute('aria-label', `Slot ${index + 1}: ${name}`);
+
+      const icon = document.createElement('canvas');
+      icon.className = 'slot-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      renderBlockIcon(icon, id, registry.shape(id), swatchFlatColor(id));
+      slot.append(icon);
 
       const badge = document.createElement('span');
       badge.className = 'slot-badge';
