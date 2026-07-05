@@ -480,7 +480,7 @@ export class ChunkManager {
         emission: (x: number, y: number, z: number) =>
           this.registry.emission(entry.data.get(x, y, z)),
       };
-      const field = computeChunkLight(input);
+      const field = computeChunkLight(input, entry.data.maxSolidY);
       entry.data.skyLight.set(field.sky);
       entry.data.blockLight.set(field.block);
     }
@@ -740,7 +740,7 @@ export class ChunkManager {
       isOpaque: (x: number, y: number, z: number) => this.registry.isOpaque(data.get(x, y, z)),
       emission: (x: number, y: number, z: number) => this.registry.emission(data.get(x, y, z)),
     };
-    const field = computeChunkLight(input);
+    const field = computeChunkLight(input, data.maxSolidY);
     data.skyLight.set(field.sky);
     data.blockLight.set(field.block);
 

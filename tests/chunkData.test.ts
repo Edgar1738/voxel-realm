@@ -47,10 +47,35 @@ describe('ChunkData.maxSolidY', () => {
     expect(c.maxSolidY).toBe(20);
   });
 
-  it('does not fall when a voxel is cleared to AIR (stays monotonic)', () => {
+  it('falls to the next solid voxel when the top voxel is cleared to AIR', () => {
+    const c = new ChunkData(0, 0);
+    c.set(1, 5, 1, STONE);
+    c.set(0, 20, 0, STONE);
+    expect(c.maxSolidY).toBe(20);
+    c.set(0, 20, 0, AIR); // clear the top -> falls to the next solid slice
+    expect(c.maxSolidY).toBe(5);
+  });
+
+  it('drops to -1 when the last solid voxel is cleared', () => {
     const c = new ChunkData(0, 0);
     c.set(0, 20, 0, STONE);
     c.set(0, 20, 0, AIR);
+    expect(c.maxSolidY).toBe(-1);
+  });
+
+  it('stays put when a non-top voxel is cleared', () => {
+    const c = new ChunkData(0, 0);
+    c.set(1, 5, 1, STONE);
+    c.set(0, 20, 0, STONE);
+    c.set(1, 5, 1, AIR); // clear below the top -> no change
+    expect(c.maxSolidY).toBe(20);
+  });
+
+  it('stays put when one of several voxels sharing the top slice is cleared', () => {
+    const c = new ChunkData(0, 0);
+    c.set(0, 20, 0, STONE);
+    c.set(3, 20, 4, STONE); // second voxel on the same top slice
+    c.set(0, 20, 0, AIR); // clear one -> slice still occupied, stays at 20
     expect(c.maxSolidY).toBe(20);
   });
 
