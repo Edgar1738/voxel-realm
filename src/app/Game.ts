@@ -19,6 +19,8 @@ import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig } from '../render/CameraRig';
 import { ChunkManager } from '../world/ChunkManager';
+import { MeshWorkerPool } from '../world/MeshWorkerPool';
+import { setSharedChunkBuffers } from '../world/chunkBuffers';
 import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldgen/Presets';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
@@ -154,6 +156,11 @@ export class Game {
       cutoutMaterial,
       texture,
     );
+    // P6: off-thread meshing via SharedArrayBuffer-backed chunks. Requires cross-origin
+    // isolation (COOP/COEP headers); without it (e.g. GitHub Pages) meshing stays
+    // synchronous on the main thread — identical output, just the pre-P6 behavior.
+    const meshPool = MeshWorkerPool.supported() ? new MeshWorkerPool() : undefined;
+    setSharedChunkBuffers(meshPool !== undefined);
     const manager = new ChunkManager(
       generator,
       new GreedyMesher(registry),
@@ -166,6 +173,7 @@ export class Game {
         genBudget: BURST_GEN_BUDGET,
         meshBudget: BURST_MESH_BUDGET,
         frameWorkMs: BURST_FRAME_WORK_MS,
+        ...(meshPool ? { meshPool } : {}),
       },
       savedDeltas,
     );
@@ -1103,6 +1111,7 @@ export class Game {
     /** Releases all resources acquired during boot. */
     function cleanup(): void {
       abortInput();
+      meshPool?.dispose();
       audio.dispose();
       persistence.dispose();
       hudTeardown?.();

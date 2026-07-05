@@ -1,26 +1,26 @@
-import {
-  CHUNK_AREA,
-  CHUNK_SIZE_X,
-  CHUNK_SIZE_Z,
-  CHUNK_VOLUME,
-  WORLD_HEIGHT,
-} from '../core/constants';
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../core/constants';
 import { voxelIndex, inChunkBounds } from '../core/coords';
 import { AIR } from '../blocks/blocks';
+import { allocChunkArrays, chunkArraysOver } from './chunkBuffers';
 import type { BlockId } from '../core/types';
 
 /** Flat voxel storage for one chunk column (16 x WORLD_HEIGHT x 16). */
 export class ChunkData {
   readonly cx: number;
   readonly cz: number;
+  /**
+   * The single buffer backing all five arrays below (P6). A SharedArrayBuffer when shared
+   * chunk buffers are enabled (worker meshing reads it zero-copy), else a plain ArrayBuffer.
+   */
+  readonly buffer: ArrayBufferLike;
   readonly data: Uint8Array;
   /** Baked per-voxel light (0..15), filled by the lighting pass before meshing. */
-  readonly skyLight = new Uint8Array(CHUNK_VOLUME);
-  readonly blockLight = new Uint8Array(CHUNK_VOLUME);
+  readonly skyLight: Uint8Array;
+  readonly blockLight: Uint8Array;
   /** Per-voxel orientation state (0 = unoriented). See VoxelState. */
-  readonly state = new Uint8Array(CHUNK_VOLUME);
+  readonly state: Uint8Array;
   /** Per-column biome ordinal (0 = Plains). Regenerated, NOT serialized. */
-  readonly biomeData = new Uint8Array(CHUNK_AREA);
+  readonly biomeData: Uint8Array;
   /**
    * Whether this chunk contains any shaped (non-cube) voxel — slab/stair/fence/wall/gate/cross.
    * Set by ChunkManager after generation/edits (P3) so meshing can skip the shaped pass for
@@ -37,7 +37,41 @@ export class ChunkData {
   constructor(cx: number, cz: number, data?: Uint8Array) {
     this.cx = cx;
     this.cz = cz;
-    this.data = data ?? new Uint8Array(CHUNK_VOLUME); // Uint8Array defaults to 0 = AIR
+    const { buffer, arrays } = allocChunkArrays();
+    this.buffer = buffer;
+    this.data = arrays.data; // zero-initialized = AIR
+    this.skyLight = arrays.skyLight;
+    this.blockLight = arrays.blockLight;
+    this.state = arrays.state;
+    this.biomeData = arrays.biomeData;
+    if (data) this.data.set(data);
+  }
+
+  /**
+   * Reconstructs a ChunkData as VIEWS over an existing chunk buffer (no copy) — how a mesh
+   * worker sees a main-thread chunk through shared memory (P6).
+   */
+  static overBuffer(
+    cx: number,
+    cz: number,
+    buffer: ArrayBufferLike,
+    meta: { hasShaped: boolean; maxSolidY: number },
+  ): ChunkData {
+    const chunk: ChunkData = Object.create(ChunkData.prototype) as ChunkData;
+    const arrays = chunkArraysOver(buffer);
+    Object.assign(chunk, {
+      cx,
+      cz,
+      buffer,
+      data: arrays.data,
+      skyLight: arrays.skyLight,
+      blockLight: arrays.blockLight,
+      state: arrays.state,
+      biomeData: arrays.biomeData,
+      hasShaped: meta.hasShaped,
+      maxSolidY: meta.maxSolidY,
+    });
+    return chunk;
   }
 
   /** Baked skylight at a local voxel (caller ensures in-bounds). */

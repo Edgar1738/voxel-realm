@@ -248,8 +248,32 @@ function devDisk(): Plugin {
   };
 }
 
+/**
+ * COOP/COEP make the page cross-origin isolated, unlocking SharedArrayBuffer for the P6 mesh
+ * worker pool. Set as a middleware (not `server.headers`) so the headers land on the index.html
+ * DOCUMENT response too — `crossOriginIsolated` gates on the document, and `server.headers` only
+ * covers static/transform responses. Production hosting must send the same headers to get worker
+ * meshing; without them (e.g. GitHub Pages) the app falls back to synchronous main-thread meshing.
+ */
+function crossOriginIsolation(): Plugin {
+  const setHeaders = (_req: unknown, res: { setHeader(k: string, v: string): void }, next: () => void) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    next();
+  };
+  return {
+    name: 'vr-cross-origin-isolation',
+    configureServer(server) {
+      server.middlewares.use(setHeaders);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(setHeaders);
+    },
+  };
+}
+
 export default defineConfig({
   root: '.',
   build: { outDir: 'dist' },
-  plugins: [devDisk()],
+  plugins: [crossOriginIsolation(), devDisk()],
 });

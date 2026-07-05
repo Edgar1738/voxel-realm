@@ -20,7 +20,8 @@ import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
 import { computeChunkLight, applyBorderBlockLight, borderLightExport } from './Lighting';
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
-import { emitShaped, mergeMeshData } from '../mesh/emitShaped';
+import { meshChunkView, buildMeshJob } from './meshJob';
+import type { MeshScheduler } from './MeshWorkerPool';
 import { WATER, AIR } from '../blocks/blocks';
 import type { AABB } from '../blocks/shapeBoxes';
 import type { Generator, Overlay } from '../worldgen/Generator';
@@ -44,6 +45,12 @@ export interface ChunkManagerOptions {
   meshBudget: number;
   /** Soft per-frame wall-clock ceiling (ms) for streaming work (P5). */
   frameWorkMs: number;
+  /**
+   * Off-thread mesh scheduler (P6). When set, streaming meshes dispatch to it and upload
+   * asynchronously; edits/preloads still mesh synchronously for immediate feedback. When
+   * unset (default, and always in unit tests), all meshing is synchronous — today's path.
+   */
+  meshPool?: MeshScheduler;
 }
 
 /** Per-frame streaming work counters for the dev profiler (P0 roam-smoothness spike). */
@@ -109,6 +116,11 @@ export class ChunkManager {
   private hasPendingWork = false;
   // P5: legit neighbor remeshes that overflowed the per-frame budget; drained next frame(s).
   private readonly pendingRemesh = new Set<string>();
+  // P6: async mesh staleness guard. A chunk's generation bumps on every mesh (sync or
+  // dispatched) and on unload; a worker result is dropped unless its tag still matches.
+  private readonly meshGen = new Map<string, number>();
+  private pendingJobs = 0;
+  private readonly pool?: MeshScheduler;
 
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
   onChunkDeltaChanged?: (key: string, entries: ChunkDeltaEntries) => void;
@@ -137,6 +149,7 @@ export class ChunkManager {
       // (Game.boot) opts into a soft ms ceiling; tests stay deterministic on the count budget.
       frameWorkMs: options?.frameWorkMs ?? Infinity,
     };
+    if (options?.meshPool) this.pool = options.meshPool;
     this.opaquePass = opaquePass(this.registry);
     this.transparentPass = transparentPass(this.registry);
   }
@@ -223,9 +236,11 @@ export class ChunkManager {
       this.pendingRemesh.delete(key);
       const { cx, cz } = parseChunkKey(key);
       const nb = this.store.get(cx, cz);
-      if (!nb || nb.state !== ChunkState.Meshed) continue; // unloaded / not yet meshed -> drop
+      // Unloaded / not yet meshed -> drop. Meshing (P6 job in flight) still remeshes: the
+      // dispatch bumps the generation, superseding the stale in-flight result.
+      if (!nb || (nb.state !== ChunkState.Meshed && nb.state !== ChunkState.Meshing)) continue;
       this.recomputeLight(nb.data);
-      this.meshChunk(cx, cz);
+      this.dispatchMesh(cx, cz);
       meshedThisFrame.add(key);
     }
 
@@ -233,7 +248,7 @@ export class ChunkManager {
       if (overBudget()) break;
       const entry = this.store.get(cx, cz);
       if (!entry || entry.state !== ChunkState.Generated) continue;
-      this.meshChunk(cx, cz);
+      this.dispatchMesh(cx, cz);
       meshedThisFrame.add(chunkKey(cx, cz));
       // A newly-meshed chunk changes the seam of its already-meshed neighbors, so they
       // re-mesh. P2a: skip a neighbor already meshed this frame IF it was also generated
@@ -248,14 +263,16 @@ export class ChunkManager {
         const nbKey = chunkKey(cx + dx, cz + dz);
         if (meshedThisFrame.has(nbKey) && generatedThisFrameKeys.has(nbKey)) continue;
         const nb = this.store.get(cx + dx, cz + dz);
-        if (!nb || nb.state !== ChunkState.Meshed) continue;
+        // Meshing (P6) counts too: its in-flight job predates this chunk, so its seam is
+        // stale — re-dispatch (bumping the generation) so the fresh job sees this chunk.
+        if (!nb || (nb.state !== ChunkState.Meshed && nb.state !== ChunkState.Meshing)) continue;
         if (overBudget()) {
           this.pendingRemesh.add(nbKey); // defer the legit seam remesh to a later frame
           continue;
         }
         // Not part of this frame's settled batch, so only relight if light can actually change.
         if (this.feedsBlockLight(cx, cz)) this.recomputeLight(nb.data);
-        this.meshChunk(cx + dx, cz + dz);
+        this.dispatchMesh(cx + dx, cz + dz);
         meshedThisFrame.add(nbKey);
       }
     }
@@ -279,6 +296,7 @@ export class ChunkManager {
         this.store.delete(cx, cz);
         this.baseChunks.delete(key);
         this.borderExports.delete(key);
+        this.bumpGen(key); // P6: drop any in-flight mesh result for the unloaded chunk
       }
     }
     this.ordered = [...desired.values()].sort(
@@ -307,6 +325,7 @@ export class ChunkManager {
   /** Whether any desired chunk still needs generation/meshing, or a deferred remesh is queued (P1/P5). */
   private hasWorkRemaining(): boolean {
     if (this.pendingRemesh.size > 0) return true;
+    if (this.pendingJobs > 0) return true; // P6: async mesh results still in flight
     for (const { cx, cz } of this.ordered) {
       const entry = this.store.get(cx, cz);
       if (!entry || entry.state === ChunkState.Generated) return true;
@@ -786,20 +805,75 @@ export class ChunkManager {
     }
   }
 
+  /** Bumps a chunk's mesh generation, invalidating any in-flight async result (P6). */
+  private bumpGen(key: string): number {
+    const gen = (this.meshGen.get(key) ?? 0) + 1;
+    this.meshGen.set(key, gen);
+    return gen;
+  }
+
+  /**
+   * Synchronous mesh (edits, preloads, and the no-pool default): meshes on this thread and
+   * uploads immediately. Bumps the generation so a stale in-flight worker result can't
+   * overwrite this fresher mesh.
+   */
   private meshChunk(cx: number, cz: number): void {
     const entry = this.store.get(cx, cz);
     if (!entry) return;
     this.frameMesh++;
+    this.bumpGen(chunkKey(cx, cz));
     const capY = entry.data.maxSolidY; // height-cap: never sweep empty air above the tallest voxel
     const view = new VoxelView(entry.data, (dcx, dcz) => this.neighborData(cx + dcx, cz + dcz));
-    const shaped = emitShaped(view, this.registry, entry.data.hasShaped, capY);
-    const meshes: ChunkMeshes = {
-      opaque: mergeMeshData(this.mesher.mesh(view, this.opaquePass, capY), shaped.slabs),
-      transparent: this.mesher.mesh(view, this.transparentPass, capY),
-      cutout: shaped.cross,
-    };
+    const meshes: ChunkMeshes = meshChunkView(
+      view,
+      this.mesher,
+      this.registry,
+      this.opaquePass,
+      this.transparentPass,
+      entry.data.hasShaped,
+      capY,
+    );
     this.sink.upload(chunkKey(cx, cz), meshes);
     this.store.setState(cx, cz, ChunkState.Meshed);
+  }
+
+  /**
+   * Streaming mesh (P6): dispatches to the worker pool when configured, else falls back to
+   * the synchronous path. The result uploads only if the chunk is still loaded and its
+   * generation still matches (no stale mesh after an edit, sync remesh, or unload).
+   */
+  private dispatchMesh(cx: number, cz: number): void {
+    if (!this.pool) {
+      this.meshChunk(cx, cz);
+      return;
+    }
+    const entry = this.store.get(cx, cz);
+    if (!entry) return;
+    this.frameMesh++;
+    const key = chunkKey(cx, cz);
+    const gen = this.bumpGen(key);
+    this.store.setState(cx, cz, ChunkState.Meshing);
+    this.pendingJobs++;
+    const job = buildMeshJob(key, gen, entry.data, (dcx, dcz) =>
+      this.neighborData(cx + dcx, cz + dcz),
+    );
+    this.pool.submit(job).then(
+      (meshes) => {
+        this.pendingJobs--;
+        if (!this.store.get(cx, cz) || this.meshGen.get(key) !== gen) return; // stale
+        this.sink.upload(key, meshes);
+        this.store.setState(cx, cz, ChunkState.Meshed);
+      },
+      () => {
+        this.pendingJobs--;
+        // Pool disposed or worker error: leave the chunk for the next update() to re-mesh.
+        const cur = this.store.get(cx, cz);
+        if (cur && cur.state === ChunkState.Meshing && this.meshGen.get(key) === gen) {
+          this.store.setState(cx, cz, ChunkState.Generated);
+          this.hasPendingWork = true;
+        }
+      },
+    );
   }
 
   private neighborData(cx: number, cz: number): ChunkData | undefined {
