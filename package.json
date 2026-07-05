@@ -1,7 +1,7 @@
 {
   "name": "voxel-realm",
   "version": "1.0.0",
-  "description": "",
+  "description": "Browser voxel sandbox engine: streamed chunks, greedy meshing with vertex AO, weather, procedural audio, and an in-game builder with blueprints",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,7 +20,7 @@
     "url": "git+https://github.com/Edgar1738/voxel-realm.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Edgar1738 <info@edgarha.com>",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Edgar1738/voxel-realm/issues"
