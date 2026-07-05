@@ -62,6 +62,44 @@ describe('computeChunkLight', () => {
     expect(field.sky[voxelIndex(0, 1, 0)]).toBe(15);
   });
 
+  /** Assert a maxSolidY-capped compute equals a full compute at EVERY cell. */
+  function expectCappedEqualsFull(input: LightInput, maxSolidY: number): void {
+    const full = computeChunkLight(input);
+    const capped = computeChunkLight(input, maxSolidY);
+    for (let i = 0; i < full.sky.length; i++) {
+      expect(capped.sky[i]).toBe(full.sky[i]);
+      expect(capped.block[i]).toBe(full.block[i]);
+    }
+  }
+
+  it('capping at maxSolidY is byte-identical to a full compute at every cell', () => {
+    // Terrain-like input: a solid floor 0..40, a pillar to y=60 at (8,*,8) with a lantern on top.
+    const opaque = new Set<string>();
+    const emission = new Map<string, number>();
+    for (let y = 0; y <= 40; y++) {
+      for (let x = 0; x < CHUNK_SIZE_X; x++) {
+        for (let z = 0; z < CHUNK_SIZE_Z; z++) opaque.add(key(x, y, z));
+      }
+    }
+    for (let y = 41; y <= 60; y++) opaque.add(key(8, y, 8));
+    emission.set(key(8, 60, 8), 14); // emitter is the topmost solid voxel
+    expectCappedEqualsFull(makeInput(opaque, emission), 60);
+  });
+
+  it('capping is byte-identical even for a high floating emitter (block light climbs above maxSolidY)', () => {
+    // A single floating lantern high above an all-air chunk floor: maxSolidY is the lantern's y,
+    // and its block light spreads up to MAX_LIGHT cells ABOVE it — the +MAX_LIGHT flood margin
+    // must capture that so the capped result still matches full.
+    const emission = new Map<string, number>();
+    emission.set(key(8, 120, 8), 15); // max-emission emitter, floating
+    expectCappedEqualsFull(makeInput(new Set(), emission), 120);
+  });
+
+  it('capping an all-air chunk (maxSolidY -1) still lights fully to sky 15', () => {
+    const capped = computeChunkLight(makeInput(new Set()), -1);
+    for (let i = 0; i < capped.sky.length; i++) expect(capped.sky[i]).toBe(15);
+  });
+
   it('an overhang slab dims the voxel directly beneath it but it stays lit by horizontal spread', () => {
     // A 3x3 opaque slab at y=64 around (8,64,8), open sky everywhere else.
     const slabY = 64;

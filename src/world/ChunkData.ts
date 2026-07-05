@@ -28,9 +28,11 @@ export class ChunkData {
    */
   hasShaped = false;
   /**
-   * Highest y that holds a non-AIR voxel, or -1 for an all-air chunk. Maintained O(1) in set()
-   * (monotonic: only ever raised, so clearing the top voxel leaves it one slice high — harmless).
-   * Used to cap meshing height so the empty air above terrain is never swept.
+   * Highest y that holds a non-AIR voxel, or -1 for an all-air chunk. Maintained in set():
+   * O(1) on placement (raise), and on removal it stays put unless the topmost slice is emptied,
+   * in which case it rescans downward from that slice to find the new top. Keeping this tight
+   * matters because it caps BOTH meshing height (never sweep empty air) and the lighting
+   * recompute — so an aerial edit that is later removed must not leave the cap stuck high.
    */
   maxSolidY = -1;
 
@@ -95,12 +97,21 @@ export class ChunkData {
       throw new RangeError(`ChunkData.set out of bounds: (${x}, ${y}, ${z})`);
     }
     this.data[voxelIndex(x, y, z)] = id;
-    if (id !== AIR && y > this.maxSolidY) this.maxSolidY = y;
+    if (id !== AIR) {
+      if (y > this.maxSolidY) this.maxSolidY = y;
+    } else if (y === this.maxSolidY) {
+      // Cleared a voxel on the current top slice — it may now be empty. Rescan from here
+      // down (cheap in the common case; the emptied slice is usually still occupied elsewhere).
+      this.recomputeMaxSolidY(y);
+    }
   }
 
-  /** Recomputes the exact maxSolidY by scanning voxels top-down; for bulk writes that bypass set(). */
-  recomputeMaxSolidY(): void {
-    for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+  /**
+   * Recomputes the exact maxSolidY by scanning voxels top-down from `fromY` (default: the world
+   * ceiling). Used for bulk writes that bypass set(), and by set() when the top slice is cleared.
+   */
+  recomputeMaxSolidY(fromY: number = WORLD_HEIGHT - 1): void {
+    for (let y = fromY; y >= 0; y--) {
       for (let z = 0; z < CHUNK_SIZE_Z; z++) {
         for (let x = 0; x < CHUNK_SIZE_X; x++) {
           if (this.data[voxelIndex(x, y, z)] !== AIR) {

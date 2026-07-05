@@ -54,7 +54,7 @@ function inBounds(x: number, y: number, z: number): boolean {
  * `seeds` lists the flat indices of those seeds. Light drops 1 per step and never
  * enters opaque voxels. Uses a FIFO array with a head pointer (no Array.shift).
  */
-function propagate(levels: Uint8Array, seeds: number[], input: LightInput): void {
+function propagate(levels: Uint8Array, seeds: number[], input: LightInput, capY: number): void {
   const queue: number[] = seeds;
   let head = 0;
 
@@ -77,7 +77,10 @@ function propagate(levels: Uint8Array, seeds: number[], input: LightInput): void
       const nx = x + dx;
       const ny = y + dy;
       const nz = z + dz;
-      if (!inBounds(nx, ny, nz)) {
+      // Never spread above the cap: those cells are empty air the mesher never reads, and
+      // a detour above the cap is always longer than a same-level path at/below it, so this
+      // leaves every read cell (y <= capY) byte-identical to an uncapped fill.
+      if (ny > capY || !inBounds(nx, ny, nz)) {
         continue;
       }
       if (input.isOpaque(nx, ny, nz)) {
@@ -96,13 +99,15 @@ function propagate(levels: Uint8Array, seeds: number[], input: LightInput): void
  * Seed skylight: a non-opaque voxel open to the sky (no opaque voxel anywhere
  * above it in its column) starts at 15. Returns the seeded flat indices.
  */
-function seedSky(sky: Uint8Array, input: LightInput): number[] {
+function seedSky(sky: Uint8Array, input: LightInput, capY: number): number[] {
   const seeds: number[] = [];
   for (let x = 0; x < CHUNK_SIZE_X; x++) {
     for (let z = 0; z < CHUNK_SIZE_Z; z++) {
-      // Walk down the column; once we hit an opaque voxel, everything below is shadowed.
+      // Walk down the column from the cap. Cells above the cap are open air handled by the
+      // caller's direct fill, so starting at capY yields the same result as the world ceiling.
+      // Once we hit an opaque voxel, everything below is shadowed.
       let open = true;
-      for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+      for (let y = capY; y >= 0; y--) {
         if (input.isOpaque(x, y, z)) {
           open = false;
           continue;
@@ -119,9 +124,10 @@ function seedSky(sky: Uint8Array, input: LightInput): number[] {
 }
 
 /** Seed block light: every voxel with emission > 0 starts at its emission level. */
-function seedBlock(block: Uint8Array, input: LightInput): number[] {
+function seedBlock(block: Uint8Array, input: LightInput, capY: number): number[] {
   const seeds: number[] = [];
-  for (let y = 0; y < WORLD_HEIGHT; y++) {
+  // Emitters are solid voxels, so none exist above maxSolidY (= capY): scanning to capY is exact.
+  for (let y = 0; y <= capY; y++) {
     for (let z = 0; z < CHUNK_SIZE_Z; z++) {
       for (let x = 0; x < CHUNK_SIZE_X; x++) {
         const level = input.emission(x, y, z);
@@ -142,13 +148,36 @@ function seedBlock(block: Uint8Array, input: LightInput): number[] {
  * Compute baked sky and block lighting for one chunk via two independent BFS
  * flood-fills. Light drops 1 per step and never enters opaque voxels;
  * out-of-bounds neighbours are ignored (chunk-local).
+ *
+ * `maxSolidY` is the chunk's highest non-air voxel (default: the world ceiling, i.e. no cap).
+ * The flood only runs up to `maxSolidY + MAX_LIGHT`, which is provably byte-identical to a full
+ * compute at EVERY cell — not just the ones the height-capped mesher reads:
+ *   - Sky: every cell above the tallest solid voxel is open air, so its skylight is exactly 15.
+ *     We fill that region directly instead of flooding it (a taller neighbor chunk may sample
+ *     these above-cap border columns, so they must hold the correct 15).
+ *   - Block: emitters are solid voxels, so none sit above `maxSolidY`; block light from any
+ *     emitter attenuates to 0 within MAX_LIGHT steps, so nothing above `maxSolidY + MAX_LIGHT`
+ *     is ever non-zero. Above the cap it stays 0 — correct.
+ * The win: for typical terrain (surface ~70 of 192) the flood does ~45% of the work per relight.
  */
-export function computeChunkLight(input: LightInput): LightField {
+export function computeChunkLight(
+  input: LightInput,
+  maxSolidY: number = WORLD_HEIGHT - 1,
+): LightField {
   const sky = new Uint8Array(CHUNK_VOLUME);
   const block = new Uint8Array(CHUNK_VOLUME);
 
-  propagate(sky, seedSky(sky, input), input);
-  propagate(block, seedBlock(block, input), input);
+  // Flood ceiling: highest solid voxel plus one light radius (so all block light is captured).
+  const cap = Math.min(WORLD_HEIGHT - 1, maxSolidY + MAX_LIGHT);
+
+  propagate(sky, seedSky(sky, input, cap), input, cap);
+  propagate(block, seedBlock(block, input, cap), input, cap);
+
+  // Open air above the tallest solid voxel is uniformly skylit (15). Because voxelIndex packs y
+  // outermost, all cells with y > maxSolidY form one contiguous tail — fill it in a single pass.
+  if (maxSolidY < WORLD_HEIGHT - 1) {
+    sky.fill(MAX_LIGHT, voxelIndex(0, Math.max(0, maxSolidY + 1), 0));
+  }
 
   return { sky, block };
 }
@@ -232,7 +261,7 @@ export function applyBorderBlockLight(
   }
 
   if (seeds.length > 0) {
-    propagate(block, seeds, input);
+    propagate(block, seeds, input, WORLD_HEIGHT - 1);
   }
 
   return changed;
