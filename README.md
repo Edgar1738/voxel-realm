@@ -2,6 +2,8 @@
 
 A browser voxel sandbox engine built from scratch in TypeScript + Three.js. Streamed chunks, greedy meshing with vertex ambient occlusion, day/night and weather cycles, flowing water, procedural audio, critters, and a full in-game builder with blueprints — in ~18k lines with two runtime dependencies.
 
+**[▶ Play it in your browser](https://edgar1738.github.io/voxel-realm/)** — or jump straight into a [ruined fortress kingdom](https://edgar1738.github.io/voxel-realm/?world=citadel).
+
 ![Voxel Realm — the Moonspire citadel, built in-game](docs/media/screenshot.jpg)
 
 ## Quick start
