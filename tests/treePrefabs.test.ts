@@ -3,14 +3,19 @@ import {
   oakVariants,
   oakScatterOptions,
   scatterOaks,
+  cactusVariants,
+  scatterCacti,
   OAK_FOOTPRINT,
   OAK_TRUNK_OFFSET,
 } from '../src/worldgen/treePrefabs';
 import { scatterStructures, placementAt, type PlacementContext } from '../src/worldgen/Structures';
+import { layeredSurfaceAt } from '../src/worldgen/layeredHeight';
+import { surfaceCap } from '../src/worldgen/SurfacePainter';
+import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
 import { validatePrefab } from '../src/core/Prefab';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
-import { WOOD, LEAVES } from '../src/blocks/blocks';
+import { WOOD, LEAVES, CACTUS, SAND } from '../src/blocks/blocks';
 
 const variants = oakVariants();
 
@@ -190,5 +195,65 @@ describe('scatterOaks (grass/snow-gated overlay for heightmap presets)', () => {
     scatterOaks(land, SEA_LEVEL, { density: 1 })(a, 1, -1, 1337);
     scatterOaks(land, SEA_LEVEL, { density: 1 })(b, 1, -1, 1337);
     expect(Array.from(a.data)).toEqual(Array.from(b.data));
+  });
+});
+
+describe('cactusVariants', () => {
+  const cacti = cactusVariants();
+
+  it('is a small library of 1-wide columns', () => {
+    expect(cacti.length).toBeGreaterThanOrEqual(3);
+    for (const c of cacti) {
+      expect(c.dims[0]).toBe(1);
+      expect(c.dims[2]).toBe(1);
+    }
+  });
+
+  it('every variant is a valid cactus column rooted at dy=0', () => {
+    for (const c of cacti) {
+      expect(validatePrefab(c)).toBeNull();
+      expect(c.blocks.every((b) => b[3] === CACTUS)).toBe(true);
+      const ys = c.blocks.map((b) => b[1]).sort((a, b) => a - b);
+      expect(ys[0]).toBe(0);
+    }
+  });
+});
+
+describe('scatterCacti (desert-sand-gated overlay)', () => {
+  it('plants cacti only on desert sand, seated one block above the surface', () => {
+    const overlay = scatterCacti(layeredSurfaceAt, SEA_LEVEL, { density: 1 });
+    const biomes = new BiomeMap(1337);
+    let cactusSeen = false;
+    let allDesertSand = true;
+    let allSeated = true;
+    // SEED 1337 has desert within this span (same region the legacy cactus test relies on).
+    for (let cx = -6; cx < 6; cx++) {
+      for (let cz = -6; cz < 6; cz++) {
+        const c = new ChunkData(cx, cz);
+        overlay(c, cx, cz, 1337);
+        for (let x = 0; x < CHUNK_SIZE_X; x++) {
+          for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+            let lowest = -1;
+            for (let y = 0; y < WORLD_HEIGHT; y++)
+              if (c.get(x, y, z) === CACTUS) {
+                lowest = y;
+                break;
+              }
+            if (lowest < 0) continue;
+            cactusSeen = true;
+            const wx = cx * CHUNK_SIZE_X + x;
+            const wz = cz * CHUNK_SIZE_Z + z;
+            const biome = biomes.biomeAt(wx, wz);
+            const h = Math.round(layeredSurfaceAt(1337, wx, wz));
+            if (biome !== Biome.Desert || surfaceCap(h, biome, SEA_LEVEL) !== SAND)
+              allDesertSand = false;
+            if (lowest !== h + 1) allSeated = false;
+          }
+        }
+      }
+    }
+    expect(cactusSeen).toBe(true);
+    expect(allDesertSand).toBe(true);
+    expect(allSeated).toBe(true);
   });
 });

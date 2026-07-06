@@ -1,7 +1,7 @@
 import { mulberry32 } from '../core/math';
-import { WOOD, LEAVES, GRASS, SNOW } from '../blocks/blocks';
+import { WOOD, LEAVES, GRASS, SNOW, CACTUS, SAND } from '../blocks/blocks';
 import { scatterStructures } from './Structures';
-import { BiomeMap } from './BiomeMap';
+import { BiomeMap, Biome } from './BiomeMap';
 import { surfaceCap } from './SurfacePainter';
 import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { ScatterOptions } from './Structures';
@@ -136,4 +136,40 @@ export function scatterOaks(
       },
     }),
   );
+}
+
+/** A few 1-wide cactus columns (heights 1..3) for desert scatter variety. */
+export function cactusVariants(): Prefab[] {
+  const out: Prefab[] = [];
+  for (let h = 1; h <= 3; h++) {
+    const blocks: PrefabVoxel[] = [];
+    for (let y = 0; y < h; y++) blocks.push([0, y, 0, CACTUS]);
+    out.push({ dims: [1, h, 1], blocks });
+  }
+  return out;
+}
+
+/**
+ * An overlay that scatters cacti across a heightmap world, seated one block above the ground and
+ * only in desert columns whose surface cap is sand (never beaches, which are sand but not desert).
+ * `surfaceAt` must be the same height function the generator uses.
+ */
+export function scatterCacti(
+  surfaceAt: HeightAt,
+  seaLevel: number,
+  extra?: Partial<ScatterOptions>,
+): Overlay {
+  const seatAt: HeightAt = (s, x, z) => surfaceAt(s, x, z) + 1;
+  return scatterStructures(cactusVariants(), {
+    cellSize: 6,
+    density: 0.5,
+    salt: 0xcac7,
+    ...extra,
+    surfaceAt: seatAt,
+    canPlace: (c) => {
+      const h = Math.round(surfaceAt(c.seed, c.ox, c.oz));
+      const biome = biomesFor(c.seed).biomeAt(c.ox, c.oz);
+      return biome === Biome.Desert && surfaceCap(h, biome, seaLevel) === SAND;
+    },
+  });
 }

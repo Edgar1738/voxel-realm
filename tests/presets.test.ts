@@ -5,9 +5,11 @@ import {
   resolveBootPreset,
   WORLD_PRESETS,
 } from '../src/worldgen/Presets';
-import { AIR, GRASS, COBBLESTONE, WATER, WOOD, LEAVES } from '../src/blocks/blocks';
+import { AIR, GRASS, SNOW, COBBLESTONE, WATER, WOOD, LEAVES, CACTUS } from '../src/blocks/blocks';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
 import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
+import { layeredSurfaceAt } from '../src/worldgen/layeredHeight';
+import { surfaceCap } from '../src/worldgen/SurfacePainter';
 import type { Generator } from '../src/worldgen/Generator';
 import type { WorldPreset } from '../src/worldgen/Presets';
 import type { WorldMeta } from '../src/persistence/SaveTypes';
@@ -81,8 +83,8 @@ describe('world presets', () => {
     expect(c.get(0, SEA_LEVEL, 0)).toBe(COBBLESTONE);
   });
 
-  it('default: keeps the tree and decoration overlays', () => {
-    expect(createGenerator('default').overlays).toHaveLength(2);
+  it('default: has the oak, cactus, and decoration overlays', () => {
+    expect(createGenerator('default').overlays).toHaveLength(3);
   });
 
   it('isWorldPreset guards unknown values', () => {
@@ -140,7 +142,7 @@ describe('world presets', () => {
     expect(isWorldPreset('caverns')).toBe(true);
     const { generator, overlays } = createGenerator('caverns');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays).toHaveLength(1); // scatterTrees
+    expect(overlays).toHaveLength(2); // oaks + cacti
 
     // Must not throw and must return a ChunkData with some non-air content
     const c = generator.generateBaseChunk(SEED, 0, 0);
@@ -307,6 +309,73 @@ describe('prefab oaks across heightmap presets', () => {
       expect(woodSeen, `${preset} should grow oak trunks`).toBe(true);
       expect(leavesSeen).toBe(true);
       expect(rootsOnGrass, `${preset} oaks must root on grass`).toBe(true);
+      expect(crossChunkCanopy, `${preset} canopy should cross a chunk border`).toBe(true);
+    });
+  }
+});
+
+describe('default and caverns grow prefab oaks and cacti', () => {
+  const biomes = new BiomeMap(SEED);
+  const layeredPresets: WorldPreset[] = ['default', 'caverns'];
+
+  for (const preset of layeredPresets) {
+    it(`${preset}: oaks gated to grass/snow (cross-chunk) and cacti gated to desert sand`, () => {
+      const { generator, overlays } = createGenerator(preset);
+      const oakOverlay = overlays[0];
+      const cactusOverlay = overlays[1];
+      let woodSeen = false;
+      let leavesSeen = false;
+      let cactusSeen = false;
+      let oakGateOk = true;
+      let cactusGateOk = true;
+      let crossChunkCanopy = false;
+
+      // SEED 1337 has desert within this span (the legacy cactus test relies on the same region).
+      for (let cx = -6; cx < 6; cx++) {
+        for (let cz = -6; cz < 6; cz++) {
+          const c = generator.generateBaseChunk(SEED, cx, cz);
+          oakOverlay(c, cx, cz, SEED);
+          cactusOverlay(c, cx, cz, SEED);
+          let chunkWood = false;
+          let chunkLeaves = false;
+          for (let x = 0; x < CHUNK_SIZE_X; x++) {
+            for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+              let lowWood = -1;
+              let lowCactus = -1;
+              for (let y = 0; y < WORLD_HEIGHT; y++) {
+                const v = c.get(x, y, z);
+                if (v === WOOD && lowWood < 0) lowWood = y;
+                else if (v === CACTUS && lowCactus < 0) lowCactus = y;
+                else if (v === LEAVES) chunkLeaves = true;
+              }
+              const wx = cx * CHUNK_SIZE_X + x;
+              const wz = cz * CHUNK_SIZE_Z + z;
+              if (lowWood > 0) {
+                chunkWood = true;
+                woodSeen = true;
+                const cap = surfaceCap(
+                  Math.round(layeredSurfaceAt(SEED, wx, wz)),
+                  biomes.biomeAt(wx, wz),
+                  SEA_LEVEL,
+                );
+                if (cap !== GRASS && cap !== SNOW) oakGateOk = false;
+              }
+              if (lowCactus > 0) {
+                cactusSeen = true;
+                if (biomes.biomeAt(wx, wz) !== Biome.Desert) cactusGateOk = false;
+              }
+            }
+          }
+          if (chunkLeaves) leavesSeen = true;
+          if (chunkLeaves && !chunkWood) crossChunkCanopy = true;
+        }
+      }
+
+      expect(woodSeen, `${preset} should grow oak trunks`).toBe(true);
+      expect(leavesSeen).toBe(true);
+      expect(cactusSeen, `${preset} should grow cacti in its deserts`).toBe(true);
+      expect(oakGateOk, `${preset} oaks must sit on grass/snow`).toBe(true);
+      expect(cactusGateOk, `${preset} cacti must sit in desert`).toBe(true);
       expect(crossChunkCanopy, `${preset} canopy should cross a chunk border`).toBe(true);
     });
   }

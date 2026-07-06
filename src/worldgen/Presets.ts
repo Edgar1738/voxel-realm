@@ -3,8 +3,8 @@ import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
-import { scatterTrees } from './TreeScatterer';
-import { scatterOaks } from './treePrefabs';
+import { scatterOaks, scatterCacti } from './treePrefabs';
+import { layeredSurfaceAt } from './layeredHeight';
 import { scatterDecorations } from './Decorations';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
@@ -267,7 +267,13 @@ export function createGenerator(preset: WorldPreset): {
         ],
       };
     case 'caverns':
-      return { generator: createCavernsGenerator(), overlays: [scatterTrees] };
+      return {
+        generator: createCavernsGenerator(),
+        overlays: [
+          scatterOaks(layeredSurfaceAt, SEA_LEVEL),
+          scatterCacti(layeredSurfaceAt, SEA_LEVEL),
+        ],
+      };
     case 'citadel':
       return {
         generator: createCitadelGenerator(),
@@ -302,6 +308,13 @@ export function createGenerator(preset: WorldPreset): {
       };
     case 'default':
     default:
-      return { generator: createWorldGenerator(), overlays: [scatterTrees, scatterDecorations()] };
+      return {
+        generator: createWorldGenerator(),
+        overlays: [
+          scatterOaks(layeredSurfaceAt, SEA_LEVEL),
+          scatterCacti(layeredSurfaceAt, SEA_LEVEL),
+          scatterDecorations(),
+        ],
+      };
   }
 }
