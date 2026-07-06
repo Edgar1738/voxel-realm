@@ -19,6 +19,12 @@ import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig, lookDirectionFromYawPitch, THIRD_PERSON_DISTANCE } from '../render/CameraRig';
 import { PlayerAvatar } from '../render/PlayerAvatar';
+import {
+  loadPlayerSkinId,
+  nextPlayerSkinId,
+  resolvePlayerSkin,
+  savePlayerSkinId,
+} from '../character/PlayerSkins';
 import { clipCameraDistance } from './aim';
 import { ChunkManager } from '../world/ChunkManager';
 import { MeshWorkerPool } from '../world/MeshWorkerPool';
@@ -240,6 +246,14 @@ export class Game {
     let tool: Tool = 'single';
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
     let tunnelConfig: TunnelConfig = { ...DEFAULT_TUNNEL_CONFIG };
+    let playerSkinId = resolvePlayerSkin().id;
+    try {
+      playerSkinId = loadPlayerSkinId(localStorage);
+    } catch {
+      /* localStorage unavailable - use the default built-in skin */
+    }
+    const avatarSkinTarget: { current?: PlayerAvatar } = {};
+    const initialPlayerSkin = resolvePlayerSkin(playerSkinId);
 
     const ui = createCreativeUi(
       registry,
@@ -255,7 +269,30 @@ export class Game {
       },
       (direction) => applyReachStep(direction),
       () => toggleHoldRepeat(),
+      {
+        initial: { id: initialPlayerSkin.id, name: initialPlayerSkin.name },
+        onCycle: () => cyclePlayerSkin(),
+      },
     );
+
+    const applyPlayerSkin = (id: string, persist: boolean): void => {
+      const skin = resolvePlayerSkin(id);
+      playerSkinId = skin.id;
+      avatarSkinTarget.current?.setSkin(skin.id);
+      ui.setSkinUi(skin.id, skin.name);
+      if (persist) {
+        try {
+          savePlayerSkinId(localStorage, skin.id);
+        } catch {
+          /* ignore persistence failure */
+        }
+        ui.setStatus(`Skin: ${skin.name}`);
+      }
+    };
+
+    function cyclePlayerSkin(): void {
+      applyPlayerSkin(nextPlayerSkinId(playerSkinId), true);
+    }
 
     // Dock hold-to-repeat toggle: flip, persist, and reflect in the UI + status toast.
     const toggleHoldRepeat = (): void => {
@@ -678,7 +715,8 @@ export class Game {
     pasteGhost.attach((o) => renderer.add(o));
 
     // Visible player character, shown only in third-person view.
-    const avatar = new PlayerAvatar();
+    const avatar = new PlayerAvatar(playerSkinId);
+    avatarSkinTarget.current = avatar;
     avatar.attach((o) => renderer.add(o));
 
     // Interaction ray: origin at the player's eye, direction from yaw/pitch. Used for every

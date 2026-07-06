@@ -336,6 +336,17 @@ export interface TourHudStatus {
 /** Weather-cycle button states: the four pinned conditions plus the automatic cycle. */
 export type ClimateMode = 'auto' | 'clear' | 'rain' | 'storm' | 'snow';
 
+/** Compact skin selector state passed from Game; ids stay owned/validated by PlayerSkins. */
+export interface PlayerSkinUiState {
+  id: string;
+  name: string;
+}
+
+export interface PlayerSkinUiConfig {
+  initial: PlayerSkinUiState;
+  onCycle: () => void;
+}
+
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
   hotbar: HTMLDivElement;
@@ -359,6 +370,10 @@ export interface CreativeUi {
   volumeSlider: HTMLInputElement;
   /** Syncs the sound controls to the engine state (icon, slider position, dimming). */
   setSoundUi(volume: number, muted: boolean): void;
+  /** Character skin selector, wired by Game to PlayerAvatar. */
+  skinButton: HTMLButtonElement;
+  /** Reflects the active built-in skin without parsing user-controlled markup. */
+  setSkinUi(id: string, name: string): void;
   /** Climate controls: weather-cycle button + time-of-day slider (wired by Game). */
   weatherButton: HTMLButtonElement;
   timeSlider: HTMLInputElement;
@@ -439,6 +454,7 @@ export function createCreativeUi(
   tunnel?: { initial: TunnelConfig; onChange: (config: TunnelConfig) => void },
   onReachStep?: (direction: 1 | -1) => void,
   onHoldRepeatToggle?: () => void,
+  skinSelector?: PlayerSkinUiConfig,
 ): CreativeUi {
   const root = document.createElement('div');
   root.id = 'creative-ui';
@@ -592,6 +608,18 @@ export function createCreativeUi(
   };
   setHoldRepeatUi(true);
 
+  // Skin selector: built-in id/name only. Future custom skins should validate before reaching UI.
+  const skinButton = button('');
+  skinButton.className = 'skin-btn';
+  skinButton.addEventListener('click', () => skinSelector?.onCycle());
+  const setSkinUi = (id: string, name: string): void => {
+    skinButton.textContent = `Skin: ${name}`;
+    skinButton.title = `Character skin: ${name} - click to cycle`;
+    skinButton.setAttribute('aria-label', skinButton.title);
+    skinButton.dataset.skin = id;
+  };
+  setSkinUi(skinSelector?.initial.id ?? 'realm-scout', skinSelector?.initial.name ?? 'Realm Scout');
+
   // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
   const soundGroup = document.createElement('div');
   soundGroup.className = 'sound-group';
@@ -666,6 +694,7 @@ export function createCreativeUi(
     toolRow,
     reachGroup,
     holdButton,
+    skinButton,
     soundGroup,
     climateGroup,
     infoButton,
@@ -1242,6 +1271,8 @@ export function createCreativeUi(
     muteButton,
     volumeSlider,
     setSoundUi,
+    skinButton,
+    setSkinUi,
     weatherButton,
     timeSlider,
     setWeatherUi,

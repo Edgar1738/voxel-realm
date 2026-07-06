@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeBootSave, loadBootMeta } from '../src/app/saveBootstrap';
 import { registerInputListeners } from '../src/app/input';
+import { createCreativeUi } from '../src/app/CreativeUi';
+
+type SkinSelectorConfig = {
+  initial: { id: string; name: string };
+  onCycle: () => void;
+};
+
+type FakeStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'clear'> & {
+  values: Map<string, string>;
+};
 
 type FakeUi = {
   hotbar: { addEventListener: (...args: unknown[]) => void };
@@ -25,8 +35,10 @@ type FakeUi = {
   volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
   weatherButton: { addEventListener: (...args: unknown[]) => void };
   timeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
+  skinButton: { addEventListener: (...args: unknown[]) => void };
   setWeatherUi: (mode: string) => void;
   setTimeUi: (t: number) => void;
+  setSkinUi: ReturnType<typeof vi.fn>;
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setReachValue: (reach: number) => void;
@@ -58,8 +70,10 @@ function makeUi(): FakeUi {
     volumeSlider: { addEventListener: vi.fn(), value: '60' },
     weatherButton: { addEventListener: vi.fn() },
     timeSlider: { addEventListener: vi.fn(), value: '500' },
+    skinButton: { addEventListener: vi.fn() },
     setWeatherUi: vi.fn(),
     setTimeUi: vi.fn(),
+    setSkinUi: vi.fn(),
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setReachValue: vi.fn(),
@@ -82,6 +96,27 @@ function makeUi(): FakeUi {
   return ui;
 }
 
+function makeStorage(initial: Record<string, string> = {}): FakeStorage {
+  const values = new Map<string, string>(Object.entries(initial));
+  return {
+    values,
+    getItem: vi.fn((key: string) => values.get(key) ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      values.set(key, value);
+    }),
+    removeItem: vi.fn((key: string) => {
+      values.delete(key);
+    }),
+    clear: vi.fn(() => {
+      values.clear();
+    }),
+  };
+}
+
+function skinSelectorConfig(): SkinSelectorConfig {
+  return vi.mocked(createCreativeUi).mock.calls[0][8] as SkinSelectorConfig;
+}
+
 const boot = vi.hoisted(() => {
   const order: string[] = [];
   return {
@@ -96,6 +131,11 @@ const boot = vi.hoisted(() => {
     cameraRigConstructorArgs: [] as unknown[],
     chunkManagerConstructorArgs: [] as unknown[],
     playerConstructorArgs: [] as unknown[],
+    playerAvatarConstructorArgs: [] as unknown[],
+    avatarSetSkin: vi.fn(),
+    avatarAttach: vi.fn(),
+    avatarDispose: vi.fn(() => order.push('avatar.dispose')),
+    avatarUpdate: vi.fn(),
     rigInstance: undefined as { yaw: number; pitch: number } | undefined,
     ui: undefined as FakeUi | undefined,
     abortInput: vi.fn(() => order.push('abortInput')),
@@ -236,6 +276,18 @@ vi.mock('../src/player/PlayerController', () => ({
   }),
 }));
 
+vi.mock('../src/render/PlayerAvatar', () => ({
+  PlayerAvatar: vi.fn(function PlayerAvatar(...args: unknown[]) {
+    boot.playerAvatarConstructorArgs = args;
+    return {
+      attach: boot.avatarAttach,
+      setSkin: boot.avatarSetSkin,
+      update: boot.avatarUpdate,
+      dispose: boot.avatarDispose,
+    };
+  }),
+}));
+
 vi.mock('../src/edit/EditService', () => ({
   EditService: vi.fn(function EditService() {
     return {
@@ -342,8 +394,10 @@ describe('Game.boot composition', () => {
     boot.cameraRigConstructorArgs = [];
     boot.chunkManagerConstructorArgs = [];
     boot.playerConstructorArgs = [];
+    boot.playerAvatarConstructorArgs = [];
     boot.rigInstance = undefined;
     boot.ui = makeUi();
+    vi.stubGlobal('localStorage', makeStorage());
     vi.stubGlobal('window', {
       location: { search: '', href: 'http://localhost/' },
       prompt: vi.fn(),
@@ -452,6 +506,73 @@ describe('Game.boot composition', () => {
 
     expect(boot.playerConstructorArgs[0]).toEqual({ x: 20, y: 70, z: -20 });
     expect(boot.rigInstance).toMatchObject({ yaw: 1.5, pitch: -0.3 });
+
+    cleanup();
+  });
+
+  it('boots the avatar and selector from a stored built-in skin', async () => {
+    vi.stubGlobal('localStorage', makeStorage({ 'vr.playerSkin': 'keep-mage' }));
+
+    const cleanup = await bootGame();
+
+    expect(boot.playerAvatarConstructorArgs).toEqual(['keep-mage']);
+    expect(skinSelectorConfig().initial).toEqual({ id: 'keep-mage', name: 'Mage of the Keep' });
+
+    cleanup();
+  });
+
+  it('falls back to the default skin when the stored id is unknown', async () => {
+    vi.stubGlobal('localStorage', makeStorage({ 'vr.playerSkin': 'retired-skin-v1' }));
+
+    const cleanup = await bootGame();
+
+    expect(boot.playerAvatarConstructorArgs).toEqual(['realm-scout']);
+    expect(skinSelectorConfig().initial).toEqual({ id: 'realm-scout', name: 'Realm Scout' });
+
+    cleanup();
+  });
+
+  it('boots on the default skin when localStorage reads throw', async () => {
+    const storage = makeStorage();
+    storage.getItem = vi.fn(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    vi.stubGlobal('localStorage', storage);
+
+    const cleanup = await bootGame();
+
+    expect(boot.playerAvatarConstructorArgs).toEqual(['realm-scout']);
+    expect(skinSelectorConfig().initial).toEqual({ id: 'realm-scout', name: 'Realm Scout' });
+
+    cleanup();
+  });
+
+  it('still cycles the skin when localStorage writes throw', async () => {
+    const storage = makeStorage();
+    storage.setItem = vi.fn(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+    vi.stubGlobal('localStorage', storage);
+
+    const cleanup = await bootGame();
+
+    expect(() => skinSelectorConfig().onCycle()).not.toThrow();
+    expect(boot.avatarSetSkin).toHaveBeenLastCalledWith('castle-mason');
+    expect(boot.ui!.setSkinUi).toHaveBeenLastCalledWith('castle-mason', 'Castle Mason');
+    expect(boot.ui!.setStatus).toHaveBeenCalledWith('Skin: Castle Mason');
+
+    cleanup();
+  });
+
+  it('cycles the selector through built-in skins and persists the chosen id', async () => {
+    const cleanup = await bootGame();
+
+    skinSelectorConfig().onCycle();
+
+    expect(boot.avatarSetSkin).toHaveBeenLastCalledWith('castle-mason');
+    expect(boot.ui!.setSkinUi).toHaveBeenLastCalledWith('castle-mason', 'Castle Mason');
+    expect(localStorage.getItem('vr.playerSkin')).toBe('castle-mason');
+    expect(boot.ui!.setStatus).toHaveBeenCalledWith('Skin: Castle Mason');
 
     cleanup();
   });
