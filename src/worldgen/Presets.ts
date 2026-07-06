@@ -210,7 +210,7 @@ export function createGenerator(preset: WorldPreset): {
     case 'amplified':
       return {
         generator: new HeightGenerator(amplifiedHeight, SEA_LEVEL),
-        overlays: [scatterTrees],
+        overlays: [scatterOaks(amplifiedHeight, SEA_LEVEL)],
       };
     case 'islands':
       return { generator: new HeightGenerator(islandsHeight, SEA_LEVEL), overlays: [] };
@@ -218,6 +218,9 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(canyonHeight, SEA_LEVEL),
         overlays: [
+          // Oaks crown the mesa; ravine floors sit below sea level, so the grass gate keeps trees
+          // off the canyon bottoms automatically.
+          scatterOaks(canyonHeight, SEA_LEVEL),
           scatterStructures([ruinedTower(), brokenWall(), brokenWall()], {
             cellSize: 48,
             density: 0.5,
@@ -250,7 +253,7 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
-          scatterTrees,
+          scatterOaks(plainsHeight, SEA_LEVEL),
           scatterStructures([barn(), watchtower(), marketStall(), farmPlot(), bridge()], {
             cellSize: 72,
             density: 0.6,

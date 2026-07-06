@@ -265,6 +265,53 @@ describe('villages preset oaks', () => {
   });
 });
 
+describe('prefab oaks across heightmap presets', () => {
+  const treePresets: WorldPreset[] = ['frontier', 'amplified', 'canyon'];
+
+  for (const preset of treePresets) {
+    it(`${preset}: grows prefab oaks rooted on grass with cross-chunk canopies`, () => {
+      const { generator, overlays } = createGenerator(preset);
+      const oakOverlay = overlays[0]; // oaks scatter first in every heightmap preset
+      let woodSeen = false;
+      let leavesSeen = false;
+      let rootsOnGrass = true;
+      let crossChunkCanopy = false;
+
+      for (let cx = -3; cx <= 3; cx++) {
+        for (let cz = -3; cz <= 3; cz++) {
+          const c = generator.generateBaseChunk(SEED, cx, cz);
+          oakOverlay(c, cx, cz, SEED);
+          let chunkWood = false;
+          let chunkLeaves = false;
+          for (let x = 0; x < CHUNK_SIZE_X; x++) {
+            for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+              let lowestWood = -1;
+              for (let y = 0; y < WORLD_HEIGHT; y++) {
+                const v = c.get(x, y, z);
+                if (v === WOOD && lowestWood < 0) lowestWood = y;
+                else if (v === LEAVES) chunkLeaves = true;
+              }
+              if (lowestWood > 0) {
+                chunkWood = true;
+                woodSeen = true;
+                if (c.get(x, lowestWood - 1, z) !== GRASS) rootsOnGrass = false;
+              }
+            }
+          }
+          if (chunkLeaves) leavesSeen = true;
+          // canopy without a local trunk == a neighbor's canopy reached across the border
+          if (chunkLeaves && !chunkWood) crossChunkCanopy = true;
+        }
+      }
+
+      expect(woodSeen, `${preset} should grow oak trunks`).toBe(true);
+      expect(leavesSeen).toBe(true);
+      expect(rootsOnGrass, `${preset} oaks must root on grass`).toBe(true);
+      expect(crossChunkCanopy, `${preset} canopy should cross a chunk border`).toBe(true);
+    });
+  }
+});
+
 describe('resolveBootPreset', () => {
   const meta = (preset?: string): WorldMeta =>
     preset === undefined ? { seed: SEED, version: 1 } : { seed: SEED, version: 1, preset };
