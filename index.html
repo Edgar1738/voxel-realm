@@ -181,6 +181,26 @@
         color: #fff;
         box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.55);
       }
+      .skin-btn {
+        width: 168px;
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        color: rgba(238, 242, 246, 0.82);
+        font-size: 12px;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition:
+          color 120ms ease,
+          box-shadow 160ms ease;
+      }
+      .skin-btn:hover {
+        color: #fff;
+        box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.42);
+      }
       /* Tunnel settings strip: wraps onto its own dock row below the tool rail. */
       .tunnel-settings {
         flex-basis: 100%;
@@ -263,7 +283,9 @@
         border-radius: 7px;
         background: transparent;
         color: rgba(238, 242, 246, 0.75);
-        transition: color 120ms ease, background-color 140ms ease;
+        transition:
+          color 120ms ease,
+          background-color 140ms ease;
       }
       .sound-btn:hover {
         color: #eef2f6;
@@ -813,10 +835,9 @@
     <div id="overlay">
       Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use
       tool, RMB place, MMB pick · 1-9 hotbar slot, wheel cycle, I inventory, T cycle tool (box
-      tools: click two corners) · B build mode: click two corners, then X fill · G clear · R
-      replace · C copy, click to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · Shift+wheel
-      adjust reach · V placement ghost · L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use
-      the menus
+      tools: click two corners) · B build mode: click two corners, then X fill · G clear · R replace
+      · C copy, click to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · Shift+wheel adjust
+      reach · V placement ghost · L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
     </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>
