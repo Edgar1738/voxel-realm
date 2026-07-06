@@ -162,6 +162,77 @@ const SPEAKER_SHAPES: Record<'on' | 'off', ReadonlyArray<[string, Record<string,
   ],
 };
 
+type IconShapes = ReadonlyArray<[string, Record<string, string>]>;
+
+/** Sun disc + eight rays; shown on the time slider when it's daytime. */
+const SUN_SHAPES: IconShapes = [
+  ['circle', { cx: '7', cy: '7', r: '2.6', fill: 'currentColor' }],
+  ...([
+    'M7 0.6 V2.3',
+    'M7 11.7 V13.4',
+    'M0.6 7 H2.3',
+    'M11.7 7 H13.4',
+    'M2.5 2.5 L3.7 3.7',
+    'M11.5 2.5 L10.3 3.7',
+    'M2.5 11.5 L3.7 10.3',
+    'M11.5 11.5 L10.3 10.3',
+  ].map(
+    (d): [string, Record<string, string>] => [
+      'path',
+      { d, stroke: 'currentColor', 'stroke-width': '1.2', 'stroke-linecap': 'round' },
+    ],
+  )),
+];
+
+/** Crescent moon; shown on the time slider at night. */
+const MOON_SHAPES: IconShapes = [
+  ['path', { d: 'M9.2 2.6 A5 5 0 1 0 9.2 11.4 A3.9 3.9 0 1 1 9.2 2.6 Z', fill: 'currentColor' }],
+];
+
+/** Shared cloud body for the precipitation weather icons. */
+const CLOUD_SHAPE: [string, Record<string, string>] = [
+  'path',
+  {
+    d: 'M3.6 9.4 A2.3 2.3 0 0 1 3.9 5 A3 3 0 0 1 9.6 5.2 A2.2 2.2 0 0 1 10 9.4 Z',
+    fill: 'currentColor',
+    'fill-opacity': '0.92',
+  },
+];
+
+/** Weather-mode icons: sun (clear), cloud+drops (rain), bolt (storm), flakes (snow), cycle (auto). */
+const WEATHER_ICON_SHAPES: Record<string, IconShapes> = {
+  clear: SUN_SHAPES,
+  rain: [
+    CLOUD_SHAPE,
+    ...(['M5 10.4 L4.3 12.2', 'M7 10.4 L6.3 12.2', 'M9 10.4 L8.3 12.2'].map(
+      (d): [string, Record<string, string>] => [
+        'path',
+        { d, stroke: 'currentColor', 'stroke-width': '1.1', 'stroke-linecap': 'round' },
+      ],
+    )),
+  ],
+  storm: [CLOUD_SHAPE, ['path', { d: 'M7.4 9.2 L5 12.1 H6.6 L6 14 L9 10.9 H7.4 Z', fill: 'currentColor' }]],
+  snow: [
+    CLOUD_SHAPE,
+    ['circle', { cx: '5', cy: '11.6', r: '0.7', fill: 'currentColor' }],
+    ['circle', { cx: '7', cy: '12.3', r: '0.7', fill: 'currentColor' }],
+    ['circle', { cx: '9', cy: '11.6', r: '0.7', fill: 'currentColor' }],
+  ],
+  auto: [
+    [
+      'path',
+      {
+        d: 'M10.8 4.6 A4.2 4.2 0 1 0 12 8',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.3',
+        'stroke-linecap': 'round',
+      },
+    ],
+    ['path', { d: 'M8.2 3.3 L11 4.3 L10.2 7 Z', fill: 'currentColor' }],
+  ],
+};
+
 /** Builds a 14px inline-SVG icon from typed shape specs (no innerHTML — trusted nodes). */
 function buildIcon(shapes: ReadonlyArray<[string, Record<string, string>]>): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
@@ -261,6 +332,9 @@ export interface TourHudStatus {
   done: boolean;
 }
 
+/** Weather-cycle button states: the four pinned conditions plus the automatic cycle. */
+export type ClimateMode = 'auto' | 'clear' | 'rain' | 'storm' | 'snow';
+
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
   hotbar: HTMLDivElement;
@@ -284,6 +358,13 @@ export interface CreativeUi {
   volumeSlider: HTMLInputElement;
   /** Syncs the sound controls to the engine state (icon, slider position, dimming). */
   setSoundUi(volume: number, muted: boolean): void;
+  /** Climate controls: weather-cycle button + time-of-day slider (wired by Game). */
+  weatherButton: HTMLButtonElement;
+  timeSlider: HTMLInputElement;
+  /** Sets the weather button's icon + label to the current mode (Game reflects `__vr` here too). */
+  setWeatherUi(mode: ClimateMode): void;
+  /** Moves the time slider + day/night icon to `t` (0=midnight … 0.5=noon … 1=midnight). */
+  setTimeUi(t: number): void;
   /** Highlights the button for `tool` and dims the rest. */
   setActiveTool(tool: string): void;
   /** Updates the dock's reach readout (the +/- buttons report steps via onReachStep). */
@@ -536,12 +617,56 @@ export function createCreativeUi(
     soundGroup.classList.toggle('is-muted', muted);
   };
 
+  // Climate controls: weather-cycle button + time-of-day slider. State/behavior wired by Game;
+  // stays visible in play mode (like the sound group) so roamers can set the mood without tools.
+  const WEATHER_LABEL: Record<ClimateMode, string> = {
+    auto: 'Auto',
+    clear: 'Clear',
+    rain: 'Rain',
+    storm: 'Storm',
+    snow: 'Snow',
+  };
+  const climateGroup = document.createElement('div');
+  climateGroup.className = 'climate-group';
+  const weatherButton = document.createElement('button');
+  weatherButton.type = 'button';
+  weatherButton.className = 'climate-btn';
+  const timeIcon = document.createElement('span');
+  timeIcon.className = 'climate-time-icon';
+  timeIcon.setAttribute('aria-hidden', 'true');
+  const timeSlider = document.createElement('input');
+  timeSlider.type = 'range';
+  timeSlider.className = 'climate-slider';
+  timeSlider.min = '0';
+  timeSlider.max = '1000';
+  timeSlider.step = '1';
+  timeSlider.setAttribute('aria-label', 'Time of day');
+  climateGroup.append(weatherButton, timeIcon, timeSlider);
+
+  const setWeatherUi = (mode: ClimateMode): void => {
+    const label = document.createElement('span');
+    label.className = 'climate-label';
+    label.textContent = WEATHER_LABEL[mode];
+    weatherButton.replaceChildren(buildIcon(WEATHER_ICON_SHAPES[mode]), label);
+    const title = `Weather: ${WEATHER_LABEL[mode]} — click to cycle`;
+    weatherButton.title = title;
+    weatherButton.setAttribute('aria-label', title);
+  };
+  const setTimeUi = (t: number): void => {
+    timeSlider.value = String(Math.round(t * 1000));
+    // Sun through the day, moon overnight — mirrors the sky's daylight window.
+    timeIcon.replaceChildren(buildIcon(t > 0.23 && t < 0.77 ? SUN_SHAPES : MOON_SHAPES));
+  };
+  setWeatherUi('auto');
+  setTimeUi(0.5);
+
   // tunnelSettings goes last with flex-basis 100% so it wraps onto its own dock row.
   dock.append(
     toolRow,
     reachGroup,
     holdButton,
     soundGroup,
+    climateGroup,
     infoButton,
     modeButton,
     blueprintButton,
@@ -1116,6 +1241,10 @@ export function createCreativeUi(
     muteButton,
     volumeSlider,
     setSoundUi,
+    weatherButton,
+    timeSlider,
+    setWeatherUi,
+    setTimeUi,
     setActiveTool,
     setReachValue,
     setHoldRepeatUi,

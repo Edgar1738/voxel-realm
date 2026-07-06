@@ -23,6 +23,10 @@ type FakeUi = {
   tourEnd: { addEventListener: (...args: unknown[]) => void };
   muteButton: { addEventListener: (...args: unknown[]) => void };
   volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
+  weatherButton: { addEventListener: (...args: unknown[]) => void };
+  timeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
+  setWeatherUi: (mode: string) => void;
+  setTimeUi: (t: number) => void;
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setReachValue: (reach: number) => void;
@@ -52,6 +56,10 @@ function makeUi(): FakeUi {
     tourEnd: { addEventListener: vi.fn() },
     muteButton: { addEventListener: vi.fn() },
     volumeSlider: { addEventListener: vi.fn(), value: '60' },
+    weatherButton: { addEventListener: vi.fn() },
+    timeSlider: { addEventListener: vi.fn(), value: '500' },
+    setWeatherUi: vi.fn(),
+    setTimeUi: vi.fn(),
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setReachValue: vi.fn(),
@@ -147,12 +155,18 @@ vi.mock('../src/render/ChunkMeshRegistry', () => ({
 }));
 
 vi.mock('../src/render/CameraRig', () => ({
+  THIRD_PERSON_DISTANCE: 4,
+  lookDirectionFromYawPitch: (yaw: number, pitch: number) => {
+    const cp = Math.cos(pitch);
+    return { x: -cp * Math.sin(yaw), y: Math.sin(pitch), z: -cp * Math.cos(yaw) };
+  },
   CameraRig: vi.fn(function CameraRig(...args: unknown[]) {
     boot.cameraRigConstructorArgs = args;
     const rig = {
       yaw: 0,
       pitch: 0,
       locked: false,
+      mode: 'first' as 'first' | 'third',
       getInput: vi.fn(() => ({
         forward: false,
         back: false,
@@ -163,6 +177,11 @@ vi.mock('../src/render/CameraRig', () => ({
         toggleFly: false,
       })),
       applyEye: vi.fn(),
+      applyPlayerView: vi.fn(),
+      toggleMode: vi.fn(() => {
+        rig.mode = rig.mode === 'first' ? 'third' : 'first';
+        return rig.mode;
+      }),
       dispose: boot.rigDispose,
     };
     boot.rigInstance = rig;

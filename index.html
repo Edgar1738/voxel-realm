@@ -277,6 +277,48 @@
         opacity: 0.35;
       }
 
+      /* ---- Climate controls (weather cycle + time-of-day slider) ---- */
+      .climate-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .climate-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 8px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: rgba(238, 242, 246, 0.8);
+        font-size: 12px;
+        transition:
+          color 120ms ease,
+          background-color 140ms ease;
+      }
+      .climate-btn:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .climate-label {
+        min-width: 34px;
+        text-align: left;
+      }
+      .climate-time-icon {
+        display: inline-flex;
+        align-items: center;
+        color: rgba(238, 242, 246, 0.7);
+      }
+      .climate-slider {
+        width: 84px;
+        accent-color: #ffd34d;
+      }
+
       /* ---- Status toast (centered, above hotbar) ---- */
       .creative-status {
         position: fixed;

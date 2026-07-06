@@ -2,7 +2,6 @@ import type { EditService } from '../edit/EditService';
 import type { EditOutcome, SetVoxel, WorldVoxel } from '../edit/EditTypes';
 import type { CreativeInventory } from './CreativeInventory';
 import type { CameraRig } from '../render/CameraRig';
-import type { Renderer } from '../render/Renderer';
 import type { ChunkManager } from '../world/ChunkManager';
 import { raycastVoxels, type VoxelRaycastHit } from '../edit/VoxelRaycast';
 import { boxVoxels, sphereVoxels, tunnelConfigVoxels, type TunnelConfig } from '../edit/Brushes';
@@ -12,6 +11,7 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import { MAX_EDIT_VOXELS } from './editCap';
 import { gateToggleEdit } from './useAction';
 import { resolveTarget, type PreviewDeps } from './targetPreview';
+import type { InteractionRay } from './aim';
 import { resolveBuilderIntent, type BuilderIntent } from './builderInput';
 import type { BuilderMode } from './BuilderState';
 import type { ExperienceMode } from './experienceMode';
@@ -176,6 +176,8 @@ export interface InputCallbacks {
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
   onToggleHeadlamp: () => void;
+  /** Invoked when F1 is pressed — toggles first/third-person (works in play and build modes). */
+  onToggleView: () => void;
   /** Invoked after a Shift+wheel reach change, with the new reach value. */
   onReachChange: (reach: number) => void;
 }
@@ -183,12 +185,13 @@ export interface InputCallbacks {
 export interface InputContext {
   canvas: HTMLCanvasElement;
   rig: CameraRig;
-  renderer: Renderer;
   manager: ChunkManager;
   inventory: CreativeInventory;
   registry: BlockRegistry;
   edit: EditService;
   previewDeps: PreviewDeps;
+  /** Interaction ray (eye origin + yaw/pitch look), independent of the render camera's transform. */
+  aim: () => InteractionRay;
   callbacks: InputCallbacks;
 }
 
@@ -206,12 +209,19 @@ export function editMessage(action: 'undo' | 'redo', outcome: EditOutcome): stri
 export function registerInputListeners(ctx: InputContext): () => void {
   const controller = new AbortController();
   const { signal } = controller;
-  const { canvas, rig, renderer, manager, inventory, registry, edit, previewDeps, callbacks } = ctx;
+  const { canvas, rig, manager, inventory, registry, edit, previewDeps, aim, callbacks } = ctx;
 
   // Single merged keydown handler covering both tool shortcuts and undo/redo.
   window.addEventListener(
     'keydown',
     (e) => {
+      // Perspective toggle works in both play and build modes (default browser F1 opens help).
+      if (e.code === 'F1') {
+        e.preventDefault();
+        callbacks.onToggleView();
+        return;
+      }
+
       // Play mode: creative shortcuts are inert. B enters build mode; L (headlamp) passes
       // through below; movement/look/fly live in CameraRig and are untouched.
       if (!creativeInputAllowed(callbacks.getExperienceMode())) {
@@ -300,13 +310,15 @@ export function registerInputListeners(ctx: InputContext): () => void {
 
   const targetKey = (v: { x: number; y: number; z: number }): string => `${v.x},${v.y},${v.z}`;
 
-  const raycastHit = (): VoxelRaycastHit | undefined =>
-    raycastVoxels(
+  const raycastHit = (): VoxelRaycastHit | undefined => {
+    const { origin, dir } = aim();
+    return raycastVoxels(
       { getBlock: (x, y, z) => manager.getBlock(x, y, z) },
-      renderer.camera.position,
-      rig.forward(),
+      origin,
+      dir,
       getReach(),
     );
+  };
 
   /** Digs with the active primary tool (single break or configured tunnel). */
   const performDig = (hit: VoxelRaycastHit): void => {

@@ -86,8 +86,10 @@ const SHAPED_SHAPES: ReadonlySet<string> = new Set([
  * newly desired chunks under a per-frame budget, nearest first. When a chunk meshes,
  * its already-meshed edge neighbors re-mesh so border seams resolve.
  *
- * Edits are batched: `applyEdits` mutates all voxels, then re-meshes each touched chunk (and
- * any touched border neighbor) exactly once and notifies persistence once per touched chunk.
+ * Edits are batched: `applyEdits` mutates all voxels, relights synchronously, then re-meshes each
+ * touched chunk (and any touched border neighbor) once via {@link dispatchMesh} — off the main
+ * thread when a mesh pool is present, so holding a dig/place doesn't stutter the frame. Without a
+ * pool it falls back to synchronous meshing. Persistence is notified once per touched chunk.
  * Deltas are stored as diffs from generated terrain, so reverting a voxel to its terrain
  * value removes the delta.
  */
@@ -512,7 +514,7 @@ export class ChunkManager {
         old[2] !== newExport[2] ||
         old[3] !== newExport[3];
       this.borderExports.set(key, newExport);
-      this.meshChunk(cx, cz);
+      this.dispatchMesh(cx, cz);
       if (exportChanged) borderChangedKeys.add(key);
     }
 
@@ -525,7 +527,7 @@ export class ChunkManager {
         const nb = this.store.get(cx + dx, cz + dz);
         if (nb) {
           const nbExportChanged = this.recomputeLight(nb.data);
-          this.meshChunk(cx + dx, cz + dz);
+          this.dispatchMesh(cx + dx, cz + dz);
           if (nbExportChanged) {
             this.relightNeighbors(cx + dx, cz + dz);
           }
@@ -783,7 +785,7 @@ export class ChunkManager {
       // Re-light and only re-mesh if the neighbor's border export actually changed.
       const exportChanged = this.recomputeLight(nb.data);
       if (exportChanged) {
-        this.meshChunk(cx + dx, cz + dz);
+        this.dispatchMesh(cx + dx, cz + dz);
       }
     }
   }
@@ -813,7 +815,7 @@ export class ChunkManager {
   }
 
   /**
-   * Synchronous mesh (edits, preloads, and the no-pool default): meshes on this thread and
+   * Synchronous mesh (preloads and the no-pool default): meshes on this thread and
    * uploads immediately. Bumps the generation so a stale in-flight worker result can't
    * overwrite this fresher mesh.
    */
