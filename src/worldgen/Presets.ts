@@ -3,7 +3,8 @@ import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
-import { scatterTrees } from './TreeScatterer';
+import { scatterOaks, scatterForest, scatterCacti } from './treePrefabs';
+import { layeredSurfaceAt } from './layeredHeight';
 import { scatterDecorations } from './Decorations';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
@@ -209,7 +210,7 @@ export function createGenerator(preset: WorldPreset): {
     case 'amplified':
       return {
         generator: new HeightGenerator(amplifiedHeight, SEA_LEVEL),
-        overlays: [scatterTrees],
+        overlays: [scatterOaks(amplifiedHeight, SEA_LEVEL)],
       };
     case 'islands':
       return { generator: new HeightGenerator(islandsHeight, SEA_LEVEL), overlays: [] };
@@ -217,6 +218,9 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(canyonHeight, SEA_LEVEL),
         overlays: [
+          // Oaks crown the mesa; ravine floors sit below sea level, so the grass gate keeps trees
+          // off the canyon bottoms automatically.
+          scatterOaks(canyonHeight, SEA_LEVEL),
           scatterStructures([ruinedTower(), brokenWall(), brokenWall()], {
             cellSize: 48,
             density: 0.5,
@@ -230,7 +234,9 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
-          scatterTrees,
+          // Richer prefab oaks whose canopies span chunk borders, rooted only on grass. Runs before
+          // the building scatter so cottages still clear any trees inside their footprint.
+          scatterOaks(plainsHeight, SEA_LEVEL),
           scatterStructures([cottage(), cottage(), well(), lampPost()], {
             cellSize: 80,
             density: 0.6,
@@ -247,7 +253,7 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
-          scatterTrees,
+          scatterOaks(plainsHeight, SEA_LEVEL),
           scatterStructures([barn(), watchtower(), marketStall(), farmPlot(), bridge()], {
             cellSize: 72,
             density: 0.6,
@@ -261,7 +267,13 @@ export function createGenerator(preset: WorldPreset): {
         ],
       };
     case 'caverns':
-      return { generator: createCavernsGenerator(), overlays: [scatterTrees] };
+      return {
+        generator: createCavernsGenerator(),
+        overlays: [
+          scatterForest(layeredSurfaceAt, SEA_LEVEL),
+          scatterCacti(layeredSurfaceAt, SEA_LEVEL),
+        ],
+      };
     case 'citadel':
       return {
         generator: createCitadelGenerator(),
@@ -296,6 +308,13 @@ export function createGenerator(preset: WorldPreset): {
       };
     case 'default':
     default:
-      return { generator: createWorldGenerator(), overlays: [scatterTrees, scatterDecorations()] };
+      return {
+        generator: createWorldGenerator(),
+        overlays: [
+          scatterForest(layeredSurfaceAt, SEA_LEVEL),
+          scatterCacti(layeredSurfaceAt, SEA_LEVEL),
+          scatterDecorations(),
+        ],
+      };
   }
 }

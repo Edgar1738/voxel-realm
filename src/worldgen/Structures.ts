@@ -14,6 +14,19 @@ import type { Prefab } from '../core/Prefab';
  */
 export type Structure = Prefab;
 
+/** What a `canPlace` predicate is told about a resolved candidate before it's committed. */
+export interface PlacementContext {
+  seed: WorldSeed;
+  /** Grid cell the candidate belongs to. */
+  cellX: number;
+  cellZ: number;
+  /** Resolved min-corner world position of the placement. */
+  ox: number;
+  oz: number;
+  /** The anchored base Y (same value the placement will use for `oy`). */
+  surfaceY: number;
+}
+
 export interface ScatterOptions {
   /** One spawning candidate per `cellSize` x `cellSize` world region. */
   cellSize: number;
@@ -43,6 +56,18 @@ export interface ScatterOptions {
    * - 'min': the lowest surface under the footprint, so a structure on a slope never floats.
    */
   anchor?: 'corner' | 'min';
+  /**
+   * Seat the placement by an interior column at this `[dx, dz]` offset from the min corner, instead
+   * of a footprint corner. Set it to a tree's trunk column so a wide canopy never tilts the seating
+   * on sloped ground. Takes precedence over `anchor`.
+   */
+  anchorOffset?: [number, number];
+  /**
+   * Per-candidate placement veto, run after the world position is resolved. Return false to drop
+   * that candidate (e.g. a tree that must only root on grass, or only in certain biomes). Rejecting
+   * a cluster member skips just that member; the rest of the cluster still resolves.
+   */
+  canPlace?: (ctx: PlacementContext) => boolean;
 }
 
 /** Resolve a placement's base Y from the chosen anchoring strategy. */
@@ -55,6 +80,12 @@ function anchorY(
   dimZ: number,
 ): number {
   const { surfaceAt } = opts;
+  // An explicit interior anchor column wins: seat a tree by its trunk, not a canopy corner, so it
+  // never floats or buries on a slope.
+  if (opts.anchorOffset) {
+    const [ax, az] = opts.anchorOffset;
+    return Math.round(surfaceAt(seed, ox + ax, oz + az));
+  }
   if (opts.anchor !== 'min') return Math.round(surfaceAt(seed, ox, oz));
   return Math.round(
     Math.min(
@@ -121,6 +152,7 @@ export function placementsAt(
     const ox = clamp(centerX + Math.round((rng() * 2 - 1) * radius), cellX * cellSize, maxX);
     const oz = clamp(centerZ + Math.round((rng() * 2 - 1) * radius), cellZ * cellSize, maxZ);
     const oy = anchorY(opts, seed, ox, oz, dimX, dimZ);
+    if (opts.canPlace && !opts.canPlace({ seed, cellX, cellZ, ox, oz, surfaceY: oy })) continue;
     placements.push({ structure, ox, oy, oz });
   }
   return placements;

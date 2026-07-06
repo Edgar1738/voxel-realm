@@ -135,6 +135,80 @@ describe('placementsAt (clusters)', () => {
   });
 });
 
+describe('canPlace filter', () => {
+  const opts = { cellSize: 8, surfaceAt: flatAt, density: 1, salt: 0 };
+
+  it('drops placements that canPlace rejects', () => {
+    expect(placementsAt([box()], { ...opts, canPlace: () => false }, 1337, 0, 0)).toEqual([]);
+  });
+
+  it('keeps placements canPlace accepts', () => {
+    const ps = placementsAt([box()], { ...opts, canPlace: () => true }, 1337, 0, 0);
+    expect(ps.length).toBeGreaterThan(0);
+  });
+
+  it('passes the resolved world position and surface height to canPlace', () => {
+    const seen: Array<{ ox: number; oz: number; surfaceY: number; seed: number }> = [];
+    const ps = placementsAt(
+      [box()],
+      {
+        ...opts,
+        canPlace: (ctx) => {
+          seen.push({ ox: ctx.ox, oz: ctx.oz, surfaceY: ctx.surfaceY, seed: ctx.seed });
+          return true;
+        },
+      },
+      1337,
+      0,
+      0,
+    );
+    expect(seen).toHaveLength(ps.length);
+    expect(seen[0]).toEqual({ ox: ps[0].ox, oz: ps[0].oz, surfaceY: ps[0].oy, seed: 1337 });
+  });
+
+  it('rejects only the matching cluster members, keeping the rest', () => {
+    const clustered = {
+      ...opts,
+      clusterCount: 3,
+      canPlace: (ctx: { ox: number }) => ctx.ox % 2 === 0,
+    };
+    for (const p of placementsAt([box()], clustered, 1337, 0, 0)) {
+      expect(p.ox % 2).toBe(0);
+    }
+  });
+});
+
+describe('anchorOffset (seat by an interior column)', () => {
+  // A surface that rises one block per world-x step, so the four footprint corners differ.
+  const slope = (_seed: number, x: number, _z: number): number => x;
+
+  it('seats Y at the offset column, not the origin corner', () => {
+    const opts = {
+      cellSize: 16,
+      surfaceAt: slope,
+      density: 1,
+      salt: 0,
+      anchorOffset: [2, 0] as [number, number],
+    };
+    const p = placementAt([box()], opts, 7, 1, 0)!;
+    expect(p.oy).toBe(Math.round(slope(7, p.ox + 2, p.oz))); // trunk column, offset +2 in x
+    expect(p.oy).not.toBe(Math.round(slope(7, p.ox, p.oz))); // and NOT the origin corner
+  });
+
+  it('takes precedence over anchor:min', () => {
+    const opts = {
+      cellSize: 16,
+      surfaceAt: slope,
+      density: 1,
+      salt: 0,
+      anchor: 'min' as const,
+      anchorOffset: [2, 0] as [number, number],
+    };
+    const p = placementAt([box()], opts, 7, 1, 0)!;
+    expect(p.oy).toBe(Math.round(slope(7, p.ox + 2, p.oz)));
+  });
+});
+
 describe('minSurfaceY filter', () => {
   const opts = { cellSize: 16, surfaceAt: flatAt, density: 1, salt: 0 };
 

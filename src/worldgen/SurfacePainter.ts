@@ -3,9 +3,22 @@ import { GRASS, DIRT, STONE, SAND, SNOW, MUD } from '../blocks/blocks';
 import { Biome } from './BiomeMap';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
+import type { BlockId } from '../core/types';
 
 const DIRT_BAND = 3; // thickness of the sub-surface band
 const SNOW_LINE = 95; // any surface at/above this altitude is snow-capped
+
+/**
+ * The surface cap block for a column, from its altitude and biome. Shared so overlays (e.g. the tree
+ * scatterer deciding where an oak may root) apply the exact same rule the terrain paints with.
+ */
+export function surfaceCap(height: number, biome: Biome, seaLevel: number): BlockId {
+  if (height <= seaLevel + 1) return SAND; // beaches / lake & sea floors win over biome
+  if (height >= SNOW_LINE || biome === Biome.Tundra) return SNOW; // altitude or tundra snow
+  if (biome === Biome.Desert) return SAND;
+  if (biome === Biome.Swamp) return MUD;
+  return GRASS;
+}
 
 /** Paints the surface cap + band per column from biome, altitude, and sea level. */
 export class SurfacePainter implements TerrainStage {
@@ -18,21 +31,9 @@ export class SurfacePainter implements TerrainStage {
         const biome = ctx.biomes.biomeAt(worldX, worldZ);
         chunk.setBiome(x, z, biome);
 
-        let cap = GRASS;
-        let band = DIRT;
-        if (height <= ctx.seaLevel + 1) {
-          cap = SAND; // beaches / lake & sea floors win over biome
-          band = SAND;
-        } else if (height >= SNOW_LINE || biome === Biome.Tundra) {
-          cap = SNOW; // altitude or tundra snow, over a dirt band
-          band = DIRT;
-        } else if (biome === Biome.Desert) {
-          cap = SAND;
-          band = SAND;
-        } else if (biome === Biome.Swamp) {
-          cap = MUD;
-          band = MUD;
-        }
+        const cap = surfaceCap(height, biome, ctx.seaLevel);
+        // Grass/snow sit over a dirt band; sand and mud caps continue their own material below.
+        const band = cap === GRASS || cap === SNOW ? DIRT : cap;
 
         for (let y = 0; y <= height; y++) {
           let block = STONE;
