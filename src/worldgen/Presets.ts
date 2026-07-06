@@ -3,7 +3,7 @@ import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
-import { scatterOaks, scatterCacti } from './treePrefabs';
+import { scatterOaks, scatterForest, scatterCacti } from './treePrefabs';
 import { layeredSurfaceAt } from './layeredHeight';
 import { scatterDecorations } from './Decorations';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
@@ -270,7 +270,7 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: createCavernsGenerator(),
         overlays: [
-          scatterOaks(layeredSurfaceAt, SEA_LEVEL),
+          scatterForest(layeredSurfaceAt, SEA_LEVEL),
           scatterCacti(layeredSurfaceAt, SEA_LEVEL),
         ],
       };
@@ -311,7 +311,7 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: createWorldGenerator(),
         overlays: [
-          scatterOaks(layeredSurfaceAt, SEA_LEVEL),
+          scatterForest(layeredSurfaceAt, SEA_LEVEL),
           scatterCacti(layeredSurfaceAt, SEA_LEVEL),
           scatterDecorations(),
         ],

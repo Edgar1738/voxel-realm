@@ -5,7 +5,17 @@ import {
   resolveBootPreset,
   WORLD_PRESETS,
 } from '../src/worldgen/Presets';
-import { AIR, GRASS, SNOW, COBBLESTONE, WATER, WOOD, LEAVES, CACTUS } from '../src/blocks/blocks';
+import {
+  AIR,
+  GRASS,
+  SNOW,
+  MUD,
+  COBBLESTONE,
+  WATER,
+  WOOD,
+  LEAVES,
+  CACTUS,
+} from '../src/blocks/blocks';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
 import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
 import { layeredSurfaceAt } from '../src/worldgen/layeredHeight';
@@ -358,7 +368,8 @@ describe('default and caverns grow prefab oaks and cacti', () => {
                   biomes.biomeAt(wx, wz),
                   SEA_LEVEL,
                 );
-                if (cap !== GRASS && cap !== SNOW) oakGateOk = false;
+                // broadleaf on grass, conifers on snow, swamp oaks on mud
+                if (cap !== GRASS && cap !== SNOW && cap !== MUD) oakGateOk = false;
               }
               if (lowCactus > 0) {
                 cactusSeen = true;
