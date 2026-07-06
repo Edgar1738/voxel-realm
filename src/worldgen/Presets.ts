@@ -4,6 +4,7 @@ import { mulberry32 } from '../core/math';
 import { ChunkData } from '../world/ChunkData';
 import { AIR, GRASS, DIRT, STONE, COBBLESTONE, GRAVEL } from '../blocks/blocks';
 import { scatterTrees } from './TreeScatterer';
+import { scatterOaks } from './treePrefabs';
 import { scatterDecorations } from './Decorations';
 import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator';
 import { HeightGenerator } from './HeightGenerator';
@@ -230,7 +231,9 @@ export function createGenerator(preset: WorldPreset): {
       return {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
-          scatterTrees,
+          // Richer prefab oaks whose canopies span chunk borders, rooted only on grass. Runs before
+          // the building scatter so cottages still clear any trees inside their footprint.
+          scatterOaks(plainsHeight, SEA_LEVEL),
           scatterStructures([cottage(), cottage(), well(), lampPost()], {
             cellSize: 80,
             density: 0.6,

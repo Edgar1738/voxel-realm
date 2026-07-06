@@ -5,8 +5,9 @@ import {
   resolveBootPreset,
   WORLD_PRESETS,
 } from '../src/worldgen/Presets';
-import { AIR, GRASS, COBBLESTONE, WATER } from '../src/blocks/blocks';
+import { AIR, GRASS, COBBLESTONE, WATER, WOOD, LEAVES } from '../src/blocks/blocks';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
+import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
 import type { Generator } from '../src/worldgen/Generator';
 import type { WorldPreset } from '../src/worldgen/Presets';
 import type { WorldMeta } from '../src/persistence/SaveTypes';
@@ -208,6 +209,59 @@ describe('frontier preset', () => {
     const { generator, overlays } = createGenerator('frontier');
     expect(generator).toBeDefined();
     expect(overlays.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('villages preset oaks', () => {
+  it('wires three overlays: oaks, buildings, decorations', () => {
+    expect(createGenerator('villages').overlays).toHaveLength(3);
+  });
+
+  it('grows prefab oaks rooted on grass, none in desert, with cross-chunk canopies', () => {
+    const { generator, overlays } = createGenerator('villages');
+    const oakOverlay = overlays[0];
+    const biomes = new BiomeMap(SEED);
+    let woodSeen = false;
+    let leavesSeen = false;
+    let rootsOnGrass = true;
+    let desertTrunk = false;
+    let crossChunkCanopy = false;
+
+    for (let cx = -4; cx <= 4; cx++) {
+      for (let cz = -4; cz <= 4; cz++) {
+        const c = generator.generateBaseChunk(SEED, cx, cz);
+        oakOverlay(c, cx, cz, SEED);
+        let chunkWood = false;
+        let chunkLeaves = false;
+        for (let x = 0; x < CHUNK_SIZE_X; x++) {
+          for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+            let lowestWood = -1;
+            for (let y = 0; y < WORLD_HEIGHT; y++) {
+              const v = c.get(x, y, z);
+              if (v === WOOD && lowestWood < 0) lowestWood = y;
+              if (v === LEAVES) chunkLeaves = true;
+            }
+            if (lowestWood > 0) {
+              chunkWood = true;
+              woodSeen = true;
+              if (c.get(x, lowestWood - 1, z) !== GRASS) rootsOnGrass = false;
+              const biome = biomes.biomeAt(cx * CHUNK_SIZE_X + x, cz * CHUNK_SIZE_Z + z);
+              if (biome === Biome.Desert) desertTrunk = true;
+            }
+          }
+        }
+        if (chunkLeaves) leavesSeen = true;
+        // A chunk holding canopy leaves but no trunk proves a neighbor's canopy reached across the
+        // border — impossible with the old chunk-local overlay, which dropped cross-chunk leaves.
+        if (chunkLeaves && !chunkWood) crossChunkCanopy = true;
+      }
+    }
+
+    expect(woodSeen).toBe(true);
+    expect(leavesSeen).toBe(true);
+    expect(rootsOnGrass).toBe(true);
+    expect(desertTrunk).toBe(false);
+    expect(crossChunkCanopy).toBe(true);
   });
 });
 
