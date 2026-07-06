@@ -114,6 +114,9 @@ import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
+// Camera eye eases up this many blocks/sec when the player steps up (stairs/ledges), so a
+// 1-block step-up smooths over ~110ms instead of snapping the view a full block.
+const STEP_EYE_SPEED = 9;
 
 /** Composition root: a player flying/walking and sculpting the streamed voxel world. */
 export class Game {
@@ -916,6 +919,7 @@ export class Game {
     let burstActive = true;
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
+    let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
@@ -925,6 +929,15 @@ export class Game {
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
       const eye = player.eye();
+      // Ease the camera up small step-ups (stairs/ledges) instead of snapping a full block; snap
+      // for jumps, falls, flying, and teleports so those stay responsive.
+      const stepDy = eye.y - smoothEyeY;
+      if (player.grounded && stepDy > 0 && stepDy < 1.3) {
+        smoothEyeY = Math.min(eye.y, smoothEyeY + STEP_EYE_SPEED * cdt);
+      } else {
+        smoothEyeY = eye.y;
+      }
+      const viewEye = { x: eye.x, y: smoothEyeY, z: eye.z };
       // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
       let thirdDistance = THIRD_PERSON_DISTANCE;
       if (rig.mode === 'third') {
@@ -936,7 +949,7 @@ export class Game {
           THIRD_PERSON_DISTANCE,
         );
       }
-      rig.applyPlayerView(eye, thirdDistance);
+      rig.applyPlayerView(viewEye, thirdDistance);
       avatar.update(player.position, rig.yaw, rig.mode === 'third');
       const move = movementSounds.update(
         cdt,
