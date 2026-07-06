@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   oakVariants,
+  birchVariants,
+  coniferVariants,
+  swampOakVariants,
   oakScatterOptions,
   scatterOaks,
+  scatterForest,
   cactusVariants,
   scatterCacti,
   OAK_FOOTPRINT,
   OAK_TRUNK_OFFSET,
 } from '../src/worldgen/treePrefabs';
+import type { Prefab } from '../src/core/Prefab';
 import { scatterStructures, placementAt, type PlacementContext } from '../src/worldgen/Structures';
 import { layeredSurfaceAt } from '../src/worldgen/layeredHeight';
 import { surfaceCap } from '../src/worldgen/SurfacePainter';
@@ -75,6 +80,65 @@ describe('oakVariants', () => {
   it('offers real shape variety (variants are not all identical)', () => {
     const shapes = new Set(variants.map((v) => JSON.stringify(v.blocks)));
     expect(shapes.size).toBeGreaterThan(1);
+  });
+});
+
+describe('tree species libraries', () => {
+  const species: Array<{ name: string; make: () => Prefab[] }> = [
+    { name: 'birch', make: birchVariants },
+    { name: 'conifer', make: coniferVariants },
+    { name: 'swampOak', make: swampOakVariants },
+  ];
+
+  for (const { name, make } of species) {
+    describe(name, () => {
+      const variants = make();
+
+      it('produces several variants', () => {
+        expect(variants.length).toBeGreaterThanOrEqual(6);
+      });
+
+      it('is a deterministic, pure factory', () => {
+        expect(make()).toEqual(make());
+      });
+
+      it('shares the oak footprint with a centered, contiguous trunk from dy=0', () => {
+        const [cx, cz] = OAK_TRUNK_OFFSET;
+        for (const v of variants) {
+          expect(validatePrefab(v)).toBeNull();
+          expect(v.dims[0]).toBe(OAK_FOOTPRINT);
+          expect(v.dims[2]).toBe(OAK_FOOTPRINT);
+          const ys = v.blocks
+            .filter(([x, , z, id]) => x === cx && z === cz && id === WOOD)
+            .map((b) => b[1])
+            .sort((a, b) => a - b);
+          expect(ys[0]).toBe(0);
+          for (let i = 1; i < ys.length; i++) expect(ys[i]).toBe(ys[i - 1] + 1);
+          expect(ys.length).toBeGreaterThanOrEqual(3);
+        }
+      });
+
+      it('has a rounded leaf canopy, not a solid cube', () => {
+        for (const v of variants) {
+          const leaves = v.blocks.filter((b) => b[3] === LEAVES);
+          expect(leaves.length).toBeGreaterThan(0);
+          const xs = leaves.map((b) => b[0]);
+          const ys = leaves.map((b) => b[1]);
+          const zs = leaves.map((b) => b[2]);
+          const spanX = Math.max(...xs) - Math.min(...xs) + 1;
+          const spanY = Math.max(...ys) - Math.min(...ys) + 1;
+          const spanZ = Math.max(...zs) - Math.min(...zs) + 1;
+          expect(leaves.length).toBeLessThan(spanX * spanY * spanZ);
+        }
+      });
+    });
+  }
+
+  it('each species has a distinct silhouette from oak', () => {
+    const oakSig = JSON.stringify(oakVariants()[0].blocks);
+    expect(JSON.stringify(birchVariants()[0].blocks)).not.toBe(oakSig);
+    expect(JSON.stringify(coniferVariants()[0].blocks)).not.toBe(oakSig);
+    expect(JSON.stringify(swampOakVariants()[0].blocks)).not.toBe(oakSig);
   });
 });
 
@@ -216,6 +280,52 @@ describe('cactusVariants', () => {
       const ys = c.blocks.map((b) => b[1]).sort((a, b) => a - b);
       expect(ys[0]).toBe(0);
     }
+  });
+});
+
+describe('scatterForest (biome-accurate species dispatch)', () => {
+  const snowy = (): number => 100; // >= snow line -> SNOW cap regardless of biome
+  const grassy = (): number => 70; // temperate altitude -> mostly GRASS
+  const beachy = (): number => SEA_LEVEL; // shoreline -> SAND
+
+  function counts(overlay: ReturnType<typeof scatterForest>): { wood: number; leaves: number } {
+    let wood = 0;
+    let leaves = 0;
+    for (let cx = -1; cx <= 1; cx++) {
+      for (let cz = -1; cz <= 1; cz++) {
+        const c = new ChunkData(cx, cz);
+        overlay(c, cx, cz, 1337);
+        for (const v of c.data) {
+          if (v === WOOD) wood++;
+          else if (v === LEAVES) leaves++;
+        }
+      }
+    }
+    return { wood, leaves };
+  }
+
+  it('plants conifers on snow (the broadleaf gate rejects snow, so any tree there is a conifer)', () => {
+    const { wood, leaves } = counts(scatterForest(snowy, SEA_LEVEL));
+    expect(wood).toBeGreaterThan(0);
+    expect(leaves).toBeGreaterThan(0);
+  });
+
+  it('plants broadleaf on temperate grass', () => {
+    expect(counts(scatterForest(grassy, SEA_LEVEL)).wood).toBeGreaterThan(0);
+  });
+
+  it('plants nothing on bare sand/beach', () => {
+    const { wood, leaves } = counts(scatterForest(beachy, SEA_LEVEL));
+    expect(wood).toBe(0);
+    expect(leaves).toBe(0);
+  });
+
+  it('is deterministic', () => {
+    const a = new ChunkData(0, 0);
+    const b = new ChunkData(0, 0);
+    scatterForest(snowy, SEA_LEVEL)(a, 0, 0, 1337);
+    scatterForest(snowy, SEA_LEVEL)(b, 0, 0, 1337);
+    expect(Array.from(a.data)).toEqual(Array.from(b.data));
   });
 });
 
