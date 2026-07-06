@@ -147,12 +147,18 @@ vi.mock('../src/render/ChunkMeshRegistry', () => ({
 }));
 
 vi.mock('../src/render/CameraRig', () => ({
+  THIRD_PERSON_DISTANCE: 4,
+  lookDirectionFromYawPitch: (yaw: number, pitch: number) => {
+    const cp = Math.cos(pitch);
+    return { x: -cp * Math.sin(yaw), y: Math.sin(pitch), z: -cp * Math.cos(yaw) };
+  },
   CameraRig: vi.fn(function CameraRig(...args: unknown[]) {
     boot.cameraRigConstructorArgs = args;
     const rig = {
       yaw: 0,
       pitch: 0,
       locked: false,
+      mode: 'first' as 'first' | 'third',
       getInput: vi.fn(() => ({
         forward: false,
         back: false,
@@ -163,6 +169,11 @@ vi.mock('../src/render/CameraRig', () => ({
         toggleFly: false,
       })),
       applyEye: vi.fn(),
+      applyPlayerView: vi.fn(),
+      toggleMode: vi.fn(() => {
+        rig.mode = rig.mode === 'first' ? 'third' : 'first';
+        return rig.mode;
+      }),
       dispose: boot.rigDispose,
     };
     boot.rigInstance = rig;

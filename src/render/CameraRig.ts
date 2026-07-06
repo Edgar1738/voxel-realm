@@ -1,8 +1,26 @@
 import { Euler, Vector3, type PerspectiveCamera } from 'three';
 import type { InputState } from '../player/PlayerController';
+import type { Vec3 } from '../core/types';
 
 const SENSITIVITY = 0.0025;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
+
+/** How far the third-person camera trails behind the eye, before obstruction clipping. */
+export const THIRD_PERSON_DISTANCE = 4;
+
+/** Which viewpoint the render camera uses; `first` is the classic eye-in-head view. */
+export type CameraMode = 'first' | 'third';
+
+/**
+ * Look direction for a given yaw/pitch, matching the camera's YXZ forward: −Z at yaw 0,
+ * +Y when pitched up. This is the single source of truth for the look convention, so the
+ * interaction ray (aim.ts) and the third-person offset stay aligned with the first-person view
+ * even when the render camera is pulled back off the eye.
+ */
+export function lookDirectionFromYawPitch(yaw: number, pitch: number): Vec3 {
+  const cp = Math.cos(pitch);
+  return { x: -cp * Math.sin(yaw), y: Math.sin(pitch), z: -cp * Math.cos(yaw) };
+}
 
 /**
  * Owns pointer-lock mouse-look and keyboard input, and writes the player's eye transform
@@ -13,6 +31,7 @@ export class CameraRig {
   yaw = 0;
   pitch = 0;
   locked = false;
+  mode: CameraMode = 'first';
 
   private readonly pressed = new Set<string>();
   private toggleFlyQueued = false;
@@ -126,10 +145,37 @@ export class CameraRig {
     return { x: v.x, y: v.y, z: v.z };
   }
 
-  /** Writes the eye position + look orientation to the camera. */
+  /** Flips between first- and third-person and returns the new mode. */
+  toggleMode(): CameraMode {
+    this.mode = this.mode === 'first' ? 'third' : 'first';
+    return this.mode;
+  }
+
+  /** Writes the eye position + look orientation to the camera (first-person snap). */
   applyEye(x: number, y: number, z: number): void {
     this.camera.position.set(x, y, z);
     this.euler.set(this.pitch, this.yaw, 0);
     this.camera.quaternion.setFromEuler(this.euler);
+  }
+
+  /**
+   * Positions the render camera for the current mode. Orientation is always the yaw/pitch look
+   * (identical in both modes, so the crosshair keeps pointing along the aim ray). First-person
+   * sits the camera at the eye — byte-identical to {@link applyEye}. Third-person pulls it
+   * straight back along −look by `thirdDistance` (already obstruction-clipped by the caller).
+   */
+  applyPlayerView(eye: Vec3, thirdDistance = THIRD_PERSON_DISTANCE): void {
+    this.euler.set(this.pitch, this.yaw, 0);
+    this.camera.quaternion.setFromEuler(this.euler);
+    if (this.mode === 'first') {
+      this.camera.position.set(eye.x, eye.y, eye.z);
+      return;
+    }
+    const dir = lookDirectionFromYawPitch(this.yaw, this.pitch);
+    this.camera.position.set(
+      eye.x - dir.x * thirdDistance,
+      eye.y - dir.y * thirdDistance,
+      eye.z - dir.z * thirdDistance,
+    );
   }
 }
