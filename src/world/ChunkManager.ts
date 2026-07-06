@@ -19,6 +19,13 @@ import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
 import { applyOverlays } from '../worldgen/Generator';
 import { computeChunkLight, applyBorderBlockLight, borderLightExport } from './Lighting';
+import {
+  updateBlockLight,
+  updateSkyLight,
+  type LightWorld,
+  type SkyChunk,
+  type VoxelLightProps,
+} from './IncrementalLight';
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { meshChunkView, buildMeshJob } from './meshJob';
 import type { MeshScheduler } from './MeshWorkerPool';
@@ -110,6 +117,8 @@ export class ChunkManager {
   private frameGen = 0;
   private frameMesh = 0;
   private lastStats: ChunkFrameStats = { genCount: 0, meshCount: 0, updateMs: 0 };
+  /** Main-thread wall-clock (ms) of the most recent applyEdits batch's relight+dispatch (dev). */
+  private lastEditRelightMs = 0;
   // P1: the desired chunk set is rebuilt + sorted only when the center chunk changes;
   // `hasPendingWork` keeps draining the gen/mesh backlog across same-center frames.
   private lastCenterCx: number | undefined;
@@ -159,6 +168,11 @@ export class ChunkManager {
   /** Snapshot of the most recent update()'s streaming work (dev profiler, P0). */
   get lastFrameStats(): Readonly<ChunkFrameStats> {
     return this.lastStats;
+  }
+
+  /** Main-thread cost (ms) of the most recent applyEdits batch — relight + mesh dispatch (dev). */
+  get lastEditRelight(): number {
+    return this.lastEditRelightMs;
   }
 
   /** Whether chunks are still streaming in (generation/mesh backlog not yet drained). */
@@ -407,14 +421,24 @@ export class ChunkManager {
   }
 
   /**
-   * Applies a batch of voxel edits: mutates all loaded, in-range voxels, then re-meshes each
-   * touched chunk (and any touched border neighbor) exactly once and notifies persistence
-   * once per touched chunk. Returns only the voxels that actually changed (with before/after).
+   * Applies a batch of voxel edits: mutates all loaded, in-range voxels, incrementally relights
+   * only the neighbourhood of each change ({@link updateSkyLight}/{@link updateBlockLight} — far
+   * cheaper than a whole-chunk recompute), then re-meshes each touched chunk (and any touched
+   * border neighbor) exactly once and notifies persistence once per touched chunk. Returns only
+   * the voxels that actually changed (with before/after).
    */
   applyEdits(edits: SetVoxel[]): VoxelChange[] {
+    const t0 = performance.now();
     const changes: VoxelChange[] = [];
     const editedChunks = new Set<string>();
+    // Chunks that must re-mesh: the edited chunk plus any border neighbor whose seam geometry
+    // changed. Block light can also cross a seam and dirty a chunk not on this list — those are
+    // folded in from `lightDirty` below.
     const remeshKeys = new Set<string>();
+    // Chunks whose baked block light the incremental relight actually mutated (block light
+    // crosses chunk borders). Each needs a border-export refresh + a re-mesh.
+    const lightDirty = new Set<string>();
+    const world = this.blockLightWorld(lightDirty);
 
     for (const edit of edits) {
       if (edit.y < 0 || edit.y >= WORLD_HEIGHT) continue;
@@ -430,6 +454,10 @@ export class ChunkManager {
       const nextState = edit.state ?? 0;
       if (before === edit.id && beforeState === nextState) continue;
 
+      const beforeProps: VoxelLightProps = {
+        opaque: this.registry.isOpaque(before),
+        emission: this.registry.emission(before),
+      };
       entry.data.set(lx, edit.y, lz, edit.id);
       entry.data.setState(lx, edit.y, lz, nextState);
       if (SHAPED_SHAPES.has(this.registry.shape(edit.id))) entry.data.hasShaped = true;
@@ -444,6 +472,20 @@ export class ChunkManager {
         afterState: nextState,
       });
 
+      // Incremental relight for this single voxel, interleaved with the mutation so each step
+      // transforms a correct field for the prior state into a correct one for the new state —
+      // the cross-chunk block BFS always reads live neighbor light (no stale-read two-pass dance).
+      const afterProps: VoxelLightProps = {
+        opaque: this.registry.isOpaque(edit.id),
+        emission: this.registry.emission(edit.id),
+      };
+      if (beforeProps.opaque !== afterProps.opaque) {
+        // Sky is chunk-local; only opacity changes it.
+        updateSkyLight(this.skyChunkFor(entry.data), lx, edit.y, lz, beforeProps, afterProps);
+        lightDirty.add(chunkKey(cx, cz)); // the edited chunk's sky changed -> re-mesh it
+      }
+      updateBlockLight(world, edit.x, edit.y, edit.z, beforeProps, afterProps);
+
       const key = chunkKey(cx, cz);
       editedChunks.add(key);
       remeshKeys.add(key);
@@ -453,93 +495,58 @@ export class ChunkManager {
       if (lz === CHUNK_SIZE_Z - 1) remeshKeys.add(chunkKey(cx, cz + 1));
     }
 
-    // Re-light in two passes to avoid circular stale-read artefacts when multiple
-    // chunks in the same batch exchange border light:
-    //
-    // Pass 1 — base light only: recompute each chunk's local emitter + sky light
-    //           WITHOUT reading any neighbor's blockLight (border seed reads 0 for
-    //           all chunks in the current batch). This gives every chunk a correct
-    //           locally-sourced light value before anyone reads their neighbor.
-    //
-    // Pass 2 — border seed: now that every chunk in the batch has correct local
-    //           light, run the full border-seed pass (which reads neighbor blockLight).
-    //           Chunks outside the batch already have stable values from previous frames.
-    //
-    // After both passes, re-mesh all affected chunks and propagate export changes
-    // to their outer-ring neighbors (which were NOT in the batch).
-
-    // Build set of chunk coords in the batch for the stale-read guard.
-    const batchKeys = remeshKeys;
-
-    // Pass 1: local light only — border seed skips neighbors in the batch.
-    for (const key of batchKeys) {
+    // Refresh the border-export baseline for every chunk whose block light changed (this drives
+    // the streaming relight guards, e.g. feedsBlockLight) and fold those chunks into the re-mesh
+    // set — a neighbor the BFS wrote into is not necessarily a geometry border of any edit.
+    for (const key of lightDirty) {
       const { cx, cz } = parseChunkKey(key);
-      const entry = this.store.get(cx, cz);
-      if (!entry) continue;
-      const input = {
-        isOpaque: (x: number, y: number, z: number) =>
-          this.registry.isOpaque(entry.data.get(x, y, z)),
-        emission: (x: number, y: number, z: number) =>
-          this.registry.emission(entry.data.get(x, y, z)),
-      };
-      const field = computeChunkLight(input, entry.data.maxSolidY);
-      entry.data.skyLight.set(field.sky);
-      entry.data.blockLight.set(field.block);
+      const nb = this.store.get(cx, cz);
+      if (nb) this.borderExports.set(key, borderLightExport(nb.data.blockLight));
+      remeshKeys.add(key);
     }
 
-    // Pass 2: border seed — safe to read all neighbors since local light is stable.
-    const borderChangedKeys = new Set<string>();
-    for (const key of batchKeys) {
+    for (const key of remeshKeys) {
       const { cx, cz } = parseChunkKey(key);
-      const entry = this.store.get(cx, cz);
-      if (!entry) continue;
-      const input = {
-        isOpaque: (x: number, y: number, z: number) =>
-          this.registry.isOpaque(entry.data.get(x, y, z)),
-        emission: (x: number, y: number, z: number) =>
-          this.registry.emission(entry.data.get(x, y, z)),
-      };
-      // Re-apply border seed from neighbors (now all locally stable).
-      applyBorderBlockLight(entry.data.blockLight, input, (dcx, dcz, lx, y, lz) => {
-        const nb = this.store.get(cx + dcx, cz + dcz)?.data;
-        return nb ? nb.getBlockLight(lx, y, lz) : 0;
-      });
-      // Update the border export and check for changes.
-      const newExport = borderLightExport(entry.data.blockLight);
-      const old = this.borderExports.get(key);
-      const exportChanged =
-        old === undefined ||
-        old[0] !== newExport[0] ||
-        old[1] !== newExport[1] ||
-        old[2] !== newExport[2] ||
-        old[3] !== newExport[3];
-      this.borderExports.set(key, newExport);
-      this.dispatchMesh(cx, cz);
-      if (exportChanged) borderChangedKeys.add(key);
-    }
-
-    // Propagate export changes to outer-ring neighbors (not in the batch).
-    for (const key of borderChangedKeys) {
-      const { cx, cz } = parseChunkKey(key);
-      for (const [dx, dz] of EDGE_NEIGHBORS) {
-        const nbKey = chunkKey(cx + dx, cz + dz);
-        if (batchKeys.has(nbKey)) continue; // already handled in batch
-        const nb = this.store.get(cx + dx, cz + dz);
-        if (nb) {
-          const nbExportChanged = this.recomputeLight(nb.data);
-          this.dispatchMesh(cx + dx, cz + dz);
-          if (nbExportChanged) {
-            this.relightNeighbors(cx + dx, cz + dz);
-          }
-        }
-      }
+      if (this.store.get(cx, cz)) this.dispatchMesh(cx, cz);
     }
 
     for (const key of editedChunks) {
       this.onChunkDeltaChanged?.(key, this.getChunkDelta(key));
     }
     if (changes.length > 0) this.onEditsApplied?.(changes);
+    this.lastEditRelightMs = performance.now() - t0;
     return changes;
+  }
+
+  /** Cross-chunk voxel + block-light grid the incremental block relighter reads/writes. */
+  private blockLightWorld(dirty: Set<string>): LightWorld {
+    return {
+      isOpaque: (wx, wy, wz) => this.registry.isOpaque(this.getBlock(wx, wy, wz)),
+      emission: (wx, wy, wz) => this.registry.emission(this.getBlock(wx, wy, wz)),
+      isLoaded: (wx, wz) =>
+        this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz)) !== undefined,
+      getBlockLight: (wx, wy, wz) => this.getBlockLight(wx, wy, wz),
+      setBlockLight: (wx, wy, wz, v) => {
+        const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+        if (entry) entry.data.blockLight[voxelIndex(worldToLocal(wx), wy, worldToLocal(wz))] = v;
+      },
+      markDirty: (wx, wz) => dirty.add(chunkKey(worldToChunkCoord(wx), worldToChunkCoord(wz))),
+    };
+  }
+
+  /** Chunk-local sky-light grid over one chunk (maxSolidY read live as edits update it). */
+  private skyChunkFor(data: ChunkData): SkyChunk {
+    const registry = this.registry;
+    return {
+      get maxSolidY() {
+        return data.maxSolidY;
+      },
+      isOpaque: (x, y, z) => registry.isOpaque(data.get(x, y, z)),
+      getSky: (x, y, z) => data.skyLight[voxelIndex(x, y, z)],
+      setSky: (x, y, z, v) => {
+        data.skyLight[voxelIndex(x, y, z)] = v;
+      },
+    };
   }
 
   /** Convenience single-voxel edit; returns whether the voxel changed. */
@@ -764,30 +771,6 @@ export class ChunkManager {
       old[3] !== newExport[3];
     this.borderExports.set(key, newExport);
     return exportChanged;
-  }
-
-  /**
-   * Neighbor re-lighting: for each of the 4 horizontal neighbors of (cx,cz), if the
-   * neighbor is already lit (Generated or Meshed), re-light it and re-mesh it so it
-   * can pick up the updated border contribution from (cx,cz). Guards against infinite
-   * ping-pong by only triggering when the neighbor's own border export actually changes
-   * (recomputeLight returns true).
-   *
-   * Only called when THIS chunk's export changed, and only propagates ONE level out
-   * (the re-lit neighbor's own export change is handled in its own recomputeLight call,
-   * which will trigger its own round for its neighbors if needed — but since block light
-   * attenuates by 1 per step, the cascade naturally terminates within 15 chunks).
-   */
-  private relightNeighbors(cx: number, cz: number): void {
-    for (const [dx, dz] of EDGE_NEIGHBORS) {
-      const nb = this.store.get(cx + dx, cz + dz);
-      if (!nb) continue;
-      // Re-light and only re-mesh if the neighbor's border export actually changed.
-      const exportChanged = this.recomputeLight(nb.data);
-      if (exportChanged) {
-        this.dispatchMesh(cx + dx, cz + dz);
-      }
-    }
   }
 
   /**
