@@ -167,7 +167,7 @@ type IconShapes = ReadonlyArray<[string, Record<string, string>]>;
 /** Sun disc + eight rays; shown on the time slider when it's daytime. */
 const SUN_SHAPES: IconShapes = [
   ['circle', { cx: '7', cy: '7', r: '2.6', fill: 'currentColor' }],
-  ...([
+  ...[
     'M7 0.6 V2.3',
     'M7 11.7 V13.4',
     'M0.6 7 H2.3',
@@ -176,12 +176,10 @@ const SUN_SHAPES: IconShapes = [
     'M11.5 2.5 L10.3 3.7',
     'M2.5 11.5 L3.7 10.3',
     'M11.5 11.5 L10.3 10.3',
-  ].map(
-    (d): [string, Record<string, string>] => [
-      'path',
-      { d, stroke: 'currentColor', 'stroke-width': '1.2', 'stroke-linecap': 'round' },
-    ],
-  )),
+  ].map((d): [string, Record<string, string>] => [
+    'path',
+    { d, stroke: 'currentColor', 'stroke-width': '1.2', 'stroke-linecap': 'round' },
+  ]),
 ];
 
 /** Crescent moon; shown on the time slider at night. */
@@ -204,14 +202,17 @@ const WEATHER_ICON_SHAPES: Record<string, IconShapes> = {
   clear: SUN_SHAPES,
   rain: [
     CLOUD_SHAPE,
-    ...(['M5 10.4 L4.3 12.2', 'M7 10.4 L6.3 12.2', 'M9 10.4 L8.3 12.2'].map(
+    ...['M5 10.4 L4.3 12.2', 'M7 10.4 L6.3 12.2', 'M9 10.4 L8.3 12.2'].map(
       (d): [string, Record<string, string>] => [
         'path',
         { d, stroke: 'currentColor', 'stroke-width': '1.1', 'stroke-linecap': 'round' },
       ],
-    )),
+    ),
   ],
-  storm: [CLOUD_SHAPE, ['path', { d: 'M7.4 9.2 L5 12.1 H6.6 L6 14 L9 10.9 H7.4 Z', fill: 'currentColor' }]],
+  storm: [
+    CLOUD_SHAPE,
+    ['path', { d: 'M7.4 9.2 L5 12.1 H6.6 L6 14 L9 10.9 H7.4 Z', fill: 'currentColor' }],
+  ],
   snow: [
     CLOUD_SHAPE,
     ['circle', { cx: '5', cy: '11.6', r: '0.7', fill: 'currentColor' }],

@@ -355,7 +355,13 @@ export class Game {
 
     // Climate controls: weather-cycle button + time-of-day slider. The engine logic already
     // exists (weatherClock/daynight); these just drive it and keep the UI and `__vr` in sync.
-    const WEATHER_CYCLE: readonly (WeatherKind | 'auto')[] = ['auto', 'clear', 'rain', 'storm', 'snow'];
+    const WEATHER_CYCLE: readonly (WeatherKind | 'auto')[] = [
+      'auto',
+      'clear',
+      'rain',
+      'storm',
+      'snow',
+    ];
     let weatherMode: WeatherKind | 'auto' = 'auto';
     let scrubbingTime = false;
     const applyWeatherMode = (mode: WeatherKind | 'auto'): void => {
