@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SurfacePainter } from '../src/worldgen/SurfacePainter';
+import { SurfacePainter, surfaceCap } from '../src/worldgen/SurfacePainter';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_AREA, SEA_LEVEL } from '../src/core/constants';
 import { AIR, GRASS, DIRT, STONE, SAND, SNOW, MUD } from '../src/blocks/blocks';
@@ -74,5 +74,26 @@ describe('SurfacePainter biome caps', () => {
     stage.apply(chunk, ctx(top, Biome.Swamp));
     expect(chunk.get(0, top, 0)).toBe(MUD);
     expect(chunk.get(0, top - 1, 0)).toBe(MUD);
+  });
+});
+
+describe('surfaceCap (shared cap rule)', () => {
+  it('grass on a mid-altitude plains column', () => {
+    expect(surfaceCap(70, Biome.Plains, SEA_LEVEL)).toBe(GRASS);
+  });
+
+  it('sand at or below the beach line, whatever the biome', () => {
+    expect(surfaceCap(SEA_LEVEL + 1, Biome.Tundra, SEA_LEVEL)).toBe(SAND);
+    expect(surfaceCap(SEA_LEVEL, Biome.Plains, SEA_LEVEL)).toBe(SAND);
+  });
+
+  it('snow for tundra and for anything above the snow line', () => {
+    expect(surfaceCap(70, Biome.Tundra, SEA_LEVEL)).toBe(SNOW);
+    expect(surfaceCap(120, Biome.Plains, SEA_LEVEL)).toBe(SNOW);
+  });
+
+  it('sand for desert, mud for swamp', () => {
+    expect(surfaceCap(70, Biome.Desert, SEA_LEVEL)).toBe(SAND);
+    expect(surfaceCap(70, Biome.Swamp, SEA_LEVEL)).toBe(MUD);
   });
 });
