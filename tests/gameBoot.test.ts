@@ -23,6 +23,10 @@ type FakeUi = {
   tourEnd: { addEventListener: (...args: unknown[]) => void };
   muteButton: { addEventListener: (...args: unknown[]) => void };
   volumeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
+  weatherButton: { addEventListener: (...args: unknown[]) => void };
+  timeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
+  setWeatherUi: (mode: string) => void;
+  setTimeUi: (t: number) => void;
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setReachValue: (reach: number) => void;
@@ -52,6 +56,10 @@ function makeUi(): FakeUi {
     tourEnd: { addEventListener: vi.fn() },
     muteButton: { addEventListener: vi.fn() },
     volumeSlider: { addEventListener: vi.fn(), value: '60' },
+    weatherButton: { addEventListener: vi.fn() },
+    timeSlider: { addEventListener: vi.fn(), value: '500' },
+    setWeatherUi: vi.fn(),
+    setTimeUi: vi.fn(),
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setReachValue: vi.fn(),

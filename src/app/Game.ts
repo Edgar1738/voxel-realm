@@ -353,6 +353,43 @@ export class Game {
       audio.playTick(); // audible feedback while dragging
     });
 
+    // Climate controls: weather-cycle button + time-of-day slider. The engine logic already
+    // exists (weatherClock/daynight); these just drive it and keep the UI and `__vr` in sync.
+    const WEATHER_CYCLE: readonly (WeatherKind | 'auto')[] = ['auto', 'clear', 'rain', 'storm', 'snow'];
+    let weatherMode: WeatherKind | 'auto' = 'auto';
+    let scrubbingTime = false;
+    const applyWeatherMode = (mode: WeatherKind | 'auto'): void => {
+      weatherMode = mode;
+      if (mode === 'auto') {
+        weatherClock.resume();
+      } else {
+        weatherClock.force(mode);
+        weather.setKind(mode);
+      }
+      ui.setWeatherUi(mode);
+    };
+    ui.setWeatherUi(weatherMode); // reflect the default (auto) without re-rolling the clock
+    ui.weatherButton.addEventListener('click', () => {
+      const next = WEATHER_CYCLE[(WEATHER_CYCLE.indexOf(weatherMode) + 1) % WEATHER_CYCLE.length];
+      applyWeatherMode(next);
+      setStatus(next === 'auto' ? 'Weather: auto cycle' : `Weather: ${next}`);
+    });
+
+    // The slider tracks the day cycle each frame, except while the player is actively scrubbing it.
+    ui.setTimeUi(daynight.time);
+    ui.timeSlider.addEventListener('pointerdown', () => {
+      scrubbingTime = true;
+    });
+    ui.timeSlider.addEventListener('input', () => {
+      daynight.set(Number(ui.timeSlider.value) / 1000);
+    });
+    const stopScrub = (): void => {
+      scrubbingTime = false;
+    };
+    ui.timeSlider.addEventListener('pointerup', stopScrub);
+    ui.timeSlider.addEventListener('blur', stopScrub);
+    window.addEventListener('pointerup', stopScrub);
+
     ui.picker.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
       if (!btn) return;
@@ -878,6 +915,7 @@ export class Game {
       const cdt = Math.min(dt, MAX_DT);
       if (import.meta.env.DEV) devRoam?.step(cdt);
       daynight.advance(cdt);
+      if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
       const eye = player.eye();
@@ -1093,14 +1131,10 @@ export class Game {
             return ticker.queued;
           },
         },
-        // Pins the weather for testing/captures ('auto' resumes the natural cycle).
+        // Pins the weather for testing/captures ('auto' resumes the natural cycle). Routes through
+        // applyWeatherMode so dev-console changes keep the HUD button in sync.
         weather: (kind: WeatherKind | 'auto') => {
-          if (kind === 'auto') {
-            weatherClock.resume();
-          } else {
-            weatherClock.force(kind);
-            weather.setKind(kind);
-          }
+          applyWeatherMode(kind);
           return weather.kind;
         },
         // Wraps the engine so dev-console changes keep the HUD controls in sync.
