@@ -158,3 +158,70 @@ describe('CameraRig', () => {
     expect(() => rig.dispose()).not.toThrow();
   });
 });
+
+describe('CameraRig view modes', () => {
+  it('defaults to first-person and toggles to third and back', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const rig = new CameraRig(cam, makeCanvas());
+    expect(rig.mode).toBe('first');
+    expect(rig.toggleMode()).toBe('third');
+    expect(rig.mode).toBe('third');
+    expect(rig.toggleMode()).toBe('first');
+    expect(rig.mode).toBe('first');
+  });
+
+  it('applyPlayerView sits the camera exactly at the eye in first-person', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera();
+    const rig = new CameraRig(cam as unknown as import('three').PerspectiveCamera, makeCanvas());
+    rig.yaw = 1.1;
+    rig.pitch = 0.3;
+    rig.applyPlayerView({ x: 10, y: 20, z: 30 }, 4);
+    expect(cam.position.set).toHaveBeenCalledWith(10, 20, 30);
+    expect(cam.quaternion.setFromEuler).toHaveBeenCalled();
+  });
+
+  it('applyPlayerView trails the camera behind the eye along −look in third-person', async () => {
+    vi.resetModules();
+    const { CameraRig, lookDirectionFromYawPitch, THIRD_PERSON_DISTANCE } =
+      await import('../src/render/CameraRig');
+    expect(THIRD_PERSON_DISTANCE).toBe(4);
+    const cam = makeCamera();
+    const rig = new CameraRig(cam as unknown as import('three').PerspectiveCamera, makeCanvas());
+    rig.mode = 'third';
+    rig.yaw = 0.7;
+    rig.pitch = -0.2;
+    const eye = { x: 5, y: 8, z: -3 };
+    const dist = 4;
+    rig.applyPlayerView(eye, dist);
+    const d = lookDirectionFromYawPitch(0.7, -0.2);
+    expect(cam.position.set).toHaveBeenCalledWith(
+      eye.x - d.x * dist,
+      eye.y - d.y * dist,
+      eye.z - d.z * dist,
+    );
+  });
+
+  it('look direction matches a real three camera forward (first-person view unchanged)', async () => {
+    vi.resetModules();
+    const { lookDirectionFromYawPitch } = await import('../src/render/CameraRig');
+    const three = await import('three');
+    for (const [yaw, pitch] of [
+      [0, 0],
+      [0.7, -0.3],
+      [-1.2, 0.5],
+    ] as const) {
+      const cam = new three.PerspectiveCamera();
+      cam.quaternion.setFromEuler(new three.Euler(pitch, yaw, 0, 'YXZ'));
+      const v = new three.Vector3();
+      cam.getWorldDirection(v);
+      const look = lookDirectionFromYawPitch(yaw, pitch);
+      expect(look.x).toBeCloseTo(v.x, 6);
+      expect(look.y).toBeCloseTo(v.y, 6);
+      expect(look.z).toBeCloseTo(v.z, 6);
+    }
+  });
+});

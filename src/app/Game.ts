@@ -17,7 +17,9 @@ import { BlockTicker } from '../world/BlockTicker';
 import { DayNight } from '../render/DayNight';
 import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
-import { CameraRig } from '../render/CameraRig';
+import { CameraRig, lookDirectionFromYawPitch, THIRD_PERSON_DISTANCE } from '../render/CameraRig';
+import { PlayerAvatar } from '../render/PlayerAvatar';
+import { clipCameraDistance } from './aim';
 import { ChunkManager } from '../world/ChunkManager';
 import { MeshWorkerPool } from '../world/MeshWorkerPool';
 import { setSharedChunkBuffers } from '../world/chunkBuffers';
@@ -666,8 +668,22 @@ export class Game {
     const pasteGhost = new PasteGhost();
     pasteGhost.attach((o) => renderer.add(o));
 
-    const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined =>
-      raycastVoxels(previewSampler, renderer.camera.position, rig.forward(), getReach());
+    // Visible player character, shown only in third-person view.
+    const avatar = new PlayerAvatar();
+    avatar.attach((o) => renderer.add(o));
+
+    // Interaction ray: origin at the player's eye, direction from yaw/pitch. Used for every
+    // break/place/toggle/builder aim so reach stays anchored to the head, not the render camera
+    // (which sits behind the player in third-person).
+    const aimRay = (): { origin: Vec3; dir: Vec3 } => ({
+      origin: player.eye(),
+      dir: lookDirectionFromYawPitch(rig.yaw, rig.pitch),
+    });
+
+    const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined => {
+      const { origin, dir } = aimRay();
+      return raycastVoxels(previewSampler, origin, dir, getReach());
+    };
 
     /** Paste origin (min corner) = the empty cell adjacent to the aimed face. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
@@ -759,14 +775,14 @@ export class Game {
           setStatus(`Rotated (${builder.transform.turns * 90}°)`);
           return;
         case 'mirror': {
-          const f = rig.forward();
+          const f = aimRay().dir;
           builder.mirrorAxis(dominantHorizontalAxis(f.x, f.z));
           setStatus('Mirrored');
           return;
         }
         case 'arrayInc':
         case 'arrayDec': {
-          const f = rig.forward();
+          const f = aimRay().dir;
           builder.arrayAdjust(intent === 'arrayInc' ? 1 : -1, dominantHorizontalAxis(f.x, f.z));
           setStatus(`Array x${builder.transform.arrayCount}`);
           return;
@@ -809,12 +825,12 @@ export class Game {
     const abortInput = registerInputListeners({
       canvas,
       rig,
-      renderer,
       manager,
       inventory,
       registry,
       edit,
       previewDeps,
+      aim: aimRay,
       callbacks: {
         onStatusChange: setStatus,
         onToolChange: setTool,
@@ -867,6 +883,10 @@ export class Game {
           setHeadlamp(!headlampOn, true);
           setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
         },
+        onToggleView: () => {
+          const next = rig.toggleMode();
+          setStatus(next === 'third' ? 'Third-person view (F1)' : 'First-person view (F1)');
+        },
         onReachChange: (reach) => {
           try {
             saveReach(localStorage, reach);
@@ -899,7 +919,19 @@ export class Game {
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
       const eye = player.eye();
-      rig.applyEye(eye.x, eye.y, eye.z);
+      // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
+      let thirdDistance = THIRD_PERSON_DISTANCE;
+      if (rig.mode === 'third') {
+        const look = lookDirectionFromYawPitch(rig.yaw, rig.pitch);
+        thirdDistance = clipCameraDistance(
+          (x, y, z) => manager.isSolid(x, y, z),
+          eye,
+          { x: -look.x, y: -look.y, z: -look.z },
+          THIRD_PERSON_DISTANCE,
+        );
+      }
+      rig.applyPlayerView(eye, thirdDistance);
+      avatar.update(player.position, rig.yaw, rig.mode === 'third');
       const move = movementSounds.update(
         cdt,
         player.position.x,
@@ -1021,12 +1053,8 @@ export class Game {
         // Play mode: no targeting outline/ghost — the world reads as scenery, not edit targets.
         const previewOn = rig.locked && !ui.isInventoryOpen() && experience === 'build';
         if (previewOn) {
-          const previewHit = raycastVoxels(
-            previewSampler,
-            renderer.camera.position,
-            rig.forward(),
-            getReach(),
-          );
+          const aimHere = aimRay();
+          const previewHit = raycastVoxels(previewSampler, aimHere.origin, aimHere.dir, getReach());
           targetOverlay.update(
             previewHit
               ? resolveTarget(previewHit, inventory.selectedBlock, rig.yaw, previewDeps)
@@ -1150,6 +1178,7 @@ export class Game {
       persistence.dispose();
       hudTeardown?.();
       celestial.dispose();
+      avatar.dispose();
       sink.disposeAll();
       renderer.dispose();
       rig.dispose();
