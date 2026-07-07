@@ -142,6 +142,12 @@ export class Critters {
     return out;
   }
 
+  /** Frees the shared instanced-mesh GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicMaterial).dispose();
+  }
+
   update(dt: number, cam: { x: number; y: number; z: number }, env: CritterEnv): void {
     this.scanTimer -= dt;
     if (this.scanTimer <= 0) {

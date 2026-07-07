@@ -79,4 +79,13 @@ export class TargetOverlay {
       this.ghost.visible = false;
     }
   }
+
+  /** Frees the outline + placement-ghost GPU resources (both preallocated ghost materials). */
+  dispose(): void {
+    this.outline.geometry.dispose();
+    (this.outline.material as LineBasicMaterial).dispose();
+    this.ghost.geometry.dispose();
+    this.validMat.dispose();
+    this.invalidMat.dispose();
+  }
 }

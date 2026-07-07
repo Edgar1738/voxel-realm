@@ -59,4 +59,12 @@ export class PasteGhost {
     this.mesh.visible = true;
     this.edges.visible = true;
   }
+
+  /** Frees the ghost fill + edge-outline GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicMaterial).dispose();
+    this.edges.geometry.dispose();
+    (this.edges.material as LineBasicMaterial).dispose();
+  }
 }

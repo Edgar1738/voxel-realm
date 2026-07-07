@@ -123,6 +123,16 @@ export class BlockParticles {
     this.pops.push({ mesh, age: 0 });
   }
 
+  /** Frees the pooled particle mesh and each pop ghost's (cloned) GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicMaterial).dispose();
+    for (const pop of this.popPool) {
+      pop.geometry.dispose();
+      (pop.material as MeshBasicMaterial).dispose();
+    }
+  }
+
   /** Advances particle physics and pop fades; call once per frame. */
   update(dt: number): void {
     let write = 0;

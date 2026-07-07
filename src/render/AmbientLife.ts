@@ -160,6 +160,12 @@ export class AmbientLife {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
+  /** Frees the shared instanced-mesh GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicMaterial).dispose();
+  }
+
   private move(agent: Agent, dt: number): void {
     const t = agent.age;
     if (agent.kind === 'butterfly') {

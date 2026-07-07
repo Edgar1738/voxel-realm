@@ -193,6 +193,12 @@ export class Weather {
     }
   }
 
+  /** Frees the pooled precipitation mesh's GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    this.material.dispose();
+  }
+
   private spawnPos(cam: { x: number; y: number; z: number }, anyHeight: boolean): Vector3 {
     const angle = this.rng() * Math.PI * 2;
     const radius = Math.sqrt(this.rng()) * SPAWN_RADIUS;

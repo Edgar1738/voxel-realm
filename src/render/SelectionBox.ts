@@ -34,4 +34,10 @@ export class SelectionBox {
     this.mesh.position.set(minX + sx / 2, minY + sy / 2, minZ + sz / 2);
     this.mesh.visible = true;
   }
+
+  /** Frees the wireframe box's GPU resources. */
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    (this.mesh.material as LineBasicMaterial).dispose();
+  }
 }

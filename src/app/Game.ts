@@ -1236,6 +1236,13 @@ export class Game {
       hudTeardown?.();
       celestial.dispose();
       avatar.dispose();
+      weather.dispose();
+      ambientLife.dispose();
+      critters.dispose();
+      particles.dispose();
+      selectionBox.dispose();
+      pasteGhost.dispose();
+      targetOverlay.dispose();
       sink.disposeAll();
       renderer.dispose();
       rig.dispose();
