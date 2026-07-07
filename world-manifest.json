@@ -1,0 +1,481 @@
+{
+  "version": 1,
+  "worlds": [
+    {
+      "slug": "tidewreck-cove",
+      "title": "Tidewreck Cove",
+      "description": "A fishing harbor tucked into a cliff-ringed bay: a striped lighthouse on the point, stilt huts and piers at the waterline, cottages up the terraces — and beneath the north cliffs, a sea cave winds down to a smugglers' den and their unopened vault.",
+      "preset": "flat",
+      "seed": 1337,
+      "version": 1,
+      "spawn": {
+        "x": 0,
+        "y": 63.9,
+        "z": 8
+      },
+      "look": {
+        "yaw": 1.31,
+        "pitch": 0.115
+      },
+      "landmarks": [
+        {
+          "name": "Lighthouse Point",
+          "x": -47,
+          "y": 68,
+          "z": -4
+        },
+        {
+          "name": "Harbor Piers",
+          "x": 0,
+          "y": 64,
+          "z": 4
+        },
+        {
+          "name": "The Wreck",
+          "x": 28,
+          "y": 62,
+          "z": 28
+        },
+        {
+          "name": "Sea Cave Mouth",
+          "x": 18,
+          "y": 64,
+          "z": -14
+        },
+        {
+          "name": "Smugglers' Vault",
+          "x": 16,
+          "y": 57,
+          "z": -40
+        }
+      ],
+      "tour": [
+        {
+          "x": 0,
+          "y": 64,
+          "z": 10,
+          "label": "Harbor Piers"
+        },
+        {
+          "x": -40,
+          "y": 68,
+          "z": 0,
+          "label": "Lighthouse Point"
+        },
+        {
+          "x": 26,
+          "y": 63,
+          "z": 24,
+          "label": "The Wreck"
+        },
+        {
+          "x": 18,
+          "y": 64,
+          "z": -13,
+          "label": "Sea Cave"
+        },
+        {
+          "x": 20,
+          "y": 57,
+          "z": -38,
+          "label": "Smugglers' Den"
+        }
+      ],
+      "tags": [
+        "coastal",
+        "harbor",
+        "dungeon"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 54
+    },
+    {
+      "slug": "caverns",
+      "title": "Glow Caverns",
+      "description": "Descend through a ruined tower into a vast crystal cavern: a glowing heart-crystal, an underground waterfall, a fungal grotto, and a tiny hamlet built where daylight never reaches.",
+      "preset": "flat",
+      "seed": 1337,
+      "version": 1,
+      "spawn": {
+        "x": -55,
+        "y": 64,
+        "z": -16
+      },
+      "look": {
+        "yaw": 1.571,
+        "pitch": 0
+      },
+      "landmarks": [
+        {
+          "name": "ruin",
+          "x": -55,
+          "y": 64,
+          "z": -16
+        },
+        {
+          "name": "ruined-tower",
+          "x": -55,
+          "y": 63,
+          "z": -16
+        },
+        {
+          "name": "balcony",
+          "x": -24,
+          "y": 41,
+          "z": -16
+        },
+        {
+          "name": "heart-crystal",
+          "x": 14,
+          "y": 14,
+          "z": 6
+        },
+        {
+          "name": "hamlet",
+          "x": 31,
+          "y": 14,
+          "z": -3
+        },
+        {
+          "name": "waterfall",
+          "x": -34,
+          "y": 14,
+          "z": 10
+        },
+        {
+          "name": "fungal-grotto",
+          "x": 6,
+          "y": 14,
+          "z": 44
+        }
+      ],
+      "tour": [
+        {
+          "label": "Ruined Tower",
+          "x": -55,
+          "y": 65,
+          "z": -16
+        },
+        {
+          "label": "The Balcony",
+          "x": -24,
+          "y": 42,
+          "z": -16
+        },
+        {
+          "label": "The Waterfall",
+          "x": -34,
+          "y": 16,
+          "z": 10
+        },
+        {
+          "label": "Heart Crystal",
+          "x": 14,
+          "y": 16,
+          "z": 6
+        },
+        {
+          "label": "The Hamlet",
+          "x": 31,
+          "y": 16,
+          "z": -3
+        },
+        {
+          "label": "Fungal Grotto",
+          "x": 6,
+          "y": 16,
+          "z": 44
+        }
+      ],
+      "tags": [
+        "underground",
+        "caves",
+        "crystal"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 32
+    },
+    {
+      "slug": "giza",
+      "title": "The Pyramids of Giza",
+      "description": "The Giza plateau recreated from OpenStreetMap: the Great Pyramid of Khufu, the Pyramid of Khafre (with its surviving limestone cap), the Pyramid of Menkaure, the queens’ pyramids, the Great Sphinx, and the mortuary/valley temples — set in the desert.",
+      "preset": "flat",
+      "seed": 1337,
+      "version": 1,
+      "spawn": {
+        "x": 780,
+        "y": 64,
+        "z": 403
+      },
+      "look": {
+        "yaw": 1.4610171131490515,
+        "pitch": -0.05
+      },
+      "landmarks": [
+        {
+          "name": "Great Pyramid of Khufu",
+          "x": 505,
+          "y": 65,
+          "z": 92
+        },
+        {
+          "name": "Pyramid of Khafre",
+          "x": 238,
+          "y": 65,
+          "z": 343
+        },
+        {
+          "name": "Pyramid of Menkaure",
+          "x": 121,
+          "y": 65,
+          "z": 599
+        },
+        {
+          "name": "The Great Sphinx",
+          "x": 729,
+          "y": 64,
+          "z": 403
+        }
+      ],
+      "tour": [
+        {
+          "label": "The Great Sphinx",
+          "x": 745,
+          "y": 66,
+          "z": 403
+        },
+        {
+          "label": "Great Pyramid of Khufu",
+          "x": 650,
+          "y": 66,
+          "z": 250
+        },
+        {
+          "label": "Pyramid of Khafre",
+          "x": 380,
+          "y": 66,
+          "z": 343
+        },
+        {
+          "label": "Pyramid of Menkaure",
+          "x": 200,
+          "y": 66,
+          "z": 599
+        }
+      ],
+      "tags": [
+        "monument",
+        "desert",
+        "osm"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 2300
+    },
+    {
+      "slug": "wash-park",
+      "title": "Washington Park, Denver",
+      "description": "A voxel recreation of Denver's Washington Park + surrounding neighborhood, built from OpenStreetMap geometry.",
+      "preset": "flat",
+      "seed": 1337,
+      "version": 1,
+      "spawn": {
+        "x": 211,
+        "y": 64,
+        "z": 184
+      },
+      "look": {
+        "yaw": 3.141592653589793,
+        "pitch": -0.15
+      },
+      "landmarks": [
+        {
+          "name": "Smith Lake",
+          "x": 211,
+          "y": 62,
+          "z": 114
+        },
+        {
+          "name": "Grasmere Lake",
+          "x": 257,
+          "y": 62,
+          "z": 590
+        },
+        {
+          "name": "Great Meadow",
+          "x": 228,
+          "y": 62,
+          "z": 332
+        },
+        {
+          "name": "Mount Vernon Garden",
+          "x": 177,
+          "y": 62,
+          "z": 251
+        },
+        {
+          "name": "Boat House",
+          "x": 251,
+          "y": 62,
+          "z": 162
+        },
+        {
+          "name": "Rec Center",
+          "x": 394,
+          "y": 62,
+          "z": 494
+        }
+      ],
+      "tour": [
+        {
+          "label": "Boat House",
+          "x": 251,
+          "y": 64,
+          "z": 162
+        },
+        {
+          "label": "Smith Lake",
+          "x": 211,
+          "y": 64,
+          "z": 140
+        },
+        {
+          "label": "Mount Vernon Garden",
+          "x": 177,
+          "y": 64,
+          "z": 251
+        },
+        {
+          "label": "Great Meadow",
+          "x": 228,
+          "y": 64,
+          "z": 332
+        },
+        {
+          "label": "Grasmere Lake",
+          "x": 257,
+          "y": 64,
+          "z": 560
+        },
+        {
+          "label": "Rec Center",
+          "x": 394,
+          "y": 64,
+          "z": 494
+        }
+      ],
+      "tags": [
+        "city",
+        "park",
+        "osm"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 2003
+    },
+    {
+      "slug": "moonspire-realm",
+      "title": "Moonspire Realm",
+      "description": "A moated citadel on a wide green plain: cross the drawbridge into the walled courtyard, climb the red-brick keep beneath its glowstone beacon, and seek out the Moonspire and the wizard’s tower — with a farmers’ hamlet and a frosty outcrop beyond the walls.",
+      "preset": "flat",
+      "seed": 1337,
+      "version": 1,
+      "spawn": {
+        "x": -2,
+        "y": 64.9,
+        "z": 78
+      },
+      "look": {
+        "yaw": 0,
+        "pitch": 0.167
+      },
+      "landmarks": [
+        {
+          "name": "The Drawbridge",
+          "x": -3,
+          "y": 63.9,
+          "z": 60
+        },
+        {
+          "name": "The Keep",
+          "x": 0,
+          "y": 63.9,
+          "z": 22
+        },
+        {
+          "name": "The Moonspire",
+          "x": 33,
+          "y": 63.9,
+          "z": -20
+        },
+        {
+          "name": "Wizard's Tower",
+          "x": -22,
+          "y": 63.9,
+          "z": -5
+        },
+        {
+          "name": "The Hamlet",
+          "x": -24,
+          "y": 63.9,
+          "z": 88
+        },
+        {
+          "name": "Frost Outcrop",
+          "x": 138,
+          "y": 63.9,
+          "z": -48
+        },
+        {
+          "name": "Arrival",
+          "x": -2,
+          "y": 64.9,
+          "z": 78
+        }
+      ],
+      "tour": [
+        {
+          "label": "The Drawbridge",
+          "x": -3,
+          "y": 64,
+          "z": 58
+        },
+        {
+          "label": "The Keep",
+          "x": 0,
+          "y": 64,
+          "z": 20
+        },
+        {
+          "label": "The Moonspire",
+          "x": 33,
+          "y": 64,
+          "z": -20
+        },
+        {
+          "label": "Wizard's Tower",
+          "x": -22,
+          "y": 64,
+          "z": -4
+        },
+        {
+          "label": "The Hamlet",
+          "x": -24,
+          "y": 64,
+          "z": 88
+        },
+        {
+          "label": "Frost Outcrop",
+          "x": 138,
+          "y": 64,
+          "z": -44
+        }
+      ],
+      "tags": [
+        "citadel",
+        "castle",
+        "fantasy"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 139
+    }
+  ]
+}
