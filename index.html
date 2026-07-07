@@ -29,7 +29,10 @@
         color: #fff;
         background: rgba(0, 0, 0, 0.35);
         text-align: center;
-        cursor: pointer;
+        /* Click-through: world clicks fall to the canvas (which requests mouse capture),
+           HUD clicks reach their controls even while the overlay is up. Without this the
+           overlay eats the entire toolbar whenever the mouse isn't captured. */
+        pointer-events: none;
       }
       #crosshair {
         position: fixed;
@@ -53,8 +56,13 @@
         color: #eef2f6;
         pointer-events: none;
       }
-      #creative-ui button {
+      /* The HUD root is click-through; every interactive control must re-enable pointer
+         events here or it is unreachable (the time/volume sliders were missing). */
+      #creative-ui button,
+      #creative-ui input {
         pointer-events: auto;
+      }
+      #creative-ui button {
         font: inherit;
         cursor: pointer;
       }

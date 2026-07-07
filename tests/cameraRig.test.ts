@@ -57,8 +57,18 @@ function makeCamera() {
   };
 }
 
+// A real EventTarget: CameraRig listens for clicks on the canvas itself (world clicks
+// request mouse capture; HUD clicks land on their own controls and never reach it).
+class FakeCanvas extends EventTarget {
+  requestPointerLock = vi.fn();
+}
+
 function makeCanvas() {
-  return { requestPointerLock: vi.fn() } as unknown as HTMLCanvasElement;
+  return new FakeCanvas() as unknown as HTMLCanvasElement;
+}
+
+function makeOverlay() {
+  return { textContent: '', style: { display: 'flex' } } as unknown as HTMLElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +166,70 @@ describe('CameraRig', () => {
     const rig = new CameraRig(cam, makeCanvas());
     rig.dispose();
     expect(() => rig.dispose()).not.toThrow();
+  });
+});
+
+describe('CameraRig pointer-lock capture', () => {
+  it('requests mouse capture from canvas clicks while unlocked', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    new CameraRig(cam, canvas);
+
+    (canvas as unknown as EventTarget).dispatchEvent(new Event('click'));
+    expect((canvas as unknown as FakeCanvas).requestPointerLock).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores clicks that do not land on the canvas (HUD stays free of capture)', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    new CameraRig(cam, canvas);
+
+    // A toolbar/HUD click bubbles to the document but never touches the canvas.
+    fakeDocument.dispatchEvent(new Event('click'));
+    expect((canvas as unknown as FakeCanvas).requestPointerLock).not.toHaveBeenCalled();
+  });
+
+  it('does not re-request capture while already locked', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    new CameraRig(cam, canvas);
+
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+    (canvas as unknown as EventTarget).dispatchEvent(new Event('click'));
+    expect((canvas as unknown as FakeCanvas).requestPointerLock).not.toHaveBeenCalled();
+    fakeDocument.pointerLockElement = null;
+  });
+
+  it('surfaces a blocked-capture message that says the toolbar still works', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const overlay = makeOverlay();
+    new CameraRig(cam, canvas, overlay);
+
+    fakeDocument.dispatchEvent(new Event('pointerlockerror'));
+    expect(overlay.textContent).toContain('Mouse capture is blocked');
+    expect(overlay.textContent).toContain('toolbar still work');
+  });
+
+  it('dispose() stops canvas clicks from requesting capture', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas);
+
+    rig.dispose();
+    (canvas as unknown as EventTarget).dispatchEvent(new Event('click'));
+    expect((canvas as unknown as FakeCanvas).requestPointerLock).not.toHaveBeenCalled();
   });
 });
 
