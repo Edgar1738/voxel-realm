@@ -1,4 +1,4 @@
-import { Color } from 'three';
+import { Color, DirectionalLight, HemisphereLight } from 'three';
 import { Renderer } from '../render/Renderer';
 import { createTextureArray } from '../render/TextureArray';
 import {
@@ -718,6 +718,15 @@ export class Game {
     const avatar = new PlayerAvatar(playerSkinId);
     avatarSkinTarget.current = avatar;
     avatar.attach((o) => renderer.add(o));
+    // The avatar is the scene's only lit (MeshLambert) material — chunks, particles, weather,
+    // critters, overlays and the sky are all unlit — so without any lights it rendered pure black
+    // and every skin looked identical. A soft hemisphere fill plus a gentle key light give the
+    // avatar readable form and let the skins show; nothing else in the scene responds to lights.
+    const avatarFill = new HemisphereLight(0xffffff, 0x45484f, 2.2);
+    const avatarKey = new DirectionalLight(0xffffff, 1.4);
+    avatarKey.position.set(0.5, 1.0, 0.3);
+    renderer.add(avatarFill);
+    renderer.add(avatarKey);
 
     // Interaction ray: origin at the player's eye, direction from yaw/pitch. Used for every
     // break/place/toggle/builder aim so reach stays anchored to the head, not the render camera

@@ -11,13 +11,24 @@ import {
 } from '../src/character/PlayerSkins';
 
 describe('built-in player skins', () => {
-  it('ships the four first-party Voxel Realm skins', () => {
+  it('ships the first-party Voxel Realm skins', () => {
     expect(BUILT_IN_PLAYER_SKINS.map((s) => s.id)).toEqual([
       'realm-scout',
       'castle-mason',
       'dawn-guard',
       'keep-mage',
+      'shadow-wanderer',
     ]);
+  });
+
+  it('includes the Shadow Wanderer all-black skin', () => {
+    const shadow = resolvePlayerSkin('shadow-wanderer');
+    expect(shadow.id).toBe('shadow-wanderer');
+    expect(isPlayerSkinId('shadow-wanderer')).toBe(true);
+    // Every slot is the same near-black value, so the avatar reads as a solid silhouette.
+    const values = Object.values(shadow.palette);
+    expect(new Set(values).size).toBe(1);
+    expect(values[0]).toBeLessThan(0x111111);
   });
 
   it('defaults to the Realm Scout skin', () => {
@@ -38,7 +49,8 @@ describe('built-in player skins', () => {
     expect(nextPlayerSkinId('realm-scout')).toBe('castle-mason');
     expect(nextPlayerSkinId('castle-mason')).toBe('dawn-guard');
     expect(nextPlayerSkinId('dawn-guard')).toBe('keep-mage');
-    expect(nextPlayerSkinId('keep-mage')).toBe('realm-scout');
+    expect(nextPlayerSkinId('keep-mage')).toBe('shadow-wanderer');
+    expect(nextPlayerSkinId('shadow-wanderer')).toBe('realm-scout');
     expect(nextPlayerSkinId('unknown')).toBe('castle-mason');
   });
 

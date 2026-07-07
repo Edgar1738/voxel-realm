@@ -35,6 +35,13 @@ describe('PlayerAvatar', () => {
     expect(helmet.visible).toBe(false);
   });
 
+  it('can apply the Shadow Wanderer (all-black) skin by id', () => {
+    const avatar = new PlayerAvatar('shadow-wanderer');
+    const torso = avatar.group.getObjectByName('torso') as Mesh;
+    const mat = torso.material as MeshLambertMaterial;
+    expect(mat.color.getHex()).toBe(resolvePlayerSkin('shadow-wanderer').palette.tunic);
+  });
+
   it('starts hidden (first-person default)', () => {
     expect(new PlayerAvatar().group.visible).toBe(false);
   });

@@ -1,4 +1,9 @@
-export type PlayerSkinId = 'realm-scout' | 'castle-mason' | 'dawn-guard' | 'keep-mage';
+export type PlayerSkinId =
+  | 'realm-scout'
+  | 'castle-mason'
+  | 'dawn-guard'
+  | 'keep-mage'
+  | 'shadow-wanderer';
 
 export type PlayerSkinSlot =
   | 'skin'
@@ -122,6 +127,30 @@ export const BUILT_IN_PLAYER_SKINS: readonly PlayerSkin[] = [
       hood: 0x2c173a,
     },
     accessories: ['hood', 'mantle', 'cloak'],
+  },
+  {
+    id: 'shadow-wanderer',
+    name: 'Shadow Wanderer',
+    description: 'A cloaked figure of pure shadow — the all-black silhouette, now by choice.',
+    // Uniform near-black across every slot: reads as a solid black silhouette even under scene
+    // lighting (an almost-zero Lambert color stays black), so the classic all-black look is a
+    // deliberate, selectable skin rather than an accident of missing lights.
+    palette: {
+      skin: 0x0a0a0f,
+      hair: 0x0a0a0f,
+      tunic: 0x0a0a0f,
+      sleeves: 0x0a0a0f,
+      pants: 0x0a0a0f,
+      boots: 0x0a0a0f,
+      gloves: 0x0a0a0f,
+      belt: 0x0a0a0f,
+      trim: 0x0a0a0f,
+      metal: 0x0a0a0f,
+      leather: 0x0a0a0f,
+      cloak: 0x0a0a0f,
+      hood: 0x0a0a0f,
+    },
+    accessories: ['hood', 'cloak'],
   },
 ];
 
