@@ -30,6 +30,8 @@ export class BuilderState {
     arrayCount: 1,
     arrayAxis: 'x',
   };
+  /** Whole-block offset dialed in on top of the live aim so a paste can be placed precisely. */
+  nudge: Vec3i = { x: 0, y: 0, z: 0 };
   private nextCorner: 'a' | 'b' = 'a';
 
   /** off ↔ selecting. Leaving Build mode clears the selection and any paste session. */
@@ -74,12 +76,29 @@ export class BuilderState {
   setClipboard(p: Prefab): void {
     this.clipboard = p;
     this.transform = { turns: 0, mirrorX: false, mirrorZ: false, arrayCount: 1, arrayAxis: 'x' };
+    this.resetNudge();
     this.mode = 'pasting';
   }
 
   /** Leave paste mode but keep the clipboard for another paste. */
   exitPaste(): void {
     if (this.mode === 'pasting') this.mode = 'selecting';
+    this.resetNudge();
+  }
+
+  /** Shift the paste offset by whole blocks along each axis. */
+  nudgeBy(dx: number, dy: number, dz: number): void {
+    this.nudge = { x: this.nudge.x + dx, y: this.nudge.y + dy, z: this.nudge.z + dz };
+  }
+
+  /** Clear the paste offset back to the raw aim cell. */
+  resetNudge(): void {
+    this.nudge = { x: 0, y: 0, z: 0 };
+  }
+
+  /** Apply the current nudge offset to a base origin (returns a new point; never mutates). */
+  applyNudge(base: Vec3i): Vec3i {
+    return { x: base.x + this.nudge.x, y: base.y + this.nudge.y, z: base.z + this.nudge.z };
   }
 
   rotate(delta: number): void {

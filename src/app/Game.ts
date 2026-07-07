@@ -94,7 +94,7 @@ import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './ex
 import { tourRoute, tourTick, tourStep } from './tour';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
-import { dominantHorizontalAxis } from './builderInput';
+import { dominantHorizontalAxis, nudgeDelta } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
 import { BlockParticles, particleColorOf } from '../render/BlockParticles';
@@ -109,6 +109,7 @@ import {
   captureRegion,
   prefabToVoxels,
   orientedStateReader,
+  boxDims,
 } from './RegionOps';
 import {
   ServerBlueprintStore,
@@ -741,10 +742,10 @@ export class Game {
       return raycastVoxels(previewSampler, origin, dir, getReach());
     };
 
-    /** Paste origin (min corner) = the empty cell adjacent to the aimed face. */
+    /** Paste origin (min corner) = the aim-adjacent empty cell, shifted by the dialed-in nudge. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
       const aim = builderAim();
-      return aim ? { x: aim.adjacent.x, y: aim.adjacent.y, z: aim.adjacent.z } : undefined;
+      return aim ? builder.applyNudge(aim.adjacent) : undefined;
     };
 
     /** Preload the chunks under a world XZ box; on the manager's over-size throw, warn and signal abort. */
@@ -843,8 +844,22 @@ export class Game {
           setStatus(`Array x${builder.transform.arrayCount}`);
           return;
         }
-        default:
+        case 'nudgeReset':
+          if (builder.mode !== 'pasting') return;
+          builder.resetNudge();
+          setStatus('Nudge reset');
           return;
+        default: {
+          const delta = nudgeDelta(intent);
+          if (delta && builder.mode === 'pasting') {
+            builder.nudgeBy(...delta);
+            const { x, y, z } = builder.nudge;
+            setStatus(
+              `Nudge: ${x >= 0 ? '+' : ''}${x}X ${y >= 0 ? '+' : ''}${y}Y ${z >= 0 ? '+' : ''}${z}Z`,
+            );
+          }
+          return;
+        }
       }
     };
 
@@ -912,13 +927,18 @@ export class Game {
           if (builder.mode === 'selecting') {
             builder.setCorner(hit.block);
             const b = builder.selectionBox();
-            setStatus(b ? 'Selection set' : 'Pick the opposite corner');
+            if (b) {
+              const [sx, sy, sz] = boxDims(b);
+              setStatus(`Selection ${sx}×${sy}×${sz} (${sx * sy * sz} blocks)`);
+            } else {
+              setStatus('Pick the opposite corner');
+            }
             return;
           }
           if (builder.mode === 'pasting') {
             const p = builder.transformedClipboard();
             if (!p) return;
-            const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
+            const origin = builder.applyNudge(hit.adjacent);
             if (
               !preloadOrWarn(origin.x, origin.z, origin.x + p.dims[0] - 1, origin.z + p.dims[2] - 1)
             )

@@ -13,6 +13,15 @@ export interface Box {
   z2: number;
 }
 
+/** Inclusive block dimensions `[sx, sy, sz]` of a box (corners may be in any order). */
+export function boxDims(box: Box): [number, number, number] {
+  return [
+    Math.abs(box.x2 - box.x1) + 1,
+    Math.abs(box.y2 - box.y1) + 1,
+    Math.abs(box.z2 - box.z1) + 1,
+  ];
+}
+
 /** Deduped chunk keys for chunk columns that overlap `box` and are not loaded. */
 export function unloadedChunksInBox(
   isLoaded: (x: number, z: number) => boolean,

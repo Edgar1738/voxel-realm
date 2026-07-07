@@ -43,6 +43,7 @@ Open the URL, click to lock the pointer, and you're in.
 | `I` | Creative inventory |
 | `X` / `G` / `R` / `C` | Fill / clear / replace / copy region |
 | `[` `]`, `M`, `+`/`-` | Rotate / mirror / array a paste |
+| Arrows, `PgUp`/`PgDn`, `N` | Nudge a paste on X/Z, up/down, reset |
 | `Z`, `Y` | Undo / redo |
 | `Shift` + wheel | Adjust reach |
 | `V` | Placement ghost |

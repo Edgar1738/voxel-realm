@@ -5,9 +5,17 @@ import {
   unloadedChunksInBox,
   captureRegion,
   orientedStateReader,
+  boxDims,
 } from '../src/app/RegionOps';
 import { rotateY, type Prefab } from '../src/core/Prefab';
 import { packState, setOpen, FACING } from '../src/world/VoxelState';
+
+describe('boxDims', () => {
+  it('returns inclusive dimensions regardless of corner order', () => {
+    expect(boxDims({ x1: 0, y1: 0, z1: 0, x2: 2, y2: 0, z2: 4 })).toEqual([3, 1, 5]);
+    expect(boxDims({ x1: 2, y1: 5, z1: 4, x2: 0, y2: 5, z2: 0 })).toEqual([3, 1, 5]);
+  });
+});
 
 describe('replaceVoxels', () => {
   it('retargets only matching ids inside the box', () => {
