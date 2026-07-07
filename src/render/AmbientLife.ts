@@ -39,6 +39,9 @@ const KINDS: Record<LifeKindName, KindDef> = {
   leaf: { count: 14, palette: [0x4d8f3a, 0x6aa84f, 0x8fbc5a], scale: [0.11, 0.02, 0.11] },
 };
 
+/** The kind names, hoisted once so the per-sample scan loop doesn't rebuild the key array. */
+const LIFE_KINDS = Object.keys(KINDS) as LifeKindName[];
+
 /** Whether a kind is out and about at this daylight level (butterflies nap at night; fireflies own it). */
 export function kindActive(kind: LifeKindName, daylight: number): boolean {
   if (kind === 'butterfly') return daylight > 0.55;
@@ -197,7 +200,7 @@ export class AmbientLife {
       const x = Math.floor(cam.x + (this.rng() * 2 - 1) * RANGE);
       const y = Math.floor(cam.y + (this.rng() * 2 - 1) * 12);
       const z = Math.floor(cam.z + (this.rng() * 2 - 1) * RANGE);
-      for (const kind of Object.keys(KINDS) as LifeKindName[]) {
+      for (const kind of LIFE_KINDS) {
         if (!isAnchor(kind, getBlock, x, y, z)) continue;
         const list = this.anchors[kind];
         if (list.length >= MAX_ANCHORS) list[Math.floor(this.rng() * list.length)].set(x, y, z);
@@ -205,7 +208,7 @@ export class AmbientLife {
       }
     }
     // Drop anchors that fell out of range (world streamed on, or the player moved).
-    for (const kind of Object.keys(KINDS) as LifeKindName[]) {
+    for (const kind of LIFE_KINDS) {
       this.anchors[kind] = this.anchors[kind].filter(
         (a) => Math.abs(a.x - cam.x) <= RANGE + 6 && Math.abs(a.z - cam.z) <= RANGE + 6,
       );
@@ -213,7 +216,7 @@ export class AmbientLife {
   }
 
   private repopulate(daylight: number): void {
-    for (const kind of Object.keys(KINDS) as LifeKindName[]) {
+    for (const kind of LIFE_KINDS) {
       if (!kindActive(kind, daylight)) continue;
       const anchors = this.anchors[kind];
       if (anchors.length === 0) continue;

@@ -959,6 +959,12 @@ export class Game {
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
 
+    // Stable per-frame callbacks, hoisted so the render loop allocates no closures each frame.
+    const isSolidOrWater = (x: number, y: number, z: number): boolean =>
+      manager.isSolid(x, y, z) || manager.isWater(x, y, z);
+    const getBlockAt = (x: number, y: number, z: number): number => manager.getBlock(x, y, z);
+    const critterEnv = { getBlock: getBlockAt, player: player.position };
+
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
       if (import.meta.env.DEV) devRoam?.step(cdt);
@@ -1020,15 +1026,10 @@ export class Game {
       const rolled = weatherClock.advance(cdt);
       if (rolled !== undefined) weather.setKind(rolled);
       // Drops die on solids *and* water surfaces — rain must not streak through lakes.
-      weather.update(cdt, eye, (x, y, z) => manager.isSolid(x, y, z) || manager.isWater(x, y, z));
-      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, (x, y, z) =>
-        manager.getBlock(x, y, z),
-      );
+      weather.update(cdt, eye, isSolidOrWater);
+      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, getBlockAt);
       ticker.update(cdt);
-      critters.update(cdt, eye, {
-        getBlock: (x, y, z) => manager.getBlock(x, y, z),
-        player: player.position,
-      });
+      critters.update(cdt, eye, critterEnv);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);

@@ -26,7 +26,7 @@ const FOLIAGE_TINTS: readonly RGB[] = [
 ];
 
 /** index 0 = white; 1..6 = grass per biome; 7..12 = foliage per biome. */
-export const TINT_PALETTE: RGB[] = [WHITE, ...GRASS_TINTS, ...FOLIAGE_TINTS];
+export const TINT_PALETTE: readonly RGB[] = [WHITE, ...GRASS_TINTS, ...FOLIAGE_TINTS];
 
 /** The palette index for a (biome, category). An unknown biome clamps to Plains. */
 export function tintIndexFor(biome: number, category: TintCategory): number {

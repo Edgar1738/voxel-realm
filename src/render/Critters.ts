@@ -63,6 +63,9 @@ const KINDS: Record<CritterKind, KindDef> = {
   },
 };
 
+/** The kind names, hoisted once so the per-sample scan loop doesn't rebuild the key array. */
+const CRITTER_KINDS = Object.keys(KINDS) as CritterKind[];
+
 /** Whether the cell can host a kind: birds/rabbits need standable tops, fish need open water. */
 export function critterAnchor(
   kind: CritterKind,
@@ -299,14 +302,14 @@ export class Critters {
       const x = Math.floor(cam.x + (this.rng() * 2 - 1) * RANGE);
       const y = Math.floor(cam.y + (this.rng() * 2 - 1) * 12);
       const z = Math.floor(cam.z + (this.rng() * 2 - 1) * RANGE);
-      for (const kind of Object.keys(KINDS) as CritterKind[]) {
+      for (const kind of CRITTER_KINDS) {
         if (!critterAnchor(kind, getBlock, x, y, z)) continue;
         const list = this.anchors[kind];
         if (list.length >= MAX_ANCHORS) list[Math.floor(this.rng() * list.length)].set(x, y, z);
         else list.push(new Vector3(x, y, z));
       }
     }
-    for (const kind of Object.keys(KINDS) as CritterKind[]) {
+    for (const kind of CRITTER_KINDS) {
       this.anchors[kind] = this.anchors[kind].filter(
         (a) => Math.abs(a.x - cam.x) <= RANGE + 8 && Math.abs(a.z - cam.z) <= RANGE + 8,
       );
@@ -314,7 +317,7 @@ export class Critters {
   }
 
   private repopulate(): void {
-    for (const kind of Object.keys(KINDS) as CritterKind[]) {
+    for (const kind of CRITTER_KINDS) {
       const anchors = this.anchors[kind];
       if (anchors.length === 0) continue;
       const def = KINDS[kind];

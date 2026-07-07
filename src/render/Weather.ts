@@ -150,7 +150,10 @@ export class Weather {
     }
 
     while (this.drops.length < p.count) {
-      this.drops.push({ pos: this.spawnPos(cam, true), phase: this.rng() * Math.PI * 2 });
+      this.drops.push({
+        pos: this.spawnPos(cam, true, new Vector3()),
+        phase: this.rng() * Math.PI * 2,
+      });
     }
     if (this.drops.length > p.count) this.drops.length = p.count;
 
@@ -165,8 +168,8 @@ export class Weather {
         d.pos.y < cam.y - KILL_BELOW ||
         isSolid(Math.floor(d.pos.x), Math.floor(d.pos.y), Math.floor(d.pos.z));
       if (dead) {
-        const next = this.spawnPos(cam, false);
-        d.pos.copy(next);
+        // Recycle in place — write straight into the drop's vector, no per-frame allocation.
+        this.spawnPos(cam, false, d.pos);
       }
       this.scratchMatrix.compose(d.pos, this.scratchQuat, this.scratchScale);
       this.mesh.setMatrixAt(i, this.scratchMatrix);
@@ -199,12 +202,17 @@ export class Weather {
     this.material.dispose();
   }
 
-  private spawnPos(cam: { x: number; y: number; z: number }, anyHeight: boolean): Vector3 {
+  /** Samples a spawn point into `out` (returned) so callers can recycle without allocating. */
+  private spawnPos(
+    cam: { x: number; y: number; z: number },
+    anyHeight: boolean,
+    out: Vector3,
+  ): Vector3 {
     const angle = this.rng() * Math.PI * 2;
     const radius = Math.sqrt(this.rng()) * SPAWN_RADIUS;
     const yLo = anyHeight ? -KILL_BELOW : SPAWN_ABOVE_MIN;
     const y = cam.y + yLo + this.rng() * (SPAWN_ABOVE_MAX - yLo);
-    return new Vector3(cam.x + Math.cos(angle) * radius, y, cam.z + Math.sin(angle) * radius);
+    return out.set(cam.x + Math.cos(angle) * radius, y, cam.z + Math.sin(angle) * radius);
   }
 }
 
