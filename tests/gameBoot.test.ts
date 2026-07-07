@@ -140,6 +140,7 @@ const boot = vi.hoisted(() => {
     ui: undefined as FakeUi | undefined,
     abortInput: vi.fn(() => order.push('abortInput')),
     persistenceDispose: vi.fn(() => order.push('persistence.dispose')),
+    rendererAdd: vi.fn(),
     rendererStart: vi.fn(),
     rendererDispose: vi.fn(() => order.push('renderer.dispose')),
     celestialDispose: vi.fn(() => order.push('celestial.dispose')),
@@ -153,7 +154,7 @@ vi.mock('../src/render/Renderer', () => ({
     return {
       scene: boot.scene,
       camera: boot.camera,
-      add: vi.fn(),
+      add: boot.rendererAdd,
       start: boot.rendererStart,
       dispose: boot.rendererDispose,
     };
@@ -162,6 +163,7 @@ vi.mock('../src/render/Renderer', () => ({
 
 vi.mock('../src/render/TextureArray', () => ({
   createTextureArray: vi.fn(() => boot.texture),
+  mipmappedArray: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 
 vi.mock('../src/render/ChunkMaterial', () => ({
@@ -506,6 +508,19 @@ describe('Game.boot composition', () => {
 
     expect(boot.playerConstructorArgs[0]).toEqual({ x: 20, y: 70, z: -20 });
     expect(boot.rigInstance).toMatchObject({ yaw: 1.5, pitch: -0.3 });
+
+    cleanup();
+  });
+
+  it('adds a light to the scene so the lit avatar is not rendered black', async () => {
+    // Regression guard for the all-black-avatar bug: the avatar's MeshLambert material needs a
+    // scene light to show any color. Boot must add at least one Light to the scene.
+    const cleanup = await bootGame();
+
+    const addedALight = boot.rendererAdd.mock.calls.some(
+      ([o]) => (o as { isLight?: boolean } | undefined)?.isLight === true,
+    );
+    expect(addedALight).toBe(true);
 
     cleanup();
   });

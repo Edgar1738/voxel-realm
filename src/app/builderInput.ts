@@ -11,8 +11,35 @@ export type BuilderIntent =
   | 'mirror'
   | 'arrayInc'
   | 'arrayDec'
+  | 'nudgeXPlus'
+  | 'nudgeXMinus'
+  | 'nudgeYPlus'
+  | 'nudgeYMinus'
+  | 'nudgeZPlus'
+  | 'nudgeZMinus'
+  | 'nudgeReset'
   | 'cancel'
   | 'none';
+
+/** World-space whole-block delta for a nudge intent, or null for non-nudge intents. Pure. */
+export function nudgeDelta(intent: BuilderIntent): [number, number, number] | null {
+  switch (intent) {
+    case 'nudgeXPlus':
+      return [1, 0, 0];
+    case 'nudgeXMinus':
+      return [-1, 0, 0];
+    case 'nudgeYPlus':
+      return [0, 1, 0];
+    case 'nudgeYMinus':
+      return [0, -1, 0];
+    case 'nudgeZPlus':
+      return [0, 0, 1];
+    case 'nudgeZMinus':
+      return [0, 0, -1];
+    default:
+      return null;
+  }
+}
 
 /** Maps a keyboard `code` to a builder intent given the current mode. Pure. */
 export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIntent {
@@ -47,6 +74,21 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
       case 'Minus':
       case 'NumpadSubtract':
         return 'arrayDec';
+      // Whole-block paste nudge: arrows move on the X/Z plane, Page keys change height.
+      case 'ArrowRight':
+        return 'nudgeXPlus';
+      case 'ArrowLeft':
+        return 'nudgeXMinus';
+      case 'ArrowDown':
+        return 'nudgeZPlus';
+      case 'ArrowUp':
+        return 'nudgeZMinus';
+      case 'PageUp':
+        return 'nudgeYPlus';
+      case 'PageDown':
+        return 'nudgeYMinus';
+      case 'KeyN':
+        return 'nudgeReset';
       case 'Escape':
         return 'cancel';
       default:

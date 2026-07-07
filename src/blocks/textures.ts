@@ -51,16 +51,25 @@ const brick =
   (px, py, rng) => {
     const courseH = 4,
       brickW = 8;
-    const ox = (Math.floor(py / courseH) % 2) * (brickW / 2);
+    const course = Math.floor(py / courseH);
+    const ox = (course % 2) * (brickW / 2);
     const onMortar = py % courseH === 0 || (px + ox) % brickW === 0;
-    return onMortar ? shade(mortar, (rng() - 0.5) * 6) : shade(base, (rng() - 0.5) * 16);
+    if (onMortar) return shade(mortar, (rng() - 0.5) * 6);
+    // Per-brick tone so a wall reads as individual bricks, plus a faint shadow line at each base.
+    const brickCol = Math.floor((px + ox) / brickW);
+    const tone = (((((course * 7 + brickCol * 13) % 5) + 5) % 5) - 2) * 5; // stable -10..10 per brick
+    const weather = py % courseH === courseH - 1 ? -6 : 0;
+    return shade(base, tone + weather + (rng() - 0.5) * 12);
   };
 const planks =
   (base: RGB): Pixel =>
   (px, py, rng) => {
-    if (py % 5 === 0) return shade(base, -38);
+    if (py % 5 === 0) return shade(base, -38); // dark seam between courses
+    const board = Math.floor(py / 5);
+    const boardTone = (((board * 7) % 5) - 2) * 3; // per-board tone variation (-6..+6)
     const grain = px % 2 === 0 ? 4 : -4;
-    return shade(base, grain + (rng() - 0.5) * 9);
+    const knot = (px * 3 + board * 11) % 23 === 0 ? -22 : 0; // occasional wood knot
+    return shade(base, grain + boardTone + knot + (rng() - 0.5) * 8);
   };
 const cobble =
   (base: RGB, mortar: RGB): Pixel =>
@@ -91,42 +100,63 @@ const ridges =
   };
 const grassTopP =
   (base: RGB): Pixel =>
-  (_px, _py, rng) => {
+  (px, py, rng) => {
+    // Clumped blades: brighter tufts and shadowed gaps grouped in patches, plus fine noise,
+    // so grass reads as clustered growth rather than per-pixel static.
+    const clump = Math.sin(px * 1.3 + py * 0.7) + Math.sin(px * 0.5 - py * 1.4);
+    const tuft = clump > 1.0 ? 20 : clump < -1.0 ? -18 : 0;
     const r = rng();
-    const blade = r < 0.14 ? 22 : r > 0.9 ? -16 : 0;
-    return shade(base, blade + (rng() - 0.5) * 14);
+    const blade = r < 0.12 ? 20 : r > 0.92 ? -14 : 0;
+    return shade(base, tuft + blade + (rng() - 0.5) * 12);
   };
 const grassSideP =
   (dirt: RGB, green: RGB): Pixel =>
-  (_px, py, rng) => {
+  (px, py, rng) => {
     const lip = py < 3 || (py === 3 && rng() < 0.5);
-    return lip ? shade(green, (rng() - 0.5) * 16) : shade(dirt, (rng() - 0.5) * 18);
+    if (lip) return shade(green, (rng() - 0.5) * 16);
+    // A few grass tufts hang a row or two below the lip for a softer transition.
+    if (py <= 6 && (px * 7) % 5 === 0 && rng() < 0.6) return shade(green, (rng() - 0.5) * 14 - 6);
+    const pebble = rng() < 0.06 ? -16 : 0; // occasional darker pebble in the dirt
+    return shade(dirt, pebble + (rng() - 0.5) * 16);
   };
 const stoneFace =
   (base: RGB): Pixel =>
-  (_px, _py, rng) =>
-    rng() < 0.05 ? shade(base, -36) : shade(base, (rng() - 0.5) * 20);
+  (px, py, rng) => {
+    // Low-frequency veining + sparse hairline seams over the speckle, so stone reads as
+    // rock with structure instead of flat noise.
+    const vein = Math.sin(px * 1.3 + py * 2.1) * 5 + Math.sin(px * 0.7 - py * 1.1) * 3;
+    const crack = (px * 5 + py * 3) % 17 === 0 ? -14 : 0;
+    const fleck = rng() < 0.04 ? -30 : 0;
+    return shade(base, vein + crack + fleck + (rng() - 0.5) * 12);
+  };
 const leavesP =
   (base: RGB): Pixel =>
-  (_px, _py, rng) => {
+  (px, py, rng) => {
+    // Clustered light/shadow so leaves read as overlapping clumps rather than TV static.
+    const cluster = Math.sin(px * 0.9 + py * 1.7) + Math.sin(px * 1.9 - py * 0.6);
+    const depth = cluster > 0.8 ? 24 : cluster < -0.9 ? -30 : 0;
     const r = rng();
-    return r < 0.1
-      ? shade(base, -34)
-      : r > 0.88
-        ? shade(base, 26)
-        : shade(base, (rng() - 0.5) * 22);
+    const spore = r < 0.08 ? -18 : r > 0.9 ? 16 : 0;
+    return shade(base, depth + spore + (rng() - 0.5) * 16);
   };
 const glassP =
   (base: RGB): Pixel =>
   (px, py, rng) => {
     const border = px === 0 || py === 0 || px === TILE - 1 || py === TILE - 1;
-    return border ? shade(base, 24) : shade(base, (rng() - 0.5) * 6);
+    if (border) return shade(base, 24);
+    // Diagonal sheen streaks across the pane for a glassy highlight.
+    const d = (px + py) % 11;
+    const sheen = d === 4 ? 22 : d === 5 ? 14 : 0;
+    return shade(base, sheen + (rng() - 0.5) * 5);
   };
 const lanternP =
   (frame: RGB, glow: RGB): Pixel =>
   (px, py, rng) => {
     const onFrame = px <= 1 || py <= 1 || px >= TILE - 2 || py >= TILE - 2 || px === 7 || px === 8;
-    return onFrame ? shade(frame, (rng() - 0.5) * 8) : shade(glow, (rng() - 0.5) * 18);
+    if (onFrame) return shade(frame, (rng() - 0.5) * 8);
+    // Warm glow that brightens toward the center of each pane so the lantern reads as lit.
+    const core = (1 - Math.min(1, Math.hypot(px - 7.5, py - 7.5) / 8)) * 20;
+    return shade(glow, core + (rng() - 0.5) * 14);
   };
 const oreP =
   (spot: RGB): Pixel =>

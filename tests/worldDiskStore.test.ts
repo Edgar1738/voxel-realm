@@ -61,6 +61,15 @@ describe('worldDiskStore', () => {
     expect(listWorlds(root)).toEqual(['beta', 'gamma']);
   });
 
+  it('copyWorld snapshots independently — later edits to the source do not touch the copy', () => {
+    // Guards the in-memory snapshot cache: the copy must not share a cached object with its source.
+    writeChunk(root, 'src', '0,0', [[1, 1]]);
+    copyWorld(root, 'src', 'dst');
+    writeChunk(root, 'src', '0,0', [[9, 9]]); // mutate the source after copying
+    expect(readWorld(root, 'dst').chunks['0,0']).toEqual([[1, 1]]); // copy is unaffected
+    expect(readWorld(root, 'src').chunks['0,0']).toEqual([[9, 9]]);
+  });
+
   it('sanitizes names and falls back to "default"', () => {
     expect(safeWorldName('a/b c.json')).toBe('a_b_c_json');
     expect(safeWorldName('')).toBe('default');

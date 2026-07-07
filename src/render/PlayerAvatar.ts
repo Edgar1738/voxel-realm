@@ -79,15 +79,56 @@ const PARTS: readonly Part[] = [
 
 export const PLAYER_AVATAR_PART_IDS: readonly string[] = PARTS.map((part) => part.id);
 
+/** A swinging limb: the primary part (arm/leg) pivots at its top, the extremity (glove/boot) rides along. */
+interface LimbDef {
+  primary: string;
+  extremity: string;
+  kind: 'arm' | 'leg';
+  /** +1 for right, −1 for left, so left/right swing in opposite phase. */
+  sign: number;
+}
+
+const LIMBS: readonly LimbDef[] = [
+  { primary: 'right-arm', extremity: 'right-glove', kind: 'arm', sign: 1 },
+  { primary: 'left-arm', extremity: 'left-glove', kind: 'arm', sign: -1 },
+  { primary: 'right-leg', extremity: 'right-boot', kind: 'leg', sign: 1 },
+  { primary: 'left-leg', extremity: 'left-boot', kind: 'leg', sign: -1 },
+];
+
+/** Motion this frame, driving the walk cycle. `dh` = horizontal distance moved, `dt` = seconds. */
+export interface AvatarMotion {
+  dh: number;
+  dt: number;
+}
+
+/** Radians of stride phase advanced per block of ground covered (a full swing every ~1.1 blocks). */
+const STRIDE_PER_BLOCK = 2.8;
+/** Peak limb swing (radians ≈ 29°). */
+const MAX_SWING = 0.5;
+/** Above this horizontal speed (blocks/s) the walk cycle engages. */
+const MOVING_SPEED = 0.6;
+/** How fast the swing amplitude eases in/out (per second). */
+const SWING_EASE = 10;
+
+interface Limb {
+  pivot: Group;
+  kind: 'arm' | 'leg';
+  sign: number;
+}
+
 /**
- * Visible blocky player character for third-person view. Built once as a Group of box parts;
- * update() only mutates position/yaw/visibility. Hidden in first-person. Skin changes recolor and
- * show/hide prebuilt parts; no render resources are allocated per frame.
+ * Visible blocky player character for third-person view. Built once; update() mutates position,
+ * yaw, visibility and — driven by how far the player moved — a contralateral arm/leg walk swing.
+ * Arm/leg limbs live under pivot groups at the shoulder/hip so they swing from the joint (gloves and
+ * boots ride along). Hidden in first-person. Skin changes recolor/show-hide prebuilt parts.
  */
 export class PlayerAvatar {
   readonly group = new Group();
   private readonly disposables: (BoxGeometry | Material)[] = [];
   private readonly partMeshes = new Map<string, Mesh<BoxGeometry, MeshLambertMaterial>>();
+  private readonly limbs: Limb[] = [];
+  private phase = 0;
+  private swingAmp = 0;
 
   constructor(skinId?: string) {
     for (const part of PARTS) {
@@ -96,10 +137,37 @@ export class PlayerAvatar {
       const mesh = new Mesh(geometry, material);
       mesh.name = part.id;
       mesh.position.set(...part.pos);
-      this.group.add(mesh);
       this.partMeshes.set(part.id, mesh);
       this.disposables.push(geometry, material);
     }
+
+    const limbMembers = new Set(LIMBS.flatMap((l) => [l.primary, l.extremity]));
+    // Non-limb parts hang directly off the root at their authored position.
+    for (const part of PARTS) {
+      if (limbMembers.has(part.id)) continue;
+      this.group.add(this.partMeshes.get(part.id)!);
+    }
+    // Each limb gets a pivot group at the top of its primary part; members are re-expressed in
+    // pivot-local space so a rest pose (rotation 0) is byte-identical to the authored layout.
+    const byId = new Map(PARTS.map((p) => [p.id, p]));
+    for (const def of LIMBS) {
+      const primary = byId.get(def.primary)!;
+      const pivot = new Group();
+      pivot.position.set(primary.pos[0], primary.pos[1] + primary.size[1] / 2, primary.pos[2]);
+      for (const memberId of [def.primary, def.extremity]) {
+        const member = byId.get(memberId)!;
+        const mesh = this.partMeshes.get(memberId)!;
+        mesh.position.set(
+          member.pos[0] - pivot.position.x,
+          member.pos[1] - pivot.position.y,
+          member.pos[2] - pivot.position.z,
+        );
+        pivot.add(mesh);
+      }
+      this.group.add(pivot);
+      this.limbs.push({ pivot, kind: def.kind, sign: def.sign });
+    }
+
     this.setSkin(skinId);
     this.group.visible = false;
   }
@@ -108,12 +176,28 @@ export class PlayerAvatar {
     add(this.group);
   }
 
-  /** Places the avatar at the body center with the given look yaw; hides it in first-person. */
-  update(center: Vec3, yaw: number, visible: boolean): void {
+  /**
+   * Places the avatar at the body center with the given look yaw and advances the walk cycle from
+   * this frame's motion; hides it in first-person. With no motion the limbs ease back to rest.
+   */
+  update(center: Vec3, yaw: number, visible: boolean, motion?: AvatarMotion): void {
     this.group.visible = visible;
     if (!visible) return;
     this.group.position.set(center.x, center.y, center.z);
     this.group.rotation.y = yaw;
+
+    const dh = motion?.dh ?? 0;
+    const dt = motion?.dt ?? 0;
+    // Phase tracks distance covered, so the stride matches ground speed and freezes when still.
+    this.phase += dh * STRIDE_PER_BLOCK;
+    const speed = dt > 0 ? dh / dt : 0;
+    const targetAmp = speed > MOVING_SPEED ? MAX_SWING : 0;
+    this.swingAmp += (targetAmp - this.swingAmp) * Math.min(1, dt * SWING_EASE);
+    const swing = Math.sin(this.phase) * this.swingAmp;
+    for (const limb of this.limbs) {
+      // Legs lead; arms swing opposite the same-side leg for a natural contralateral gait.
+      limb.pivot.rotation.x = (limb.kind === 'leg' ? limb.sign : -limb.sign) * swing;
+    }
   }
 
   /** Applies one of the built-in skins; unknown ids fall back to the default Realm Scout. */

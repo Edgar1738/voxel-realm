@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveBuilderIntent, dominantHorizontalAxis } from '../src/app/builderInput';
+import { resolveBuilderIntent, dominantHorizontalAxis, nudgeDelta } from '../src/app/builderInput';
 
 describe('resolveBuilderIntent', () => {
   it('KeyB always toggles mode', () => {
@@ -35,6 +35,36 @@ describe('resolveBuilderIntent', () => {
     expect(resolveBuilderIntent('NumpadSubtract', 'pasting')).toBe('arrayDec');
     expect(resolveBuilderIntent('Escape', 'pasting')).toBe('cancel');
     expect(resolveBuilderIntent('KeyX', 'pasting')).toBe('none');
+  });
+
+  it('pasting mode maps the paste-nudge keys (arrows/Page/N)', () => {
+    expect(resolveBuilderIntent('ArrowRight', 'pasting')).toBe('nudgeXPlus');
+    expect(resolveBuilderIntent('ArrowLeft', 'pasting')).toBe('nudgeXMinus');
+    expect(resolveBuilderIntent('ArrowDown', 'pasting')).toBe('nudgeZPlus');
+    expect(resolveBuilderIntent('ArrowUp', 'pasting')).toBe('nudgeZMinus');
+    expect(resolveBuilderIntent('PageUp', 'pasting')).toBe('nudgeYPlus');
+    expect(resolveBuilderIntent('PageDown', 'pasting')).toBe('nudgeYMinus');
+    expect(resolveBuilderIntent('KeyN', 'pasting')).toBe('nudgeReset');
+  });
+
+  it('nudge keys are inert outside paste mode', () => {
+    for (const code of ['ArrowRight', 'ArrowUp', 'PageUp', 'KeyN']) {
+      expect(resolveBuilderIntent(code, 'selecting')).toBe('none');
+      expect(resolveBuilderIntent(code, 'off')).toBe('none');
+    }
+  });
+});
+
+describe('nudgeDelta', () => {
+  it('maps nudge intents to unit world deltas and everything else to null', () => {
+    expect(nudgeDelta('nudgeXPlus')).toEqual([1, 0, 0]);
+    expect(nudgeDelta('nudgeXMinus')).toEqual([-1, 0, 0]);
+    expect(nudgeDelta('nudgeYPlus')).toEqual([0, 1, 0]);
+    expect(nudgeDelta('nudgeYMinus')).toEqual([0, -1, 0]);
+    expect(nudgeDelta('nudgeZPlus')).toEqual([0, 0, 1]);
+    expect(nudgeDelta('nudgeZMinus')).toEqual([0, 0, -1]);
+    expect(nudgeDelta('nudgeReset')).toBeNull();
+    expect(nudgeDelta('rotateCW')).toBeNull();
   });
 });
 

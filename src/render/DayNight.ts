@@ -39,6 +39,9 @@ export class DayNight {
     for (const m of this.materials) {
       (m.uniforms.uLightDir.value as Vector3).set(s.sun[0], s.sun[1], s.sun[2]);
       (m.uniforms.uFogColor.value as Vector3).set(r, g, b);
+      // Sky-tint ambient reads its own uniform, deliberately separate from uFogColor so the
+      // underwater fog override (applyUnderwater) can't corrupt the surface lighting hue.
+      (m.uniforms.uSkyColor.value as Vector3).set(r, g, b);
       m.uniforms.uDayLight.value = s.daylight;
     }
   }

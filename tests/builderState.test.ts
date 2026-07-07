@@ -78,3 +78,35 @@ describe('BuilderState clipboard + transform', () => {
     expect(new BuilderState().transformedClipboard()).toBeUndefined();
   });
 });
+
+describe('BuilderState paste nudge', () => {
+  it('accumulates nudge and applies it to a base origin without mutating input', () => {
+    const b = new BuilderState();
+    b.setClipboard({ dims: [1, 1, 1], blocks: [[0, 0, 0, ID]] });
+    b.nudgeBy(2, 0, 0);
+    b.nudgeBy(0, -1, 3);
+    expect(b.nudge).toEqual({ x: 2, y: -1, z: 3 });
+    const base = { x: 10, y: 20, z: 30 };
+    expect(b.applyNudge(base)).toEqual({ x: 12, y: 19, z: 33 });
+    expect(base).toEqual({ x: 10, y: 20, z: 30 }); // untouched
+  });
+
+  it('resetNudge clears the offset', () => {
+    const b = new BuilderState();
+    b.nudgeBy(5, 5, 5);
+    b.resetNudge();
+    expect(b.nudge).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('starts a fresh paste un-nudged (setClipboard and exitPaste reset it)', () => {
+    const b = new BuilderState();
+    b.setClipboard({ dims: [1, 1, 1], blocks: [[0, 0, 0, ID]] });
+    b.nudgeBy(3, 3, 3);
+    b.setClipboard({ dims: [1, 1, 1], blocks: [[0, 0, 0, ID]] });
+    expect(b.nudge).toEqual({ x: 0, y: 0, z: 0 });
+
+    b.nudgeBy(1, 1, 1);
+    b.exitPaste();
+    expect(b.nudge).toEqual({ x: 0, y: 0, z: 0 });
+  });
+});

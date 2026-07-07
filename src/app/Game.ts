@@ -1,6 +1,6 @@
-import { Color } from 'three';
+import { Color, DirectionalLight, HemisphereLight } from 'three';
 import { Renderer } from '../render/Renderer';
-import { createTextureArray } from '../render/TextureArray';
+import { createTextureArray, mipmappedArray } from '../render/TextureArray';
 import {
   createChunkMaterial,
   createTransparentMaterial,
@@ -94,7 +94,7 @@ import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './ex
 import { tourRoute, tourTick, tourStep } from './tour';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
-import { dominantHorizontalAxis } from './builderInput';
+import { dominantHorizontalAxis, nudgeDelta } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
 import { BlockParticles, particleColorOf } from '../render/BlockParticles';
@@ -109,6 +109,7 @@ import {
   captureRegion,
   prefabToVoxels,
   orientedStateReader,
+  boxDims,
 } from './RegionOps';
 import {
   ServerBlueprintStore,
@@ -134,8 +135,11 @@ export class Game {
     const registry = new BlockRegistry();
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
-    const material = createChunkMaterial(texture);
-    const transparentMaterial = createTransparentMaterial(texture);
+    // Opaque/transparent block faces use a mipmapped sibling (less distant shimmer); the cutout
+    // plant pass keeps the crisp base so mip alpha-averaging can't erode thin foliage at range.
+    const mipTexture = mipmappedArray(texture);
+    const material = createChunkMaterial(mipTexture);
+    const transparentMaterial = createTransparentMaterial(mipTexture);
     const cutoutMaterial = createCutoutMaterial(texture);
     const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
     const daynight = new DayNight(renderer.scene, chunkMaterials);
@@ -718,6 +722,15 @@ export class Game {
     const avatar = new PlayerAvatar(playerSkinId);
     avatarSkinTarget.current = avatar;
     avatar.attach((o) => renderer.add(o));
+    // The avatar is the scene's only lit (MeshLambert) material — chunks, particles, weather,
+    // critters, overlays and the sky are all unlit — so without any lights it rendered pure black
+    // and every skin looked identical. A soft hemisphere fill plus a gentle key light give the
+    // avatar readable form and let the skins show; nothing else in the scene responds to lights.
+    const avatarFill = new HemisphereLight(0xffffff, 0x45484f, 2.2);
+    const avatarKey = new DirectionalLight(0xffffff, 1.4);
+    avatarKey.position.set(0.5, 1.0, 0.3);
+    renderer.add(avatarFill);
+    renderer.add(avatarKey);
 
     // Interaction ray: origin at the player's eye, direction from yaw/pitch. Used for every
     // break/place/toggle/builder aim so reach stays anchored to the head, not the render camera
@@ -732,10 +745,10 @@ export class Game {
       return raycastVoxels(previewSampler, origin, dir, getReach());
     };
 
-    /** Paste origin (min corner) = the empty cell adjacent to the aimed face. */
+    /** Paste origin (min corner) = the aim-adjacent empty cell, shifted by the dialed-in nudge. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
       const aim = builderAim();
-      return aim ? { x: aim.adjacent.x, y: aim.adjacent.y, z: aim.adjacent.z } : undefined;
+      return aim ? builder.applyNudge(aim.adjacent) : undefined;
     };
 
     /** Preload the chunks under a world XZ box; on the manager's over-size throw, warn and signal abort. */
@@ -834,8 +847,22 @@ export class Game {
           setStatus(`Array x${builder.transform.arrayCount}`);
           return;
         }
-        default:
+        case 'nudgeReset':
+          if (builder.mode !== 'pasting') return;
+          builder.resetNudge();
+          setStatus('Nudge reset');
           return;
+        default: {
+          const delta = nudgeDelta(intent);
+          if (delta && builder.mode === 'pasting') {
+            builder.nudgeBy(...delta);
+            const { x, y, z } = builder.nudge;
+            setStatus(
+              `Nudge: ${x >= 0 ? '+' : ''}${x}X ${y >= 0 ? '+' : ''}${y}Y ${z >= 0 ? '+' : ''}${z}Z`,
+            );
+          }
+          return;
+        }
       }
     };
 
@@ -903,13 +930,18 @@ export class Game {
           if (builder.mode === 'selecting') {
             builder.setCorner(hit.block);
             const b = builder.selectionBox();
-            setStatus(b ? 'Selection set' : 'Pick the opposite corner');
+            if (b) {
+              const [sx, sy, sz] = boxDims(b);
+              setStatus(`Selection ${sx}×${sy}×${sz} (${sx * sy * sz} blocks)`);
+            } else {
+              setStatus('Pick the opposite corner');
+            }
             return;
           }
           if (builder.mode === 'pasting') {
             const p = builder.transformedClipboard();
             if (!p) return;
-            const origin = { x: hit.adjacent.x, y: hit.adjacent.y, z: hit.adjacent.z };
+            const origin = builder.applyNudge(hit.adjacent);
             if (
               !preloadOrWarn(origin.x, origin.z, origin.x + p.dims[0] - 1, origin.z + p.dims[2] - 1)
             )
@@ -958,6 +990,15 @@ export class Game {
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
+    // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
+    let avatarPrevX = player.position.x;
+    let avatarPrevZ = player.position.z;
+
+    // Stable per-frame callbacks, hoisted so the render loop allocates no closures each frame.
+    const isSolidOrWater = (x: number, y: number, z: number): boolean =>
+      manager.isSolid(x, y, z) || manager.isWater(x, y, z);
+    const getBlockAt = (x: number, y: number, z: number): number => manager.getBlock(x, y, z);
+    const critterEnv = { getBlock: getBlockAt, player: player.position };
 
     renderer.start((dt) => {
       const cdt = Math.min(dt, MAX_DT);
@@ -988,7 +1029,10 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      avatar.update(player.position, rig.yaw, rig.mode === 'third');
+      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
+      avatarPrevX = player.position.x;
+      avatarPrevZ = player.position.z;
+      avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
       const move = movementSounds.update(
         cdt,
         player.position.x,
@@ -1020,15 +1064,10 @@ export class Game {
       const rolled = weatherClock.advance(cdt);
       if (rolled !== undefined) weather.setKind(rolled);
       // Drops die on solids *and* water surfaces — rain must not streak through lakes.
-      weather.update(cdt, eye, (x, y, z) => manager.isSolid(x, y, z) || manager.isWater(x, y, z));
-      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, (x, y, z) =>
-        manager.getBlock(x, y, z),
-      );
+      weather.update(cdt, eye, isSolidOrWater);
+      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, getBlockAt);
       ticker.update(cdt);
-      critters.update(cdt, eye, {
-        getBlock: (x, y, z) => manager.getBlock(x, y, z),
-        player: player.position,
-      });
+      critters.update(cdt, eye, critterEnv);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
@@ -1236,7 +1275,15 @@ export class Game {
       hudTeardown?.();
       celestial.dispose();
       avatar.dispose();
+      weather.dispose();
+      ambientLife.dispose();
+      critters.dispose();
+      particles.dispose();
+      selectionBox.dispose();
+      pasteGhost.dispose();
+      targetOverlay.dispose();
       sink.disposeAll();
+      mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too
       renderer.dispose();
       rig.dispose();
     }

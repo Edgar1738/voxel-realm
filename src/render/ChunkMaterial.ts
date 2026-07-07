@@ -30,6 +30,7 @@ out vec3 vTint;
 out vec3 vNormal;
 out vec3 vViewPos;
 out vec3 vWorldPos;
+out vec3 vWorldNormal;
 
 void main() {
   vUv = uv;
@@ -38,6 +39,10 @@ void main() {
   vLight = light;
   vTint = tint;
   vNormal = normalize(normalMatrix * normal);
+  // World-space normal for hemispheric ambient + water top-face masking. Chunk meshes are
+  // translation-only (no rotation/scale), so mat3(modelMatrix) is a plain basis; the plant
+  // sway below only displaces position, never the normal.
+  vWorldNormal = normalize(mat3(modelMatrix) * normal);
   vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
   // Wind sway for cutout plants: tops (uv.y=1) lean, roots stay planted. World-position
   // phase keeps neighboring plants out of lockstep. uSwayAmp is 0 on non-plant passes.
@@ -56,6 +61,7 @@ precision highp float;
 precision highp int;
 precision highp sampler2DArray;
 
+uniform mat4 viewMatrix;
 uniform sampler2DArray uTex;
 uniform vec3 uLightDir;
 uniform vec3 uFogColor;
@@ -69,6 +75,13 @@ uniform float uTorchRadius;
 uniform float uTime;
 uniform float uWaveAmp;
 uniform float uAoStrength;
+uniform vec3 uSkyColor;
+uniform float uAmbientStrength;
+uniform vec3 uWaterDeep;
+uniform float uWaterDepthTint;
+uniform float uFresnelPower;
+uniform float uFresnelTint;
+uniform float uSpecStrength;
 
 in vec2 vUv;
 in float vLayer;
@@ -78,6 +91,7 @@ in vec3 vTint;
 in vec3 vNormal;
 in vec3 vViewPos;
 in vec3 vWorldPos;
+in vec3 vWorldNormal;
 
 out vec4 fragColor;
 
@@ -85,12 +99,19 @@ void main() {
   vec4 texel = texture(uTex, vec3(vUv, vLayer));
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
   vec3 base = texel.rgb * vTint;
-  // Water shimmer: two drifting sine fields brighten/darken the surface so still water
-  // reads as liquid. uWaveAmp is 0 on every pass except the transparent (water) one.
+  // Water surface treatment (transparent pass only; uWaveAmp is 0 on every other pass):
+  // the two-sine shimmer, a deep-blue depth tint, and a sky-tinted grazing-angle rim.
+  // fres (view-angle fresnel) is reused for the alpha and to gate the glint further down.
+  float fres = 0.0;
   if (uWaveAmp > 0.0) {
     float wave = sin(vWorldPos.x * 1.6 + vWorldPos.z * 0.7 + uTime * 1.4) *
                  sin(vWorldPos.z * 1.9 - vWorldPos.x * 0.5 + uTime * 1.1);
     base *= 1.0 + uWaveAmp * wave;
+    vec3 Nv = normalize(vNormal);
+    vec3 V = normalize(-vViewPos);
+    fres = pow(1.0 - clamp(dot(Nv, V), 0.0, 1.0), uFresnelPower);
+    base = mix(base, uWaterDeep, uWaterDepthTint);
+    base = mix(base, uSkyColor, fres * uFresnelTint);
   }
   float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
@@ -106,10 +127,34 @@ void main() {
   // uAoStrength: dev-tunable AO intensity (0 = off, 1 = baked value, >1 exaggerated).
   float aoFactor = clamp(mix(1.0, vAo, uAoStrength), 0.0, 1.0);
   float shade = (0.45 + 0.55 * diff) * aoFactor;
-  vec3 color = base * shade * level;
+  // Hemispheric ambient: sky hue on up-faces, warmer/darker below, keyed by WORLD up.
+  // Luminance-normalized (divide by hemi's luma) so it only RECOLORS and never adds
+  // brightness -- baked light level stays the sole brightness driver, so caves stay dark
+  // and lanterns stay bright. uAmbientStrength = 0 collapses tintMul to 1.0 (legacy look).
+  float up = clamp(vWorldNormal.y * 0.5 + 0.5, 0.0, 1.0);
+  vec3 hemi = mix(uSkyColor * 0.55 + vec3(0.06, 0.05, 0.04), uSkyColor, up);
+  vec3 hueTint = hemi / max(dot(hemi, vec3(0.299, 0.587, 0.114)), 1e-3);
+  vec3 ambient = hueTint * mix(0.72, 1.0, up);
+  vec3 tintMul = mix(vec3(1.0), ambient, uAmbientStrength);
+  vec3 color = base * tintMul * shade * level;
+  // Water sun glint: a Blinn-Phong highlight confined to top faces in daylight, so night
+  // and underwater water stay calm. Sky-tinted so the sparkle matches the time of day.
+  if (uWaveAmp > 0.0) {
+    vec3 Nv = normalize(vNormal);
+    vec3 V = normalize(-vViewPos);
+    vec3 Lv = normalize((viewMatrix * vec4(normalize(uLightDir), 0.0)).xyz);
+    vec3 H = normalize(V + Lv);
+    float spec = pow(max(dot(Nv, H), 0.0), 48.0);
+    float topMask = smoothstep(0.5, 0.9, vWorldNormal.y);
+    color += uSpecStrength * spec * topMask * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
+  }
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
-  fragColor = vec4(color, uAlpha);
+  // Water alpha varies with view angle: near-transparent looking straight down (fres≈0
+  // keeps uAlpha), opaque/reflective at grazing angles (fres→1).
+  float outAlpha = uAlpha;
+  if (uWaveAmp > 0.0) outAlpha = mix(uAlpha, 1.0, fres);
+  fragColor = vec4(color, outAlpha);
 }
 `;
 
@@ -153,6 +198,15 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
       uSwayAmp: { value: swayAmp },
       uWaveAmp: { value: waveAmp },
       uAoStrength: { value: 1.0 },
+      // Sky-tint ambient (Part 1): default matches the fog color; DayNight overwrites it live.
+      uSkyColor: { value: new Vector3(0.529, 0.725, 0.91) },
+      uAmbientStrength: { value: 0.35 },
+      // Water polish (Part 2): deep depth tint, grazing fresnel, and sun glint strength.
+      uWaterDeep: { value: new Vector3(0.05, 0.16, 0.32) },
+      uWaterDepthTint: { value: 0.35 },
+      uFresnelPower: { value: 4.0 },
+      uFresnelTint: { value: 0.5 },
+      uSpecStrength: { value: 0.6 },
     },
     vertexShader,
     fragmentShader,

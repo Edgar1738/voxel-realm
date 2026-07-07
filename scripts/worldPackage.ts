@@ -6,13 +6,20 @@
 //   npm run world:package -- --save moonspire-realm --title "Moonspire Realm" --port 5191
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { archiveWorld, roamUrl, type GitInfo } from './archiveCore.ts';
 import { validatePackage, summarizePackage } from './packageCore.ts';
 import { auditWorldMeta } from '../src/app/worldMeta.ts';
 import { WORLD_HEIGHT } from '../src/core/constants.ts';
 import type { WorldMeta } from '../src/persistence/SaveTypes.ts';
+import {
+  buildManifestEntry,
+  upsertManifestEntry,
+  validateManifest,
+  emptyManifest,
+  type WorldManifest,
+} from '../src/persistence/worldManifest.ts';
 
 const VAULT_ROOT = process.env.VR_VAULT ?? 'C:/Users/Edgar/Documents/Obsidian Vault/Voxel Realm';
 
@@ -94,6 +101,44 @@ console.log(
   `  chunks: ${summary.chunkCount} · entries: ${summary.totalEntries} · non-air: ${summary.nonAirEntries}`,
 );
 console.log(`  block ids: ${blockList}`);
+
+// Optional: merge this world into a shipped-collection manifest. Opt-in via --manifest [path]
+// (defaults to world-manifest.json in the repo root). All the merge/validate logic is the pure,
+// unit-tested worldManifest module; this only reads/writes the file.
+function flagValue(name: string): string | undefined {
+  const v = getFlag(args, name);
+  return v && !v.startsWith('--') ? v : undefined;
+}
+if (args.includes('--manifest')) {
+  const manifestPath = resolve(cwd, flagValue('manifest') ?? 'world-manifest.json');
+  const tagsArg = flagValue('tags');
+  const previewArg = flagValue('preview');
+  let entry;
+  try {
+    entry = buildManifestEntry(saveName, snapshot.meta as WorldMeta, {
+      slug: saveName,
+      chunkCount: summary.chunkCount,
+      ...(tagsArg ? { tags: tagsArg.split(',').map((s) => s.trim()).filter(Boolean) } : {}),
+      ...(previewArg ? { preview: previewArg } : {}),
+    });
+  } catch (err) {
+    console.error(`world:package: cannot add "${saveName}" to the manifest: ${(err as Error).message}`);
+    console.error('  fix: set a spawn + look (e.g. world.setSpawn("Arrival")) and re-save.');
+    process.exit(1);
+  }
+  let manifest: WorldManifest = existsSync(manifestPath)
+    ? (JSON.parse(readFileSync(manifestPath, 'utf8')) as WorldManifest)
+    : emptyManifest();
+  manifest = upsertManifestEntry(manifest, entry);
+  const manifestProblems = validateManifest(manifest);
+  if (manifestProblems.length > 0) {
+    console.error(`world:package: manifest would be invalid:`);
+    for (const problem of manifestProblems) console.error(`  - ${problem}`);
+    process.exit(1);
+  }
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log(`  manifest: ${manifestPath} (${manifest.worlds.length} world(s))`);
+}
 
 const capturesArg = getFlag(args, 'captures');
 const portArg = getFlag(args, 'port');
