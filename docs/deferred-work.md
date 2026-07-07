@@ -5,12 +5,6 @@ The recent polish/refactor pass (branch `claude/codex-inspection-review-0l07b5`)
 scoped **out** of those v1s — recorded here so it survives in the repo rather than in chat.
 
 ## Render / graphics
-- **Real sun rise/set arc.** `src/render/Sky.ts:39` hardcodes sun elevation to a constant `0.85`,
-  so the sun never actually rises or sets and sunrise/sunset is only a colour wash — no directional
-  light change. Tracking elevation to time-of-day gives real golden-hour light, but it's a scoped
-  design change: it fights `tests/sky.test.ts:18-21` (asserts the sun stays above the horizon at
-  midnight) and couples into `CelestialSky` disc positioning (`CelestialSky.ts:143-159`, currently
-  an opacity cross-fade). Needs a night-shading floor so faces don't go black.
 - **Water shoreline + foam.** The water shader has depth tint / fresnel / sun glint, but no shoreline
   treatment or surface foam.
 
