@@ -12,9 +12,29 @@ describe('PlayerAvatar', () => {
     expect(avatar.group.children.length).toBeGreaterThan(0);
   });
 
-  it('builds the expected data-driven part set', () => {
+  it('builds every data-driven part (findable in the avatar graph)', () => {
     const avatar = new PlayerAvatar();
-    expect(avatar.group.children.map((c) => c.name)).toEqual(PLAYER_AVATAR_PART_IDS);
+    for (const id of PLAYER_AVATAR_PART_IDS) {
+      expect(avatar.group.getObjectByName(id)).toBeDefined();
+    }
+  });
+
+  it('swings the limbs while moving and eases back to rest when still', () => {
+    const avatar = new PlayerAvatar();
+    const legPivot = avatar.group.getObjectByName('right-leg')!.parent!;
+    for (let i = 0; i < 30; i++)
+      avatar.update({ x: 0, y: 0, z: 0 }, 0, true, { dh: 0.1, dt: 0.016 });
+    expect(Math.abs(legPivot.rotation.x)).toBeGreaterThan(0.05);
+    for (let i = 0; i < 150; i++)
+      avatar.update({ x: 0, y: 0, z: 0 }, 0, true, { dh: 0, dt: 0.016 });
+    expect(Math.abs(legPivot.rotation.x)).toBeLessThan(0.02);
+  });
+
+  it('stays at rest when updated without motion', () => {
+    const avatar = new PlayerAvatar();
+    const legPivot = avatar.group.getObjectByName('right-leg')!.parent!;
+    avatar.update({ x: 0, y: 0, z: 0 }, 0, true);
+    expect(legPivot.rotation.x).toBe(0);
   });
 
   it('uses Realm Scout as the default skin', () => {

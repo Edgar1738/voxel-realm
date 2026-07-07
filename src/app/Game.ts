@@ -987,6 +987,9 @@ export class Game {
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
+    // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
+    let avatarPrevX = player.position.x;
+    let avatarPrevZ = player.position.z;
 
     // Stable per-frame callbacks, hoisted so the render loop allocates no closures each frame.
     const isSolidOrWater = (x: number, y: number, z: number): boolean =>
@@ -1023,7 +1026,10 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      avatar.update(player.position, rig.yaw, rig.mode === 'third');
+      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
+      avatarPrevX = player.position.x;
+      avatarPrevZ = player.position.z;
+      avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
       const move = movementSounds.update(
         cdt,
         player.position.x,
