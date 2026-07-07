@@ -17,15 +17,29 @@ export function createTextureArray(): DataArrayTexture {
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
   tex.type = UnsignedByteType;
-  // Crisp texels up close (Nearest mag), but trilinear-filtered minification with mipmaps so
-  // distant/grazing surfaces stop shimmering. Each 16px tile is its own array layer, so mip
-  // downsampling averages only within a tile — no cross-tile atlas bleed. 16 is power-of-two,
-  // so WebGL2 can generate the array-texture mip chain.
+  // Crisp, un-mipmapped base. The cutout (alpha-tested) plant pass samples THIS so mip-averaging
+  // of thin binary-alpha blades can't drop their alpha below alphaTest=0.5 and erode foliage at
+  // distance. The opaque/transparent passes use the mipmapped sibling below instead.
   tex.magFilter = NearestFilter;
-  tex.minFilter = LinearMipmapLinearFilter;
-  tex.generateMipmaps = true;
+  tex.minFilter = NearestFilter;
   tex.wrapS = RepeatWrapping;
   tex.wrapT = RepeatWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * A mipmapped sibling of {@link createTextureArray} for the OPAQUE and TRANSPARENT passes:
+ * trilinear minification kills distant shimmer on solid block faces while `magFilter` stays
+ * Nearest for crisp close-ups. Deliberately NOT used by the cutout pass (see above). `clone()`
+ * shares the source pixel data (same `image` reference), so this is a second small GPU upload,
+ * not a second paint. 16px tiles are power-of-two and each is its own array layer, so WebGL2
+ * builds a per-layer mip chain with no cross-tile bleed.
+ */
+export function mipmappedArray(base: DataArrayTexture): DataArrayTexture {
+  const tex = base.clone();
+  tex.minFilter = LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
   tex.needsUpdate = true;
   return tex;
 }

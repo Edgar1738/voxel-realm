@@ -1,6 +1,6 @@
 import { Color, DirectionalLight, HemisphereLight } from 'three';
 import { Renderer } from '../render/Renderer';
-import { createTextureArray } from '../render/TextureArray';
+import { createTextureArray, mipmappedArray } from '../render/TextureArray';
 import {
   createChunkMaterial,
   createTransparentMaterial,
@@ -135,8 +135,11 @@ export class Game {
     const registry = new BlockRegistry();
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
-    const material = createChunkMaterial(texture);
-    const transparentMaterial = createTransparentMaterial(texture);
+    // Opaque/transparent block faces use a mipmapped sibling (less distant shimmer); the cutout
+    // plant pass keeps the crisp base so mip alpha-averaging can't erode thin foliage at range.
+    const mipTexture = mipmappedArray(texture);
+    const material = createChunkMaterial(mipTexture);
+    const transparentMaterial = createTransparentMaterial(mipTexture);
     const cutoutMaterial = createCutoutMaterial(texture);
     const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
     const daynight = new DayNight(renderer.scene, chunkMaterials);
@@ -1280,6 +1283,7 @@ export class Game {
       pasteGhost.dispose();
       targetOverlay.dispose();
       sink.disposeAll();
+      mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too
       renderer.dispose();
       rig.dispose();
     }

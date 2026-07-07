@@ -163,6 +163,7 @@ vi.mock('../src/render/Renderer', () => ({
 
 vi.mock('../src/render/TextureArray', () => ({
   createTextureArray: vi.fn(() => boot.texture),
+  mipmappedArray: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 
 vi.mock('../src/render/ChunkMaterial', () => ({
