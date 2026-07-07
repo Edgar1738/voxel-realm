@@ -28,11 +28,19 @@ export class CitadelStamp {
     this.wz1 = this.wz0 + CHUNK_SIZE_Z - 1;
   }
 
-  /** Sets a single world voxel, ignoring it if out of this chunk or the world's vertical range. */
-  set(wx: number, wy: number, wz: number, id: BlockId): void {
+  /**
+   * Sets a single world voxel, ignoring it if out of this chunk or the world's vertical range.
+   * An optional orientation `state` (see VoxelState — facing + half bits) is written for shaped
+   * blocks such as stairs; the default 0 leaves the state untouched, so plain cube stamps behave
+   * exactly as before.
+   */
+  set(wx: number, wy: number, wz: number, id: BlockId, state = 0): void {
     if (wy < 0 || wy >= WORLD_HEIGHT) return;
     if (wx < this.wx0 || wx > this.wx1 || wz < this.wz0 || wz > this.wz1) return;
-    this.chunk.set(wx - this.wx0, wy, wz - this.wz0, id);
+    const lx = wx - this.wx0;
+    const lz = wz - this.wz0;
+    this.chunk.set(lx, wy, lz, id);
+    if (state !== 0) this.chunk.setState(lx, wy, lz, state);
   }
 
   /** Reads a world voxel; returns -1 for anything outside this chunk (cross-chunk reads aren't safe). */

@@ -12,6 +12,8 @@ import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
 import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGenerator';
 import { citadelSite } from './citadelSite';
+import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
+import { harborSite } from './harborSite';
 import {
   cottage,
   well,
@@ -50,7 +52,8 @@ export type WorldPreset =
   | 'villages'
   | 'caverns'
   | 'frontier'
-  | 'citadel';
+  | 'citadel'
+  | 'harbor';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -64,6 +67,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'caverns',
   'frontier',
   'citadel',
+  'harbor',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -304,6 +308,16 @@ export function createGenerator(preset: WorldPreset): {
               anchor: 'min', // seat ruins on the lowest footprint column so they don't float on slopes
             },
           ),
+        ],
+      };
+    case 'harbor':
+      return {
+        generator: createHarborGenerator(),
+        overlays: [
+          // Trees crown the upper hillside above the town (gated to grass well above the quay), then
+          // the authored harbor stamps in — houses clear any tree that falls inside their footprint.
+          scatterOaks(harborSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 11 }),
+          harborSite(),
         ],
       };
     case 'default':
