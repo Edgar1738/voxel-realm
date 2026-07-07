@@ -83,7 +83,7 @@ __vr.help()
 ## Development
 
 ```bash
-npm test           # vitest — ~1100 tests, headless (fake-indexeddb, no GPU needed)
+npm test           # vitest — 1200+ tests, headless (fake-indexeddb, no GPU needed)
 npm run lint       # eslint + prettier
 npm run build      # tsc --noEmit && vite build
 ```
@@ -106,3 +106,18 @@ src/
 ├── persistence/   IndexedDB + dev-server save stores
 └── app/           Game composition root, input, UI, builder state, dev tools
 ```
+
+## Authoring worlds
+
+Building and publishing a curated world (build → save → add metadata → audit → package → share)
+is documented in **[docs/authoring-worlds.md](docs/authoring-worlds.md)**.
+
+## Deploying
+
+Off-thread meshing (the P6 worker pool) requires the page to be **cross-origin isolated**, which
+means the host must send `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` on the document. The dev server sets these
+automatically; a production host must send the same headers to unlock `SharedArrayBuffer` and the
+worker pool. Hosts that can't set custom headers (e.g. plain GitHub Pages) still work — the engine
+detects the missing isolation via `MeshWorkerPool.supported()` and falls back to main-thread
+meshing, so meshing runs on the render thread instead of workers.
