@@ -51,9 +51,15 @@ const brick =
   (px, py, rng) => {
     const courseH = 4,
       brickW = 8;
-    const ox = (Math.floor(py / courseH) % 2) * (brickW / 2);
+    const course = Math.floor(py / courseH);
+    const ox = (course % 2) * (brickW / 2);
     const onMortar = py % courseH === 0 || (px + ox) % brickW === 0;
-    return onMortar ? shade(mortar, (rng() - 0.5) * 6) : shade(base, (rng() - 0.5) * 16);
+    if (onMortar) return shade(mortar, (rng() - 0.5) * 6);
+    // Per-brick tone so a wall reads as individual bricks, plus a faint shadow line at each base.
+    const brickCol = Math.floor((px + ox) / brickW);
+    const tone = (((((course * 7 + brickCol * 13) % 5) + 5) % 5) - 2) * 5; // stable -10..10 per brick
+    const weather = py % courseH === courseH - 1 ? -6 : 0;
+    return shade(base, tone + weather + (rng() - 0.5) * 12);
   };
 const planks =
   (base: RGB): Pixel =>
@@ -147,7 +153,10 @@ const lanternP =
   (frame: RGB, glow: RGB): Pixel =>
   (px, py, rng) => {
     const onFrame = px <= 1 || py <= 1 || px >= TILE - 2 || py >= TILE - 2 || px === 7 || px === 8;
-    return onFrame ? shade(frame, (rng() - 0.5) * 8) : shade(glow, (rng() - 0.5) * 18);
+    if (onFrame) return shade(frame, (rng() - 0.5) * 8);
+    // Warm glow that brightens toward the center of each pane so the lantern reads as lit.
+    const core = (1 - Math.min(1, Math.hypot(px - 7.5, py - 7.5) / 8)) * 20;
+    return shade(glow, core + (rng() - 0.5) * 14);
   };
 const oreP =
   (spot: RGB): Pixel =>
