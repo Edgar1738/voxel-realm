@@ -3,6 +3,7 @@ import {
   RGBAFormat,
   UnsignedByteType,
   NearestFilter,
+  LinearMipmapLinearFilter,
   RepeatWrapping,
 } from 'three';
 import { BLOCK_TEXTURES, TEXTURE_LAYER_COUNT } from '../blocks/blocks';
@@ -16,8 +17,13 @@ export function createTextureArray(): DataArrayTexture {
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
   tex.type = UnsignedByteType;
+  // Crisp texels up close (Nearest mag), but trilinear-filtered minification with mipmaps so
+  // distant/grazing surfaces stop shimmering. Each 16px tile is its own array layer, so mip
+  // downsampling averages only within a tile — no cross-tile atlas bleed. 16 is power-of-two,
+  // so WebGL2 can generate the array-texture mip chain.
   tex.magFilter = NearestFilter;
-  tex.minFilter = NearestFilter;
+  tex.minFilter = LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
   tex.wrapS = RepeatWrapping;
   tex.wrapT = RepeatWrapping;
   tex.needsUpdate = true;
