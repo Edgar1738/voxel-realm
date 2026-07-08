@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "seed": 1337,
+    "version": 1,
+    "preset": "ashen-reach",
+    "title": "Ashen Reach",
+    "description": "A volcanic caldera kingdom: Emberhold village watches The Ember Spire rise from a basalt island in a dark crater lake. Cross the magma bridge, climb the ash road to the rim observatory, and look back across the bowl.",
+    "spawn": { "x": 8, "y": 70.5, "z": 14 },
+    "look": { "yaw": 3.1416, "pitch": -0.05 },
+    "landmarks": [
+      { "name": "Emberhold Plaza", "x": 8, "y": 69, "z": 4 },
+      { "name": "Arrival Gate", "x": 8, "y": 69, "z": -16 },
+      { "name": "The Ember Spire", "x": 0, "y": 66, "z": 96 },
+      { "name": "Magma Bridge", "x": 48, "y": 65, "z": 72 },
+      { "name": "Shore Dock", "x": 8, "y": 64, "z": 54 },
+      { "name": "Rim Observatory", "x": -92, "y": 118, "z": 96 },
+      { "name": "Ash Mine", "x": 78, "y": 88, "z": 108 },
+      { "name": "Ember Shrine", "x": 100, "y": 100, "z": 96 }
+    ],
+    "tour": [
+      { "name": "Emberhold Plaza", "x": 8, "y": 70, "z": 6 },
+      { "name": "Shore Dock", "x": 8, "y": 65, "z": 52 },
+      { "name": "Magma Bridge", "x": 48, "y": 66, "z": 72 },
+      { "name": "The Ember Spire", "x": 0, "y": 72, "z": 88 },
+      { "name": "Ash Mine", "x": 76, "y": 90, "z": 108 },
+      { "name": "Rim Observatory", "x": -88, "y": 120, "z": 100 },
+      { "name": "Spire Overlook", "x": -90, "y": 124, "z": 96 }
+    ]
+  },
+  "chunks": {}
+}

@@ -10,10 +10,12 @@ import {
   GRAVEL,
   DEEPSLATE,
   GLOWSTONE,
+  CRYSTAL,
   BRICK,
   PLANKS,
   GLASS,
   COBBLESTONE,
+  BOOKSHELF,
 } from '../src/blocks/blocks';
 
 const SEED = 1337;
@@ -90,12 +92,14 @@ describe('ashen-reach terrain composition', () => {
 
   it('digs a deep flooded caldera lake south of the village', () => {
     const { at } = makeSampler();
-    const { cx, cz } = ASHEN.caldera;
-    const floor = ashenSurfaceAt(SEED, cx, cz);
-    expect(floor).toBeLessThanOrEqual(ASHEN.lake.floorY + 4);
-    expect(at(cx, floor + 1, cz)).toBe(WATER);
-    expect(at(cx, SEA_LEVEL, cz)).toBe(WATER);
-    expect(at(cx, SEA_LEVEL + 1, cz)).toBe(AIR);
+    // Sample the flooded ring between island and beach (not the spire island center).
+    const wx = ASHEN.caldera.cx + 22;
+    const wz = ASHEN.caldera.cz;
+    const floor = ashenSurfaceAt(SEED, wx, wz);
+    expect(floor).toBeLessThan(SEA_LEVEL);
+    expect(at(wx, floor + 1, wz)).toBe(WATER);
+    expect(at(wx, SEA_LEVEL, wz)).toBe(WATER);
+    expect(at(wx, SEA_LEVEL + 1, wz)).toBe(AIR);
   });
 
   it('raises a high basalt rim outside the terrace', () => {
@@ -111,6 +115,16 @@ describe('ashen-reach terrain composition', () => {
     const { cx, cz, y } = ASHEN.observatory;
     const h = ashenSurfaceAt(SEED, cx, cz);
     expect(h).toBeGreaterThanOrEqual(y - 6);
+  });
+
+  it('raises a dry basalt island under the Ember Spire', () => {
+    const { cx, cz, topY } = ASHEN.spireIsland;
+    const h = ashenSurfaceAt(SEED, cx, cz);
+    expect(h).toBeGreaterThanOrEqual(SEA_LEVEL);
+    expect(h).toBeGreaterThanOrEqual(topY - 3);
+    // Lake ring just outside the island stays flooded.
+    const floor = ashenSurfaceAt(SEED, cx + 22, cz);
+    expect(floor).toBeLessThan(SEA_LEVEL);
   });
 });
 
@@ -158,6 +172,28 @@ describe('ashen-reach site architecture', () => {
       if (at(cx + 3, floorY + dy, cz) === GLASS) foundGlass = true;
     }
     expect(foundGlass).toBe(true);
+  });
+
+  it('builds the Ember Spire beacon above the island', () => {
+    const { at } = makeSampler();
+    const cx = ASHEN.spireIsland.cx;
+    const cz = ASHEN.spireIsland.cz;
+    const base = ashenSurfaceAt(SEED, cx, cz);
+    // Deepslate drum wall.
+    expect(at(cx + 4, base + 10, cz)).toBe(DEEPSLATE);
+    // Glowstone/crystal crown somewhere above.
+    let foundBeacon = false;
+    for (let y = base + 28; y <= base + 50; y++) {
+      const id = at(cx, y, cz);
+      if (id === GLOWSTONE || id === CRYSTAL) foundBeacon = true;
+    }
+    expect(foundBeacon).toBe(true);
+  });
+
+  it('furnishes a village house interior', () => {
+    const { at } = makeSampler();
+    // Cottage at (-8,-28)-(-2,-22): bookshelf at inner SW corner.
+    expect(at(-7, ASHEN.village.benchY + 1, -27)).toBe(BOOKSHELF);
   });
 });
 

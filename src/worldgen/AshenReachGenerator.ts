@@ -39,6 +39,11 @@ export const ASHEN = {
   beachWidth: 7,
   /** First solid shore step just above water. */
   shoreY: SEA_LEVEL + 1, // 63
+  /**
+   * Hero island in the lake: seats The Ember Spire. Top sits above the waterline so the tower
+   * rises from rock, not from open water — readable silhouette from Emberhold and the rim.
+   */
+  spireIsland: { cx: 0, cz: 96, r: 11, topY: 66 },
   /** Emberhold village bench on the north shore (covers default spawn at ~8,8). */
   village: { cx: 8, cz: 6, rx: 38, rz: 30, benchY: 68 },
   /** Mid ash terrace between beach and rim. */
@@ -55,7 +60,28 @@ export const ASHEN = {
   observatory: { cx: -92, cz: 96, r: 14, y: 118 },
   /** Magma fissure the ash bridge spans (east shore approach). */
   fissure: { cx: 48, cz: 72, halfLen: 14, halfW: 3 },
+  /** East-rim mine adit (secondary landmark). */
+  mine: { cx: 78, cz: 108, mouthY: 88 },
 } as const;
+
+/**
+ * Authored ash road with target elevations. Terrain grades a walkable corridor toward these
+ * heights; the site overlay paves the same line. Order: plaza → bridge → south shore → observatory.
+ */
+export const ASHEN_ROAD: ReadonlyArray<{ x: number; z: number; y: number }> = [
+  { x: 8, z: 10, y: 68 },
+  { x: 12, z: 28, y: 67 },
+  { x: 20, z: 44, y: 65 },
+  { x: 32, z: 56, y: 64 },
+  { x: 48, z: 64, y: 64 }, // fissure bridge north
+  { x: 48, z: 80, y: 64 }, // past fissure
+  { x: 36, z: 100, y: 66 },
+  { x: 12, z: 118, y: 70 },
+  { x: -20, z: 124, y: 76 },
+  { x: -52, z: 118, y: 92 },
+  { x: -72, z: 108, y: 104 },
+  { x: -88, z: 100, y: 116 }, // observatory approach
+];
 
 const DETAIL_FBM: FbmOptions = { octaves: 4, persistence: 0.5, lacunarity: 2, frequency: 1 / 55 };
 const MACRO_FBM: FbmOptions = { octaves: 3, persistence: 0.5, lacunarity: 2, frequency: 1 / 160 };
@@ -131,6 +157,29 @@ function samplersFor(seed: WorldSeed): Samplers {
   return s;
 }
 
+/** Distance + interpolated target Y along ASHEN_ROAD (for grading a walkable corridor). */
+function projectRoad(wx: number, wz: number): { dist: number; y: number } {
+  let best = Infinity;
+  let bestY = ASHEN.terraceY;
+  for (let i = 0; i < ASHEN_ROAD.length - 1; i++) {
+    const a = ASHEN_ROAD[i];
+    const b = ASHEN_ROAD[i + 1];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len2 = dx * dx + dz * dz || 1;
+    let u = ((wx - a.x) * dx + (wz - a.z) * dz) / len2;
+    u = u < 0 ? 0 : u > 1 ? 1 : u;
+    const px = a.x + dx * u;
+    const pz = a.z + dz * u;
+    const dist = Math.hypot(wx - px, wz - pz);
+    if (dist < best) {
+      best = dist;
+      bestY = a.y + (b.y - a.y) * u;
+    }
+  }
+  return { dist: best, y: bestY };
+}
+
 /**
  * Raw surface height for a world column. Authored radial profile with noise jitter so the rim
  * reads as broken basalt, not a perfect cone.
@@ -141,10 +190,19 @@ function ashenHeight(noise: Samplers, wx: number, wz: number): number {
   const macro = fbm2D(noise.macro, wx, wz, MACRO_FBM);
   const rimN = fbm2D(noise.rim, wx, wz, RIM_FBM);
 
-  // 1) Lake basin floor (flooded by WaterFiller).
+  // 1) Lake basin: flooded bowl, with a dry basalt island under the Ember Spire.
   if (d < ASHEN.lake.r) {
+    const ix = wx - ASHEN.spireIsland.cx;
+    const iz = wz - ASHEN.spireIsland.cz;
+    const id = Math.hypot(ix, iz);
+    if (id < ASHEN.spireIsland.r) {
+      // Soft cone island rising above the waterline.
+      const t = id / ASHEN.spireIsland.r;
+      const island = lerp(ASHEN.spireIsland.topY, ASHEN.shoreY - 1, t * t);
+      return island + detail * 0.8;
+    }
     const m = lakeMask(d);
-    // Bowl: deeper center, rising toward the beach.
+    // Bowl: deeper mid-ring (around the island), rising toward the beach.
     const bowl = lerp(ASHEN.lake.floorY, ASHEN.shoreY - 2, 1 - m);
     return bowl + detail * 1.2;
   }
@@ -207,6 +265,13 @@ function ashenHeight(noise: Samplers, wx: number, wz: number): number {
     }
   }
 
+  // Grade a walkable corridor along the ash road (single-block steps, not cliff climbs).
+  const road = projectRoad(wx, wz);
+  if (road.dist < 5.5) {
+    const blend = 1 - smoothstep01(road.dist / 5.5);
+    h = lerp(h, road.y, blend * 0.92);
+  }
+
   return h;
 }
 
@@ -219,6 +284,11 @@ export function ashenSurfaceAt(seed: WorldSeed, wx: number, wz: number): number 
 function surfacePaint(seed: WorldSeed, wx: number, wz: number): { top: BlockId; band: BlockId } {
   const d = calderaDist(wx, wz);
   const h = ashenSurfaceAt(seed, wx, wz);
+  // Spire island top (above water) is basalt.
+  {
+    const id = Math.hypot(wx - ASHEN.spireIsland.cx, wz - ASHEN.spireIsland.cz);
+    if (id < ASHEN.spireIsland.r && h >= SEA_LEVEL) return { top: DEEPSLATE, band: DEEPSLATE };
+  }
   if (h < SEA_LEVEL) {
     if (d < ASHEN.lake.r * 0.55) return { top: DEEPSLATE, band: DEEPSLATE };
     return { top: GRAVEL, band: STONE };

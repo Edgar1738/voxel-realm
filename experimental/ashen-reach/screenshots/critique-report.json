@@ -1,0 +1,164 @@
+{
+  "url": "http://localhost:5173/?world=ashen-reach&save=ashen-reach",
+  "shots": [
+    {
+      "name": "01-spawn-opening",
+      "note": "Spawn looking south through vista to Ember Spire",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-01-spawn-opening.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\01-spawn-opening.png",
+      "ok": true
+    },
+    {
+      "name": "02-wide-overview",
+      "note": "Wide bowl composition",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-02-wide-overview.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\02-wide-overview.png",
+      "ok": true
+    },
+    {
+      "name": "03-main-approach",
+      "note": "Road approach toward lake + spire",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-03-main-approach.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\03-main-approach.png",
+      "ok": true
+    },
+    {
+      "name": "04-hero-ember-spire",
+      "note": "Hero landmark: Ember Spire from east shore",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-04-hero-ember-spire.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\04-hero-ember-spire.png",
+      "ok": true
+    },
+    {
+      "name": "05-secondary-observatory",
+      "note": "Secondary: rim observatory",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-05-secondary-observatory.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\05-secondary-observatory.png",
+      "ok": true
+    },
+    {
+      "name": "06-street-plaza",
+      "note": "Path-level plaza / forge row",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-06-street-plaza.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\06-street-plaza.png",
+      "ok": true
+    },
+    {
+      "name": "07-house-interior",
+      "note": "Cottage interior furniture",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-07-house-interior.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\07-house-interior.png",
+      "ok": true
+    },
+    {
+      "name": "08-elevated-rim",
+      "note": "Elevated rim looking at spire",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-08-elevated-rim.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\08-elevated-rim.png",
+      "ok": true
+    },
+    {
+      "name": "09-magma-bridge",
+      "note": "Magma fissure bridge approach",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-09-magma-bridge.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\09-magma-bridge.png",
+      "ok": true
+    },
+    {
+      "name": "10-dock-to-spire",
+      "note": "Dock waterline → spire",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-10-dock-to-spire.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\10-dock-to-spire.png",
+      "ok": true
+    },
+    {
+      "name": "11-mine-mouth",
+      "note": "Ash mine adit",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-11-mine-mouth.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\11-mine-mouth.png",
+      "ok": true
+    },
+    {
+      "name": "12-final-overlook",
+      "note": "Observatory final viewpoint over village",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-12-final-overlook.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\12-final-overlook.png",
+      "ok": true
+    }
+  ],
+  "traversal": [
+    {
+      "name": "plaza",
+      "x": 8,
+      "z": 4,
+      "surfaceY": 68,
+      "surfaceBlock": "cobblestone",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "dock",
+      "x": 8,
+      "z": 54,
+      "surfaceY": 64,
+      "surfaceBlock": "sand",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "bridge",
+      "x": 48,
+      "z": 72,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "spire-base",
+      "x": 0,
+      "z": 96,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "observatory",
+      "x": -92,
+      "z": 96,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "mine",
+      "x": 78,
+      "z": 108,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    }
+  ],
+  "errors": []
+}
