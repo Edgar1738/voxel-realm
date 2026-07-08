@@ -138,6 +138,11 @@ Rules in `src/world/fluidRules.ts`; ticker: one wave per 0.18 s, 128 cells/wave.
   by running `npm run dev` and driving a browser (Playwright + the preinstalled Chromium)
   through `page.evaluate` calls against `__vr`. `reachable`/`simulate` step physics manually, so
   they work even in a hidden/headless tab; verify WebGL renders (software GL is fine, slower).
+  Proven capture recipe under software GL (Phase 0): the adaptive view-distance governor pins
+  VD at ~4 chunks and disposes preloaded chunks every frame, so **stub the loop first**
+  (`window.requestAnimationFrame = () => 0` after boot), then `preloadArea` tiles (≤ radius 7
+  each — the 256-chunk cap), set `time`/`weather`/`fog`, and shoot with
+  `__vr.save(name, {hud:false})`, which forces its own renders.
 
 ## 3. Terrain strategy — build on the `default` preset
 
@@ -165,6 +170,33 @@ caps) within view of the core. Record the site's bounding box and the spawn-vist
 this document before building. If no acceptable site exists after a
 genuine search (~30+ probes), fall back to `flat` with **hollow-shell** mountains — but treat
 that as a scope escalation and say so, don't slide into it.
+
+### Selected site — Phase 0 record (2026-07-08) ✓
+
+An exhaustive analytical survey (±8192 blocks, every column sampled at stride 16 against a
+transcription of the height/biome pipeline, validated exactly against the engine by
+`tests/frostvaleSiteProbe.test.ts` and cross-checked in-engine via `__vr.surface`) found 409
+gate-passing sites; the selected winner:
+
+- **World footprint:** x 200–800, z 3040–3640 (600×600, center ≈ (500, 3340)).
+- **Headwall massif:** (500–620, 3080–3230); natural peaks **y113 at (560, 3184)** and y110+
+  at (584, 3160), with natural snow caps and conifer scatter. The falls lip goes on its south
+  face near (555, 3195) — the natural face already drops y100 → y60 in ~60 blocks at x≈544;
+  build the lip up to ~y118–123 for the 55–60 drop.
+- **Plunge basin:** natural sub-62 hollow at (472–560, 3230–3300) → pool and upper river.
+- **West lake:** (140–360, 3150–3300) — the river's outlet; bridge/ford below the pool.
+- **Village bowl:** (420–620, 3290–3470), floor y63–70, a natural Mountains/Tundra patchwork
+  (grass meadows with snow patches — keep the grass for critters; it's already the Frostvale
+  look). Confirmed from ground level: the snowy massif reads over the meadows.
+- **Spawn-vista candidate:** ≈(520, 65, 3450) looking north — meadows → village site → massif
+  + falls in one frame.
+- **Mountain pass:** NE col ≈(640, 3100) between the massif and the NE hills (north exit);
+  gentle secondary exit south ≈(590, 3450).
+- **Phase 1 re-surface list:** sand shorelines (the generator caps ≤y63 near water with SAND —
+  beaches read wrong here) → gravel/stone/grass; NE desert pocket (656–712, 3040–3160) →
+  stone/snow; east swamp fringe (x ≥ ~700, z 3176–3300) → re-dress as moor or re-cap; the
+  S desert strip sits outside the footprint (z ≥ 3650).
+- Survey overviews: `docs/media/frostvale-site-aerial.jpg`, `docs/media/frostvale-site-massif.jpg`.
 
 ## 4. Design program
 
@@ -281,6 +313,7 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 
 - **Phase 0 — Site survey.** Probe seed-1337 `default` terrain; select and document the site
   (bounding box, floor/headwall heights, spawn-vista candidate). *Gate: site meets §3 criteria.*
+  **Done 2026-07-08 — see the site record in §3.**
 - **Phase 1 — Terrain + water.** Sculpt cliffs/headwall (raise the falls lip to pool + 50–60),
   carve river channel, build falls + pool + river + tributary cascades (all sources, banked),
   tarn, frozen pond — the entire walkable sheet is SNOW; glass "ice windows" only where players
