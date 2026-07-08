@@ -387,6 +387,16 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
   blocks and anything within 3 of a road deck, jittered 9-block grid at 0.35–0.55 density.
 - **Phase 6 — Exploration layer.** Grotto, cave dress, tarn hut, ruins, vault, unmarked
   secrets. *Gate: each secret reachable; vault gated behind genuine discovery, not luck.*
+  **Done 2026-07-08.** Crystal grotto behind the falls (swim the pool → ledge at (557–561, 62,
+  3204–3206) → doorway beside the curtain; a window behind the curtain lets you leap out
+  through the falls — safe because curtain source cells rest on water and never spread);
+  authored cave from a boulder-hidden mouth at (612, 69, 3237) descending to a crystal chamber
+  and a cobble-walled, gate-doored treasure vault (aisle at x630; hoard shelf x631–632);
+  spring cascade on the east face at (601, 79–91, 3157) into a sealed basin (containment exact:
+  31/31 water cells); ruined homestead at (330–337, 3348–3355); broken bridge piers at the
+  lake mouth; unmarked poacher's camp at (395, 3254) with ember-glow fire ring. Reachability:
+  grotto swim chain and cave→vault chain both pass (vault targets must aim at the walkable
+  aisle, not the hoard shelf). Four secrets stay unmarked: grotto, vault, camp, ruin.
 - **Phase 7 — Curation + ship.** See §6.
 
 ## 6. Definition of done (the shipping contract — CI-enforced)
