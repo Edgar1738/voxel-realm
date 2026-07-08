@@ -137,21 +137,6 @@
       ],
       "port": 5223,
       "autoPort": false
-    },
-    {
-      "name": "overlay-fix",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--",
-        ".claude/worktrees/overlay-fix",
-        "--port",
-        "5224",
-        "--strictPort"
-      ],
-      "port": 5224,
-      "autoPort": false
     }
   ]
 }

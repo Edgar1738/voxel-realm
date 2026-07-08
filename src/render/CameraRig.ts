@@ -46,18 +46,19 @@ export class CameraRig {
   ) {
     const signal = this.inputController.signal;
 
-    // Listen on document, not the canvas: the fullscreen overlay sits on top of the
-    // canvas and would otherwise swallow the click before it reaches requestPointerLock.
-    // Embedded webviews (e.g. IDE preview panels) deny pointer lock outright — surface
-    // that on the overlay instead of failing silently.
+    // Listen on the canvas, not the document: the fullscreen overlay is click-through
+    // (pointer-events: none in index.html), so world clicks land on the canvas while HUD
+    // clicks land on their controls and must NOT grab the mouse — otherwise every toolbar
+    // click captures the cursor (and when capture is denied, e.g. embedded webviews, the
+    // overlay used to stay up and swallow the whole toolbar).
     const showLockError = (): void => {
       if (this.overlay) {
         this.overlay.textContent =
-          'Mouse capture is blocked in this embedded view — open the game in a regular ' +
-          'browser tab (e.g. http://localhost:5173) to play.';
+          'Mouse capture is blocked in this embedded view — menus and toolbar still work; ' +
+          'open the game in a regular browser tab (e.g. http://localhost:5173) for mouse-look.';
       }
     };
-    document.addEventListener(
+    canvas.addEventListener(
       'click',
       () => {
         if (this.locked) return;
