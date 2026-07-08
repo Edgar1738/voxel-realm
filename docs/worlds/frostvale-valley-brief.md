@@ -188,8 +188,10 @@ gate-passing sites; the selected winner:
 - **Village bowl:** (420–620, 3290–3470), floor y63–70, a natural Mountains/Tundra patchwork
   (grass meadows with snow patches — keep the grass for critters; it's already the Frostvale
   look). Confirmed from ground level: the snowy massif reads over the meadows.
-- **Spawn-vista candidate:** ≈(520, 65, 3450) looking north — meadows → village site → massif
-  + falls in one frame.
+- **Spawn vista (confirmed in-engine after Phase 1):** (560, ~65.5, 3330) looking north — the
+  full falls curtain over the plunge basin, gravel shore and snow ledges in the foreground
+  (`docs/media/frostvale-p1-spawn-vista.jpg`). The earlier candidate at (520, 3450) turned out
+  to sit inside a wooded hillside — vista points must be verified with an actual render.
 - **Mountain pass:** NE col ≈(640, 3100) between the massif and the NE hills (north exit);
   gentle secondary exit south ≈(590, 3450).
 - **Phase 1 re-surface list:** sand shorelines (the generator caps ≤y63 near water with SAND —
@@ -319,6 +321,15 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
   tarn, frozen pond — the entire walkable sheet is SNOW; glass "ice windows" only where players
   cannot step, since glass has no collision. *Gate: `__vr.flow.queued() === 0` after a full
   settle; `scan` shows no stray water outside channels.*
+  **Done 2026-07-08.** Headwall raised to ~y122 (lip y118, 55-block curtain at x 552–556,
+  z 3205), stone-lined amphitheater + plunge pool, tributary cascade at x 578–579, ~230-block
+  river to the west lake, hanging tarn on the plateau at (560, 3167, WL 105), frozen mere
+  (2,315-cell snow sheet) NW of the village bowl, alpine shore/desert/moor recap. Gates:
+  flow queue 0; water scans match predicted natural water **exactly** (4,267/4,267 and
+  1,181/1,181 — zero leaks). Save: 832 chunks / 2.38 MB (`docs/worlds/wip/`). Lessons
+  recorded: rim-fills on un-surveyed ground can produce towers (the first tarn) — carve water
+  bodies into known ground; verify every vista with a render; the falls sightline needed the
+  pool's south knob lowered.
 - **Phase 2 — Circulation.** Roads, switchbacks, stairs, bridges, retaining walls. *Gate:
   `reachable()` passes leg-by-leg along every named route (spawn→square, square→lodge,
   square→bridge→ford, trail→watchtower→shrine).*
