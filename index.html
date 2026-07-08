@@ -29,7 +29,10 @@
         color: #fff;
         background: rgba(0, 0, 0, 0.35);
         text-align: center;
-        cursor: pointer;
+        /* Click-through: world clicks fall to the canvas (which requests mouse capture),
+           HUD clicks reach their controls even while the overlay is up. Without this the
+           overlay eats the entire toolbar whenever the mouse isn't captured. */
+        pointer-events: none;
       }
       #crosshair {
         position: fixed;
@@ -53,8 +56,13 @@
         color: #eef2f6;
         pointer-events: none;
       }
-      #creative-ui button {
+      /* The HUD root is click-through; every interactive control must re-enable pointer
+         events here or it is unreachable (the time/volume sliders were missing). */
+      #creative-ui button,
+      #creative-ui input {
         pointer-events: auto;
+      }
+      #creative-ui button {
         font: inherit;
         cursor: pointer;
       }
@@ -827,10 +835,201 @@
           transform: none;
         }
       }
+
+      /* ---- World-select front door (#menu) ---- */
+      #menu {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        overflow-y: auto;
+        font:
+          14px system-ui,
+          sans-serif;
+        color: #eef2f6;
+        background:
+          radial-gradient(1200px 500px at 50% -10%, rgba(94, 140, 210, 0.28), transparent 70%),
+          linear-gradient(180deg, #10141c 0%, #171d28 55%, #10141c 100%);
+      }
+      .menu-column {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+      .menu-header {
+        text-align: center;
+        margin-bottom: 36px;
+      }
+      .menu-title {
+        margin: 0;
+        font-size: 44px;
+        font-weight: 750;
+        letter-spacing: 0.5px;
+        color: #fff;
+        text-shadow: 0 2px 18px rgba(94, 140, 210, 0.35);
+      }
+      .menu-tagline {
+        margin: 10px 0 0;
+        font-size: 16px;
+        color: rgba(238, 242, 246, 0.78);
+      }
+      .menu-hint {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: rgba(238, 242, 246, 0.45);
+      }
+      .menu-section {
+        margin-top: 34px;
+      }
+      .menu-section-title {
+        margin: 0 0 14px;
+        font-size: 13px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 1.4px;
+        color: rgba(255, 211, 77, 0.85);
+      }
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+        gap: 14px;
+      }
+      .menu-grid-small {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      }
+      .menu-card {
+        display: flex;
+        flex-direction: column;
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        color: inherit;
+        text-decoration: none;
+        transition:
+          transform 140ms ease,
+          border-color 140ms ease,
+          box-shadow 160ms ease;
+      }
+      .menu-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 211, 77, 0.55);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.07),
+          0 8px 22px rgba(0, 0, 0, 0.35);
+      }
+      .menu-card-banner {
+        position: relative;
+        height: 86px;
+      }
+      /* A faint block grid so the banner reads voxel, not just gradient. */
+      .menu-card-banner::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+        background-size: 14px 14px;
+      }
+      .menu-card-banner-glyph {
+        position: absolute;
+        left: 14px;
+        bottom: 8px;
+        font-size: 40px;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.35);
+        z-index: 1;
+      }
+      .menu-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 14px 14px;
+        flex: 1;
+      }
+      .menu-card-title {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .menu-card-desc {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(238, 242, 246, 0.72);
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      .menu-card-footer {
+        margin-top: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding-top: 4px;
+      }
+      .menu-tag {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(238, 242, 246, 0.7);
+      }
+      .menu-card-facts {
+        margin-left: auto;
+        font-size: 11px;
+        color: rgba(255, 211, 77, 0.75);
+        white-space: nowrap;
+      }
+      .menu-card-small {
+        flex-direction: row;
+        align-items: center;
+        gap: 0;
+      }
+      .menu-card-small .menu-card-body {
+        padding: 12px 14px;
+        gap: 4px;
+      }
+      .menu-card-small .menu-card-title {
+        font-size: 14px;
+      }
+      .menu-card-small .menu-card-desc {
+        font-size: 12px;
+        -webkit-line-clamp: 2;
+      }
+      .menu-swatch {
+        flex: none;
+        width: 46px;
+        align-self: stretch;
+      }
+      .menu-worlds-link {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 6;
+        padding: 6px 12px;
+        border-radius: 9px;
+        font:
+          13px system-ui,
+          sans-serif;
+        color: rgba(238, 242, 246, 0.85);
+        text-decoration: none;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .menu-worlds-link:hover {
+        color: #fff;
+        border-color: rgba(255, 211, 77, 0.55);
+      }
     </style>
   </head>
   <body>
     <canvas id="app"></canvas>
+    <div id="menu" hidden></div>
     <div id="crosshair"></div>
     <div id="overlay">
       Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use

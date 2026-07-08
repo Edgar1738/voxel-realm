@@ -8,7 +8,8 @@
         "run",
         "dev"
       ],
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "richtrees",
@@ -109,18 +110,17 @@
       "autoPort": false
     },
     {
-      "name": "sun-arc",
+      "name": "night-debug",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
         "dev",
         "--",
-        ".claude/worktrees/sun-arc",
         "--port",
-        "5223",
+        "5231",
         "--strictPort"
       ],
-      "port": 5223,
+      "port": 5231,
       "autoPort": false
     }
   ]

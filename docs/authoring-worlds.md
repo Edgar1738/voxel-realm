@@ -84,6 +84,20 @@ Get a clean roam URL (strips any debug spawn/look overrides) to hand to a player
 __vr.world.roamUrl()   // e.g. https://…/?save=moonspire-realm&world=citadel
 ```
 
+## 8. Ship it (optional)
+
+To put the world on the public front door, add it to the shipped collection and bundle it for
+static hosting:
+
+```bash
+npm run world:package -- --save moonspire-realm --title "Moonspire Realm" --manifest --tags citadel,fantasy
+npm run world:bundle
+```
+
+Commit `world-manifest.json` and `public/worlds/<slug>.json`; the world-select menu and the
+production loader are both driven by the manifest, and CI (`tests/shippedWorlds.test.ts`) fails if
+they drift apart.
+
 ---
 
 **Note on `.saves/`:** the directory is gitignored — treat local saves as *source material*, not

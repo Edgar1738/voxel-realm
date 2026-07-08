@@ -8,6 +8,8 @@ import {
   emptyManifest,
   upsertManifestEntry,
   validateManifest,
+  findManifestEntry,
+  entryMetaProblems,
   type WorldManifestEntry,
 } from '../src/persistence/worldManifest';
 
@@ -104,6 +106,34 @@ describe('manifestEntryProblems', () => {
   });
 });
 
+describe('entryMetaProblems', () => {
+  const entry = buildManifestEntry('Moonspire Realm', fullMeta);
+
+  it('accepts a snapshot whose meta matches its manifest entry', () => {
+    expect(entryMetaProblems(entry, fullMeta)).toEqual([]);
+  });
+
+  it('flags a missing meta and every generator-identity mismatch', () => {
+    expect(entryMetaProblems(entry, undefined)).toEqual(['snapshot has no meta']);
+    expect(entryMetaProblems(entry, { ...fullMeta, seed: 7 })[0]).toMatch(/seed 7/);
+    expect(entryMetaProblems(entry, { ...fullMeta, version: 9 })[0]).toMatch(/version 9/);
+    expect(entryMetaProblems(entry, { ...fullMeta, preset: 'flat' })[0]).toMatch(/preset flat/);
+  });
+
+  it('treats an absent preset as "default"', () => {
+    const noPreset: WorldMeta = { ...fullMeta };
+    delete noPreset.preset;
+    const defaultEntry = { ...entry, preset: 'default' };
+    expect(entryMetaProblems(defaultEntry, noPreset)).toEqual([]);
+  });
+
+  it('requires spawn and look on the snapshot meta', () => {
+    const noSpawn: WorldMeta = { ...fullMeta };
+    delete noSpawn.spawn;
+    expect(entryMetaProblems(entry, noSpawn)).toContain('snapshot meta is missing spawn/look');
+  });
+});
+
 describe('manifest collection', () => {
   it('starts empty at the current version', () => {
     expect(emptyManifest()).toEqual({ version: MANIFEST_VERSION, worlds: [] });
@@ -122,6 +152,12 @@ describe('manifest collection', () => {
     expect(m.worlds.map((w) => w.slug)).toEqual(['world-b', 'world-a']);
     expect(m.worlds.find((w) => w.slug === 'world-a')?.description).toBe('Changed.');
     expect(validateManifest(m)).toEqual([]);
+  });
+
+  it('finds entries by slug', () => {
+    const m = upsertManifestEntry(emptyManifest(), buildManifestEntry('World A', fullMeta));
+    expect(findManifestEntry(m, 'world-a')?.title).toBe('Moonspire Realm');
+    expect(findManifestEntry(m, 'nope')).toBeUndefined();
   });
 
   it('reports a version mismatch and per-entry problems with the slug prefix', () => {

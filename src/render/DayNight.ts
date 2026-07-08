@@ -1,4 +1,4 @@
-import { Color, Vector3, type RawShaderMaterial, type Scene } from 'three';
+import { Color, SRGBColorSpace, Vector3, type RawShaderMaterial, type Scene } from 'three';
 import { skyState } from './Sky';
 
 /** Drives the sky color, sun/moon light direction + tint, and daylight uniforms from a time of day in [0,1). */
@@ -35,7 +35,11 @@ export class DayNight {
     const r = s.sky[0] / 255;
     const g = s.sky[1] / 255;
     const b = s.sky[2] / 255;
-    this.background.setRGB(r, g, b);
+    // skyState colors are display-sRGB. The chunk shader takes them raw (RawShaderMaterial has no
+    // output transform), but scene.background is color-managed: the renderer converts it
+    // working→sRGB at clear time, so the space must be declared here or the sky clears brighter
+    // than the fog and the horizon seams (night: fog 16,20,44 vs sky 71,79,115).
+    this.background.setRGB(r, g, b, SRGBColorSpace);
     for (const m of this.materials) {
       // The shading light is the sun by day and the moon at night (never below the horizon);
       // dirStrength/lightColor carry the twilight fade and golden-hour/moonlight tint.
