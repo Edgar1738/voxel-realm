@@ -113,6 +113,19 @@ src/
 Building and publishing a curated world (build → save → add metadata → audit → package → share)
 is documented in **[docs/authoring-worlds.md](docs/authoring-worlds.md)**.
 
+## Shipped worlds (the front door)
+
+The bare URL serves a world-select menu built from `world-manifest.json`: the curated showcase
+collection plus create-a-world presets. Shipped worlds are static assets — `npm run world:bundle`
+validates every manifest entry against its `.saves/<slug>.json` snapshot and writes a compact copy
+to `public/worlds/<slug>.json`, which the production app fetches read-only and overlays with the
+player's own edits (per-world IndexedDB). CI cross-checks the manifest against the bundled
+snapshots (`tests/shippedWorlds.test.ts`), so a stale or missing bundle fails the build.
+
+To ship a new world: author + package it (see the guide above), add it to the manifest with
+`world:package --manifest`, then run `npm run world:bundle` and commit `world-manifest.json` +
+`public/worlds/`.
+
 ## Deploying
 
 Off-thread meshing (the P6 worker pool) requires the page to be **cross-origin isolated**, which
