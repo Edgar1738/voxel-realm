@@ -180,21 +180,36 @@ describe('ashen-reach site architecture', () => {
     const cx = ASHEN.spireIsland.cx;
     const cz = ASHEN.spireIsland.cz;
     const base = ashenSurfaceAt(SEED, cx, cz);
-    // Deepslate drum wall.
-    expect(at(cx + 4, base + 10, cz)).toBe(DEEPSLATE);
+    // Tiered drum wall (outer radius 6 at lower tier).
+    expect(at(cx + 6, base + 8, cz)).toBe(DEEPSLATE);
     // Glowstone/crystal crown somewhere above.
     let foundBeacon = false;
-    for (let y = base + 28; y <= base + 50; y++) {
+    for (let y = base + 40; y <= base + 75; y++) {
       const id = at(cx, y, cz);
       if (id === GLOWSTONE || id === CRYSTAL) foundBeacon = true;
     }
     expect(foundBeacon).toBe(true);
   });
 
-  it('furnishes a village house interior', () => {
+  it('builds gate district civic interiors with furniture', () => {
     const { at } = makeSampler();
-    // Cottage at (-8,-28)-(-2,-22): bookshelf at inner SW corner.
-    expect(at(-7, ASHEN.village.benchY + 1, -27)).toBe(BOOKSHELF);
+    // Guild-scale building west of plaza has bookshelf dressing.
+    let foundShelf = false;
+    for (let x = -27; x <= -15; x++) {
+      for (let z = 1; z <= 9; z++) {
+        if (at(x, ASHEN.village.benchY + 1, z) === BOOKSHELF) foundShelf = true;
+      }
+    }
+    expect(foundShelf).toBe(true);
+  });
+
+  it('raises authored geological landmarks on the rim', () => {
+    expect(ashenSurfaceAt(SEED, ASHEN.cliffHorn.cx, ASHEN.cliffHorn.cz)).toBeGreaterThan(
+      ASHEN.terraceY + 20,
+    );
+    expect(ashenSurfaceAt(SEED, ASHEN.monastery.cx, ASHEN.monastery.cz)).toBeGreaterThan(
+      ASHEN.terraceY + 10,
+    );
   });
 
   it('provides a walkable causeway from dock toward the spire island', () => {

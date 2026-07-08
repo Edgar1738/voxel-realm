@@ -4,7 +4,6 @@ import {
   COBBLESTONE,
   BRICK,
   PLANKS,
-  WOOD,
   GLASS,
   GRAVEL,
   SAND,
@@ -13,31 +12,37 @@ import {
   LANTERN,
   GLOWSTONE,
   CRYSTAL,
-  FURNACE,
   BOOKSHELF,
+  FURNACE,
   OAK_FENCE,
   COBBLE_WALL,
   STONEBRICK_WALL,
   STAIRS_STONE,
-  STAIRS_PLANK,
   STAIRS_COBBLE,
-  STAIRS_BRICK,
-  PLANK_SLAB,
-  GOLD_ORE,
-  EMERALD_ORE,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
 import { ASHEN, ASHEN_ROAD, ashenSurfaceAt } from './AshenReachGenerator';
-import { well, marketStall, lampPost } from './prefabs';
 import { deadTree, obelisk } from './wildsPrefabs';
+import {
+  buildArrivalTunnel,
+  buildCraterGate,
+  buildGateDistrict,
+} from './ashenReachDistrict';
+import { buildEmberSpireM2, buildCeremonialApproach } from './ashenReachTower';
+import {
+  buildCliffMonastery,
+  buildDrownedRuins,
+  buildAshMinesM2,
+  buildCliffEmbeddedRuin,
+} from './ashenReachSecondaries';
 import type { Overlay } from './Generator';
 import type { Prefab } from '../core/Prefab';
-import type { BlockId, WorldSeed } from '../core/types';
+import type { WorldSeed } from '../core/types';
 import { SEA_LEVEL } from '../core/constants';
 
 // ── Frame ──────────────────────────────────────────────────────────────────────────────────────
-const VY = ASHEN.village.benchY; // 68 — Emberhold deck level
+const VY = ASHEN.village.benchY; // 68 — district deck level
 const SHORE = ASHEN.shoreY; // 63
 
 /** Stamp a prefab (min-corner) with orientation state preserved. */
@@ -50,126 +55,7 @@ function stampPrefab(s: CitadelStamp, p: Prefab, ox: number, oy: number, oz: num
   }
 }
 
-// ── Hip roof (same contract as harbor) ─────────────────────────────────────────────────────────
-function hipRoof(
-  s: CitadelStamp,
-  x0: number,
-  z0: number,
-  x1: number,
-  z1: number,
-  baseY: number,
-  stair: BlockId,
-  cube: BlockId,
-): void {
-  const ax = Math.min(x0, x1);
-  const bx = Math.max(x0, x1);
-  const az = Math.min(z0, z1);
-  const bz = Math.max(z0, z1);
-  for (let r = 0; ; r++) {
-    const lx0 = ax + r;
-    const lx1 = bx - r;
-    const lz0 = az + r;
-    const lz1 = bz - r;
-    if (lx0 > lx1 || lz0 > lz1) break;
-    const y = baseY + r;
-    if (lx1 - lx0 <= 1 || lz1 - lz0 <= 1) {
-      s.fill(lx0, y, lz0, lx1, y, lz1, cube);
-      break;
-    }
-    for (let x = lx0 + 1; x <= lx1 - 1; x++) {
-      s.set(x, y, lz0, stair, packState(FACING.N, 0));
-      s.set(x, y, lz1, stair, packState(FACING.S, 0));
-    }
-    for (let z = lz0 + 1; z <= lz1 - 1; z++) {
-      s.set(lx0, y, z, stair, packState(FACING.W, 0));
-      s.set(lx1, y, z, stair, packState(FACING.E, 0));
-    }
-    s.set(lx0, y, lz0, cube);
-    s.set(lx1, y, lz0, cube);
-    s.set(lx0, y, lz1, cube);
-    s.set(lx1, y, lz1, cube);
-  }
-}
-
-// ── Houses ─────────────────────────────────────────────────────────────────────────────────────
-type Facing4 = 'N' | 'E' | 'S' | 'W';
-
-interface HouseOpts {
-  wall: BlockId;
-  roofStair: BlockId;
-  roofCube: BlockId;
-  height: number;
-  door: Facing4;
-}
-
-function house(
-  s: CitadelStamp,
-  x0: number,
-  z0: number,
-  x1: number,
-  z1: number,
-  floorY: number,
-  opts: HouseOpts,
-): void {
-  const top = floorY + opts.height;
-  const roofPeak = top + Math.ceil((Math.max(x1 - x0, z1 - z0) + 3) / 2);
-
-  s.fill(x0 - 1, floorY, z0 - 1, x1 + 1, roofPeak + 1, z1 + 1, AIR);
-  s.fill(x0, floorY - 1, z0, x1, floorY - 14, z1, DEEPSLATE);
-  s.slab(x0, z0, x1, z1, floorY, PLANKS);
-
-  s.walls(x0, floorY + 1, z0, x1, top, z1, opts.wall);
-  for (const [px, pz] of [
-    [x0, z0],
-    [x1, z0],
-    [x0, z1],
-    [x1, z1],
-  ] as const) {
-    s.fill(px, floorY + 1, pz, px, top, pz, WOOD);
-  }
-
-  const wy = floorY + 2;
-  for (let x = x0 + 2; x <= x1 - 2; x += 2) {
-    s.set(x, wy, z0, GLASS);
-    s.set(x, wy, z1, GLASS);
-  }
-  for (let z = z0 + 2; z <= z1 - 2; z += 2) {
-    s.set(x0, wy, z, GLASS);
-    s.set(x1, wy, z, GLASS);
-  }
-
-  const mx = (x0 + x1) >> 1;
-  const mz = (z0 + z1) >> 1;
-  if (opts.door === 'N') s.fill(mx, floorY + 1, z0, mx, floorY + 2, z0, AIR);
-  else if (opts.door === 'S') s.fill(mx, floorY + 1, z1, mx, floorY + 2, z1, AIR);
-  else if (opts.door === 'W') s.fill(x0, floorY + 1, mz, x0, floorY + 2, mz, AIR);
-  else s.fill(x1, floorY + 1, mz, x1, floorY + 2, mz, AIR);
-
-  s.set(x1 - 1, top - 1, z1 - 1, LANTERN);
-  hipRoof(s, x0 - 1, z0 - 1, x1 + 1, z1 + 1, top, opts.roofStair, opts.roofCube);
-
-  // Interior detail: furniture + hearth so houses aren't hollow shells.
-  const ix0 = x0 + 1;
-  const iz0 = z0 + 1;
-  const ix1 = x1 - 1;
-  const iz1 = z1 - 1;
-  if (ix1 - ix0 >= 2 && iz1 - iz0 >= 2) {
-    s.set(ix0, floorY + 1, iz0, BOOKSHELF);
-    s.set(ix0, floorY + 2, iz0, BOOKSHELF);
-    s.set(ix1, floorY + 1, iz1, FURNACE);
-    // Table: plank slab + fence "legs" reading as a small dining block.
-    const tx = (ix0 + ix1) >> 1;
-    const tz = (iz0 + iz1) >> 1;
-    s.set(tx, floorY + 1, tz, OAK_FENCE);
-    s.set(tx, floorY + 2, tz, PLANK_SLAB);
-    s.set(tx, floorY + 3, tz, LANTERN);
-    // Bed nook: two carpet-like terracotta slabs against the far wall.
-    s.set(ix0 + 1, floorY + 1, iz1, TERRACOTTA);
-    s.set(ix0 + 2, floorY + 1, iz1, TERRACOTTA);
-  }
-}
-
-// ── Plaza + forge market ───────────────────────────────────────────────────────────────────────
+// ── Plaza flagstones (overlaid under Gate District avenues) ────────────────────────────────────
 const PLAZA = { x0: -10, z0: -14, x1: 26, z1: 18 } as const;
 
 function pavePlaza(s: CitadelStamp): void {
@@ -181,93 +67,8 @@ function pavePlaza(s: CitadelStamp): void {
   for (let wz = az; wz <= bz; wz++) {
     for (let wx = ax; wx <= bx; wx++) {
       const r = hash2(wx, wz, 0xa51);
-      // Warm flagstones: brick / terracotta / cobble mix
       s.set(wx, VY, wz, r < 0.18 ? BRICK : r < 0.32 ? TERRACOTTA : r < 0.4 ? STONE : COBBLESTONE);
     }
-  }
-}
-
-function buildMarket(s: CitadelStamp): void {
-  stampPrefab(s, well(), 6, VY + 1, 0);
-  stampPrefab(s, marketStall(), 16, VY + 1, -8);
-  stampPrefab(s, marketStall(), -4, VY + 1, 8);
-  // Ember forges: furnaces as "smelters" under a open timber shed.
-  s.fill(18, VY + 1, 6, 24, VY + 1, 12, COBBLESTONE);
-  for (const [fx, fz] of [
-    [19, 7],
-    [22, 7],
-    [19, 10],
-    [22, 10],
-  ] as const) {
-    s.set(fx, VY + 1, fz, FURNACE);
-  }
-  // Shed posts + plank roof.
-  for (const [px, pz] of [
-    [18, 6],
-    [24, 6],
-    [18, 12],
-    [24, 12],
-  ] as const) {
-    s.fill(px, VY + 2, pz, px, VY + 4, pz, WOOD);
-  }
-  s.slab(17, 5, 25, 13, VY + 5, PLANK_SLAB);
-  s.set(21, VY + 4, 9, LANTERN);
-
-  for (const [lx, lz] of [
-    [PLAZA.x0 + 2, PLAZA.z0 + 2],
-    [PLAZA.x1 - 2, PLAZA.z0 + 2],
-    [PLAZA.x0 + 2, PLAZA.z1 - 2],
-    [PLAZA.x1 - 2, PLAZA.z1 - 2],
-  ] as const) {
-    stampPrefab(s, lampPost(), lx, VY + 1, lz);
-  }
-}
-
-/** Arrival gate on the north edge of the plaza — two pillars + arch, facing the caldera. */
-function buildArrivalGate(s: CitadelStamp): void {
-  const z = PLAZA.z0 - 2;
-  for (const x of [2, 14]) {
-    s.fill(x, VY + 1, z, x + 1, VY + 7, z + 1, DEEPSLATE);
-    s.set(x, VY + 8, z, GLOWSTONE);
-    s.set(x + 1, VY + 8, z + 1, GLOWSTONE);
-  }
-  s.fill(2, VY + 6, z, 15, VY + 7, z + 1, BRICK); // lintel
-  s.fill(4, VY + 1, z, 13, VY + 5, z + 1, AIR); // passage
-  // Ember crystals on the gate crown.
-  s.set(8, VY + 8, z, CRYSTAL);
-  s.set(9, VY + 8, z, CRYSTAL);
-}
-
-// ── Neighbourhood ──────────────────────────────────────────────────────────────────────────────
-function buildVillageHouses(s: CitadelStamp): void {
-  const palettes: HouseOpts[] = [
-    { wall: BRICK, roofStair: STAIRS_STONE, roofCube: DEEPSLATE, height: 4, door: 'S' },
-    { wall: TERRACOTTA, roofStair: STAIRS_BRICK, roofCube: BRICK, height: 4, door: 'S' },
-    { wall: COBBLESTONE, roofStair: STAIRS_PLANK, roofCube: PLANKS, height: 5, door: 'E' },
-    { wall: PLANKS, roofStair: STAIRS_BRICK, roofCube: BRICK, height: 4, door: 'W' },
-  ];
-
-  // Cottages ring the plaza but leave a clear south vista corridor (x≈4..12) so spawn
-  // looks over the dock toward The Ember Spire — landscape composition first.
-  const plots: Array<{ x0: number; z0: number; x1: number; z1: number; p: number; door: Facing4 }> =
-    [
-      { x0: -8, z0: -28, x1: -2, z1: -22, p: 0, door: 'S' },
-      { x0: 2, z0: -30, x1: 10, z1: -24, p: 1, door: 'S' },
-      { x0: 14, z0: -28, x1: 22, z1: -22, p: 2, door: 'S' },
-      { x0: 28, z0: -10, x1: 34, z1: -2, p: 3, door: 'W' },
-      { x0: 28, z0: 4, x1: 34, z1: 12, p: 0, door: 'W' },
-      { x0: 28, z0: 16, x1: 34, z1: 24, p: 1, door: 'W' },
-      { x0: -18, z0: -8, x1: -12, z1: 0, p: 1, door: 'E' },
-      { x0: -18, z0: 6, x1: -12, z1: 14, p: 2, door: 'E' },
-      { x0: -18, z0: 18, x1: -12, z1: 26, p: 3, door: 'E' },
-      // Flanking cottages south of plaza, clear of the x=4..12 vista corridor.
-      { x0: -10, z0: 22, x1: -4, z1: 28, p: 0, door: 'N' },
-      { x0: 16, z0: 22, x1: 24, z1: 28, p: 2, door: 'N' },
-    ];
-
-  for (const plot of plots) {
-    const opts = { ...palettes[plot.p % palettes.length], door: plot.door };
-    house(s, plot.x0, plot.z0, plot.x1, plot.z1, VY, opts);
   }
 }
 
@@ -641,159 +442,19 @@ function buildObservatory(s: CitadelStamp, seed: WorldSeed): void {
   }
 }
 
-// ── Hero landmark: The Ember Spire on the caldera island ───────────────────────────────────────
-/**
- * Tall basalt spire with a glowing crystal crown — the world's skyline signature. Walkable
- * spiral interior from the island top to a balcony under the beacon.
- */
-function buildEmberSpire(s: CitadelStamp, seed: WorldSeed): void {
-  const { cx, cz, topY } = {
-    cx: ASHEN.spireIsland.cx,
-    cz: ASHEN.spireIsland.cz,
-    topY: ashenSurfaceAt(seed, ASHEN.spireIsland.cx, ASHEN.spireIsland.cz),
-  };
-  const baseY = Math.max(topY, ASHEN.spireIsland.topY - 1);
-  const wallTop = baseY + 28;
-  const r = 4;
-
-  // Island plinth ring (seals the tower footing).
-  for (let dz = -7; dz <= 7; dz++) {
-    for (let dx = -7; dx <= 7; dx++) {
-      if (dx * dx + dz * dz > 49) continue;
-      s.fill(cx + dx, SEA_LEVEL - 4, cz + dz, cx + dx, baseY, cz + dz, DEEPSLATE);
-      if (dx * dx + dz * dz > 25) s.set(cx + dx, baseY, cz + dz, GRAVEL);
-      else s.set(cx + dx, baseY, cz + dz, STONE);
-    }
-  }
-
-  // Outer drum walls + interior void.
-  for (let dz = -r; dz <= r; dz++) {
-    for (let dx = -r; dx <= r; dx++) {
-      const d2 = dx * dx + dz * dz;
-      if (d2 > r * r) continue;
-      if (d2 >= (r - 1) * (r - 1)) {
-        s.fill(cx + dx, baseY + 1, cz + dz, cx + dx, wallTop, cz + dz, DEEPSLATE);
-      } else {
-        s.fill(cx + dx, baseY + 1, cz + dz, cx + dx, wallTop, cz + dz, AIR);
-      }
-    }
-  }
-
-  // Floors at mid + balcony with stair shafts.
-  s.slab(cx - r + 1, cz - r + 1, cx + r - 1, cz + r - 1, baseY + 1, STONE);
-  s.slab(cx - r + 1, cz - r + 1, cx + r - 1, cz + r - 1, baseY + 14, PLANKS);
-  s.fill(cx - 1, baseY + 2, cz - 1, cx + 1, wallTop, cz + 1, AIR);
-  spiralStair(s, cx, cz, baseY + 2, wallTop, STAIRS_STONE, DEEPSLATE);
-
-  // North door (toward Emberhold) — short pier of cobble from island edge is terrain.
-  s.fill(cx, baseY + 1, cz - r, cx, baseY + 3, cz - r, AIR);
-  s.set(cx - 1, baseY + 2, cz - r + 1, LANTERN);
-  s.set(cx + 1, baseY + 2, cz - r + 1, LANTERN);
-
-  // Arrow-slit windows on the cardinals.
-  for (const [dx, dz] of [
-    [r, 0],
-    [-r, 0],
-    [0, r],
-    [0, -r],
-  ] as const) {
-    s.set(cx + dx, baseY + 8, cz + dz, GLASS);
-    s.set(cx + dx, baseY + 20, cz + dz, GLASS);
-  }
-
-  // Ember crown: stepped crystal/glowstone finial — the beacon visible from the village.
-  for (let dy = 0; dy <= 8; dy++) {
-    const rr = Math.max(1, 3 - Math.floor(dy / 2));
-    for (let dz = -rr; dz <= rr; dz++) {
-      for (let dx = -rr; dx <= rr; dx++) {
-        if (Math.abs(dx) + Math.abs(dz) > rr + 1) continue;
-        const id = dy < 3 ? DEEPSLATE : dy < 6 ? CRYSTAL : GLOWSTONE;
-        s.set(cx + dx, wallTop + 1 + dy, cz + dz, id);
-      }
-    }
-  }
-  s.fill(cx, wallTop + 10, cz, cx, wallTop + 14, cz, GLOWSTONE);
-  s.set(cx, wallTop + 15, cz, CRYSTAL);
-
-  // Balcony ring under the crown (walkable lookout).
-  for (let a = 0; a < 24; a++) {
-    const ang = (a / 24) * Math.PI * 2;
-    const px = Math.round(cx + Math.cos(ang) * (r + 1));
-    const pz = Math.round(cz + Math.sin(ang) * (r + 1));
-    s.set(px, wallTop, pz, STONE);
-    s.set(px, wallTop + 1, pz, STONEBRICK_WALL);
-  }
-
-  // Study chamber at mid floor.
-  s.set(cx - 2, baseY + 15, cz - 2, BOOKSHELF);
-  s.set(cx - 2, baseY + 15, cz - 1, BOOKSHELF);
-  s.set(cx + 2, baseY + 15, cz + 2, FURNACE);
-  s.set(cx + 2, baseY + 16, cz + 2, LANTERN);
-}
-
-// ── East-rim mine adit ─────────────────────────────────────────────────────────────────────────
-function buildMine(s: CitadelStamp, seed: WorldSeed): void {
-  const { cx, cz } = ASHEN.mine;
-  const mouthY = ashenSurfaceAt(seed, cx, cz);
-  // Timber-framed portal into the rim, tunnel running east into rock.
-  s.fill(cx - 1, mouthY + 1, cz - 2, cx + 1, mouthY + 4, cz + 2, AIR);
-  s.fill(cx - 1, mouthY, cz - 2, cx + 1, mouthY, cz + 2, COBBLESTONE);
-  for (const z of [cz - 2, cz + 2]) {
-    s.fill(cx, mouthY + 1, z, cx, mouthY + 4, z, WOOD);
-  }
-  s.fill(cx - 1, mouthY + 4, cz - 2, cx + 1, mouthY + 4, cz + 2, WOOD);
-  s.set(cx, mouthY + 3, cz - 2, LANTERN);
-  s.set(cx, mouthY + 3, cz + 2, LANTERN);
-
-  // Tunnel 14 blocks into the rim (+x), with ore flecks and a glowstone "seam".
-  for (let i = 0; i <= 14; i++) {
-    const x = cx + i;
-    s.fill(x, mouthY + 1, cz - 1, x, mouthY + 3, cz + 1, AIR);
-    s.fill(x, mouthY, cz - 1, x, mouthY, cz + 1, COBBLESTONE);
-    if (i % 4 === 0) s.set(x, mouthY + 3, cz, LANTERN);
-    if (hash2(x, cz, 0x01a1) < 0.2) s.set(x, mouthY + 1, cz - 1, GOLD_ORE);
-    if (hash2(x, cz, 0x02b2) < 0.12) s.set(x, mouthY + 2, cz + 1, EMERALD_ORE);
-    if (i > 8 && i < 12) s.set(x, mouthY + 1, cz, GLOWSTONE);
-  }
-  // Cart stop / crate at the end.
-  s.set(cx + 13, mouthY + 1, cz, FURNACE);
-  s.set(cx + 14, mouthY + 1, cz - 1, WOOD);
-  s.set(cx + 14, mouthY + 1, cz + 1, WOOD);
-}
-
-// ── Outer wilds dressing ───────────────────────────────────────────────────────────────────────
+// ── Sparse outer wilds only (no random scatter in the district) ────────────────────────────────
 function buildWilds(s: CitadelStamp, seed: WorldSeed): void {
-  // Standing stones south of the lake, dead trees on outer slopes, a gold cache near a vent.
   stampPrefab(s, obelisk(), 8, ashenSurfaceAt(seed, 8, 160) + 1, 160);
-
+  // Few dead trees only outside the rim — intentional markers, not scatter fill.
   for (const [tx, tz] of [
-    [-40, 20],
-    [50, 30],
-    [-110, 60],
-    [90, 90],
-    [-20, 180],
-    [70, 150],
-    [-80, 160],
+    [-120, 40],
+    [110, 80],
+    [-30, 190],
   ] as const) {
     const h = ashenSurfaceAt(seed, tx, tz);
     if (h < SHORE + 2) continue;
     stampPrefab(s, deadTree(), tx, h + 1, tz);
   }
-
-  // Small "ember shrine" on the east rim: deepslate ring + crystal + gold/emerald accents.
-  const sx = 100;
-  const sz = 96;
-  const sh = ashenSurfaceAt(seed, sx, sz);
-  for (let a = 0; a < 8; a++) {
-    const ang = (a / 8) * Math.PI * 2;
-    const px = Math.round(sx + Math.cos(ang) * 4);
-    const pz = Math.round(sz + Math.sin(ang) * 4);
-    s.fill(px, sh + 1, pz, px, sh + 3, pz, DEEPSLATE);
-  }
-  s.set(sx, sh + 1, sz, GLOWSTONE);
-  s.set(sx, sh + 2, sz, CRYSTAL);
-  s.set(sx + 1, sh + 1, sz, GOLD_ORE);
-  s.set(sx - 1, sh + 1, sz, EMERALD_ORE);
 }
 
 // ── Dockside sandbar & lake edge polish ────────────────────────────────────────────────────────
@@ -812,27 +473,31 @@ function polishShore(s: CitadelStamp): void {
 }
 
 /**
- * Ashen Reach site overlay: Ember Spire (hero) on the caldera island, Emberhold village,
- * graded ash road with stair climbs, magma fissure bridge, vents, dock, west-rim observatory,
- * east-rim mine, and outer wilds.
+ * Ashen Reach site overlay (Milestone 2):
+ * Arrival tunnel → Crater Gate → Gate District → lakefront → ceremonial causeway →
+ * Ember Spire (full climb) + secondaries (monastery, drowned ruins, ash mines, cliff ruin).
  */
 export function ashenReachSite(): Overlay {
   return (chunk, cx, cz, seed) => {
     const s = new CitadelStamp(chunk, cx, cz);
+    buildArrivalTunnel(s);
+    buildCraterGate(s);
+    buildGateDistrict(s, seed);
     pavePlaza(s);
-    buildArrivalGate(s);
-    buildMarket(s);
-    buildVillageHouses(s);
     buildCalderaOverlook(s);
     paveRoad(s, seed);
     stairRoadClimbs(s, seed);
     buildFissureAndBridge(s);
     buildVents(s, seed);
     buildShoreDock(s, seed);
+    buildCeremonialApproach(s, seed);
     buildSpireCauseway(s, seed);
-    buildEmberSpire(s, seed);
+    buildEmberSpireM2(s, seed);
     buildObservatory(s, seed);
-    buildMine(s, seed);
+    buildAshMinesM2(s, seed);
+    buildCliffMonastery(s, seed);
+    buildDrownedRuins(s, seed);
+    buildCliffEmbeddedRuin(s, seed);
     buildWilds(s, seed);
     polishShore(s);
   };

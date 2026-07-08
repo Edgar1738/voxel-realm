@@ -1,160 +1,154 @@
-# Grok World Journal — Ashen Reach
+# Ashen Reach — World Journal
 
-Factual record for Edgar. Experimental candidate only. Branch is isolated from `main`.
+**Status:** Approved Voxel Realm world (Milestone 2). Isolated branch — **not merged to main**.
 
 ---
 
-## Identity
+## World identity
 
 | Field | Value |
 | --- | --- |
-| **World name** | Ashen Reach |
+| **Official name** | **Ashen Reach** |
 | **World ID / preset** | `ashen-reach` |
-| **Save name** | `ashen-reach` (meta bootstrap: `experimental/ashen-reach/save-meta.json`) |
+| **Save name** | `ashen-reach` |
+| **One-sentence** | An ancient volcanic-caldera civilization: pass through the Crater Gate into the Gate District, cross the ceremonial causeway to The Ember Spire, and climb to the summit beacon. |
 | **Branch** | `grok/ashen-reach` |
 | **Worktree** | `.claude/worktrees/grok+ashen-reach` |
-| **Agent** | Grok (xAI) |
-| **Status** | Saved / archived — still not on `main` unless Edgar merges |
-| **Vault archive** | `Obsidian Vault/Voxel Realm/Artifacts/2026-07-08-ashen-reach` |
-| **Local save** | `.saves/ashen-reach.json` (from `experimental/ashen-reach/save-meta.json`) |
+| **Architecture language** | Deepslate massing, brick/terracotta trim, stone paving, glowstone/crystal ember accents, narrow vertical windows, hip roofs, timber posts |
 
 ---
 
-## Design concept
+## Approved composition (do not replace)
 
-A volcanic caldera kingdom. Emberhold village sits on the north ash terrace of a dark crater lake. The **Ember Spire** (hero landmark) rises from a basalt island in the lake, connected by a walkable causeway. An ash road half-circles the basin past a magma fissure bridge to a west-rim observatory. Architecture language: brick/terracotta cottages, deepslate monuments, warm forge industry, glowstone/crystal “ember” lighting (engine has no lava block).
+```
+ARRIVAL PASS → CRATER GATE → GATE DISTRICT → LAKEFRONT
+  → CEREMONIAL CAUSEWAY → EMBER SPIRE → SUMMIT
+```
 
-**Not** Stonehaven (alpine lake kingdom), Frostvale, or a castle-on-flat-plane remake.
-
----
-
-## Major decisions
-
-1. **Generator preset + site overlay** (same pattern as harbor/citadel) rather than a multi-MB hand-placed save — reviewable as code, deterministic, no overwrite of shipped worlds.
-2. **Landscape first:** radial caldera height field (island, beach, terrace, rim, outer plains) before architecture.
-3. **Hero = Ember Spire on island**, not the observatory (observatory is secondary skyline).
-4. **Shared `ASHEN` / `ASHEN_ROAD` constants** so terrain grading and paving stay aligned.
-5. **No caves** under the site (solid ground for foundations).
-6. **Not added to `world-manifest.json`** — isolation from official collection until Edgar decides.
-7. **Causeway to the island** after composition critique: hero must be reachable on foot, not swim-only.
+Plus: central caldera lake, circular open water, dark tower on island.
 
 ---
 
-## Areas built
+## Milestone history
 
-| Area | Contents |
+### M1 (approved first pass)
+
+- Authored caldera terrain + island
+- Emberhold plaza, causeway, basic spire, magma bridge, vents, observatory, simple mine
+- Vault archive `2026-07-08-ashen-reach`
+
+### M2 (depth pass — current)
+
+**Terrain landmarks**
+
+- Arrival pass (enclosed north approach)
+- SE cliff horn
+- SW ash ravine
+- NW monastery shelf
+- NE terraced shelf
+- Drowned-ruins shallows (west lake)
+
+**District**
+
+- Crater Gate (monumental twin towers + arch)
+- Caldera Gate District: avenues, alleys, plaza, civic buildings, guild hall, workshops, terraces, colonnade vista
+
+**Tower**
+
+- Multi-tier exterior, buttresses, balconies
+- Vertical journey: entrance → archive → ceremonial → guardian → shrine → summit crown
+
+**Secondaries**
+
+1. Cliff Monastery (NW) — cloister, shrine, overlook, approach stairs  
+2. Drowned Ruins (west lake) — broken arches, waterline chamber  
+3. Ash Mines (east) — monumental portal, branches, chamber, vertical shaft  
+
+**Also:** ceremonial lakefront plaza, expanded causeway approach, reduced random scatter
+
+---
+
+## Main player journey
+
+1. **Spawn** — arrival pass `(8, 71.5, -48)` looking south  
+2. **Tunnel** — lantern-lined pass  
+3. **Crater Gate** — emerge into first reveal of caldera  
+4. **Gate District** — avenues, plaza, markets, terraces  
+5. **Overlook / avenue south** — framed view toward lake  
+6. **Lakefront plaza** — pylons, ceremonial apron  
+7. **Causeway** — cross water to island  
+8. **Spire entrance** — monumental north arch  
+9. **Climb** — spiral through distinct floors  
+10. **Summit** — crown beacon + walk ring  
+
+---
+
+## Secondary routes
+
+| Destination | How to reach |
 | --- | --- |
-| Emberhold plaza | Warm flagstone mix, well, market stalls, forge shed, lamp posts |
-| Arrival gate | North deepslate pillars + brick lintel + crystal crown |
-| Caldera overlook | South plaza parapet with framed vista gap + glow pillars |
-| Village houses | Varied wall/roof palettes, furnished interiors |
-| Vista corridor | Stairs + lantern posts toward dock |
-| Shore dock | Surface-seated cobble jetty |
-| Spire causeway | 3-wide stone deck dock→island, rails, under-deck glow |
-| Ember Spire | Deepslate drum, spiral, mid study, balcony, crystal/glow crown |
-| Magma bridge | Glowstone/crystal fissure + stone deck + lanterns |
-| Ember vents | Gravel cones with glow hearts around shore |
-| Rim observatory | Deepslate tower, glass/crystal dome, spiral |
-| Ash mine | Timber portal + lit tunnel + ore flecks (east rim) |
-| Outer wilds | Dead trees, south obelisk, east ember shrine |
+| Cliff Monastery | NW from district; follow stair path toward `(-62, 48)` |
+| Drowned Ruins | West shore / causeway west; stepping stones to shallows |
+| Ash Mines | East along ash road / fissure area to `(78, 108)` |
+| Magma Bridge | East shore road (secondary scenic) |
+| Cliff Horn Ruin | SE rim geological landmark |
+| Rim Observatory | West rim road (legacy secondary) |
 
 ---
 
-## Tools used
+## Files
 
-| Tool | Use |
+| Path | Role |
 | --- | --- |
-| `AshenReachGenerator` / `LayeredGenerator` / `WaterFiller` / `OreScatterer` | Terrain |
-| `CitadelStamp` | Chunk-clipped architecture |
-| Prefabs (`well`, `marketStall`, `lampPost`, `deadTree`, `obelisk`) | Dressing |
-| `scatterOaks` + `scatterDecorations` | Sparse vegetation |
-| `window.__vr` (teleport, pov, surface, capture, world.setMeta) | Playtest + stills |
-| Playwright + `experimental/ashen-reach/capture-shots.mjs` | Automated 14-view capture |
-| Vitest `tests/ashenReach.test.ts` | Determinism + structure contracts |
-
-**Not used:** full in-game shape tools for the primary build (generator path was more reliable for a deterministic candidate). Engine path/blueprint APIs exist and were inspected; primary deliverable is the world, not new authoring tools.
+| `src/worldgen/AshenReachGenerator.ts` | Terrain + geological landmarks |
+| `src/worldgen/ashenReachSite.ts` | Overlay orchestration |
+| `src/worldgen/ashenReachDistrict.ts` | Gate + district |
+| `src/worldgen/ashenReachTower.ts` | Spire M2 + ceremonial approach |
+| `src/worldgen/ashenReachSecondaries.ts` | Monastery, ruins, mines, cliff ruin |
+| `experimental/ashen-reach/save-meta.json` | Curated spawn/tour meta |
+| `tests/ashenReach.test.ts` | Contracts |
 
 ---
 
-## Engine limitations discovered
+## Engine changes
 
-1. **No lava block** — “magma” is glowstone/crystal/deepslate aesthetic.
-2. **Adaptive view distance + fog** — wide aerial stills often empty until long chunk warm-up; foot play is more honest.
-3. **Default spawn settles only for default SPAWN** — curated worlds need meta or URL spawn.
-4. **Empty-chunk saves with preset** work for meta-only curation; full packaging not done (experimental).
-5. **Swim is possible** but poor as the only route to a hero landmark — fixed with causeway.
+None beyond world content. Used existing `CitadelStamp`, prefabs, `LayeredGenerator`, `__vr` capture APIs.
 
 ---
 
-## Important fixes
+## Performance notes
 
-| Issue | Fix |
-| --- | --- |
-| Spawn blocked by south houses | Vista corridor + spawn at z=14 looking south |
-| Dock cobble buried under sand | Surface-seated dock paving |
-| Hollow houses | Furniture (bookshelf, furnace, table, bed nook) |
-| Steep rim | `ASHEN_ROAD` elevation grading + stair overlays |
-| Weak / swim-only hero | Island + Ember Spire + walkable causeway |
-| Accidental first view | Caldera overlook frame + vista lanterns |
+- Solid ground (no caves under site)  
+- Geometry denser in district + tower — monitor FPS at full view distance  
+- Prefer authored landmarks over wall noise scatter  
 
 ---
 
-## Screenshots captured
+## Known weaknesses (post M2)
 
-Locations:
-
-- `.captures/ashen-01-…` through `ashen-14-…` (JPEG via `__vr.save` / overview)
-- `experimental/ashen-reach/screenshots/01-…png` … `14-…png` (Playwright viewport)
-
-| # | View | Height |
-| --- | --- | --- |
-| 01 | Spawn opening | Player |
-| 02 | Wide overview | Aerial |
-| 03 | Main approach | Player |
-| 04 | Hero Ember Spire | Mixed |
-| 05 | Secondary observatory | Mixed |
-| 06 | Street plaza | Player |
-| 07 | House interior | Player |
-| 08 | Elevated rim | Elevated |
-| 09 | Magma bridge | Player |
-| 10 | Dock to spire | Player |
-| 11 | Mine mouth | Player |
-| 12 | Final overlook | Elevated |
-| 13 | Atmospheric detail | Player |
-| 14 | Signature (causeway → spire) | Player |
+1. Cottage/civic buildings still share similar floor plans (palette + size variation only).  
+2. Monastery stair may need foot-polish on steep terrain.  
+3. Wide aerial stills still sensitive to chunk streaming/fog.  
+4. Night lighting not authored as a separate pass.  
+5. Not yet on official `world-manifest` / `main`.  
 
 ---
 
-## Known weaknesses
+## Future opportunities (Milestone 3 candidates)
 
-1. Outer ash plains beyond the rim are thinner than the bowl interior.
-2. Mine and shrine are secondary and simpler than plaza/spire.
-3. Wide overview captures remain sensitive to stream timing/fog.
-4. Architectural cottage variety is palette-level, not unique landmark houses.
-5. Daytime sky is clear blue — volcanic haze would need engine atmosphere work (out of scope).
-
----
-
-## Possible future improvements
-
-- Night lighting pass (more crown/vent intensity; day/night pinned for stills).
-- Small boats or wreck dressing on the lake.
-- One unique “mayor’s house” / guild hall for architectural hierarchy.
-- Package optional tour meta into a reviewable save under `experimental/` only if Edgar wants menu entry.
-- Performance budget check at full rim view distance after long roam.
+1. Unique landmark buildings (guild hall as special architecture)  
+2. Night + fog atmosphere pass for volcanic mood  
+3. More tower balcony exterior connections  
+4. Optional official packaging after Edgar merge authorization  
 
 ---
 
-## Commits (isolated branch)
+## Launch
 
-Verify with `git log` on `grok/ashen-reach`:
+```powershell
+cd C:\Users\Edgar\Desktop\voxel-realm\.claude\worktrees\grok+ashen-reach
+copy experimental\ashen-reach\save-meta.json .saves\ashen-reach.json
+npm run dev
+```
 
-- `f950548` — initial experimental Ashen Reach caldera preset  
-- `7c54268` — polish: spire hero, vista, playtest stills  
-- later commit(s) — causeway, overlook, journal, atmospheric + signature stills
-
----
-
-## Recommendation (non-binding)
-
-Worth keeping for another milestone (causeway + plaza + spire are solid). Not ready to promote as official without Edgar’s walk and a night/atmosphere pass. Do **not** merge to `main` without explicit instruction.
+http://localhost:5173/?save=ashen-reach&world=ashen-reach

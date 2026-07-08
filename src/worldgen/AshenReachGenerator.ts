@@ -30,6 +30,10 @@ import type { BlockId, WorldSeed } from '../core/types';
  *
  * Terrain and site overlays share these constants so architecture seats on the ground.
  */
+/**
+ * Official identity (Milestone 2+): permanent Voxel Realm world — not an experiment name.
+ * Preset / save ID: `ashen-reach`. Display title: Ashen Reach.
+ */
 export const ASHEN = {
   /** Heart of the crater lake. */
   caldera: { cx: 0, cz: 96 },
@@ -43,9 +47,9 @@ export const ASHEN = {
    * Hero island in the lake: seats The Ember Spire. Top sits above the waterline so the tower
    * rises from rock, not from open water — readable silhouette from Emberhold and the rim.
    */
-  spireIsland: { cx: 0, cz: 96, r: 11, topY: 66 },
-  /** Emberhold village bench on the north shore (covers default spawn at ~8,8). */
-  village: { cx: 8, cz: 6, rx: 38, rz: 30, benchY: 68 },
+  spireIsland: { cx: 0, cz: 96, r: 12, topY: 66 },
+  /** Caldera Gate District bench on the north shore. */
+  village: { cx: 8, cz: 6, rx: 42, rz: 34, benchY: 68 },
   /** Mid ash terrace between beach and rim. */
   terraceY: 68,
   /** Inner radius where the rim climb begins. */
@@ -56,12 +60,36 @@ export const ASHEN = {
   rimOuter: 128,
   /** Gentle outer ash plains beyond the rim. */
   outerY: 78,
-  /** West-rim observatory knoll (seated on the rim crest). */
+  /**
+   * Arrival approach north of the district: enclosed pass → Crater Gate → first reveal.
+   * Spawn sits in the pass; look south toward the gate.
+   */
+  arrival: {
+    spawnX: 8,
+    spawnY: 71.5,
+    spawnZ: -48,
+    passZ0: -56,
+    passZ1: -30,
+    passHalfW: 4,
+    passY: 70,
+    wallY: 86,
+  },
+  /** West-rim observatory knoll (secondary). */
   observatory: { cx: -92, cz: 96, r: 14, y: 118 },
   /** Magma fissure the ash bridge spans (east shore approach). */
   fissure: { cx: 48, cz: 72, halfLen: 14, halfW: 3 },
-  /** East-rim mine adit (secondary landmark). */
+  /** East-rim ash mines (secondary destination). */
   mine: { cx: 78, cz: 108, mouthY: 88 },
+  /** NW cliff monastery shelf (secondary). */
+  monastery: { cx: -62, cz: 48, r: 16, y: 102 },
+  /** SE basalt cliff horn (geological landmark). */
+  cliffHorn: { cx: 58, cz: 148, r: 18, y: 128 },
+  /** SW ash ravine cut (geological landmark). */
+  ravine: { cx: -48, cz: 148, halfW: 6, halfL: 22, floorY: 78 },
+  /** NE terraced rim shelf. */
+  terraceShelf: { cx: 70, cz: 40, r: 14, y: 96 },
+  /** Drowned ruins shallows (west lake, secondary). */
+  drowned: { cx: -28, cz: 100, r: 8 },
 } as const;
 
 /**
@@ -129,13 +157,16 @@ function villageMask(wx: number, wz: number): number {
   return 1 - smoothstep01((e - 0.72) / 0.28);
 }
 
+/** Soft radial mask for a circular feature (1 at center → 0 at r). */
+function radialMask(wx: number, wz: number, cx: number, cz: number, r: number): number {
+  const t = Math.hypot(wx - cx, wz - cz) / r;
+  if (t >= 1) return 0;
+  return (1 - t * t) ** 1.35;
+}
+
 /** Observatory knoll mask on the west rim. */
 function knollMask(wx: number, wz: number): number {
-  const dx = wx - ASHEN.observatory.cx;
-  const dz = wz - ASHEN.observatory.cz;
-  const t = Math.hypot(dx, dz) / ASHEN.observatory.r;
-  if (t >= 1) return 0;
-  return (1 - t * t) ** 1.4;
+  return radialMask(wx, wz, ASHEN.observatory.cx, ASHEN.observatory.cz, ASHEN.observatory.r);
 }
 
 interface Samplers {
@@ -251,6 +282,41 @@ function ashenHeight(noise: Samplers, wx: number, wz: number): number {
     h = Math.max(h, lerp(h, ASHEN.observatory.y, km) + rimN * 1.5);
   }
 
+  // ── Milestone 2: large authored geological landmarks (break up procedural rim noise) ──
+  // SE basalt cliff horn — a single massive silhouette for orientation.
+  {
+    const m = radialMask(wx, wz, ASHEN.cliffHorn.cx, ASHEN.cliffHorn.cz, ASHEN.cliffHorn.r);
+    if (m > 0) h = Math.max(h, lerp(h, ASHEN.cliffHorn.y, m) + rimN * 2);
+  }
+  // NW monastery shelf — walkable flat for the cliff complex.
+  {
+    const m = radialMask(wx, wz, ASHEN.monastery.cx, ASHEN.monastery.cz, ASHEN.monastery.r);
+    if (m > 0.2) h = lerp(h, ASHEN.monastery.y + detail * 0.3, Math.min(1, m * 1.4));
+  }
+  // NE terraced rim shelf.
+  {
+    const m = radialMask(wx, wz, ASHEN.terraceShelf.cx, ASHEN.terraceShelf.cz, ASHEN.terraceShelf.r);
+    if (m > 0.25) h = lerp(h, ASHEN.terraceShelf.y, Math.min(1, m * 1.3));
+  }
+  // SW ash ravine — deep cut for a recognizable gap in the wall.
+  {
+    const dx = (wx - ASHEN.ravine.cx) / ASHEN.ravine.halfW;
+    const dz = (wz - ASHEN.ravine.cz) / ASHEN.ravine.halfL;
+    const e = dx * dx + dz * dz;
+    if (e < 1) {
+      const cut = (1 - e) * (h - ASHEN.ravine.floorY);
+      h = Math.max(ASHEN.ravine.floorY, h - cut);
+    }
+  }
+  // Drowned-ruins shallows: tiny basalt knuckles west of the island (still mostly open water).
+  {
+    const m = radialMask(wx, wz, ASHEN.drowned.cx, ASHEN.drowned.cz, ASHEN.drowned.r);
+    if (m > 0 && d < ASHEN.lake.r) {
+      const rise = lerp(ASHEN.lake.floorY, SEA_LEVEL - 1, m);
+      h = Math.max(h, rise);
+    }
+  }
+
   // Magma fissure trench on the east approach (site fills glowstone; terrain digs the bed).
   const fx = wx - ASHEN.fissure.cx;
   const fz = wz - ASHEN.fissure.cz;
@@ -262,6 +328,20 @@ function ashenHeight(noise: Samplers, wx: number, wz: number): number {
     if (edge < 1) {
       const cut = (1 - edge) * 8;
       h = Math.min(h, ASHEN.shoreY - 2 - cut);
+    }
+  }
+
+  // Arrival pass north of the district: flat floor + raised walls (enclosed approach → reveal).
+  {
+    const A = ASHEN.arrival;
+    if (wz >= A.passZ0 && wz <= A.passZ1) {
+      const dx = Math.abs(wx - A.spawnX);
+      if (dx <= A.passHalfW) {
+        h = A.passY + detail * 0.2;
+      } else if (dx <= A.passHalfW + 8) {
+        const t = (dx - A.passHalfW) / 8;
+        h = Math.max(h, lerp(A.passY + 2, A.wallY, smoothstep01(t)) + rimN * 2);
+      }
     }
   }
 

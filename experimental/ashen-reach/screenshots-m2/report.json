@@ -1,0 +1,261 @@
+{
+  "url": "http://localhost:5173/?world=ashen-reach&save=ashen-reach",
+  "shots": [
+    {
+      "name": "01-spawn",
+      "eye": [
+        8,
+        72.5,
+        -48
+      ],
+      "look": [
+        8,
+        72,
+        -30
+      ],
+      "note": "Spawn in arrival pass",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-01-spawn.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\01-spawn.png",
+      "ok": true
+    },
+    {
+      "name": "02-first-reveal",
+      "eye": [
+        8,
+        73,
+        -26
+      ],
+      "look": [
+        0,
+        80,
+        96
+      ],
+      "note": "First reveal past Crater Gate",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-02-first-reveal.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\02-first-reveal.png",
+      "ok": true
+    },
+    {
+      "name": "03-crater-gate",
+      "eye": [
+        8,
+        73,
+        -32
+      ],
+      "look": [
+        8,
+        78,
+        -28
+      ],
+      "note": "Crater Gate monument",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-03-crater-gate.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\03-crater-gate.png",
+      "ok": true
+    },
+    {
+      "name": "04-district-street",
+      "eye": [
+        8,
+        70.5,
+        -8
+      ],
+      "look": [
+        8,
+        70,
+        12
+      ],
+      "note": "Main district avenue",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-04-district-street.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\04-district-street.png",
+      "ok": true
+    },
+    {
+      "name": "05-central-plaza",
+      "eye": [
+        4,
+        70.5,
+        2
+      ],
+      "look": [
+        16,
+        72,
+        6
+      ],
+      "note": "Central plaza",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-05-central-plaza.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\05-central-plaza.png",
+      "ok": true
+    },
+    {
+      "name": "06-district-to-tower",
+      "eye": [
+        8,
+        71,
+        16
+      ],
+      "look": [
+        0,
+        90,
+        96
+      ],
+      "note": "District view toward tower",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-06-district-to-tower.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\06-district-to-tower.png",
+      "ok": true
+    },
+    {
+      "name": "07-lakefront",
+      "eye": [
+        8,
+        66,
+        48
+      ],
+      "look": [
+        0,
+        75,
+        90
+      ],
+      "note": "Lakefront plaza",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-07-lakefront.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\07-lakefront.png",
+      "ok": true
+    },
+    {
+      "name": "08-main-bridge",
+      "eye": [
+        6,
+        65.5,
+        68
+      ],
+      "look": [
+        0,
+        85,
+        96
+      ],
+      "note": "Causeway / main bridge",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-08-main-bridge.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\08-main-bridge.png",
+      "ok": true
+    },
+    {
+      "name": "09-tower-entrance",
+      "eye": [
+        0,
+        70,
+        84
+      ],
+      "look": [
+        0,
+        78,
+        92
+      ],
+      "note": "Tower entrance",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-09-tower-entrance.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\09-tower-entrance.png",
+      "ok": true
+    },
+    {
+      "name": "10-tower-interior",
+      "eye": [
+        0,
+        78,
+        96
+      ],
+      "look": [
+        2,
+        82,
+        98
+      ],
+      "note": "Tower interior mid climb",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-10-tower-interior.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\10-tower-interior.png",
+      "ok": true
+    },
+    {
+      "name": "11-tower-balcony",
+      "eye": [
+        7,
+        80,
+        96
+      ],
+      "look": [
+        0,
+        90,
+        96
+      ],
+      "note": "Tower balcony",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-11-tower-balcony.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\11-tower-balcony.png",
+      "ok": true
+    },
+    {
+      "name": "12-monastery",
+      "eye": [
+        -58,
+        104,
+        52
+      ],
+      "look": [
+        0,
+        80,
+        96
+      ],
+      "note": "Cliff Monastery secondary",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-12-monastery.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\12-monastery.png",
+      "ok": true
+    },
+    {
+      "name": "13-drowned-ruins",
+      "eye": [
+        -32,
+        65,
+        98
+      ],
+      "look": [
+        -28,
+        64,
+        100
+      ],
+      "note": "Drowned Ruins secondary",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-13-drowned-ruins.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\13-drowned-ruins.png",
+      "ok": true
+    },
+    {
+      "name": "14-ash-mines",
+      "eye": [
+        74,
+        90,
+        108
+      ],
+      "look": [
+        88,
+        90,
+        108
+      ],
+      "note": "Ash Mines secondary",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-14-ash-mines.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\14-ash-mines.png",
+      "ok": true
+    },
+    {
+      "name": "15-summit-signature",
+      "eye": [
+        0,
+        118,
+        96
+      ],
+      "look": [
+        8,
+        70,
+        10
+      ],
+      "note": "Tower summit signature",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-m2-15-summit-signature.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots-m2\\15-summit-signature.png",
+      "ok": true
+    }
+  ],
+  "errors": []
+}
