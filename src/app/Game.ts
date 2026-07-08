@@ -97,6 +97,7 @@ import type { BuilderIntent } from './builderInput';
 import { dominantHorizontalAxis, nudgeDelta } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
+import { TourMarker } from '../render/TourMarker';
 import { BlockParticles, particleColorOf } from '../render/BlockParticles';
 import { AudioEngine } from '../audio/AudioEngine';
 import { MovementSoundTracker } from '../audio/MovementSounds';
@@ -650,17 +651,22 @@ export class Game {
     });
 
     // Guided tour (meta.tour): active waypoint + distance in the HUD, advancing on arrival.
+    // World-space gold beacon tracks the active waypoint so players can navigate by sight,
+    // not only by the distance readout.
+    const tourMarker = new TourMarker();
+    tourMarker.attach((o) => renderer.add(o));
     const route = tourRoute(bootMeta.meta);
     let tourIndex: number | undefined;
     const endTour = (message: string): void => {
       tourIndex = undefined;
       ui.setTourHud(undefined);
+      tourMarker.update(undefined, false);
       setStatus(message);
     };
     const startTour = (): void => {
       if (!route) return void setStatus('This world has no tour');
       tourIndex = 0;
-      setStatus('Tour started — follow the marker distance');
+      setStatus('Tour started — follow the gold beacon');
     };
     ui.tourPrev.addEventListener('click', () => {
       if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, -1);
@@ -669,13 +675,19 @@ export class Game {
       if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, 1);
     });
     ui.tourEnd.addEventListener('click', () => endTour('Tour ended'));
-    /** One tour tick: advance from the player position and refresh the HUD (loop + dev hook). */
+    /** One tour tick: advance from the player position and refresh the HUD + beacon. */
     const updateTour = (): void => {
-      if (!route || tourIndex === undefined) return;
+      if (!route || tourIndex === undefined) {
+        tourMarker.update(undefined, false);
+        return;
+      }
       const s = tourTick(route, tourIndex, player.position.x, player.position.z);
       tourIndex = s.index;
       if (s.done) endTour(`Tour complete — ${s.name}`);
-      else ui.setTourHud(s);
+      else {
+        ui.setTourHud(s);
+        tourMarker.update(route[s.index], true);
+      }
     };
 
     // World intro/info panel: shown once per save on a curated first visit, reopenable via Info.
@@ -1288,6 +1300,7 @@ export class Game {
       particles.dispose();
       selectionBox.dispose();
       pasteGhost.dispose();
+      tourMarker.dispose();
       targetOverlay.dispose();
       sink.disposeAll();
       mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too
