@@ -398,6 +398,16 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
   grotto swim chain and cave→vault chain both pass (vault targets must aim at the walkable
   aisle, not the hoard shelf). Four secrets stay unmarked: grotto, vault, camp, ruin.
 - **Phase 7 — Curation + ship.** See §6.
+  **Done 2026-07-08 — shipped as the sixth curated world.** WIP save published as
+  `frostvale-valley`; spawn posed at the Arrival vista (560.5, 66.4, 3330.5) looking at the
+  falls; 8 named landmarks (+ the auto-registered `Arrival` spawn landmark — `setSpawn(name)`
+  adds one, so plan for it); 10-waypoint tour along verified routes (square → lodge → mere →
+  bridge → mill → falls → switchback → shrine → watchtower → narrows); `audit()` →
+  `ready:true` with zero warnings; flow queue 0. Packaged with `VR_VAULT` pointed at a scratch
+  dir (no curation warnings), bundled after restoring the other five saves from
+  `public/worlds/`, `npm test` green (1320 tests incl. `shippedWorlds`). Bundle 2.90 MB
+  (≤ ~6 MB budget). Package previews: `docs/media/frostvale-p7-preview.jpg` (bridge → falls)
+  and `frostvale-p7-arrival.jpg` (spawn vista). Roam: `?save=frostvale-valley&world=default`.
 
 ## 6. Definition of done (the shipping contract — CI-enforced)
 
