@@ -133,6 +133,34 @@ export function upsertManifestEntry(
   return { version: manifest.version, worlds };
 }
 
+/** The shipped world with this slug, or undefined when the name isn't in the collection. */
+export function findManifestEntry(
+  manifest: WorldManifest,
+  slug: string,
+): WorldManifestEntry | undefined {
+  return manifest.worlds.find((w) => w.slug === slug);
+}
+
+/**
+ * Problems where a bundled snapshot's meta doesn't match its manifest entry (empty = match).
+ * Guards the static pipeline: a stale bundle must not ship under a manifest that promises a
+ * different generator (seed/version/preset) or a spawn the snapshot can't honour.
+ */
+export function entryMetaProblems(
+  entry: WorldManifestEntry,
+  meta: WorldMeta | undefined,
+): string[] {
+  if (!meta) return ['snapshot has no meta'];
+  const p: string[] = [];
+  if (meta.seed !== entry.seed) p.push(`snapshot seed ${meta.seed} != manifest ${entry.seed}`);
+  if (meta.version !== entry.version)
+    p.push(`snapshot version ${meta.version} != manifest ${entry.version}`);
+  if ((meta.preset ?? 'default') !== entry.preset)
+    p.push(`snapshot preset ${meta.preset ?? 'default'} != manifest ${entry.preset}`);
+  if (!meta.spawn || !meta.look) p.push('snapshot meta is missing spawn/look');
+  return p;
+}
+
 /** Whole-manifest validation: schema version, unique slugs, and every entry valid. */
 export function validateManifest(manifest: WorldManifest): string[] {
   const problems: string[] = [];

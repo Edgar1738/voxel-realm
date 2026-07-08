@@ -37,8 +37,8 @@ import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
-import { IndexedDbSaveStore } from '../persistence/IndexedDbSaveStore';
-import { ServerSaveStore } from '../persistence/ServerSaveStore';
+import { createBootStore } from './bootStore';
+import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
@@ -145,14 +145,18 @@ export class Game {
     const daynight = new DayNight(renderer.scene, chunkMaterials);
     const celestial = new CelestialSky(renderer.scene);
 
-    // Load the durable save (or start fresh / discard an incompatible one).
-    // Shared storage in dev (server-owned, named worlds via ?save=); IndexedDB in production.
+    // Load the durable save (or start fresh / discard an incompatible one). Dev uses the
+    // server-owned disk store; production serves shipped worlds from static hosting with a
+    // per-slug IndexedDB overlay, and everything else from per-name IndexedDB.
     const worldName = worldNameFromSearch(window.location.search);
-    let store: SaveStore = import.meta.env.DEV
-      ? new ServerSaveStore(worldName, (id) => registry.has(id))
-      : new IndexedDbSaveStore();
+    let store: SaveStore = createBootStore(worldName, (id) => registry.has(id), SHIPPED_MANIFEST, {
+      dev: import.meta.env.DEV,
+      baseUrl: import.meta.env.BASE_URL,
+    });
     const bootMeta = await loadBootMeta(store);
     store = bootMeta.store;
+    const worldTitle = bootMeta.meta?.title?.trim();
+    if (worldTitle) document.title = `${worldTitle} — Voxel Realm`;
 
     // Pick the world environment. An explicit `?world=` wins; otherwise an existing save keeps its
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
