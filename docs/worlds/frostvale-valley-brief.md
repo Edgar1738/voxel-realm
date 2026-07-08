@@ -67,11 +67,13 @@ Load-bearing behaviors:
 
 Rules in `src/world/fluidRules.ts`; ticker: one wave per 0.18 s, 128 cells/wave.
 
-- **A water cell resting on water never moves.** Hand-placed source columns and the top layer of
-  ≥2-deep pools are permanently inert. This is how you build the waterfall: place the entire
-  visible curtain as source columns (`__vr.fill` with block id 8 — water is not in the creative
-  picker). Flowing water renders *identically* to sources (the mesher ignores flow state), so
-  simulation buys zero visual benefit and costs settle time.
+- **Source water resting on water is permanently inert** (state 0 — what `__vr.fill` and
+  `__vr.place` write by default). Flowing water on water never falls or spreads sideways, but it
+  still re-levels every tick and evaporates if orphaned from its feed — so place *every* layer
+  of pools, rivers, and the entire falls curtain as sources (`fill` with block id 8 — water is
+  not in the creative picker); never rely on water that flooded into place. Flowing water
+  renders *identically* to sources (the mesher ignores flow state), so simulation buys zero
+  visual benefit and costs settle time.
 - 1-deep water on a solid bed **spreads** into same-level air, and any drop resets its range —
   a single leak creeps downhill indefinitely, writing a saved delta per wetted cell. Banks at or
   above the water surface along the *entire* river are mandatory. Make rivers 2 deep: the top
@@ -90,9 +92,10 @@ Rules in `src/world/fluidRules.ts`; ticker: one wave per 0.18 s, 128 cells/wave.
   `__vr.time(t)` are session tools for screenshots only.)
 - Snowfall never accumulates as blocks. All snow cover is placed SNOW cubes (worldgen paints
   snow caps at surface height ≥ 95, `SurfacePainter.ts:9`).
-- Critters are habitat-driven near the camera: rabbits/birds need **GRASS** (never snow), fish
-  need **2-deep water**, butterflies need flowers by day, fireflies need grass/water at night.
-  Keep the valley floor grassy and flowered so the village feels alive.
+- Critters are habitat-driven near the camera: rabbits need **GRASS**, birds need **GRASS or
+  LEAVES** (they perch in canopies, conifers included), fish need **2-deep water**, butterflies
+  need flowers by day, fireflies need grass/water at night. Nothing anchors on SNOW blocks —
+  keep the valley floor grassy and flowered so the village feels alive.
 - The guided tour is a HUD-guided **walk** (name + distance readout), started from the world-info
   dialog — *not* the `T` key despite the README. Waypoints use the JSON key **`name`** (the
   shipped worlds' `label` keys are silently ignored — don't copy them). Arrival radius is 4
@@ -110,7 +113,11 @@ Rules in `src/world/fluidRules.ts`; ticker: one wave per 0.18 s, 128 cells/wave.
 - Caps: console builds **50,000 voxels/call** (tile larger jobs); `copy`/`replace`/`scan`
   200,000; in-game region tools 8,192. Edits apply only to **loaded** chunks —
   `__vr.preloadArea(x, z, radius)` (or `preloadAreaAsync` in a live tab) before building far
-  away, and check the returned `unloaded` count. Undo history is 128 batches, in-memory.
+  away (it returns `{generated, meshed}`), then confirm `unloaded` is 0 on each build call's
+  returned result. Undo history is 128 batches, in-memory.
+- Region ops from the console: `copy`, `paste`, `move`, `mirror`, `rotate`, and `array(box, nx,
+  ny, nz, sx, sy, sz)` — tiled repetition with per-axis stride, the tool for fence runs, field
+  rows, and conifer belts. All preserve stair/gate facing.
 - Blueprints (`.blueprints/*.json` via the dev server) are the reuse mechanism. **Use
   `__vr.paste(await __vr.loadBlueprint(name), x, y, z)` — never `__vr.stamp()`, which drops
   per-voxel state and breaks every stair and gate orientation.**
@@ -150,10 +157,12 @@ saved delta, so steepen cliffs, carve the river, terrace the village, and leave 
 
 **Phase 0 (site survey) is therefore the first deliverable.** Fly the seed-1337 default world
 (teleport in a coarse grid, sample `__vr.surface(x,z)`, capture overviews) and select a site
-with: a bowl or through-valley with floor ~y64–75; a high headwall on one side reaching ≥y105
-(snow, and the waterfall source); flanking ridges that frame sightlines; no desert/swamp surface
-blocks (sand/mud caps) within view of the core. Record the site's bounding box and the
-spawn-vista candidate in this document before building. If no acceptable site exists after a
+with: a bowl or through-valley with floor ~y64–72; a natural headwall on one side reaching
+≥y110 (snow, and the waterfall source — you are expected to steepen and raise it; natural
+Mountains terrain tops out around y110–127); at least one saddle usable as a mountain pass out
+of the valley; flanking ridges that frame sightlines; no desert/swamp surface blocks (sand/mud
+caps) within view of the core. Record the site's bounding box and the spawn-vista candidate in
+this document before building. If no acceptable site exists after a
 genuine search (~30+ probes), fall back to `flat` with **hollow-shell** mountains — but treat
 that as a scope escalation and say so, don't slide into it.
 
@@ -165,8 +174,8 @@ that as a scope escalation and say so, don't slide into it.
 |---|---|
 | Playable core | ~600×600 blocks (sculpted; world continues naturally beyond) |
 | Village zone | ~180×180, organic — nothing grid-aligned |
-| Hero lodge | ~50×35 footprint incl. porches/wings; ridge ~20 above its terrace |
-| Valley floor | ~y64–75 (grass, meadows, river) |
+| Hero lodge | ~55×40 footprint incl. porches/wings; ridge ~20 above its terrace |
+| Valley floor | ~y64–72 (grass, meadows, river) |
 | Snow line | y95+ (matches worldgen; hand-placed snow below only as drifts/roof caps) |
 | Peaks | y110–150 |
 | Interiors | ceilings ≥4, doorways ≥2 wide × 3 high, corridors ≥2 wide, stair runs ≥2 wide |
@@ -176,9 +185,11 @@ proportions" means these numbers, not vibes.
 
 ### 4.2 The hero waterfall
 
-One enormous fall dominates the valley: lip on the snow headwall (~y110–125), a 50–60 block
-sheer drop, 3–5 blocks wide (wider reads better than taller at these scales), into a plunge
-pool at valley level, feeding the river. Construction: fully hand-placed source columns
+One enormous fall dominates the valley. The drop is the derived number: **lip = plunge-pool
+level + 50–60** (a floor at y64–72 puts the lip at ~y115–130; natural headwalls reach
+~y110–127, so building the lip up is expected sculpting, not a deviation). Make it 3–5 blocks
+wide — width reads better than height at these scales — falling sheer into a plunge pool at
+valley level, feeding the river. Construction: fully hand-placed source columns
 (§2.3), solid cliff behind the curtain, banked pool ≥2 deep, SNOW foam collar at the waterline,
 CRYSTAL glow hidden behind the curtain. **Secret: a walkable grotto behind the falls** —
 crystal-lit, reached by a ledge path from the pool; the curtain is inert so it's safe to tunnel
@@ -187,13 +198,15 @@ balcony; the river below it is crossable at the village bridge and at one ford d
 
 ### 4.3 The village
 
-A believable settlement responding to terrain, roughly: **summit shrine** → snow trail →
-**watchtower** on a spur → switchback descent → **hero lodge** on a terrace above the square →
-**village square + market stalls** → **blacksmith** (stone, chimney), **stable**, **barn +
-fields**, scattered **cabins** on their own terraces → **river, stone bridge, and water mill**
-(hand-built vertical wheel — blueprint it) → forest edge. Buildings sit on cut-and-fill
-terraces with retaining walls (cobblestone wall + stone), never on stilts of dirt. Nothing
-grid-aligned; roads find the contours.
+A believable settlement responding to terrain, roughly: **summit shrine** → snow trail over
+the **mountain pass** (the walkable route out of the valley) → **watchtower** on a spur →
+switchback descent → **hero lodge** on a terrace above the square → **village square + market
+stalls** → **blacksmith** (stone, chimney), **stable**, **barn + fields**, a
+**storehouse/granary**, scattered **cabins** on their own terraces → **river, stone bridge,
+and water mill** (hand-built vertical wheel — blueprint it) → forest edge, with a furnished
+**hunter's cabin** deeper in the trees. Buildings sit on cut-and-fill terraces with retaining
+walls (cobblestone wall + stone), never on stilts of dirt. Nothing grid-aligned; roads find
+the contours.
 
 ### 4.4 The hero lodge
 
@@ -208,7 +221,8 @@ Kitchen (furnace + counters), Dining Hall, Bedrooms, Library (bookshelves), Stor
 Basement. Furniture recipes (no furniture blocks exist): bed = plank-slab frame + SNOW duvet;
 table = fence post + top-half plank slab; chair = plank stairs; shelf = bookshelf or top-slab
 rows; hearth = furnace framed in cobble/brick + hidden glowstone; counter = planks + top-slab
-overhang. Build the furniture set **once as blueprints** and paste everywhere.
+overhang; crates = stacked planks cubes (the knotted texture reads as crating) in corners and
+cellars. Build the furniture set **once as blueprints** and paste everywhere.
 
 **The lodge balcony must overlook the entire valley — falls, river, village, peaks.**
 
@@ -217,13 +231,15 @@ overhang. Build the furniture set **once as blueprints** and paste everywhere.
 No straight lines. Use `__vr.path()` along surveyed polylines for the valley roads (gravel core
 with cobble edging and mud/dirt mottling; lay gravel on solid ground — it falls), `stairsRun`
 for stone stair climbs, retaining walls on every cut, wood bridges (bridge prefab as reference)
-over streams, and a switchback trail with landings up to the shrine. Every path leads somewhere;
-the road network *is* the exploration guide.
+over streams, narrow dirt forest paths threading the conifer belts, a snow trail over the
+mountain pass, and a switchback trail with landings up to the shrine. Every path leads
+somewhere; the road network *is* the exploration guide.
 
 ### 4.6 Vegetation by elevation
 
-- Valley floor: grass, flowers, tall grass (they sway; butterflies/fireflies follow), fields,
-  gardens. Keep it grassy — this is where the critters live.
+- Valley floor: grass, flowers, tall grass (the cross-billboard plants sway in the wind, and
+  butterflies/fireflies follow them), fields, gardens. Keep it grassy — this is where the
+  critters live.
 - Lower slopes: conifer belts. The generator only scatters conifers on snow caps, so **harvest
   them**: `__vr.copy` 3–4 generated conifers from a snow cap, save as blueprints, and paste
   belts and clusters on the slopes (oak-toned trunks are the only wood — the conical silhouette
@@ -239,8 +255,9 @@ animal pens (empty of livestock — the engine has no farm animals; imply use wi
 mangers, water troughs), lantern posts, cairns marking trails, a hunter's camp, gardens,
 roadside shrines (camp-shrine prefab as a base). Rewarded exploration, each discoverable but
 unmarked: the behind-falls grotto; a dressed natural cave (the preset carves them — find one on
-site, light it faintly); a hanging-valley tarn with a fishing hut; an abandoned/ruined cabin; an
-old broken bridge; a hidden treasure vault (dungeon set) at the end of the cave — the Tidewreck
+site, light it faintly); one or two small tributary cascades on side streams (cheap — inert
+source columns); a hanging-valley tarn with a fishing hut; an abandoned/ruined cabin; an old
+broken bridge; a hidden treasure vault (dungeon set) at the end of the cave — the Tidewreck
 smugglers' den is the precedent. Every secret gets a landmark only if it should appear in the
 world-info list; leave at least two entirely unmarked.
 
@@ -264,18 +281,19 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 
 - **Phase 0 — Site survey.** Probe seed-1337 `default` terrain; select and document the site
   (bounding box, floor/headwall heights, spawn-vista candidate). *Gate: site meets §3 criteria.*
-- **Phase 1 — Terrain + water.** Sculpt cliffs/headwall, carve river channel, build falls +
-  pool + river (inert, banked), tarn, frozen pond (SNOW sheet, glass panes only over framed
-  2-deep water). *Gate: `__vr.flow.queued() === 0` after a full settle; `scan` shows no stray
-  water outside channels.*
+- **Phase 1 — Terrain + water.** Sculpt cliffs/headwall (raise the falls lip to pool + 50–60),
+  carve river channel, build falls + pool + river + tributary cascades (all sources, banked),
+  tarn, frozen pond — the entire walkable sheet is SNOW; glass "ice windows" only where players
+  cannot step, since glass has no collision. *Gate: `__vr.flow.queued() === 0` after a full
+  settle; `scan` shows no stray water outside channels.*
 - **Phase 2 — Circulation.** Roads, switchbacks, stairs, bridges, retaining walls. *Gate:
   `reachable()` passes leg-by-leg along every named route (spawn→square, square→lodge,
   square→bridge→ford, trail→watchtower→shrine).*
 - **Phase 3 — Hero lodge.** Shell, roofs, interiors, furniture kit, lighting. *Gate: every room
   reachable from the porch; `slice()` floor plans reviewed per storey; balcony vista captured.*
-- **Phase 4 — Village.** Square, market, blacksmith, stable, barn+fields, mill, cabins,
-  watchtower, shrine — all with interiors, terraced, lit. *Gate: every building enterable and
-  reachable from the square; no floating/buried footprints.*
+- **Phase 4 — Village.** Square, market, blacksmith, stable, barn+fields, storehouse, mill,
+  cabins, hunter's cabin, watchtower, shrine — all with interiors, terraced, lit. *Gate: every
+  building enterable and reachable from the square; no floating/buried footprints.*
 - **Phase 5 — Vegetation + set dressing.** Conifer belts, oak clearing, meadows/flowers,
   storytelling props, snow drifts and roof caps. *Gate: the five §4.8 views composed and
   captured clean.*
@@ -296,12 +314,16 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 4. Overview + vista captures in `.captures/` (`hud:false`).
 5. `npm run world:package -- --save frostvale-valley --title "Frostvale Valley" --manifest
    --tags alpine,village,fantasy --port 5173` exits 0 with **no curation warnings**. Set
-   `VR_VAULT` first on non-Windows machines — the archive step defaults to a Windows path.
+   `VR_VAULT` to a real writable directory first on non-Windows machines — the archive step
+   defaults to a Windows path (the vault archive is a side effect; any scratch dir works).
 6. `npm run world:bundle` exits 0 → `public/worlds/frostvale-valley.json`. **Known prerequisite:
    `world:bundle` re-bundles every manifest entry and `.saves/` is gitignored, so a fresh clone
-   lacks the other five saves.** Either restore them (`npm run world:restore`) or add a small
-   `--only <slug>` flag to `scripts/worldBundle.ts` first — flag this to the maintainer rather
-   than working around it silently.
+   lacks the other five saves.** The committed bundles are byte-complete snapshots — restore by
+   copying `public/worlds/<slug>.json` to `.saves/<slug>.json` for each shipped world, then run
+   the normal full bundle. (`npm run world:restore` only works on a machine with the Obsidian
+   vault. And beware: `worldBundle.ts` prunes any `public/worlds/*.json` it didn't just write,
+   so a naive `--only` flag would delete the other worlds' bundles — don't take that path
+   without also scoping the prune.)
 7. Commit `world-manifest.json` + `public/worlds/frostvale-valley.json`; `npm test` green
    (`tests/shippedWorlds.test.ts` validates manifest/bundle/meta/block-ids).
 8. `__vr.benchTour()` run along the tour with no pathological meshing hotspots; bundle ≤ ~6 MB.
@@ -313,6 +335,8 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 - Every structure is enterable, furnished, lit, and `reachable()`-verified.
 - Exploration pays: every path leads somewhere, at least two secrets are unmarked.
 - The five composed vistas each produce a screenshot worth shipping as marketing.
+- The world visibly exercises the engine's signature systems: inert-but-simulated water at
+  scale, critter habitats, shaped-block architecture, warm lighting, the guided tour.
 - The full shipping contract (§6) passes, including CI.
 
 ## 8. Collection note
