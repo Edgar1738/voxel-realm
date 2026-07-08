@@ -1,4 +1,4 @@
-import { Color, DirectionalLight, HemisphereLight } from 'three';
+import { DirectionalLight, HemisphereLight } from 'three';
 import { Renderer } from '../render/Renderer';
 import { createTextureArray, mipmappedArray } from '../render/TextureArray';
 import {
@@ -1065,16 +1065,19 @@ export class Game {
       if (rolled !== undefined) weather.setKind(rolled);
       // Drops die on solids *and* water surfaces — rain must not streak through lakes.
       weather.update(cdt, eye, isSolidOrWater);
-      ambientLife.update(cdt, eye, skyState(daynight.time).daylight, getBlockAt);
+      const skyNow = skyState(daynight.time);
+      ambientLife.update(cdt, eye, skyNow.daylight, getBlockAt);
       ticker.update(cdt);
       critters.update(cdt, eye, critterEnv);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
-      const skyBg = renderer.scene.background;
       const fogFar = Math.max(1, manager.viewDistance * CHUNK_SIZE_X);
       const surfaceFog: FogParams = {
-        color: skyBg instanceof Color ? [skyBg.r, skyBg.g, skyBg.b] : [0.529, 0.725, 0.91],
+        // Source the surface fog from the sky model, not scene.background: the background stores
+        // color-managed (linear) components, and reading it back would feed linear values into
+        // the raw fog uniforms and re-ingest the previous frame's flash/underwater writes.
+        color: [skyNow.sky[0] / 255, skyNow.sky[1] / 255, skyNow.sky[2] / 255],
         near: fogFar * 0.55,
         far: fogFar,
       };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Color, Scene, DataArrayTexture, Vector3 } from 'three';
+import { Color, Scene, DataArrayTexture, SRGBColorSpace, Vector3 } from 'three';
 import {
   stepUnderwaterFactor,
   blendFog,
@@ -61,6 +61,14 @@ describe('blendFog', () => {
 describe('applyUnderwater', () => {
   const tex = new DataArrayTexture(new Uint8Array(4), 1, 1, 1);
 
+  // The background is color-managed (stored in working space); fog colors are display-sRGB.
+  // Read it back in sRGB so the assertion checks what actually reaches the screen.
+  const shownBackground = (scene: Scene): Color => {
+    const shown = new Color();
+    (scene.background as Color).getRGB(shown, SRGBColorSpace);
+    return shown;
+  };
+
   it('writes the blended fog band to the material uniforms and the scene background', () => {
     const material = createChunkMaterial(tex);
     const scene = new Scene();
@@ -71,7 +79,7 @@ describe('applyUnderwater', () => {
     expect(material.uniforms.uFogFar.value).toBe(UNDERWATER_FOG.far);
     const fogColor = material.uniforms.uFogColor.value as Vector3;
     expect(fogColor.x).toBeCloseTo(UNDERWATER_FOG.color[0]);
-    expect((scene.background as Color).g).toBeCloseTo(UNDERWATER_FOG.color[1]);
+    expect(shownBackground(scene).g).toBeCloseTo(UNDERWATER_FOG.color[1]);
   });
 
   it('restores the surface fog at factor 0', () => {
@@ -83,6 +91,6 @@ describe('applyUnderwater', () => {
     applyUnderwater([material], scene, SURFACE, 0);
     expect(material.uniforms.uFogNear.value).toBe(SURFACE.near);
     expect(material.uniforms.uFogFar.value).toBe(SURFACE.far);
-    expect((scene.background as Color).r).toBeCloseTo(SURFACE.color[0]);
+    expect(shownBackground(scene).r).toBeCloseTo(SURFACE.color[0]);
   });
 });
