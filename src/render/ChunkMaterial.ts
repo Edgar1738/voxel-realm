@@ -64,6 +64,8 @@ precision highp sampler2DArray;
 uniform mat4 viewMatrix;
 uniform sampler2DArray uTex;
 uniform vec3 uLightDir;
+uniform float uDirStrength;
+uniform vec3 uLightColor;
 uniform vec3 uFogColor;
 uniform float uFogNear;
 uniform float uFogFar;
@@ -113,7 +115,9 @@ void main() {
     base = mix(base, uWaterDeep, uWaterDepthTint);
     base = mix(base, uSkyColor, fres * uFresnelTint);
   }
-  float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
+  // Diffuse sun/moon term in world space: uLightDir is world-space, so it must pair with
+  // vWorldNormal (vNormal is view-space and would make shading swim as the camera turns).
+  float diff = max(dot(normalize(vWorldNormal), normalize(uLightDir)), 0.0);
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
   float block = mod(vLight, 16.0) / 15.0;
@@ -126,7 +130,11 @@ void main() {
   float level = max(max(sky * uDayLight, max(block, torch)), 0.06);
   // uAoStrength: dev-tunable AO intensity (0 = off, 1 = baked value, >1 exaggerated).
   float aoFactor = clamp(mix(1.0, vAo, uAoStrength), 0.0, 1.0);
-  float shade = (0.45 + 0.55 * diff) * aoFactor;
+  // uDirStrength fades the directional term to a flat mid-value (0.6 ~ hemisphere-average
+  // diff) at twilight; uLightColor tints only this term, so golden-hour warmth never leaks
+  // into caves or lantern light. Brightness stays driven solely by the baked light level.
+  float dir = mix(0.6, diff, uDirStrength);
+  vec3 shade = (vec3(0.45) + 0.55 * dir * uLightColor) * aoFactor;
   // Hemispheric ambient: sky hue on up-faces, warmer/darker below, keyed by WORLD up.
   // Luminance-normalized (divide by hemi's luma) so it only RECOLORS and never adds
   // brightness -- baked light level stays the sole brightness driver, so caves stay dark
@@ -186,6 +194,10 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
     uniforms: {
       uTex: { value: tex },
       uLightDir: { value: new Vector3(0.5, 1.0, 0.3).normalize() },
+      // Sun-arc lighting: DayNight overwrites these live (dirStrength dips at twilight,
+      // lightColor goes gold at low sun / cool blue under the moon).
+      uDirStrength: { value: 1.0 },
+      uLightColor: { value: new Vector3(1, 1, 1) },
       uFogColor: { value: new Vector3(0.529, 0.725, 0.91) },
       uFogNear: { value: 40 },
       uFogFar: { value: 220 },

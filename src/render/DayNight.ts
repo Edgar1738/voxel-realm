@@ -1,7 +1,7 @@
 import { Color, SRGBColorSpace, Vector3, type RawShaderMaterial, type Scene } from 'three';
 import { skyState } from './Sky';
 
-/** Drives the sky color, sun direction, and daylight uniforms from a time of day in [0,1). */
+/** Drives the sky color, sun/moon light direction + tint, and daylight uniforms from a time of day in [0,1). */
 export class DayNight {
   time: number;
   dayLengthSec: number;
@@ -41,7 +41,15 @@ export class DayNight {
     // than the fog and the horizon seams (night: fog 16,20,44 vs sky 71,79,115).
     this.background.setRGB(r, g, b, SRGBColorSpace);
     for (const m of this.materials) {
-      (m.uniforms.uLightDir.value as Vector3).set(s.sun[0], s.sun[1], s.sun[2]);
+      // The shading light is the sun by day and the moon at night (never below the horizon);
+      // dirStrength/lightColor carry the twilight fade and golden-hour/moonlight tint.
+      (m.uniforms.uLightDir.value as Vector3).set(s.light[0], s.light[1], s.light[2]);
+      m.uniforms.uDirStrength.value = s.dirStrength;
+      (m.uniforms.uLightColor.value as Vector3).set(
+        s.lightColor[0],
+        s.lightColor[1],
+        s.lightColor[2],
+      );
       (m.uniforms.uFogColor.value as Vector3).set(r, g, b);
       // Sky-tint ambient reads its own uniform, deliberately separate from uFogColor so the
       // underwater fog override (applyUnderwater) can't corrupt the surface lighting hue.

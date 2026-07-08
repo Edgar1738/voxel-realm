@@ -60,6 +60,15 @@ function starOpacity(daylight: number): number {
 }
 
 /**
+ * Disc fade across the horizon from its elevation (unit-sphere y). Full strength while the disc
+ * is above the horizon — a setting sun stays blazing right down to the skyline — then fades out
+ * over y -0.02..-0.14 as it slips below, matching the disc's angular size (~30/400 in unit-y).
+ */
+function discOpacity(y: number): number {
+  return Math.max(0, Math.min(1, (y + 0.14) / 0.12));
+}
+
+/**
  * Sun + moon discs that traverse the sky with the time of day, plus a star field that fades in at
  * night. Tracks the existing day/night model via {@link skyState}. Everything renders behind terrain
  * via the depth buffer (depthTest on, depthWrite off) and stays centered on the camera so it reads
@@ -148,11 +157,10 @@ export class CelestialSky {
     // Moon rides the opposite point of the arc.
     this.moon.position.copy(this.sunDir).multiplyScalar(-SKY_RADIUS).add(cameraPos);
 
-    // The sky model keeps the sun's elevation constant (only azimuth rotates), so drive the
-    // sun/moon visibility from daylight instead: sun blazes by day, moon takes over at night.
-    const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
-    const sunOpacity = clamp01((state.daylight - 0.35) / 0.45);
-    const moonOpacity = clamp01((0.78 - state.daylight) / 0.5);
+    // The sun truly rises and sets now, so visibility follows elevation: each disc shows while
+    // above the horizon and fades as it slips under. During twilight both ride opposite horizons.
+    const sunOpacity = discOpacity(this.sunDir.y);
+    const moonOpacity = discOpacity(-this.sunDir.y);
     this.sunMat.opacity = sunOpacity;
     this.sun.visible = sunOpacity > 0.001;
     this.moonMat.opacity = moonOpacity;
@@ -165,4 +173,4 @@ export class CelestialSky {
   }
 }
 
-export { starOpacity };
+export { starOpacity, discOpacity };
