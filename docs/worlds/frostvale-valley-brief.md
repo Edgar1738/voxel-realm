@@ -192,8 +192,11 @@ gate-passing sites; the selected winner:
   full falls curtain over the plunge basin, gravel shore and snow ledges in the foreground
   (`docs/media/frostvale-p1-spawn-vista.jpg`). The earlier candidate at (520, 3450) turned out
   to sit inside a wooded hillside — vista points must be verified with an actual render.
-- **Mountain pass:** NE col ≈(640, 3100) between the massif and the NE hills (north exit);
-  gentle secondary exit south ≈(590, 3450).
+- **Mountain pass (re-sited in Phase 2):** the NE lake-inlet **narrows** at (612–622, ~3119) —
+  stepping-stone crossing — then north through the natural shoreline defile at x≈644–658 out of
+  the valley. The watchtower pad sits on the shoulder above the narrows at (590, 3134, y85),
+  guarding the pass. Gentle secondary exit south ≈(590, 3450). (The original col guess at
+  (640, 3100) is open water — grid-sample before routing.)
 - **Phase 1 re-surface list:** sand shorelines (the generator caps ≤y63 near water with SAND —
   beaches read wrong here) → gravel/stone/grass; NE desert pocket (656–712, 3040–3160) →
   stone/snow; east swamp fringe (x ≥ ~700, z 3176–3300) → re-dress as moor or re-cap; the
@@ -333,6 +336,15 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 - **Phase 2 — Circulation.** Roads, switchbacks, stairs, bridges, retaining walls. *Gate:
   `reachable()` passes leg-by-leg along every named route (spawn→square, square→lodge,
   square→bridge→ford, trail→watchtower→shrine).*
+  **Done 2026-07-08 — 77/77 legs pass.** Six routes: mainSouth (spawn→square→south exit),
+  shoreNorth (square→mere shore→bridge at 457–463×3264–3284→switchback base), switchback
+  (west shoulder→tarn→shrine site at (559,3151)), eastLookout (square→pool SE rim overlook),
+  pass (shrine→watchtower pad (590,3134)→narrows stepping stones→defile north), westFord
+  (square→mere south shore→ford at (361–364, 3259–3267)). Square pad at (545,3346) y64.
+  Verification lessons for later phases: `reachable()`/`teleport` y is **body center =
+  ground + 1.9** (ground+1 starts embedded and intermittently sticks — it masquerades as
+  terrain failure); test legs every ~12 blocks along the actual centerline; graded fixes must
+  cut as well as fill; grade shared segments once, not per-route.
 - **Phase 3 — Hero lodge.** Shell, roofs, interiors, furniture kit, lighting. *Gate: every room
   reachable from the porch; `slice()` floor plans reviewed per storey; balcony vista captured.*
 - **Phase 4 — Village.** Square, market, blacksmith, stable, barn+fields, storehouse, mill,
