@@ -1,4 +1,4 @@
-import { Color, Vector3, type RawShaderMaterial, type Scene } from 'three';
+import { Color, SRGBColorSpace, Vector3, type RawShaderMaterial, type Scene } from 'three';
 
 /** Fog band + tint the world blends toward while the camera is submerged. */
 export interface FogParams {
@@ -60,6 +60,9 @@ export function applyUnderwater(
     m.uniforms.uFogFar.value = fog.far;
   }
   if (scene.background instanceof Color) {
-    scene.background.setRGB(fog.color[0], fog.color[1], fog.color[2]);
+    // Fog colors are display-sRGB (skyState palette / UNDERWATER_FOG). The raw chunk shader uses
+    // them as-is, but the color-managed background needs the space declared so the on-screen
+    // clear matches the fog exactly (DayNight.apply does the same).
+    scene.background.setRGB(fog.color[0], fog.color[1], fog.color[2], SRGBColorSpace);
   }
 }
