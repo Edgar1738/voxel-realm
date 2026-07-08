@@ -14,7 +14,9 @@ Factual record for Edgar. Experimental candidate only. Branch is isolated from `
 | **Branch** | `grok/ashen-reach` |
 | **Worktree** | `.claude/worktrees/grok+ashen-reach` |
 | **Agent** | Grok (xAI) |
-| **Status** | Experimental candidate — not official, not merged |
+| **Status** | Saved / archived — still not on `main` unless Edgar merges |
+| **Vault archive** | `Obsidian Vault/Voxel Realm/Artifacts/2026-07-08-ashen-reach` |
+| **Local save** | `.saves/ashen-reach.json` (from `experimental/ashen-reach/save-meta.json`) |
 
 ---
 
