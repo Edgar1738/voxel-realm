@@ -376,6 +376,15 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 - **Phase 5 — Vegetation + set dressing.** Conifer belts, oak clearing, meadows/flowers,
   storytelling props, snow drifts and roof caps. *Gate: the five §4.8 views composed and
   captured clean.*
+  **Done 2026-07-08.** 117 conifers planted across five slope belts (no natural snow-cap
+  conifers found to harvest in the surveyed windows — a synthesized cone prefab substituted,
+  reads well); 414 meadow flowers/tall-grass; crest of the headwall broken up with snow drifts
+  + boulders; props: cart at the barn, cairns along pass + switchback, firewood ricks, lookout
+  bench. All six vistas captured clean (`docs/media/frostvale-v*.jpg`): spawn, square,
+  balcony (after clearing six leftover canopy leaves off the lodge NW corner — probe before
+  clearing: the "tree" was the lodge's own wall studs), bridge, shrine panorama, falls-lip
+  overlook. Planting rules that worked: avoid rects for buildings/corridors, skip road-cap
+  blocks and anything within 3 of a road deck, jittered 9-block grid at 0.35–0.55 density.
 - **Phase 6 — Exploration layer.** Grotto, cave dress, tarn hut, ruins, vault, unmarked
   secrets. *Gate: each secret reachable; vault gated behind genuine discovery, not luck.*
 - **Phase 7 — Curation + ship.** See §6.
