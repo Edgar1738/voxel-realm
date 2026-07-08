@@ -13,7 +13,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "world:archive": "node --disable-warning=ExperimentalWarning scripts/worldArchive.ts",
     "world:restore": "node --disable-warning=ExperimentalWarning scripts/worldRestore.ts",
-    "world:package": "node --disable-warning=ExperimentalWarning scripts/worldPackage.ts"
+    "world:package": "node --disable-warning=ExperimentalWarning scripts/worldPackage.ts",
+    "world:bundle": "node --disable-warning=ExperimentalWarning scripts/worldBundle.ts"
   },
   "repository": {
     "type": "git",
