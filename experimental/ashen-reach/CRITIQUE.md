@@ -20,6 +20,24 @@ PNG backups: `experimental/ashen-reach/screenshots/`
 | 10 | Dock → spire | Waterline journey beat |
 | 11 | Mine mouth | Secondary industrial beat |
 | 12 | Final overlook | Rim reverse-view of village |
+| 13 | Atmospheric detail | **Strong** player-height: causeway lanterns, water edge, spire base |
+| 14 | Signature | **Strong** — spire framed by causeway approach on water |
+
+## Composition critique (post stills)
+
+| Question | Answer |
+| --- | --- |
+| Clear focal point? | Yes — Ember Spire (gold crown + dark drum). |
+| Hero memorable? | Yes — silhouette holds in signature + bridge shots. |
+| World depth? | Bowl gives FG/MG/BG; outer plains thinner. |
+| Terrain frames architecture? | Plaza vs basalt cliff yes; spire framed by water + causeway after polish. |
+| Weak/empty areas? | Outer rim slopes, mine simplicity. |
+| Scale correct? | Plaza/human scale good; spire tall enough to read from shore. |
+| Paths understandable? | Vista lanterns, dock, causeway, magma bridge — yes on foot. |
+| Architectural variation? | Palette variety in cottages; one hero tower + observatory secondary. |
+| Strongest views intentional? | Plaza, causeway signature, magma bridge — intentional after polish. |
+
+**Polish from this critique:** walkable **spire causeway**, **caldera overlook** frame, vista lanterns, island landing pad.
 
 ## What works
 

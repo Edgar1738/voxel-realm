@@ -15,6 +15,7 @@ import {
   PLANKS,
   GLASS,
   COBBLESTONE,
+  STONE,
   BOOKSHELF,
 } from '../src/blocks/blocks';
 
@@ -194,6 +195,21 @@ describe('ashen-reach site architecture', () => {
     const { at } = makeSampler();
     // Cottage at (-8,-28)-(-2,-22): bookshelf at inner SW corner.
     expect(at(-7, ASHEN.village.benchY + 1, -27)).toBe(BOOKSHELF);
+  });
+
+  it('provides a walkable causeway from dock toward the spire island', () => {
+    const { at } = makeSampler();
+    const deckY = SEA_LEVEL + 1;
+    // Sample a few columns along the dock→island line for solid deck + headroom.
+    for (const [x, z] of [
+      [6, 68],
+      [4, 75],
+      [2, 82],
+    ] as const) {
+      const deck = at(x, deckY, z);
+      expect([STONE, COBBLESTONE]).toContain(deck);
+      expect(at(x, deckY + 1, z)).toBe(AIR);
+    }
   });
 });
 

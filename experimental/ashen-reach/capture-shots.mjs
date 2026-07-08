@@ -106,6 +106,20 @@ const SHOTS = [
     look: [8, 70, 20],
     note: 'Observatory final viewpoint over village',
   },
+  {
+    name: '13-atmospheric-detail',
+    kind: 'pov',
+    eye: [10, 65.5, 58],
+    look: [6, 64, 70],
+    note: 'Player-height: dock rails, glow under causeway, water edge',
+  },
+  {
+    name: '14-signature',
+    kind: 'pov',
+    eye: [8, 66.5, 56],
+    look: [0, 88, 96],
+    note: 'Signature: causeway axis to Ember Spire at player height',
+  },
 ];
 
 async function waitForVr(page, timeoutMs = 90000) {

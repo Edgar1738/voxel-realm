@@ -84,6 +84,20 @@
       "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-12-final-overlook.jpg",
       "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\12-final-overlook.png",
       "ok": true
+    },
+    {
+      "name": "13-atmospheric-detail",
+      "note": "Player-height: dock rails, glow under causeway, water edge",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-13-atmospheric-detail.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\13-atmospheric-detail.png",
+      "ok": true
+    },
+    {
+      "name": "14-signature",
+      "note": "Signature: causeway axis to Ember Spire at player height",
+      "serverPath": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\.captures\\ashen-14-signature.jpg",
+      "png": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+ashen-reach\\experimental\\ashen-reach\\screenshots\\14-signature.png",
+      "ok": true
     }
   ],
   "traversal": [
@@ -104,7 +118,7 @@
       "x": 8,
       "z": 54,
       "surfaceY": 64,
-      "surfaceBlock": "sand",
+      "surfaceBlock": "cobblestone",
       "unloaded": false,
       "headroom": [
         "air",

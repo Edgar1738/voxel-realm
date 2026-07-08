@@ -460,6 +460,100 @@ function buildShoreDock(s: CitadelStamp, seed: WorldSeed): void {
     s.set(x, y, z, STAIRS_COBBLE, packState(FACING.S, 0));
     s.fill(x - 1, y - 1, z, x + 1, y - 8, z, COBBLESTONE);
   }
+  // Vista-corridor lanterns at player height — atmospheric path markers, not aerial clutter.
+  for (const z of [20, 28, 36, 44]) {
+    s.set(x - 2, VY + 1, z, COBBLE_WALL);
+    s.set(x - 2, VY + 2, z, LANTERN);
+    s.set(x + 2, VY + 1, z, COBBLE_WALL);
+    s.set(x + 2, VY + 2, z, LANTERN);
+  }
+}
+
+/**
+ * Caldera overlook at the south lip of the plaza: low parapet + framed opening that makes the
+ * first southward view intentional (spire through a stone window) rather than accidental.
+ */
+function buildCalderaOverlook(s: CitadelStamp): void {
+  const z = 20;
+  const y = VY;
+  // Retaining wall band with a 5-wide viewing gap on the vista corridor.
+  for (let x = -6; x <= 22; x++) {
+    if (x >= 5 && x <= 11) continue; // open vista
+    s.fill(x, y + 1, z, x, y + 2, z, DEEPSLATE);
+    if ((x + 6) % 4 === 0) s.set(x, y + 3, z, LANTERN);
+  }
+  // Paved overlook apron.
+  s.fill(4, y, z - 2, 12, y, z + 1, STONE);
+  // Two framing pillars either side of the gap — composition anchors at player height.
+  for (const x of [4, 12]) {
+    s.fill(x, y + 1, z, x, y + 5, z + 1, DEEPSLATE);
+    s.set(x, y + 6, z, GLOWSTONE);
+  }
+  // Low wall seat on the gap edges.
+  s.set(5, y + 1, z, STONEBRICK_WALL);
+  s.set(11, y + 1, z, STONEBRICK_WALL);
+}
+
+/**
+ * Walkable causeway: dock → Ember Spire island. Hero is reachable on foot (swim optional, not
+ * required). Deck sits one block above sea level with rail lanterns and a glow strip below.
+ */
+function buildSpireCauseway(s: CitadelStamp, seed: WorldSeed): void {
+  // From north-shore dock tip (8, 62) into the island north door (0, ~88).
+  const x0 = 8;
+  const z0 = 62;
+  const x1 = 0;
+  const z1 = 88;
+  const steps = Math.max(Math.abs(x1 - x0), Math.abs(z1 - z0), 1);
+  const deckY = SEA_LEVEL + 1; // 63 — above water, matches shore
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const cx = Math.round(x0 + (x1 - x0) * t);
+    const cz = Math.round(z0 + (z1 - z0) * t);
+    // 3-wide deck.
+    for (let dx = -1; dx <= 1; dx++) {
+      // Perpendicular to path (mostly +z travel, offset on x).
+      const wx = cx + dx;
+      const wz = cz;
+      s.fill(wx, deckY + 1, wz, wx, deckY + 3, wz, AIR);
+      s.set(wx, deckY, wz, dx === 0 ? STONE : COBBLESTONE);
+      // Piers into the lake bed.
+      s.fill(wx, deckY - 1, wz, wx, SEA_LEVEL - 8, wz, DEEPSLATE);
+      // Ember glow under the deck (visible from the side at player height).
+      if (dx === 0 && i % 3 === 0) s.set(wx, SEA_LEVEL - 1, wz, GLOWSTONE);
+    }
+    // Rails + lanterns.
+    s.set(cx - 1, deckY + 1, cz, STONEBRICK_WALL);
+    s.set(cx + 1, deckY + 1, cz, STONEBRICK_WALL);
+    if (i % 5 === 0) {
+      s.set(cx - 1, deckY + 2, cz, LANTERN);
+      s.set(cx + 1, deckY + 2, cz, LANTERN);
+    }
+  }
+  // Island landing pad north of the spire door — rocky apron so the tower is framed by ground.
+  const icx = ASHEN.spireIsland.cx;
+  const icz = ASHEN.spireIsland.cz;
+  const baseY = Math.max(ashenSurfaceAt(seed, icx, icz), ASHEN.spireIsland.topY - 1);
+  for (let dz = -10; dz <= -4; dz++) {
+    for (let dx = -4; dx <= 4; dx++) {
+      if (dx * dx + dz * dz > 100) continue;
+      const wx = icx + dx;
+      const wz = icz + dz;
+      s.fill(wx, SEA_LEVEL - 4, wz, wx, baseY, wz, DEEPSLATE);
+      s.set(wx, baseY, wz, Math.abs(dx) + Math.abs(dz) > 5 ? GRAVEL : STONE);
+      s.fill(wx, baseY + 1, wz, wx, baseY + 3, wz, AIR);
+    }
+  }
+  // Ember crystals along the landing edge — atmospheric detail at foot level.
+  for (const [dx, dz] of [
+    [-3, -8],
+    [3, -8],
+    [-2, -6],
+    [2, -6],
+    [0, -9],
+  ] as const) {
+    s.set(icx + dx, baseY + 1, icz + dz, CRYSTAL);
+  }
 }
 
 // ── Observatory on the west rim ────────────────────────────────────────────────────────────────
@@ -729,11 +823,13 @@ export function ashenReachSite(): Overlay {
     buildArrivalGate(s);
     buildMarket(s);
     buildVillageHouses(s);
+    buildCalderaOverlook(s);
     paveRoad(s, seed);
     stairRoadClimbs(s, seed);
     buildFissureAndBridge(s);
     buildVents(s, seed);
     buildShoreDock(s, seed);
+    buildSpireCauseway(s, seed);
     buildEmberSpire(s, seed);
     buildObservatory(s, seed);
     buildMine(s, seed);
