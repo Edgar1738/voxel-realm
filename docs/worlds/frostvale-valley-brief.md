@@ -361,6 +361,18 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
 - **Phase 4 — Village.** Square, market, blacksmith, stable, barn+fields, storehouse, mill,
   cabins, hunter's cabin, watchtower, shrine — all with interiors, terraced, lit. *Gate: every
   building enterable and reachable from the square; no floating/buried footprints.*
+  **Done 2026-07-08 — 11/11 buildings enterable; all six routes re-verified (78/78 legs).**
+  Sites: blacksmith (522–532, 3321–3331) with alley + forge; stable + pen (523–533, 3335–3344);
+  storehouse (524–534, 3355–3364); barn (536–550, 3408–3419) + fenced fields (536–549,
+  3390–3405); mill + water wheel (439–449, 3277–3285); cabins at (594–602, 3336) / (524–532,
+  3312) / (550–558, 3414); hunter's cabin (368–376, 3228) at the ford trail end; watchtower
+  keep (587–593, 3131–3137) with interior spiral stair + crenellated platform, pass trail bent
+  around its south face; summit shrine at (557–561, 3148–3152). Market stalls + lamp posts on
+  the square. Siting lessons: check every pad against the route polylines BEFORE building
+  (barn + cabin3 originally landed on the main road, the blacksmith on the spawn vista point);
+  door aprons need grading as one surface with neighboring approaches, not per-building strips;
+  `surface()`-derived verification heights are wrong under roofs — use explicit interior floor
+  heights; stair hatches exit cleanest as bottom-slab half-steps, not hop-up holes.
 - **Phase 5 — Vegetation + set dressing.** Conifer belts, oak clearing, meadows/flowers,
   storytelling props, snow drifts and roof caps. *Gate: the five §4.8 views composed and
   captured clean.*
