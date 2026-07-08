@@ -347,6 +347,17 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
   cut as well as fill; grade shared segments once, not per-route.
 - **Phase 3 — Hero lodge.** Shell, roofs, interiors, furniture kit, lighting. *Gate: every room
   reachable from the porch; `slice()` floor plans reviewed per storey; balcony vista captured.*
+  **Done 2026-07-08 — 15/15 rooms reachable from the porch.** Lodge at x550–596, z3352–3398 on
+  a leveled y66 terrace SE of the square: double-height great hall with hearth + ember-lit
+  chimney, kitchen, dining, library annex, three bedrooms + master, storage, railed gallery
+  over the hall, north balcony (falls vista, view corridor cleared), cellar, east attic;
+  half-step slab staircases throughout (no ladders exist). Furniture kit saved as blueprints
+  (`docs/worlds/wip/blueprints/`, copy into `.blueprints/` to reuse). Verification lessons:
+  toggle fence-gate doors open before `reachable()` runs (the walker can't interact);
+  slab-run stairs with integer tread tops need their `top` cell explicitly cleared where a
+  floor plane crosses; stair shafts need rails or walkers (and players) fall in; check every
+  wall-mounted lantern and porch post against walk lanes; wing perimeter walls crossing
+  another block's interior need upper-storey doorways carved too.
 - **Phase 4 — Village.** Square, market, blacksmith, stable, barn+fields, storehouse, mill,
   cabins, hunter's cabin, watchtower, shrine — all with interiors, terraced, lit. *Gate: every
   building enterable and reachable from the square; no floating/buried footprints.*
