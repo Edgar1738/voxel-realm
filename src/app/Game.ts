@@ -57,7 +57,7 @@ import {
   CHUNK_SIZE_X,
 } from '../core/constants';
 import { ViewDistanceGovernor } from './ViewDistanceGovernor';
-import { applyFogRange } from '../render/fog';
+import { applyFogRange, fogRangeFor } from '../render/fog';
 import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
@@ -1076,14 +1076,14 @@ export class Game {
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
-      const fogFar = Math.max(1, manager.viewDistance * CHUNK_SIZE_X);
+      const fogRange = fogRangeFor(manager.viewDistance * CHUNK_SIZE_X);
       const surfaceFog: FogParams = {
         // Source the surface fog from the sky model, not scene.background: the background stores
         // color-managed (linear) components, and reading it back would feed linear values into
         // the raw fog uniforms and re-ingest the previous frame's flash/underwater writes.
         color: [skyNow.sky[0] / 255, skyNow.sky[1] / 255, skyNow.sky[2] / 255],
-        near: fogFar * 0.55,
-        far: fogFar,
+        near: fogRange.near,
+        far: fogRange.far,
       };
       applyUnderwater(chunkMaterials, renderer.scene, surfaceFog, underwaterFactor);
       weather.applyFlash(chunkMaterials, renderer.scene);
