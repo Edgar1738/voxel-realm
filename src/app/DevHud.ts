@@ -3,6 +3,7 @@ import { collectDevState, type DevState, type DevStateContext } from './DevState
 const UPDATE_MS = 225;
 const RAD_TO_DEG = 180 / Math.PI;
 const STYLE_ID = 'dev-hud-style';
+const STORAGE_KEY = 'vr.devHud';
 
 export interface DevHudRow {
   label: string;
@@ -41,7 +42,15 @@ export function installDevHud(ctx: DevStateContext): () => void {
 
   const title = document.createElement('div');
   title.className = 'dev-hud-title';
-  title.textContent = 'Dev';
+
+  const titleText = document.createElement('span');
+  titleText.textContent = 'Dev';
+
+  const hint = document.createElement('span');
+  hint.className = 'dev-hud-hint';
+  hint.textContent = 'F3';
+
+  title.append(titleText, hint);
 
   const rows = document.createElement('dl');
   rows.className = 'dev-hud-rows';
@@ -49,7 +58,12 @@ export function installDevHud(ctx: DevStateContext): () => void {
   root.append(title, rows);
   document.body.append(root);
 
+  // Visibility preference persists across reloads (default visible; only 'off' hides it).
+  let visible = readHudVisible();
+  root.hidden = !visible;
+
   const render = (): void => {
+    if (!visible) return;
     rows.replaceChildren(
       ...formatDevHudRows(collectDevState(ctx)).map(({ label, value }) => {
         const item = document.createElement('div');
@@ -67,10 +81,22 @@ export function installDevHud(ctx: DevStateContext): () => void {
     );
   };
 
+  // F3 toggles the HUD (Minecraft debug-screen convention); the choice persists across reloads.
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.code !== 'F3') return;
+    e.preventDefault();
+    visible = !visible;
+    root.hidden = !visible;
+    writeHudVisible(visible);
+    if (visible) render();
+  };
+  window.addEventListener('keydown', onKeyDown);
+
   render();
   const intervalId = window.setInterval(render, UPDATE_MS);
 
   return (): void => {
+    window.removeEventListener('keydown', onKeyDown);
     window.clearInterval(intervalId);
     root.remove();
   };
@@ -78,6 +104,23 @@ export function installDevHud(ctx: DevStateContext): () => void {
 
 function fmt(value: number): string {
   return value.toFixed(1);
+}
+
+/** Reads the persisted HUD visibility; defaults to visible when unset or storage is unavailable. */
+function readHudVisible(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function writeHudVisible(visible: boolean): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, visible ? 'on' : 'off');
+  } catch {
+    /* localStorage unavailable (e.g. private mode) — preference just won't persist */
+  }
 }
 
 function installDevHudStyle(): void {
@@ -105,7 +148,14 @@ function installDevHudStyle(): void {
       pointer-events: none;
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
     }
+    #dev-hud[hidden] {
+      display: none;
+    }
     .dev-hud-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
       margin-bottom: 6px;
       color: rgba(255, 211, 77, 0.95);
       font:
@@ -113,6 +163,10 @@ function installDevHudStyle(): void {
         sans-serif;
       letter-spacing: 0;
       text-transform: uppercase;
+    }
+    .dev-hud-hint {
+      color: rgba(238, 242, 246, 0.4);
+      font-size: 10px;
     }
     .dev-hud-rows {
       display: grid;
