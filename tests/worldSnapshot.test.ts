@@ -134,6 +134,30 @@ describe('parseMeta – curated optional roam fields', () => {
     expect(snapshot.meta).toEqual(meta);
   });
 
+  it('accepts label as an alias for name on tour and landmark entries', () => {
+    const { snapshot } = parseWorldSnapshot(
+      {
+        meta: {
+          seed: 7,
+          version: 1,
+          preset: 'default',
+          landmarks: [{ label: 'Old Gate', x: 5, y: 64, z: 5 }],
+          tour: [
+            { label: 'Lighthouse Point', x: -40, y: 68, z: 0 },
+            { name: 'Keep', label: 'ignored when name present', x: 20, y: 70, z: 20 },
+          ],
+        },
+        chunks: {},
+      },
+      { isValidBlockId },
+    );
+    expect(snapshot.meta?.landmarks).toEqual([{ name: 'Old Gate', x: 5, y: 64, z: 5 }]);
+    expect(snapshot.meta?.tour).toEqual([
+      { name: 'Lighthouse Point', x: -40, y: 68, z: 0 },
+      { name: 'Keep', x: 20, y: 70, z: 20 },
+    ]);
+  });
+
   it('drops malformed optional fields but keeps seed/version/preset', () => {
     const { snapshot } = parseWorldSnapshot(
       {
