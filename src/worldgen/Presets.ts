@@ -14,6 +14,7 @@ import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGene
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
+import { createStonehavenGenerator, stonehavenForests } from './StonehavenGenerator';
 import {
   cottage,
   well,
@@ -53,7 +54,8 @@ export type WorldPreset =
   | 'caverns'
   | 'frontier'
   | 'citadel'
-  | 'harbor';
+  | 'harbor'
+  | 'stonehaven';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -68,6 +70,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'frontier',
   'citadel',
   'harbor',
+  'stonehaven',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -309,6 +312,11 @@ export function createGenerator(preset: WorldPreset): {
             },
           ),
         ],
+      };
+    case 'stonehaven':
+      return {
+        generator: createStonehavenGenerator(),
+        overlays: [...stonehavenForests(), scatterDecorations()],
       };
     case 'harbor':
       return {
