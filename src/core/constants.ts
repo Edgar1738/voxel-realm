@@ -23,7 +23,7 @@ export const SEA_LEVEL = 62;
 /** Lower bound for the adaptive view-distance governor (also the initial radius). */
 export const MIN_VIEW_DISTANCE = 4;
 /** Hard upper bound for the adaptive view-distance governor. */
-export const MAX_VIEW_DISTANCE = 12;
+export const MAX_VIEW_DISTANCE = 16;
 
 /** Cold-start streaming budgets: fill the spawn area fast until the first ring drains. */
 export const BURST_GEN_BUDGET = 8;
