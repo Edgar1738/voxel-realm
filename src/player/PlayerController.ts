@@ -9,6 +9,8 @@ export interface InputState {
   right: boolean;
   up: boolean; // Space: fly up / jump / swim up
   down: boolean; // Shift: fly down / sink
+  /** Double-tap-W sprint intent; only applies while walking forward on land. */
+  sprint: boolean;
   toggleFly: boolean;
 }
 
@@ -25,6 +27,7 @@ const HALF = PLAYER_HALF;
 const EYE_OFFSET = 0.7; // eye height above body center (~1.6 above feet)
 
 const WALK_SPEED = 5.5;
+const SPRINT_SPEED = 7.7; // Minecraft's ~1.4x walk
 const FLY_SPEED = 30;
 const GRAVITY = -28;
 const JUMP_VELOCITY = 9;
@@ -42,6 +45,8 @@ export class PlayerController {
   readonly position: Vec3;
   flying: boolean;
   grounded = false;
+  /** True while sprint speed is actually applied this frame (drives the camera FOV kick). */
+  sprinting = false;
   private vy = 0;
 
   constructor(spawn: Vec3, flying: boolean) {
@@ -90,13 +95,17 @@ export class PlayerController {
       mz /= len;
     }
 
+    this.sprinting =
+      !this.flying && !submerged && !onLadder && input.sprint && input.forward && !input.back;
     const speed = this.flying
       ? FLY_SPEED
       : submerged
         ? SWIM_SPEED
         : onLadder
           ? CLIMB_HORIZONTAL
-          : WALK_SPEED;
+          : this.sprinting
+            ? SPRINT_SPEED
+            : WALK_SPEED;
     const delta: Vec3 = { x: mx * speed * dt, y: 0, z: mz * speed * dt };
 
     if (this.flying) {

@@ -113,6 +113,7 @@ describe('CameraRig', () => {
       right: false,
       up: false,
       down: false,
+      sprint: false,
       toggleFly: false,
     });
 
@@ -141,9 +142,50 @@ describe('CameraRig', () => {
       right: false,
       up: false,
       down: false,
+      sprint: false,
       toggleFly: false,
     });
 
+    fakeDocument.pointerLockElement = null;
+  });
+
+  it('double-tapping W arms sprint; releasing W drops it', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas);
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+
+    // Single press: forward but no sprint.
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    expect(rig.getInput()).toMatchObject({ forward: true, sprint: false });
+
+    // Quick release + re-press = double tap → sprint (while forward is held).
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keyup', { code: 'KeyW' }));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    expect(rig.getInput()).toMatchObject({ forward: true, sprint: true });
+
+    // Releasing W ends the sprint; the next single press walks.
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keyup', { code: 'KeyW' }));
+    expect(rig.getInput().sprint).toBe(false);
+    fakeDocument.pointerLockElement = null;
+  });
+
+  it('held-key auto-repeat keydowns do not count as taps', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera() as unknown as import('three').PerspectiveCamera;
+    const canvas = makeCanvas();
+    const rig = new CameraRig(cam, canvas);
+    fakeDocument.pointerLockElement = canvas as unknown as Element;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+
+    // Two keydowns with NO keyup between them = one press + auto-repeat.
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    expect(rig.getInput().sprint).toBe(false);
     fakeDocument.pointerLockElement = null;
   });
 
