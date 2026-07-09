@@ -408,6 +408,12 @@ checkpoint overview per phase to `.captures/frostvale-phaseN-*.jpg`.
   `public/worlds/`, `npm test` green (1320 tests incl. `shippedWorlds`). Bundle 2.90 MB
   (≤ ~6 MB budget). Package previews: `docs/media/frostvale-p7-preview.jpg` (bridge → falls)
   and `frostvale-p7-arrival.jpg` (spawn vista). Roam: `?save=frostvale-valley&world=default`.
+  `benchTour({speed:30})` over the 10-waypoint, 590-block tour: totalGens 389, totalMeshes 283,
+  **peakGensPerFrame 2, peakMeshesPerFrame 6** — no meshing hotspots (frame-time percentiles
+  discarded: software-rendered headless run, same-machine only). Bench lesson: `reportBench`
+  ends with `await navigator.clipboard.writeText(...)`, which never settles in headless
+  Chromium without clipboard permission — stub `navigator.clipboard.writeText` before calling
+  `bench*` from Playwright or the call hangs after the summary prints.
 
 ## 6. Definition of done (the shipping contract — CI-enforced)
 
