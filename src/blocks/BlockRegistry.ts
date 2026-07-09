@@ -5,10 +5,12 @@ import { Face } from './blocks';
 import {
   stairBoxes,
   connectedBoxes,
+  doorBox,
   CUBE_BOX,
   SLAB_BOX,
   SLAB_TOP_BOX,
   TALL_BOX,
+  DOOR_COLLISION_HEIGHT,
   FENCE_POST,
   WALL_POST,
   type AABB,
@@ -116,6 +118,12 @@ export class BlockRegistry {
         return [TALL_BOX];
       case 'gate':
         return isOpen(state) ? [] : [TALL_BOX];
+      case 'door': {
+        // An open door still collides — the panel just lies against the side edge.
+        const { facing } = unpackState(state);
+        return [doorBox(facing, isOpen(state), DOOR_COLLISION_HEIGHT)];
+      }
+      case 'ladder':
       case 'cross':
         return [];
     }
@@ -143,16 +151,23 @@ export class BlockRegistry {
 
   /** True if right-click should toggle the block's `open` state instead of placing. */
   isToggleable(id: BlockId): boolean {
-    return this.shape(id) === 'gate';
+    const shape = this.shape(id);
+    return shape === 'gate' || shape === 'door';
+  }
+
+  /** True if the player can climb while overlapping this block's cell (ladders). */
+  isClimbable(id: BlockId): boolean {
+    return this.shape(id) === 'ladder';
   }
 
   /**
-   * True for shapes whose facing bits are meaningful (stairs, gates). Copy paths must keep
-   * even a ZERO state for these — facing N packs to 0 — or rotate/mirror cannot turn them.
+   * True for shapes whose facing bits are meaningful (stairs, gates, doors, ladders). Copy
+   * paths must keep even a ZERO state for these — facing N packs to 0 — or rotate/mirror
+   * cannot turn them.
    */
   hasFacing(id: BlockId): boolean {
     const shape = this.shape(id);
-    return shape === 'stair' || shape === 'gate';
+    return shape === 'stair' || shape === 'gate' || shape === 'door' || shape === 'ladder';
   }
 
   /** True if a fence/wall `self` should connect to `neighbor`: a full opaque cube, or the same shape. */
@@ -189,6 +204,8 @@ function isShape(value: string): value is Shape {
     value === 'stair' ||
     value === 'fence' ||
     value === 'wall' ||
-    value === 'gate'
+    value === 'gate' ||
+    value === 'ladder' ||
+    value === 'door'
   );
 }

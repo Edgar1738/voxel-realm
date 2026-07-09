@@ -15,6 +15,8 @@ export interface InputState {
 /** The world the player queries: solidity (for collision) plus water (for swimming). */
 export interface PlayerWorld extends SoliditySampler {
   isWater(x: number, y: number, z: number): boolean;
+  /** Whether the cell hosts a climbable block (ladder). Optional for older samplers/tests. */
+  isClimbable?(x: number, y: number, z: number): boolean;
 }
 
 /** Player collision half-extents around the body center (exported for placement guards). */
@@ -30,6 +32,10 @@ const JUMP_VELOCITY = 9;
 const SWIM_SPEED = 3.3; // ~0.6x walk
 const SWIM_VERTICAL = 4; // Space up / Shift down speed in water
 const SWIM_SINK = 1.2; // gentle buoyant sink with no input
+
+const CLIMB_SPEED = 4; // ladder up (forward/Space) and down (Shift)
+const CLIMB_SLIDE = 1.5; // gentle slide when idle on a ladder (Minecraft-style)
+const CLIMB_HORIZONTAL = 2.5; // slow sideways shuffle while hanging on
 
 /** Owns the player's position/velocity and integrates input + physics each frame. */
 export class PlayerController {
@@ -60,6 +66,15 @@ export class PlayerController {
       !this.flying &&
       (world.isWater(Math.floor(this.position.x), Math.floor(feetY), Math.floor(this.position.z)) ||
         world.isWater(Math.floor(this.position.x), Math.floor(headY), Math.floor(this.position.z)));
+    // On a ladder when the body column overlaps a climbable cell (ladders have no collision
+    // box, so the check is the whole cell — grabbing feels generous, like Minecraft).
+    const climbable = (y: number): boolean =>
+      world.isClimbable?.(
+        Math.floor(this.position.x),
+        Math.floor(y),
+        Math.floor(this.position.z),
+      ) ?? false;
+    const onLadder = !this.flying && !submerged && (climbable(feetY) || climbable(this.position.y));
 
     // Horizontal direction from yaw (forward = -Z at yaw 0, right = +X at yaw 0).
     const fwd: Vec3 = { x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) };
@@ -75,13 +90,26 @@ export class PlayerController {
       mz /= len;
     }
 
-    const speed = this.flying ? FLY_SPEED : submerged ? SWIM_SPEED : WALK_SPEED;
+    const speed = this.flying
+      ? FLY_SPEED
+      : submerged
+        ? SWIM_SPEED
+        : onLadder
+          ? CLIMB_HORIZONTAL
+          : WALK_SPEED;
     const delta: Vec3 = { x: mx * speed * dt, y: 0, z: mz * speed * dt };
 
     if (this.flying) {
       const vs = (input.up ? 1 : 0) - (input.down ? 1 : 0);
       delta.y = vs * FLY_SPEED * dt;
       this.vy = 0;
+    } else if (onLadder) {
+      // Forward or Space climbs, Shift descends, idle slides down slowly. Gravity is
+      // suspended while hanging on, so letting go of the keys never means a plummet.
+      if (input.forward || input.up) this.vy = CLIMB_SPEED;
+      else if (input.down) this.vy = -CLIMB_SPEED;
+      else this.vy = -CLIMB_SLIDE;
+      delta.y = this.vy * dt;
     } else if (submerged) {
       if (input.up) this.vy = SWIM_VERTICAL;
       else if (input.down) this.vy = -SWIM_VERTICAL;

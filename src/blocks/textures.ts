@@ -28,7 +28,9 @@ export type PatternName =
   | 'bookshelf'
   | 'furnace'
   | 'flower'
-  | 'tallGrass';
+  | 'tallGrass'
+  | 'ladder'
+  | 'door';
 
 export type TextureSpec = { pattern: PatternName; colors: RGB[]; amp?: number } | { custom: Pixel };
 
@@ -797,6 +799,43 @@ const flowerP =
     return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
   };
 
+/**
+ * Ladder: two vertical side rails plus evenly spaced rungs, on a transparent background
+ * (rendered in the cutout pass, so the wall shows through the gaps).
+ */
+const ladderP =
+  (wood: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const onRail = px <= 1 || px >= TILE - 2;
+    const onRung = py % 5 === 1 || py % 5 === 2;
+    if (!onRail && !onRung) return TRANSPARENT;
+    // Rails read a touch darker than rungs so the frame stands out.
+    const c = shade(wood, (onRail ? -14 : 6) + (rng() - 0.5) * 18);
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
+/**
+ * Door: a plank face with two dark inset panels and a handle dot. The texture tiles twice
+ * up the 2-block-tall panel, so each block-height repeat reads as one panelled section.
+ * colors: [wood, inset].
+ */
+const doorP =
+  (wood: RGB, inset: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const grain = ((px * 3 + py * 11) % 13) / 13 - 0.5;
+    // Two inset panels per tile with a 2px frame between everything.
+    const inX = px >= 3 && px <= TILE - 4;
+    const panelTop = py >= 2 && py <= 6;
+    const panelBottom = py >= 9 && py <= 13;
+    const handle = px >= TILE - 5 && px <= TILE - 4 && py >= 7 && py <= 8;
+    let base: RGB;
+    if (handle) base = [225, 200, 120];
+    else if (inX && (panelTop || panelBottom)) base = inset;
+    else base = wood;
+    const c = shade(base, grain * 14 + (rng() - 0.5) * 10);
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
 /** Map a pattern name + its color list to a Pixel. colors[0] is the base; others as documented. */
 function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
   const c0 = colors[0] ?? [128, 128, 128];
@@ -846,6 +885,10 @@ function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
       return flowerP(c0, c1);
     case 'tallGrass':
       return tallGrassP(c0);
+    case 'ladder':
+      return ladderP(c0);
+    case 'door':
+      return doorP(c0, c1);
   }
 }
 

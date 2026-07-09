@@ -229,9 +229,14 @@ export class Game {
     const usingDefaultSpawn =
       spawnOverrides.spawn === undefined && bootMeta.meta?.spawn === undefined;
     const player = new PlayerController(spawnState.spawn, true);
-    const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
+    const sampler: SoliditySampler & {
+      isWater(x: number, y: number, z: number): boolean;
+      isClimbable(x: number, y: number, z: number): boolean;
+    } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
+      isClimbable: (x: number, y: number, z: number) =>
+        registry.isClimbable(manager.getBlock(x, y, z)),
     };
 
     const edit = new EditService(manager);

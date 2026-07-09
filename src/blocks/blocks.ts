@@ -42,9 +42,20 @@ export const OAK_FENCE: BlockId = 35;
 export const COBBLE_WALL: BlockId = 36;
 export const STONEBRICK_WALL: BlockId = 37;
 export const OAK_FENCE_GATE: BlockId = 38;
+export const LADDER: BlockId = 39;
+export const OAK_DOOR: BlockId = 40;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
-export type Shape = 'cube' | 'slab' | 'cross' | 'stair' | 'fence' | 'wall' | 'gate';
+export type Shape =
+  | 'cube'
+  | 'slab'
+  | 'cross'
+  | 'stair'
+  | 'fence'
+  | 'wall'
+  | 'gate'
+  | 'ladder'
+  | 'door';
 
 /** Biome-tint category for a block's foliage faces. Omitted = untinted. */
 export type TintCategory = 'grass' | 'foliage';
@@ -464,6 +475,30 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     shape: 'gate',
     faces: { pattern: 'planks', colors: [[150, 116, 70]] },
+  },
+  {
+    id: LADDER,
+    name: 'ladder',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'ladder',
+    faces: { pattern: 'ladder', colors: [[158, 122, 74]] },
+  },
+  {
+    id: OAK_DOOR,
+    name: 'oak door',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'door',
+    faces: {
+      pattern: 'door',
+      colors: [
+        [160, 126, 78],
+        [110, 84, 50],
+      ],
+    },
   },
 ];
 

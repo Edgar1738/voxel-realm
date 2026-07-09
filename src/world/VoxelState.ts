@@ -58,3 +58,28 @@ export function facingFromYaw(yaw: number): number {
   const q = Math.round(yaw / (Math.PI / 2));
   return ((q % 4) + 4) % 4;
 }
+
+/**
+ * The horizontal (dx,dz) each facing looks toward — the forward vector of the yaw that
+ * {@link facingFromYaw} maps to that facing (yaw f·π/2 → (−sin, −cos)). Single source of
+ * truth for facing↔direction conversions (ladder mounting, door panel edges).
+ */
+export const FACING_DIR: ReadonlyArray<readonly [number, number]> = [
+  [0, -1], // N
+  [-1, 0], // E
+  [0, 1], // S
+  [1, 0], // W
+];
+
+/** Facing whose {@link FACING_DIR} matches the horizontal unit direction, or undefined. */
+export function facingFromDir(dx: number, dz: number): number | undefined {
+  for (let f = 0; f < FACING_DIR.length; f++) {
+    if (FACING_DIR[f][0] === dx && FACING_DIR[f][1] === dz) return f;
+  }
+  return undefined;
+}
+
+/** The opposite horizontal facing (N↔S, E↔W). */
+export function oppositeFacing(facing: number): number {
+  return (facing + 2) % 4;
+}

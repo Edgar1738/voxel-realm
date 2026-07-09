@@ -3,8 +3,14 @@ import { Face } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
 import type { MeshData } from './MeshTypes';
-import { unpackState, FACING, isOpen } from '../world/VoxelState';
-import { stairBoxes } from '../blocks/shapeBoxes';
+import { unpackState, FACING, FACING_DIR, isOpen } from '../world/VoxelState';
+import {
+  stairBoxes,
+  doorBox,
+  edgeSlabBox,
+  DOOR_RENDER_HEIGHT,
+  LADDER_THICKNESS,
+} from '../blocks/shapeBoxes';
 import { WHITE, TINT_PALETTE, tintIndexFor, type RGB } from './Tint';
 
 interface Buf {
@@ -381,6 +387,90 @@ function emitGate(
   }
 }
 
+/**
+ * Emits a door: one thin panel box, rendered 2 blocks tall so it fills a standard doorway
+ * (the box top sits mid-neighbour-voxel, so emitBoxCulled never culls it). Collision stays
+ * the 1.5-tall twin from BlockRegistry.
+ */
+function emitDoor(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  const state = view.getState(x, y, z);
+  const b = doorBox(unpackState(state).facing, isOpen(state), DOOR_RENDER_HEIGHT);
+  emitBoxCulled(
+    buf,
+    view,
+    registry,
+    id,
+    x,
+    y,
+    z,
+    [x + b[0], y + b[1], z + b[2]],
+    [x + b[3], y + b[4], z + b[5]],
+  );
+}
+
+/**
+ * Emits a ladder: a single quad hugging the wall behind its facing, into the cutout pass
+ * (double-sided, alpha-tested) so the rung gaps show the wall through them.
+ */
+function emitLadder(
+  buf: Buf,
+  view: VoxelView,
+  registry: BlockRegistry,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+): void {
+  const { facing } = unpackState(view.getState(x, y, z));
+  const b = edgeSlabBox(facing, LADDER_THICKNESS, 1);
+  const [dx, dz] = FACING_DIR[facing];
+  const layer = registry.faceLayer(id, Face.PosX);
+  const light = packLight(view, x, y, z);
+  // The visible plane sits on the plate's outward side (toward the facing direction).
+  const px = dx === 1 ? b[3] : b[0];
+  const pz = dz === 1 ? b[5] : b[2];
+  const quad: [number, number, number][] =
+    dx !== 0
+      ? [
+          [x + px, y, z],
+          [x + px, y, z + 1],
+          [x + px, y + 1, z + 1],
+          [x + px, y + 1, z],
+        ]
+      : [
+          [x, y, z + pz],
+          [x + 1, y, z + pz],
+          [x + 1, y + 1, z + pz],
+          [x, y + 1, z + pz],
+        ];
+  const uvs: [number, number][] = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ];
+  const n = buf.verts;
+  for (let k = 0; k < 4; k++) {
+    buf.positions.push(quad[k][0], quad[k][1], quad[k][2]);
+    buf.normals.push(dx, 0, dz); // outward, so the cutout material lights it like its wall
+    buf.uvs.push(uvs[k][0], uvs[k][1]);
+    buf.layers.push(layer);
+    buf.ao.push(1);
+    buf.light.push(light);
+    buf.tint.push(WHITE[0], WHITE[1], WHITE[2]);
+  }
+  buf.indices.push(n, n + 1, n + 2, n, n + 2, n + 3);
+  buf.verts += 4;
+}
+
 /** Two crossed billboard quads spanning the voxel. Double-sided (the cutout material) + no AO. */
 function emitCross(
   buf: Buf,
@@ -461,6 +551,8 @@ export function emitShaped(
         else if (shape === 'fence' || shape === 'wall')
           emitConnected(slabs, view, registry, id, x, y, z);
         else if (shape === 'gate') emitGate(slabs, view, registry, id, x, y, z);
+        else if (shape === 'door') emitDoor(slabs, view, registry, id, x, y, z);
+        else if (shape === 'ladder') emitLadder(cross, view, registry, id, x, y, z);
         else if (shape === 'cross') emitCross(cross, view, registry, id, x, y, z);
       }
     }

@@ -84,6 +84,8 @@ const SHAPED_SHAPES: ReadonlySet<string> = new Set([
   'fence',
   'wall',
   'gate',
+  'door',
+  'ladder',
   'cross',
 ]);
 

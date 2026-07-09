@@ -141,6 +141,7 @@ export function installDevControls(ctx: DevControlsContext): void {
   const playerWorld: PlayerWorld = {
     collisionBoxes: (x, y, z) => manager.collisionBoxesAt(x, y, z),
     isWater: (x, y, z) => manager.isWater(x, y, z),
+    isClimbable: (x, y, z) => registry.isClimbable(manager.getBlock(x, y, z)),
   };
 
   const currentWorld = worldName;
