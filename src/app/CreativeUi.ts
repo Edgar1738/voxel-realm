@@ -75,7 +75,15 @@ export interface HotkeyGroup {
 export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   {
     heading: 'Roam',
-    lines: ['WASD move', 'Mouse look', 'Space up / jump', 'Shift down', 'F fly', 'L headlamp'],
+    lines: [
+      'WASD move',
+      'Mouse look',
+      'Space up / jump',
+      'Shift down',
+      'F fly',
+      'L headlamp',
+      'M map',
+    ],
   },
   { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
   { heading: 'Blocks', lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory'] },

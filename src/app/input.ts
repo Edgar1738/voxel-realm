@@ -176,6 +176,8 @@ export interface InputCallbacks {
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
   onToggleHeadlamp: () => void;
+  /** Invoked when M is pressed (both modes; pasting keeps M = mirror) — toggles the world map. */
+  onToggleMap: () => void;
   /** Invoked when F1 is pressed — toggles first/third-person (works in play and build modes). */
   onToggleView: () => void;
   /** Invoked after a Shift+wheel reach change, with the new reach value. */
@@ -227,6 +229,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (!creativeInputAllowed(callbacks.getExperienceMode())) {
         if (e.code === 'KeyB') callbacks.onEnterBuild();
         else if (e.code === 'KeyL') callbacks.onToggleHeadlamp();
+        else if (e.code === 'KeyM') callbacks.onToggleMap();
         return;
       }
 
@@ -270,6 +273,11 @@ export function registerInputListeners(ctx: InputContext): () => void {
         if (intent !== 'toggleMode' && !canEdit(rig.locked, callbacks.isInventoryOpen())) return;
         stopRepeat();
         callbacks.onBuilderIntent(intent);
+        return;
+      }
+      // After builder intents so M stays "mirror" while pasting.
+      if (e.code === 'KeyM') {
+        callbacks.onToggleMap();
         return;
       }
 

@@ -37,6 +37,8 @@ import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
+import { createWorldMapUi } from './WorldMapUi';
+import { buildMapPalette } from './worldMapRender';
 import { createBootStore } from './bootStore';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -734,12 +736,30 @@ export class Game {
     applyExperience(experience);
     if (curated && !introSeen()) void openWorldInfo();
 
+    // World map (M): a player-centered top-down snapshot of the loaded world with landmark
+    // labels and the tour route. Rendered once per open.
+    const worldMap = createWorldMapUi();
+    const mapPalette = buildMapPalette();
+    const toggleWorldMap = (): void => {
+      worldMap.toggle({
+        center: { x: Math.floor(player.position.x), z: Math.floor(player.position.z) },
+        yaw: rig.yaw,
+        radius: manager.viewDistance * CHUNK_SIZE_X,
+        sample: (x, z) => manager.surfaceAt(x, z),
+        palette: mapPalette,
+        title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
+        landmarks: bootMeta.meta?.landmarks ?? [],
+        tour: route ?? [],
+      });
+    };
+
     // Escape pause menu: losing pointer lock in-game (Esc, alt-tab) opens it. The lock-loss
     // event is the only Escape signal the page gets — the browser reserves the key while
     // locked. Programmatic unlocks (inventory `I`) and already-open dialogs skip it.
     let pauseBusy = false;
     const openPauseMenu = async (): Promise<void> => {
       pauseBusy = true;
+      worldMap.close(); // the pause dialog owns the screen
       // The dialog scrim dims the scene itself; hide the click-to-play overlay text behind it.
       overlay?.style.setProperty('visibility', 'hidden');
       try {
@@ -1032,6 +1052,7 @@ export class Game {
           setHeadlamp(!headlampOn, true);
           setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
         },
+        onToggleMap: toggleWorldMap,
         onToggleView: () => {
           const next = rig.toggleMode();
           setStatus(next === 'third' ? 'Third-person view (F1)' : 'First-person view (F1)');
@@ -1343,6 +1364,7 @@ export class Game {
     function cleanup(): void {
       abortInput();
       pauseListener.abort();
+      worldMap.dispose();
       meshPool?.dispose();
       audio.dispose();
       persistence.dispose();

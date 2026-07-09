@@ -231,6 +231,15 @@ vi.mock('../src/render/CameraRig', () => ({
   }),
 }));
 
+vi.mock('../src/app/WorldMapUi', () => ({
+  createWorldMapUi: vi.fn(() => ({
+    toggle: vi.fn(() => true),
+    close: vi.fn(),
+    isOpen: vi.fn(() => false),
+    dispose: vi.fn(),
+  })),
+}));
+
 vi.mock('../src/world/ChunkManager', () => ({
   ChunkManager: vi.fn(function ChunkManager(...args: unknown[]) {
     boot.chunkManagerConstructorArgs = args;

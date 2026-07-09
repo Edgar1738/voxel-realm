@@ -387,6 +387,23 @@ export class ChunkManager {
     );
   }
 
+  /**
+   * The top-most non-air block + its height at a world column, or undefined when the chunk
+   * is unloaded (the world map paints those transparent). Bounded by the chunk's maxSolidY,
+   * so empty sky never costs a full-height scan.
+   */
+  surfaceAt(wx: number, wz: number): { id: number; y: number } | undefined {
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return undefined;
+    const lx = worldToLocal(wx);
+    const lz = worldToLocal(wz);
+    for (let y = entry.data.maxSolidY; y >= 0; y--) {
+      const id = entry.data.get(lx, y, lz);
+      if (id !== AIR) return { id, y };
+    }
+    return undefined;
+  }
+
   /** Orientation/open state at a world coord; 0 for out-of-world or unloaded chunks. */
   getState(wx: number, wy: number, wz: number): number {
     if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
