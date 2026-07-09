@@ -27,7 +27,9 @@
     "url": "https://github.com/Edgar1738/voxel-realm/issues"
   },
   "homepage": "https://github.com/Edgar1738/voxel-realm#readme",
-  "engines": { "node": "^20.19.0 || >=22.12.0" },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "dependencies": {
     "simplex-noise": "^4.0.3",
     "three": "^0.185.0"
@@ -43,6 +45,7 @@
     "eslint-plugin-prettier": "^5.5.6",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.7.0",
+    "playwright": "^1.61.1",
     "prettier": "^3.8.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",

@@ -1,0 +1,405 @@
+{
+  "url": "http://localhost:5177/?world=hollowmere&spawn=6,71.5,122&look=0,0.05",
+  "shots": [
+    {
+      "name": "01-spawn",
+      "kind": "pov",
+      "eye": [
+        6,
+        72,
+        122
+      ],
+      "look": [
+        6,
+        70,
+        108
+      ],
+      "note": "Spawn forest approach looking north",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\01-spawn.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-01-spawn.jpg"
+    },
+    {
+      "name": "02-forest-arrival",
+      "kind": "pov",
+      "eye": [
+        6,
+        71,
+        112
+      ],
+      "look": [
+        6,
+        68,
+        95
+      ],
+      "note": "Forest path toward river",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\02-forest-arrival.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-02-forest-arrival.jpg"
+    },
+    {
+      "name": "03-covered-bridge",
+      "kind": "pov",
+      "eye": [
+        6,
+        66,
+        82
+      ],
+      "look": [
+        6,
+        66,
+        72
+      ],
+      "note": "Covered bridge / river crossing",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\03-covered-bridge.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-03-covered-bridge.jpg"
+    },
+    {
+      "name": "04-arrival-hamlet",
+      "kind": "pov",
+      "eye": [
+        6,
+        68,
+        62
+      ],
+      "look": [
+        0,
+        69,
+        54
+      ],
+      "note": "Arrival hamlet inn + gate",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\04-arrival-hamlet.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-04-arrival-hamlet.jpg"
+    },
+    {
+      "name": "05-main-village-street",
+      "kind": "pov",
+      "eye": [
+        6,
+        68,
+        48
+      ],
+      "look": [
+        6,
+        68,
+        36
+      ],
+      "note": "Main village street toward market",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\05-main-village-street.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-05-main-village-street.jpg"
+    },
+    {
+      "name": "06-market-square",
+      "kind": "pov",
+      "eye": [
+        2,
+        68.5,
+        44
+      ],
+      "look": [
+        2,
+        68,
+        34
+      ],
+      "note": "Market square at player height",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\06-market-square.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-06-market-square.jpg"
+    },
+    {
+      "name": "07-hillside-district",
+      "kind": "pov",
+      "eye": [
+        -36,
+        72,
+        14
+      ],
+      "look": [
+        -48,
+        78,
+        8
+      ],
+      "note": "Hillside terraces",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\07-hillside-district.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-07-hillside-district.jpg"
+    },
+    {
+      "name": "08-layered-village-volcano",
+      "kind": "pov",
+      "eye": [
+        -48,
+        83,
+        6
+      ],
+      "look": [
+        20,
+        110,
+        -120
+      ],
+      "note": "Layered view: overlook + village + volcano",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\08-layered-village-volcano.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-08-layered-village-volcano.jpg"
+    },
+    {
+      "name": "09-first-lost-reveal",
+      "kind": "pov",
+      "eye": [
+        2,
+        68,
+        18
+      ],
+      "look": [
+        0,
+        76,
+        -6
+      ],
+      "note": "First reveal of lost village / bell silhouette",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\09-first-lost-reveal.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-09-first-lost-reveal.jpg"
+    },
+    {
+      "name": "10-transition-inner-wall",
+      "kind": "pov",
+      "eye": [
+        2,
+        68,
+        14
+      ],
+      "look": [
+        2,
+        64,
+        6
+      ],
+      "note": "Transition through broken inner gate",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\10-transition-inner-wall.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-10-transition-inner-wall.jpg"
+    },
+    {
+      "name": "11-flooded-streets",
+      "kind": "pov",
+      "eye": [
+        4,
+        63.5,
+        2
+      ],
+      "look": [
+        0,
+        66,
+        -8
+      ],
+      "note": "Flooded streets of the lost village",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\11-flooded-streets.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-11-flooded-streets.jpg"
+    },
+    {
+      "name": "12-drowned-bell-tower",
+      "kind": "pov",
+      "eye": [
+        10,
+        64,
+        2
+      ],
+      "look": [
+        0,
+        80,
+        -6
+      ],
+      "note": "Drowned Bell Tower exterior",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\12-drowned-bell-tower.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-12-drowned-bell-tower.jpg"
+    },
+    {
+      "name": "13-watermill",
+      "kind": "pov",
+      "eye": [
+        38,
+        66.5,
+        72
+      ],
+      "look": [
+        46,
+        68,
+        70
+      ],
+      "note": "Watermill landmark",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\13-watermill.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-13-watermill.jpg"
+    },
+    {
+      "name": "14-volcanic-foothills",
+      "kind": "pov",
+      "eye": [
+        4,
+        80,
+        -78
+      ],
+      "look": [
+        28,
+        130,
+        -145
+      ],
+      "note": "Volcanic foothills toward the mountain",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\14-volcanic-foothills.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-14-volcanic-foothills.jpg"
+    },
+    {
+      "name": "15-signature-overview",
+      "kind": "pov",
+      "eye": [
+        40,
+        95,
+        55
+      ],
+      "look": [
+        0,
+        75,
+        -10
+      ],
+      "note": "Signature elevated overview (player-ish high angle)",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\15-signature-overview.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-15-signature-overview.jpg"
+    },
+    {
+      "name": "16-bell-from-lost-square",
+      "kind": "pov",
+      "eye": [
+        -8,
+        63.5,
+        0
+      ],
+      "look": [
+        0,
+        82,
+        -6
+      ],
+      "note": "Bell tower from flooded square (extra)",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\16-bell-from-lost-square.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-16-bell-from-lost-square.jpg"
+    },
+    {
+      "name": "17-farm-belt",
+      "kind": "pov",
+      "eye": [
+        40,
+        68,
+        50
+      ],
+      "look": [
+        46,
+        68,
+        56
+      ],
+      "note": "Farm belt countryside transition",
+      "path": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\experimental\\hollowmere\\screenshots-m1\\17-farm-belt.jpg",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+hollowmere\\.captures\\hollowmere-17-farm-belt.jpg"
+    }
+  ],
+  "traversal": [
+    {
+      "name": "spawn",
+      "x": 6,
+      "z": 104,
+      "surfaceY": 67,
+      "surfaceBlock": "dirt",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "bridge",
+      "x": 6,
+      "z": 72,
+      "surfaceY": 71,
+      "surfaceBlock": "planks",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "hamlet",
+      "x": 6,
+      "z": 56,
+      "surfaceY": 67,
+      "surfaceBlock": "grass",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "market",
+      "x": 2,
+      "z": 36,
+      "surfaceY": 71,
+      "surfaceBlock": "planks",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "gate",
+      "x": 2,
+      "z": 12,
+      "surfaceY": 66,
+      "surfaceBlock": "cobblestone stairs",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "bell",
+      "x": 0,
+      "z": -6,
+      "surfaceY": 90,
+      "surfaceBlock": "stone",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "mill",
+      "x": 46,
+      "z": 70,
+      "surfaceY": 73,
+      "surfaceBlock": "planks",
+      "unloaded": false,
+      "headroom": [
+        "air",
+        "air"
+      ]
+    },
+    {
+      "name": "overlook",
+      "x": -50,
+      "z": 4,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    },
+    {
+      "name": "foothill",
+      "x": -6,
+      "z": -88,
+      "surfaceY": null,
+      "surfaceBlock": "air",
+      "unloaded": true,
+      "headroom": [
+        null,
+        null
+      ]
+    }
+  ],
+  "errors": []
+}

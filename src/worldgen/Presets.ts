@@ -14,6 +14,8 @@ import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGene
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
+import { createHollowmereGenerator, hollowmereSurfaceAt } from './HollowmereGenerator';
+import { hollowmereSite } from './hollowmereSite';
 import {
   cottage,
   well,
@@ -53,7 +55,8 @@ export type WorldPreset =
   | 'caverns'
   | 'frontier'
   | 'citadel'
-  | 'harbor';
+  | 'harbor'
+  | 'hollowmere';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -68,6 +71,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'frontier',
   'citadel',
   'harbor',
+  'hollowmere',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -318,6 +322,21 @@ export function createGenerator(preset: WorldPreset): {
           // the authored harbor stamps in — houses clear any tree that falls inside their footprint.
           scatterOaks(harborSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 11 }),
           harborSite(),
+        ],
+      };
+    case 'hollowmere':
+      return {
+        generator: createHollowmereGenerator(),
+        overlays: [
+          // Forest canopy mostly on the south approach and outer edges; site clears road corridor.
+          // minSurfaceY keeps trees off riverbeds; maxSurfaceY avoids high volcanic slopes.
+          scatterOaks(hollowmereSurfaceAt, SEA_LEVEL, {
+            minSurfaceY: SEA_LEVEL + 5,
+            maxSurfaceY: SEA_LEVEL + 28,
+            density: 0.35,
+            cellSize: 28,
+          }),
+          hollowmereSite(),
         ],
       };
     case 'default':
