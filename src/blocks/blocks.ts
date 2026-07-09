@@ -87,6 +87,12 @@ const speck = (c: [number, number, number], amp: number): TextureSpec => ({
 });
 const ore = (spot: [number, number, number]): TextureSpec => ({ pattern: 'ore', colors: [spot] });
 
+// Shared dirt spec: used for both DIRT's faces and grass's underside so they dedup
+// to a single texture layer (the mesher relies on grass-bottom == dirt-top).
+const DIRT_TEX: TextureSpec = { pattern: 'dirt', colors: [[134, 96, 62]] };
+const SAND_TEX: TextureSpec = { pattern: 'sand', colors: [[206, 190, 140]] };
+const GRAVEL_TEX: TextureSpec = { pattern: 'gravel', colors: [[120, 116, 112]] };
+
 /** The block table — the single source of truth. Order here does NOT affect ids. */
 export const BLOCK_DEFS: BlockDef[] = [
   { id: AIR, name: 'air', opaque: false, transparent: true },
@@ -107,7 +113,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           [86, 152, 60],
         ],
       },
-      bottom: speck([134, 96, 62], 20),
+      bottom: DIRT_TEX,
     },
   },
   {
@@ -116,7 +122,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([134, 96, 62], 20),
+    faces: DIRT_TEX,
   },
   {
     id: STONE,
@@ -153,7 +159,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([206, 190, 140], 12),
+    faces: SAND_TEX,
   },
   { id: WATER, name: 'water', opaque: false, transparent: true, faces: speck([50, 110, 200], 10) },
   {
@@ -318,7 +324,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([120, 116, 112], 26),
+    faces: GRAVEL_TEX,
   },
   {
     id: STONE_SLAB,
