@@ -39,6 +39,7 @@ import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
 import { createWorldMapUi } from './WorldMapUi';
 import { buildMapPalette } from './worldMapRender';
+import { LandmarkDiscovery } from './landmarkDiscovery';
 import { createBootStore } from './bootStore';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -124,6 +125,8 @@ import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
+const BASE_FOV = 70; // must match the Renderer's PerspectiveCamera construction
+const SPRINT_FOV_KICK = 8; // Minecraft-style widening while sprinting
 // Camera eye eases up this many blocks/sec when the player steps up (stairs/ledges), so a
 // 1-block step-up smooths over ~110ms instead of snapping the view a full block.
 const STEP_EYE_SPEED = 9;
@@ -697,6 +700,28 @@ export class Game {
       }
     };
 
+    // Landmark discovery medals: walking near a landmark marks it found, persisted per save.
+    // The map and info dialog hide undiscovered names behind "???" so exploring reveals them.
+    const discovery = new LandmarkDiscovery(
+      bootMeta.meta?.landmarks ?? [],
+      `vr.landmarksFound.${worldName}`,
+    );
+    let discoveryTimer = 0;
+    const tickDiscovery = (cdt: number): void => {
+      if (discovery.total === 0) return;
+      discoveryTimer -= cdt;
+      if (discoveryTimer > 0) return;
+      discoveryTimer = 0.5; // a stroll covers ~3 blocks between checks — plenty inside radius 12
+      const found = discovery.tick(player.position.x, player.position.z);
+      if (found.length === 0) return;
+      audio.playTick();
+      setStatus(
+        discovery.complete
+          ? `All ${discovery.total} landmarks discovered — world explored!`
+          : `Discovered: ${found.map((l) => l.name).join(', ')} (${discovery.foundCount}/${discovery.total})`,
+      );
+    };
+
     // World intro/info panel: shown once per save on a curated first visit, reopenable via Info.
     const introKey = `vr.introSeen.${worldName}`;
     const introSeen = (): boolean => {
@@ -712,7 +737,10 @@ export class Game {
         {
           title: meta?.title?.trim() || `World: ${worldName}`,
           description: meta?.description ?? '',
-          landmarks: (meta?.landmarks ?? []).map((l) => l.name),
+          landmarks: (meta?.landmarks ?? []).map((l) => ({
+            name: l.name,
+            found: discovery.isFound(l.name),
+          })),
           tourCount: meta?.tour?.length ?? 0,
         },
         worldName,
@@ -748,7 +776,10 @@ export class Game {
         sample: (x, z) => manager.surfaceAt(x, z),
         palette: mapPalette,
         title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
-        landmarks: bootMeta.meta?.landmarks ?? [],
+        landmarks: (bootMeta.meta?.landmarks ?? []).map((l) => ({
+          ...l,
+          found: discovery.isFound(l.name),
+        })),
         tour: route ?? [],
       });
     };
@@ -1098,6 +1129,13 @@ export class Game {
       if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
+
+      // Sprint feedback: ease the FOV out while sprinting and back on release.
+      const targetFov = BASE_FOV + (player.sprinting ? SPRINT_FOV_KICK : 0);
+      if (Math.abs(renderer.camera.fov - targetFov) > 0.05) {
+        renderer.camera.fov += (targetFov - renderer.camera.fov) * Math.min(1, cdt * 8);
+        renderer.camera.updateProjectionMatrix();
+      }
       const eye = player.eye();
       // Ease the camera up small step-ups (stairs/ledges) instead of snapping a full block; snap
       // for jumps, falls, flying, and teleports so those stay responsive.
@@ -1258,6 +1296,7 @@ export class Game {
       }
       // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
       updateTour();
+      tickDiscovery(cdt);
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 

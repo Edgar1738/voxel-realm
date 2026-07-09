@@ -60,7 +60,8 @@ export interface BlueprintEntry {
 export interface WorldInfo {
   title: string;
   description?: string;
-  landmarks: string[];
+  /** Undiscovered landmarks list as "???" — exploring (within the discovery radius) reveals them. */
+  landmarks: Array<{ name: string; found: boolean }>;
   /** Number of tour waypoints; the Start Tour action shows only when this is >= 2. */
   tourCount: number;
 }
@@ -912,14 +913,16 @@ export function createCreativeUi(
       panel.append(title, worldLine, message);
 
       if (info.landmarks.length > 0) {
+        const foundCount = info.landmarks.filter((l) => l.found).length;
         const heading = document.createElement('div');
         heading.className = 'info-heading';
-        heading.textContent = 'Landmarks';
+        heading.textContent = `Landmarks (${foundCount}/${info.landmarks.length} discovered)`;
         const list = document.createElement('ul');
         list.className = 'info-landmarks';
-        for (const name of info.landmarks) {
+        for (const landmark of info.landmarks) {
           const li = document.createElement('li');
-          li.textContent = name;
+          li.textContent = landmark.found ? landmark.name : '???';
+          if (!landmark.found) li.classList.add('is-undiscovered');
           list.append(li);
         }
         panel.append(heading, list);

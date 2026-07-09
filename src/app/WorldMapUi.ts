@@ -15,7 +15,8 @@ export interface WorldMapContext {
   sample: SurfaceSampler;
   palette: Map<number, MapRGB>;
   title: string;
-  landmarks: ReadonlyArray<{ name: string; x: number; z: number }>;
+  /** `found: false` renders an anonymous gray dot — the name stays hidden until discovered. */
+  landmarks: ReadonlyArray<{ name: string; x: number; z: number; found?: boolean }>;
   tour: ReadonlyArray<{ name?: string; x: number; z: number }>;
 }
 
@@ -82,16 +83,18 @@ export function createWorldMapUi(): WorldMapUi {
       }
     }
 
-    // Landmarks: white dots with dark-haloed labels.
+    // Landmarks: discovered = white dot + label; undiscovered = anonymous gray dot.
     ctx2d.font = `${Math.round(9 * labelScale)}px system-ui, sans-serif`;
     ctx2d.textBaseline = 'bottom';
     for (const l of ctx.landmarks) {
       const [px, pz] = toPx(l.x, l.z);
       if (px < 0 || pz < 0 || px > img.size || pz > img.size) continue;
-      ctx2d.fillStyle = '#ffffff';
+      const found = l.found !== false;
+      ctx2d.fillStyle = found ? '#ffffff' : 'rgba(190,195,205,0.65)';
       ctx2d.beginPath();
-      ctx2d.arc(px, pz, 1.8 * labelScale, 0, Math.PI * 2);
+      ctx2d.arc(px, pz, (found ? 1.8 : 1.3) * labelScale, 0, Math.PI * 2);
       ctx2d.fill();
+      if (!found) continue;
       ctx2d.strokeStyle = 'rgba(0,0,0,0.85)';
       ctx2d.lineWidth = 3;
       ctx2d.strokeText(l.name, px + 3 * labelScale, pz - 2 * labelScale);
