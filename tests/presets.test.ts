@@ -80,6 +80,16 @@ describe('world presets', () => {
     expect(overlays).toHaveLength(0);
   });
 
+  it('atlas: flat grass base at sea level with no overlays (structure rides in as saved deltas)', () => {
+    expect(isWorldPreset('atlas')).toBe(true);
+    expect(WORLD_PRESETS).toContain('atlas');
+    const { generator, overlays } = createGenerator('atlas');
+    const c = generator.generateBaseChunk(SEED, 3, -5);
+    expect(c.get(0, SEA_LEVEL, 0)).toBe(GRASS);
+    expect(c.get(0, SEA_LEVEL + 1, 0)).toBe(AIR);
+    expect(overlays).toHaveLength(0);
+  });
+
   it('void: entirely air', () => {
     const { generator } = createGenerator('void');
     const c = generator.generateBaseChunk(SEED, 2, -3);

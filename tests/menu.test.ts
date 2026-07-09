@@ -7,7 +7,10 @@ import {
   cardHue,
   worldCards,
   CREATE_CARDS,
+  atlasWorldUrl,
+  atlasFeatured,
 } from '../src/app/menu';
+import { ATLAS_WORLD_NAME } from '../src/worldgen/atlas/atlasRegions';
 import { isWorldPreset } from '../src/worldgen/Presets';
 import { worldNameFromSearch } from '../src/persistence/worldName';
 import {
@@ -40,6 +43,19 @@ describe('menu URLs', () => {
 
   it('pins the preset for create-a-world URLs', () => {
     expect(new URLSearchParams(presetUrl('islands')).get('world')).toBe('islands');
+  });
+
+  it('boots the master atlas world by its save name', () => {
+    expect(worldNameFromSearch(atlasWorldUrl())).toBe(ATLAS_WORLD_NAME);
+  });
+});
+
+describe('atlas featured card', () => {
+  it('links to the atlas world and lists navigation highlights', () => {
+    const card = atlasFeatured();
+    expect(card.url).toBe(atlasWorldUrl());
+    expect(card.title.length).toBeGreaterThan(0);
+    expect(card.highlights.length).toBeGreaterThan(0);
   });
 });
 

@@ -67,6 +67,8 @@ http://localhost:5173/?world=citadel
 
 Curated showcase saves built inside the engine live in `.saves/` (not committed): a medieval village, a walkable castle, a moated citadel, a coastal harbor, the Roman Colosseum, the Pyramids of Giza, and Denver's Washington Park rebuilt from real OpenStreetMap geometry.
 
+The **[World Atlas](docs/worlds/atlas.md)** (`?save=atlas`) gathers several of those saves into one master world: spawn at a central hub and travel out to each realm, placed as its own explorable district. It's assembled at load time by translating each save's chunk deltas onto shared flat terrain — see the [atlas docs](docs/worlds/atlas.md) to add another world.
+
 ```bash
 npm run world:archive    # archive a save
 npm run world:restore    # restore an archived save

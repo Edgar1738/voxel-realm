@@ -49,4 +49,15 @@ describe('createBootStore', () => {
   it('namespaces shipped overlays away from named saves', () => {
     expect(overlayDbName('castle')).not.toBe(namedDbName('castle'));
   });
+
+  it('assembles the master atlas world from a ShippedWorldStore in prod', () => {
+    const store = createBootStore('atlas', valid, manifest, prod);
+    expect(store).toBeInstanceOf(ShippedWorldStore);
+  });
+
+  it('assembles the atlas even in dev (it lives in public/worlds/, not .saves/)', () => {
+    const store = createBootStore('atlas', valid, manifest, { dev: true, baseUrl: '/' });
+    expect(store).toBeInstanceOf(ShippedWorldStore);
+    expect(store).not.toBeInstanceOf(ServerSaveStore);
+  });
 });

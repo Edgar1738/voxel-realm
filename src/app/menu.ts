@@ -4,11 +4,38 @@
 // renders, and the URLs cards navigate to. DOM rendering lives in menuScreen.ts.
 import type { WorldManifest } from '../persistence/worldManifest';
 import type { WorldPreset } from '../worldgen/Presets';
+import { ATLAS_WORLD_NAME, ATLAS_TITLE, ATLAS_DESCRIPTION } from '../worldgen/atlas/atlasRegions';
 
 /** The menu is the bare-URL front door; any explicit world selection boots straight into it. */
 export function shouldShowMenu(search: string): boolean {
   const params = new URLSearchParams(search);
   return !params.has('save') && !params.has('world');
+}
+
+/** URL that boots the master atlas world (assembled store keys off the `atlas` save name). */
+export function atlasWorldUrl(): string {
+  return `?save=${ATLAS_WORLD_NAME}`;
+}
+
+export interface FeaturedWorld {
+  title: string;
+  tagline: string;
+  description: string;
+  url: string;
+  hue: number;
+  highlights: string[];
+}
+
+/** The atlas hero card — the recommended starting experience. */
+export function atlasFeatured(): FeaturedWorld {
+  return {
+    title: ATLAS_TITLE,
+    tagline: 'Start here — the master world',
+    description: ATLAS_DESCRIPTION,
+    url: atlasWorldUrl(),
+    hue: cardHue('atlas'),
+    highlights: ['Central spawn hub', 'Signpost roads to each realm', 'Guided tour'],
+  };
 }
 
 /** URL for a shipped world: `?save=<slug>` works in dev (disk store) and prod (static+overlay). */

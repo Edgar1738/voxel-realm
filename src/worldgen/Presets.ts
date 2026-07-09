@@ -53,7 +53,8 @@ export type WorldPreset =
   | 'caverns'
   | 'frontier'
   | 'citadel'
-  | 'harbor';
+  | 'harbor'
+  | 'atlas';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -68,6 +69,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'frontier',
   'citadel',
   'harbor',
+  'atlas',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -319,6 +321,15 @@ export function createGenerator(preset: WorldPreset): {
           scatterOaks(harborSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 11 }),
           harborSite(),
         ],
+      };
+    case 'atlas':
+      // The master atlas world: flat grass at sea level — byte-identical to the base the curated
+      // saves were built on, so their translated deltas reconstruct exactly. All structure (the
+      // spawn hub and every placed region) rides in as savedDeltas from the assembled base; the
+      // generator itself contributes only clean terrain to explore between districts.
+      return {
+        generator: new FlatGenerator(flatColumn(SEA_LEVEL, GRASS, DIRT, STONE)),
+        overlays: [],
       };
     case 'default':
     default:

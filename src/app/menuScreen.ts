@@ -3,7 +3,14 @@
 // DOM rendering for the world-select front door. All card/URL logic is the pure, unit-tested
 // menu.ts module; this file only builds elements (textContent everywhere — manifest strings
 // never touch innerHTML). Styles live in index.html with the rest of the app CSS.
-import { worldCards, CREATE_CARDS, type WorldCard, type CreateCard } from './menu';
+import {
+  worldCards,
+  CREATE_CARDS,
+  atlasFeatured,
+  type WorldCard,
+  type CreateCard,
+  type FeaturedWorld,
+} from './menu';
 import type { WorldManifest } from '../persistence/worldManifest';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -45,6 +52,24 @@ function worldCardEl(card: WorldCard): HTMLAnchorElement {
   return a;
 }
 
+function featuredCardEl(card: FeaturedWorld): HTMLAnchorElement {
+  const a = el('a', 'menu-card menu-card-featured');
+  a.href = card.url;
+  a.appendChild(cardBanner(card.hue, card.title));
+
+  const body = el('div', 'menu-card-body');
+  body.appendChild(el('span', 'menu-card-tagline', card.tagline));
+  body.appendChild(el('h3', 'menu-card-title', card.title));
+  body.appendChild(el('p', 'menu-card-desc', card.description));
+
+  const footer = el('div', 'menu-card-footer');
+  for (const highlight of card.highlights) footer.appendChild(el('span', 'menu-tag', highlight));
+  body.appendChild(footer);
+
+  a.appendChild(body);
+  return a;
+}
+
 function createCardEl(card: CreateCard): HTMLAnchorElement {
   const a = el('a', 'menu-card menu-card-small');
   a.href = card.url;
@@ -75,6 +100,13 @@ export function renderMenu(root: HTMLElement, manifest: WorldManifest): void {
   );
   header.appendChild(el('p', 'menu-hint', 'Best with a mouse and keyboard.'));
   column.appendChild(header);
+
+  const featured = el('section', 'menu-section');
+  featured.appendChild(el('h2', 'menu-section-title', 'Featured'));
+  const featuredGrid = el('div', 'menu-grid');
+  featuredGrid.appendChild(featuredCardEl(atlasFeatured()));
+  featured.appendChild(featuredGrid);
+  column.appendChild(featured);
 
   const showcase = el('section', 'menu-section');
   showcase.appendChild(el('h2', 'menu-section-title', 'Showcase worlds'));
