@@ -87,6 +87,19 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   { heading: 'Reach', lines: ['Shift + wheel adjusts reach'] },
 ];
 
+/** Escape pause-menu actions; 'resume' is also the Escape/backdrop fallback. */
+export type PauseAction = 'resume' | 'guide' | 'worlds';
+
+export interface PauseDialogOpts {
+  /** World title shown under the "Paused" heading. */
+  title: string;
+  /** Current engine volume in [0,1] and mute state; changes apply live via the callbacks. */
+  volume: number;
+  muted: boolean;
+  onVolume(volume: number): void;
+  onMute(muted: boolean): void;
+}
+
 /** What the tour HUD displays for the active waypoint. */
 export interface TourHudStatus {
   name: string;
@@ -186,6 +199,13 @@ export interface CreativeUi {
     info: WorldInfo,
     worldName: string,
   ): Promise<'explore' | 'tour' | 'build' | undefined>;
+  /** Whether any modal dialog (pause, menu, worlds, blueprints, confirm) is currently open. */
+  isDialogOpen(): boolean;
+  /**
+   * Escape pause menu: resume / world guide / sound / back to worlds. Sound changes apply
+   * live through the callbacks; Escape and the backdrop resolve 'resume'.
+   */
+  showPauseDialog(opts: PauseDialogOpts): Promise<PauseAction>;
 }
 
 const STATUS_VISIBLE_MS = 1600;
@@ -956,6 +976,75 @@ export function createCreativeUi(
       const close = openDialogPanel(panel, () => finish(undefined));
     });
 
+  const isDialogOpen = (): boolean => dialogScrim.classList.contains('is-open');
+
+  const showPauseDialog = (opts: PauseDialogOpts): Promise<PauseAction> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('Paused');
+      panel.classList.add('pause-panel');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'Paused';
+      const worldLine = document.createElement('p');
+      worldLine.className = 'dialog-message';
+      worldLine.textContent = opts.title;
+
+      const finish = (action: PauseAction): void => {
+        close();
+        resolve(action);
+      };
+
+      const actions = document.createElement('div');
+      actions.className = 'pause-actions';
+      const resume = button('Resume');
+      resume.className = 'dialog-btn pause-btn';
+      resume.addEventListener('click', () => finish('resume'));
+      const guide = button('World guide & controls');
+      guide.className = 'dialog-btn pause-btn';
+      guide.addEventListener('click', () => finish('guide'));
+      const worlds = button('Back to worlds');
+      worlds.className = 'dialog-btn pause-btn';
+      worlds.addEventListener('click', () => finish('worlds'));
+
+      // Sound row mirrors the HUD controls — play mode hides the HUD chrome, so the pause
+      // menu is the roamer's only volume surface.
+      let muted = opts.muted;
+      const soundRow = document.createElement('div');
+      soundRow.className = 'sound-group pause-sound';
+      const mute = document.createElement('button');
+      mute.type = 'button';
+      mute.className = 'sound-btn';
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.className = 'sound-slider';
+      slider.min = '0';
+      slider.max = '100';
+      slider.step = '1';
+      slider.value = String(Math.round(opts.volume * 100));
+      slider.setAttribute('aria-label', 'Sound volume');
+      const syncSound = (): void => {
+        mute.replaceChildren(buildIcon(SPEAKER_SHAPES[muted ? 'off' : 'on']));
+        const label = muted ? 'Unmute sound' : 'Mute sound';
+        mute.title = label;
+        mute.setAttribute('aria-label', label);
+        mute.setAttribute('aria-pressed', String(muted));
+        slider.disabled = muted;
+        soundRow.classList.toggle('is-muted', muted);
+      };
+      mute.addEventListener('click', () => {
+        muted = !muted;
+        opts.onMute(muted);
+        syncSound();
+      });
+      slider.addEventListener('input', () => opts.onVolume(Number(slider.value) / 100));
+      syncSound();
+      soundRow.append(mute, slider);
+
+      actions.append(resume, guide, soundRow, worlds);
+      panel.append(title, worldLine, actions);
+      const close = openDialogPanel(panel, () => finish('resume'));
+    });
+
   let inventoryOpen = false;
   const isInventoryOpen = (): boolean => inventoryOpen;
   const setInventoryOpen = (open: boolean): void => {
@@ -1054,5 +1143,7 @@ export function createCreativeUi(
     setExperienceMode,
     setTourHud,
     showWorldInfoDialog,
+    isDialogOpen,
+    showPauseDialog,
   };
 }

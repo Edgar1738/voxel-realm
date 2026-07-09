@@ -412,6 +412,9 @@ describe('Game.boot composition', () => {
     vi.stubGlobal('document', {
       getElementById: vi.fn(() => undefined),
       exitPointerLock: vi.fn(),
+      // The pause menu listens for pointer-lock changes on the document.
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     });
   });
 

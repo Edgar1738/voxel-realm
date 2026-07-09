@@ -34,17 +34,34 @@
            overlay eats the entire toolbar whenever the mouse isn't captured. */
         pointer-events: none;
       }
+      /* Minecraft-style cross; difference blending inverts against bright sky and dark caves. */
       #crosshair {
         position: fixed;
         left: 50%;
         top: 50%;
-        width: 6px;
-        height: 6px;
-        margin: -3px 0 0 -3px;
-        background: #fff;
-        border-radius: 50%;
-        opacity: 0.8;
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
         pointer-events: none;
+        mix-blend-mode: difference;
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: '';
+        position: absolute;
+        background: #ddd;
+      }
+      #crosshair::before {
+        left: 8px;
+        top: 0;
+        width: 2px;
+        height: 18px;
+      }
+      #crosshair::after {
+        left: 0;
+        top: 8px;
+        width: 18px;
+        height: 2px;
       }
       #creative-ui {
         position: fixed;
@@ -605,6 +622,30 @@
       }
       .dialog-btn.danger:hover {
         background: rgba(150, 70, 58, 0.55);
+      }
+      /* ---- Escape pause menu ---- */
+      .pause-panel {
+        max-width: 300px;
+      }
+      .pause-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .pause-btn {
+        width: 100%;
+        padding: 9px 12px;
+        text-align: center;
+      }
+      .pause-sound {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 4px 0;
+      }
+      .pause-sound .sound-slider {
+        width: 160px;
       }
       .world-list {
         display: flex;

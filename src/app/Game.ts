@@ -729,6 +729,55 @@ export class Game {
     applyExperience(experience);
     if (curated && !introSeen()) void openWorldInfo();
 
+    // Escape pause menu: losing pointer lock in-game (Esc, alt-tab) opens it. The lock-loss
+    // event is the only Escape signal the page gets — the browser reserves the key while
+    // locked. Programmatic unlocks (inventory `I`) and already-open dialogs skip it.
+    let pauseBusy = false;
+    const openPauseMenu = async (): Promise<void> => {
+      pauseBusy = true;
+      // The dialog scrim dims the scene itself; hide the click-to-play overlay text behind it.
+      overlay?.style.setProperty('visibility', 'hidden');
+      try {
+        const action = await ui.showPauseDialog({
+          title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
+          volume: audio.volume,
+          muted: audio.muted,
+          onVolume: (v) => {
+            audio.setVolume(v);
+            audio.playTick(); // audible feedback while dragging
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+          onMute: (m) => {
+            audio.setMuted(m);
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+        });
+        if (action === 'resume') {
+          // Chrome enforces a ~1.25s cooldown after an Escape-exit; when the request is
+          // rejected the click-to-play overlay is already back up, so a click resumes.
+          const request = canvas.requestPointerLock() as Promise<void> | undefined;
+          void request?.catch(() => {});
+        } else if (action === 'guide') {
+          await openWorldInfo();
+        } else if (action === 'worlds') {
+          window.location.href = './';
+        }
+      } finally {
+        overlay?.style.removeProperty('visibility');
+        pauseBusy = false;
+      }
+    };
+    const pauseListener = new AbortController();
+    document.addEventListener(
+      'pointerlockchange',
+      () => {
+        if (document.pointerLockElement === canvas) return;
+        if (pauseBusy || ui.isInventoryOpen() || ui.isDialogOpen()) return;
+        void openPauseMenu();
+      },
+      { signal: pauseListener.signal },
+    );
+
     const selectionBox = new SelectionBox();
     selectionBox.attach((o) => renderer.add(o));
     const pasteGhost = new PasteGhost();
@@ -1288,6 +1337,7 @@ export class Game {
     /** Releases all resources acquired during boot. */
     function cleanup(): void {
       abortInput();
+      pauseListener.abort();
       meshPool?.dispose();
       audio.dispose();
       persistence.dispose();
