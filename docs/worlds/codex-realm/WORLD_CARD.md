@@ -8,10 +8,10 @@
 - **Branch:** UNKNOWN
 - **Worktree:** UNKNOWN
 - **Current commit:** UNKNOWN
-- **Main status:** **Local save only** — not merged, not shipped.
-- **Source assets:** Local save `.saves/codex-realm.json`
-- **Registry evidence:** Local save file `.saves/codex-realm.json` (confirmed present).
-- **Current risks:** Exists only as a local save; no branch/worktree identified. Medium confidence in its status/provenance.
+- **Main status:** **Local save only** — not merged, not shipped. Also preserved as a restorable vault archive.
+- **Source assets:** Local save `.saves/codex-realm.json`; vault archive `Voxel Realm/Artifacts/2026-07-05-codex-realm/` (restorable).
+- **Registry evidence:** Local save `.saves/codex-realm.json` (present); vault archive `Artifacts/2026-07-05-codex-realm/` catalogued in `Voxel Realm/World Archive.md`. Restore: `npm run world:restore -- --archive 2026-07-05-codex-realm --save codex-realm-restored`.
+- **Current risks:** Exists as a local save + vault archive; no branch/worktree identified. Medium confidence in its status/provenance.
 - **Next required approval:** Edgar to decide whether to promote it to a tracked branch/prototype.
 - **Last verified date:** 2026-07-08
 

@@ -52,6 +52,21 @@ Ideas that are not yet worlds — plus landmark/alias clarifications — live in
 World branches often carry reusable engine changes tangled with world content. Those are tracked
 separately in [ENGINE_CHANGE_QUEUE.md](ENGINE_CHANGE_QUEUE.md).
 
+## Relationship to the Obsidian vault
+
+Voxel Realm world knowledge lives in two places with a deliberate division of labor. Keep them
+in sync; don't duplicate.
+
+| This registry (`docs/worlds/`, in git) | The Obsidian vault (`Voxel Realm/`, Edgar's memory) |
+|----------------------------------------|-----------------------------------------------------|
+| **Source of truth for world *state*:** lifecycle classification, owner/builder, branch/worktree/commit, review history, engine-change risk, concepts/landmarks. | **Source of truth for restore/archive + narrative:** vault archive catalog, `world:restore` commands, screenshots/captures, demo URLs, session history, the "how worlds reach players" pipeline. |
+| Read this to answer "what is the status of world X, and who owns it?" | Read the vault to answer "how do I restore/launch X, and what's its story?" |
+| Structured, per-world cards. | `World Notes for Claude.md`, `World Archive.md`, `Artifacts/`, `Sessions/`. |
+
+When a world's lifecycle/ownership changes, update **this registry**; when a world is
+archived/restorable or gains captures, update the **vault**. Cards here link to the matching vault
+archive under **Registry evidence / Source assets**.
+
 ## Per-world detail
 
 Each world has a folder under `docs/worlds/<world-id>/` (archived ones under
