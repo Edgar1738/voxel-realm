@@ -107,15 +107,30 @@ function pnoise(x: number, y: number, period: number, salt: number): number {
 }
 
 /**
- * Fractal (multi-octave) value noise. The octave periods 16/8/4 all divide TILE,
- * so the sum still tiles at 16. Big smooth drifts + finer detail: the natural
- * base for "geological mottling", "moist patches", and "weather stains".
+ * Low-frequency smooth field: a lattice point every 4 px, wrapped at period 4,
+ * so the field is genuinely interpolated between pixels and tiles at 4×4 = 16 px.
+ * (Sampling pnoise at integer pixel coords bypasses the interpolation entirely —
+ * xf = yf = 0 returns the raw corner hash, i.e. per-pixel white noise.)
+ */
+function noiseLow(x: number, y: number, salt: number): number {
+  return pnoise(x / 4, y / 4, 4, salt);
+}
+/** Mid-frequency smooth field: a lattice point every 2 px, wrapped at period 8 (tiles at 16 px). */
+function noiseMid(x: number, y: number, salt: number): number {
+  return pnoise(x / 2, y / 2, 8, salt);
+}
+
+/**
+ * Fractal (multi-octave) value noise: a broad smooth drift (lattice every 4 px),
+ * a mid octave (every 2 px), and a whisper of per-pixel hash grain. Every octave
+ * wraps at 16 px so the sum still tiles. The natural base for "geological
+ * mottling", "moist patches", and "weather stains".
  */
 function fbm(x: number, y: number, salt: number): number {
   return (
-    pnoise(x, y, 16, salt) * 0.6 +
-    pnoise(x * 2, y * 2, 8, salt ^ 0x9e37) * 0.3 +
-    pnoise(x * 4, y * 4, 4, salt ^ 0x85eb) * 0.1
+    noiseLow(x, y, salt) * 0.6 +
+    noiseMid(x, y, salt ^ 0x9e37) * 0.3 +
+    hashf(x, y, salt ^ 0x85eb) * 0.1
   );
 }
 
@@ -193,9 +208,8 @@ function rockShade(base: RGB, px: number, py: number, rng: () => number): RGB {
 
   // Mineral veins: a thin meandering seam that runs a touch lighter and cooler,
   // like quartz threaded through the rock. Kept rare via a high ridge threshold.
-  // Integer coords at period 16 (the lowest frequency that still divides TILE) so
-  // the vein tiles seamlessly across adjacent stone faces.
-  const veinLine = ridge(pnoise(px + 2, py, 16, 303));
+  // A low-frequency smooth field so the ridge line meanders (still tiles at 16 px).
+  const veinLine = ridge(noiseLow(px + 2, py, 303));
   const isVein = veinLine > 0.9;
 
   // Tiny surface detail: occasional bright chip and darker pit, hashed so their
@@ -229,8 +243,8 @@ function soil(base: RGB, px: number, py: number, rng: () => number): RGB {
     col = mix(col, [152, 143, 128], 0.6 * round + 0.2);
   }
 
-  // Roots: a rare thin darker strand meandering through the earth (integer coords → seamless).
-  const root = ridge(pnoise(px, py + 2, 16, 733));
+  // Roots: a rare thin darker strand meandering through the earth (smooth low-frequency field → seamless).
+  const root = ridge(noiseLow(px, py + 2, 733));
   if (root > 0.92) col = mix(col, [78, 54, 34], 0.5);
 
   return col;
@@ -350,9 +364,12 @@ const planks =
     const bk = board % 4; // wrapped board key (tiles at 16)
     const boardTone = (((bk * 7) % 5) - 2) * 4; // per-board tone (-8..+8)
     // Long grain streaks: vary along the board length (x), constant per board, so
-    // streaks run horizontally. A finer octave adds hairline grain.
+    // streaks run horizontally. Fractional x sampling makes the streaks smooth
+    // (lattice every 4 px / 2 px, both wrapping at 16); y stays an integer lattice
+    // row per board so each board's grain is independent. A finer octave adds
+    // hairline grain.
     const grain =
-      (pnoise(px, bk * 3, 16, 1101) - 0.5) * 16 + (pnoise(px * 2, bk * 3, 8, 1102) - 0.5) * 8;
+      (pnoise(px / 4, bk * 3, 4, 1101) - 0.5) * 16 + (pnoise(px / 2, bk * 3, 8, 1102) - 0.5) * 8;
     // Knots: each board may host one dark oval with a tighter ring around it.
     const knotX = (hashf(bk, 0, 1103) * TILE) | 0;
     const kd = Math.hypot(px - knotX, (rowInBoard - pitch / 2) * 1.6);
@@ -378,7 +395,7 @@ const rings =
     const dx = px - 7.5;
     const dy = py - 7.5;
     const r = Math.hypot(dx, dy);
-    const warp = (pnoise(px, py, 16, 1201) - 0.5) * 2.2; // makes rings organic, not perfect circles
+    const warp = (noiseLow(px, py, 1201) - 0.5) * 2.2; // makes rings organic, not perfect circles
     const ring = Math.sin((r + warp) * 2.1) * 9; // light/dark growth bands
     const pith = r < 1.6 ? -16 : 0; // dark heart of the trunk
     // A single radial crack from a season of drying, along one hashed angle.
@@ -402,16 +419,16 @@ const rings =
 const bark =
   (base: RGB): Pixel =>
   (px, py, rng) => {
-    // Vertical furrows: a smooth field (integer coords at period 16 so stacked logs
-    // tile) whose x-variation forms the ridges and whose gentle y-drift keeps them
-    // from running ruler-straight.
-    const furrow = pnoise(px, py, 16, 1301);
+    // Vertical furrows: a smooth mid-frequency field (tiles at 16 px) whose
+    // x-variation forms the ridges and whose gentle y-drift keeps them from
+    // running ruler-straight.
+    const furrow = noiseMid(px, py, 1301);
     const relief = (furrow - 0.5) * 26;
     // A few columns are deep grooves (shadowed clefts between bark ridges). Fixed
     // per-column selection (px in 0..15) so the groove columns line up across tiles.
     const deep = hashf(px, 0, 1302) > 0.78 ? -14 : 0;
-    // Bark cracks: short darker breaks scattered over the surface (integer coords → seamless).
-    const crack = ridge(pnoise(px, py, 16, 1303)) > 0.92 ? -16 : 0;
+    // Bark cracks: short darker breaks along a smooth ridge line (seamless at 16 px).
+    const crack = ridge(noiseLow(px, py, 1303)) > 0.92 ? -16 : 0;
     const rough = (fbm(px, py, 1304) - 0.5) * 12;
     return shade(base, relief + deep + crack + rough + (rng() - 0.5) * 8);
   };
@@ -497,12 +514,12 @@ const sand =
   (base: RGB): Pixel =>
   (px, py, rng) => {
     // Wind ripples: ~2 crests across the tile, gently warped so they aren't robotic.
-    const warp = (pnoise(px, py, 16, 1601) - 0.5) * 2.4;
+    const warp = (noiseLow(px, py, 1601) - 0.5) * 2.4;
     // py coefficient 0.5 makes the wave complete a whole number of periods over the
     // 16px tile in BOTH axes, so the ripples tile seamlessly across a beach.
     const ripple = Math.sin(((px + py * 0.5 + warp) * Math.PI * 2 * 2) / TILE) * 5;
     const dune = (fbm(px, py, 1602) - 0.5) * 10; // broad soft shading
-    const cluster = (pnoise(px * 2, py * 2, 8, 1603) - 0.5) * 6; // faint grain clumps
+    const cluster = (noiseMid(px, py, 1603) - 0.5) * 6; // faint grain clumps
     const heavy = hashf(px, py, 1604) > 0.93 ? -14 : 0; // scattered darker grains
     return shade(base, ripple + dune + cluster + heavy + (rng() - 0.5) * 5);
   };
@@ -624,7 +641,7 @@ const oreP =
     // Where is mineral? Nuggets around cluster centres, plus thin connecting veins.
     const cl = worley(px, py, 4, seed);
     const nugget = cl.f1 < 1.7 && cl.id % 2 === 0; // ~half the cells host a nugget
-    const vein = ridge(pnoise(px, py, 16, seed ^ 0x33)) > 0.88; // integer coords → seamless
+    const vein = ridge(noiseLow(px, py, seed ^ 0x33)) > 0.88; // smooth meandering vein, seamless at 16 px
     if (!nugget && !vein) return rockShade(stoneBase, px, py, rng);
 
     const round = nugget ? Math.max(0, 1 - cl.f1 / 1.7) : 0.4; // rounded nugget relief
