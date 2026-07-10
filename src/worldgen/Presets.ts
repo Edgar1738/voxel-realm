@@ -11,6 +11,8 @@ import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
 import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGenerator';
+import { createAshenReachGenerator } from './AshenReachGenerator';
+import { ashenReachSite } from './AshenReachSite';
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
@@ -55,6 +57,7 @@ export type WorldPreset =
   | 'caverns'
   | 'frontier'
   | 'citadel'
+  | 'ashen-reach'
   | 'harbor'
   | 'grand-keep';
 
@@ -70,6 +73,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'caverns',
   'frontier',
   'citadel',
+  'ashen-reach',
   'harbor',
   'grand-keep',
 ];
@@ -314,6 +318,8 @@ export function createGenerator(preset: WorldPreset): {
           ),
         ],
       };
+    case 'ashen-reach':
+      return { generator: createAshenReachGenerator(), overlays: [ashenReachSite()] };
     case 'harbor':
       return {
         generator: createHarborGenerator(),

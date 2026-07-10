@@ -44,6 +44,8 @@ export const STONEBRICK_WALL: BlockId = 37;
 export const OAK_FENCE_GATE: BlockId = 38;
 export const LADDER: BlockId = 39;
 export const OAK_DOOR: BlockId = 40;
+/** Static glowing lava used by authored volcanic sites; it intentionally does not enter the water flow ticker. */
+export const LAVA: BlockId = 41;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -498,6 +500,22 @@ export const BLOCK_DEFS: BlockDef[] = [
         [160, 126, 78],
         [110, 84, 50],
       ],
+    },
+  },
+  {
+    id: LAVA,
+    name: 'lava',
+    opaque: false,
+    transparent: true,
+    light: 12,
+    creative: true,
+    faces: {
+      pattern: 'speckle',
+      colors: [
+        [232, 74, 20],
+        [255, 178, 48],
+      ],
+      amp: 28,
     },
   },
 ];

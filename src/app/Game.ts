@@ -96,6 +96,7 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
+import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
@@ -170,9 +171,20 @@ export class Game {
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
     const requested = new URLSearchParams(window.location.search).get('world');
     const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
+    const generatedMeta = curatedPresetMeta(preset, SEED, SAVE_VERSION);
+    const activeMeta = bootMeta.meta ?? generatedMeta;
+    const curatedTitle = activeMeta?.title?.trim();
+    if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
     const { generator, overlays } = createGenerator(preset);
 
-    const bootSave = await initializeBootSave(bootMeta, SEED, SAVE_VERSION, preset);
+    const bootSave = await initializeBootSave(
+      bootMeta,
+      SEED,
+      SAVE_VERSION,
+      preset,
+      undefined,
+      generatedMeta,
+    );
     store = bootSave.store;
     const savedDeltas: WorldDeltas = bootSave.savedDeltas;
 
@@ -225,7 +237,7 @@ export class Game {
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
     const spawnOverrides = parseSpawnOverrides(window.location.search);
     const spawnState = clampSpawnY(
-      resolveSpawn(bootMeta.meta, spawnOverrides, {
+      resolveSpawn(activeMeta, spawnOverrides, {
         spawn: SPAWN,
         look: { yaw: 0, pitch: 0 },
       }),
@@ -233,8 +245,7 @@ export class Game {
     );
     // Only the fixed default spawn hovers waiting for terrain; curated/overridden spawns are
     // intentional vantage points and must not be settled onto the ground.
-    const usingDefaultSpawn =
-      spawnOverrides.spawn === undefined && bootMeta.meta?.spawn === undefined;
+    const usingDefaultSpawn = spawnOverrides.spawn === undefined && activeMeta?.spawn === undefined;
     const player = new PlayerController(spawnState.spawn, true);
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
@@ -349,8 +360,8 @@ export class Game {
 
     // Experience mode: curated worlds (title/description/spawn/look) open explore-first in
     // `play` (creative UI hidden, edit inputs gated in input.ts); `build` is full creative.
-    const curated = isCuratedWorld(bootMeta.meta);
-    let experience: ExperienceMode = initialExperienceMode(bootMeta.meta);
+    const curated = isCuratedWorld(activeMeta);
+    let experience: ExperienceMode = initialExperienceMode(activeMeta);
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined, () =>
       ui.isInventoryOpen(),
     );
@@ -676,7 +687,7 @@ export class Game {
     // not only by the distance readout.
     const tourMarker = new TourMarker();
     tourMarker.attach((o) => renderer.add(o));
-    const route = tourRoute(bootMeta.meta);
+    const route = tourRoute(activeMeta);
     let tourIndex: number | undefined;
     const endTour = (message: string): void => {
       tourIndex = undefined;
@@ -743,7 +754,7 @@ export class Game {
       }
     };
     const openWorldInfo = async (): Promise<void> => {
-      const meta = bootMeta.meta;
+      const meta = activeMeta;
       const action = await ui.showWorldInfoDialog(
         {
           title: meta?.title?.trim() || `World: ${worldName}`,
@@ -806,7 +817,7 @@ export class Game {
       overlay?.style.setProperty('visibility', 'hidden');
       try {
         const action = await ui.showPauseDialog({
-          title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
+          title: activeMeta?.title?.trim() || `World: ${worldName}`,
           volume: audio.volume,
           muted: audio.muted,
           onVolume: (v) => {
