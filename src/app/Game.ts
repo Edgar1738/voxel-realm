@@ -1113,6 +1113,7 @@ export class Game {
       VIEW_DISTANCE,
     );
     let burstActive = true;
+    let loadingElapsed = 0;
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
@@ -1256,6 +1257,20 @@ export class Game {
       if (burstActive && !manager.streaming) {
         burstActive = false;
         manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
+        ui.setLoadingHud(undefined);
+      }
+      // Streaming status: honest progress while the first ring fills (delayed slightly so
+      // fast loads never flash a banner). Percent is capped — the last chunks are the sort
+      // tail, and 100% would linger.
+      if (burstActive) {
+        loadingElapsed += cdt;
+        if (loadingElapsed > 0.35) {
+          const pct = Math.min(
+            99,
+            Math.round((100 * manager.loadedChunkCount()) / manager.desiredChunkCount()),
+          );
+          ui.setLoadingHud(`Building ${worldTitle ?? 'the world'} — ${pct}%`);
+        }
       }
 
       // Enter the world on the ground: the default spawn hovers while chunks stream in. As

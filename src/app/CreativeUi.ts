@@ -203,6 +203,8 @@ export interface CreativeUi {
   setExperienceMode(mode: 'play' | 'build'): void;
   /** Shows/updates the tour HUD, or hides it when passed undefined. */
   setTourHud(status: TourHudStatus | undefined): void;
+  /** Cold-start streaming banner ("Building the world — 42%"), hidden when passed undefined. */
+  setLoadingHud(text: string | undefined): void;
   /**
    * Menu dialog: world title/description/landmarks + "Current world" + the grouped hotkey
    * reference. Resolves the chosen action or undefined on dismiss.
@@ -587,6 +589,21 @@ export function createCreativeUi(
   tourEnd.setAttribute('aria-label', 'End tour');
   tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
 
+  // Cold-start streaming banner: honest feedback while the first chunk ring generates and
+  // meshes, so a slow machine sees progress instead of empty sky ("is it broken?").
+  const loadingHud = document.createElement('div');
+  loadingHud.className = 'loading-hud';
+  loadingHud.style.display = 'none';
+  loadingHud.setAttribute('role', 'status');
+  const setLoadingHud = (text: string | undefined): void => {
+    if (text === undefined) {
+      loadingHud.style.display = 'none';
+      return;
+    }
+    loadingHud.style.display = 'block';
+    loadingHud.textContent = text;
+  };
+
   const setTourHud = (s: TourHudStatus | undefined): void => {
     if (!s) {
       tourHud.style.display = 'none';
@@ -598,7 +615,7 @@ export function createCreativeUi(
       : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
   };
 
-  root.append(dock, scrim, status, notice, hotbar, tourHud, dialogScrim);
+  root.append(dock, scrim, status, notice, hotbar, tourHud, loadingHud, dialogScrim);
   document.body.append(root);
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
@@ -1171,6 +1188,7 @@ export function createCreativeUi(
     showBlueprintDialog,
     setExperienceMode,
     setTourHud,
+    setLoadingHud,
     showWorldInfoDialog,
     isDialogOpen,
     showPauseDialog,

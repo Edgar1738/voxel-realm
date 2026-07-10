@@ -82,6 +82,7 @@ function makeUi(): FakeUi {
     setNotice: vi.fn(),
     setSoundUi: vi.fn(),
     renderHotbar: vi.fn(),
+    setLoadingHud: vi.fn(),
     setInventoryOpen: vi.fn((open: boolean) => {
       ui.inventoryOpen = open;
     }),

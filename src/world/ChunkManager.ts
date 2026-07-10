@@ -177,6 +177,12 @@ export class ChunkManager {
     return this.lastEditRelightMs;
   }
 
+  /** How many chunks the current view distance wants loaded ((2·vd+1)², the desired set). */
+  desiredChunkCount(): number {
+    const side = 2 * this.opts.viewDistance + 1;
+    return side * side;
+  }
+
   /** Whether chunks are still streaming in (generation/mesh backlog not yet drained). */
   get streaming(): boolean {
     return this.hasPendingWork;
