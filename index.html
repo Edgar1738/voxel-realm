@@ -628,6 +628,49 @@
         font-style: italic;
       }
 
+      /* ---- Desktop-required shell (touch-only devices) ---- */
+      #desktop-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(ellipse at 50% 30%, rgba(90, 209, 255, 0.08), transparent 60%),
+          #10141a;
+        color: #eef2f6;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      .desktop-shell-panel {
+        max-width: 420px;
+        text-align: center;
+      }
+      .desktop-shell-panel h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      .desktop-shell-panel p {
+        margin: 0 0 14px;
+        color: rgba(238, 242, 246, 0.78);
+        line-height: 1.5;
+      }
+      .desktop-shell-url {
+        font-family: ui-monospace, monospace;
+        color: #5ad1ff;
+      }
+      .desktop-shell-try {
+        padding: 9px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(238, 242, 246, 0.7);
+        font: inherit;
+      }
+
       /* ---- Cold-start loading banner ---- */
       .loading-hud {
         position: fixed;
