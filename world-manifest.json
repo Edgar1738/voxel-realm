@@ -674,7 +674,7 @@
       "description": "From a basalt overlook, cross the broken ember bridge into Cinderkeep — a fallen frontier fortress above the lava-cut valley.",
       "preset": "ashen-reach",
       "seed": 1337,
-      "version": 1,
+      "version": 2,
       "spawn": {
         "x": 0,
         "y": 108,
