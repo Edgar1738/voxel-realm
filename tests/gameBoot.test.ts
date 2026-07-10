@@ -232,6 +232,18 @@ vi.mock('../src/render/CameraRig', () => ({
   }),
 }));
 
+vi.mock('../src/render/HeldBlock', () => ({
+  HeldBlock: vi.fn(function HeldBlock() {
+    return {
+      attach: vi.fn(),
+      punch: vi.fn(),
+      setBlock: vi.fn(),
+      update: vi.fn(),
+      dispose: vi.fn(),
+    };
+  }),
+}));
+
 vi.mock('../src/app/WorldMapUi', () => ({
   createWorldMapUi: vi.fn(() => ({
     toggle: vi.fn(() => true),

@@ -19,6 +19,7 @@ import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig, lookDirectionFromYawPitch, THIRD_PERSON_DISTANCE } from '../render/CameraRig';
 import { PlayerAvatar } from '../render/PlayerAvatar';
+import { HeldBlock } from '../render/HeldBlock';
 import {
   loadPlayerSkinId,
   nextPlayerSkinId,
@@ -253,6 +254,10 @@ export class Game {
     const movementSounds = new MovementSoundTracker();
     const particles = new BlockParticles();
     particles.attach((o) => renderer.add(o));
+
+    // First-person held block (the selected hotbar block in the lower right, build mode only).
+    const heldBlock = new HeldBlock(registry);
+    heldBlock.attach(renderer.scene, renderer.camera);
 
     // Ambience: weather cycles on its own clock; __vr.weather() pins a kind for testing.
     const weather = new Weather((intensity) => audio.playThunder(intensity));
@@ -540,7 +545,10 @@ export class Game {
         return;
       }
       const batch = edit.apply(voxels);
-      if (batch) playEditEffects(batch.changes);
+      if (batch) {
+        playEditEffects(batch.changes);
+        heldBlock.punch(); // every successful edit funnels through here — one swing hook
+      }
       setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
@@ -1193,10 +1201,12 @@ export class Game {
       const bobTarget =
         viewBobOn && player.grounded && rig.mode === 'first' && avatarDh > 0.0005 ? 1 : 0;
       bobAmp += (bobTarget - bobAmp) * Math.min(1, cdt * 8);
+      let bobY = 0;
       if (bobAmp > 0.002) {
         bobPhase += avatarDh * 1.7;
         const lateral = Math.cos(bobPhase) * 0.022 * bobAmp;
-        viewEye.y += Math.sin(bobPhase * 2) * 0.042 * bobAmp;
+        bobY = Math.sin(bobPhase * 2) * 0.042 * bobAmp;
+        viewEye.y += bobY;
         viewEye.x += Math.cos(rig.yaw) * lateral;
         viewEye.z += -Math.sin(rig.yaw) * lateral;
       }
@@ -1212,6 +1222,15 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
+      // Held block: first-person build mode only; play mode reads as scenery, not a toolbar.
+      heldBlock.setBlock(inventory.selectedBlock);
+      heldBlock.update(cdt, {
+        visible:
+          rig.mode === 'first' && experience === 'build' && rig.locked && !ui.isInventoryOpen(),
+        yaw: rig.yaw,
+        pitch: rig.pitch,
+        bobY,
+      });
       avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
       const move = movementSounds.update(
         cdt,
@@ -1486,6 +1505,7 @@ export class Game {
       particles.dispose();
       selectionBox.dispose();
       pasteGhost.dispose();
+      heldBlock.dispose();
       tourMarker.dispose();
       targetOverlay.dispose();
       sink.disposeAll();
