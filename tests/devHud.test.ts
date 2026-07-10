@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDevHudRows } from '../src/app/DevHud';
+import { formatDevHudRows, readDevHudVisible } from '../src/app/DevHud';
 import type { DevState } from '../src/app/DevState';
 
 describe('formatDevHudRows', () => {
@@ -56,5 +56,20 @@ describe('formatDevHudRows', () => {
       { label: 'Mesh/f', value: '3' },
       { label: 'Gen/f', value: '2' },
     ]);
+  });
+});
+
+describe('readDevHudVisible', () => {
+  it('defaults to hidden and remembers the global saved preference', () => {
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null };
+
+    expect(readDevHudVisible(storage)).toBe(false);
+
+    values.set('vr.devHud', 'on');
+    expect(readDevHudVisible(storage)).toBe(true);
+
+    values.set('vr.devHud', 'off');
+    expect(readDevHudVisible(storage)).toBe(false);
   });
 });

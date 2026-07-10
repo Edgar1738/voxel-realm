@@ -58,7 +58,7 @@ export function installDevHud(ctx: DevStateContext): () => void {
   root.append(title, rows);
   document.body.append(root);
 
-  // Visibility preference persists across reloads (default visible; only 'off' hides it).
+  // Visibility preference persists across reloads and worlds; first-time visitors start hidden.
   let visible = readHudVisible();
   root.hidden = !visible;
 
@@ -106,13 +106,17 @@ function fmt(value: number): string {
   return value.toFixed(1);
 }
 
-/** Reads the persisted HUD visibility; defaults to visible when unset or storage is unavailable. */
-function readHudVisible(): boolean {
+/** Reads the global HUD preference; defaults to hidden when unset or storage is unavailable. */
+export function readDevHudVisible(storage: Pick<Storage, 'getItem'>): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) !== 'off';
+    return storage.getItem(STORAGE_KEY) === 'on';
   } catch {
-    return true;
+    return false;
   }
+}
+
+function readHudVisible(): boolean {
+  return readDevHudVisible(localStorage);
 }
 
 function writeHudVisible(visible: boolean): void {
