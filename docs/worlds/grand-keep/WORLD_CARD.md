@@ -2,7 +2,7 @@
 
 - **World ID:** `grand-keep`
 - **Title:** The Grand Keep
-- **Classification:** **AWAITING EDGAR REVIEW — MILESTONE 1** (was ACTIVE PROTOTYPE)
+- **Classification:** **AWAITING EDGAR REVIEW — MILESTONE 2**
 - **One-sentence promise:** An enormous multi-storey castle you can walk from gate to dungeon to battlements and Crown Tower summit entirely on foot.
 - **Builder / owner:** Grok
 - **Branch:** `grok/grand-keep`

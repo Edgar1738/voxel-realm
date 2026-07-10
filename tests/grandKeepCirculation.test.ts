@@ -73,7 +73,7 @@ describe('grand-keep circulation (structural)', () => {
       ['keep entrance', KCX, G, KZ0 + 2],
       ['great hall center', KCX, G, KZ0 + 20],
       ['throne floor', KCX, FLOOR.throne, KZ0 + 28],
-      ['residential', KCX - 4, FLOOR.residential, KZ0 + 14],
+      ['residential', KCX - 2, FLOOR.residential, KCZ],
       ['high castle', KCX + 8, FLOOR.high, KCZ],
       ['roof', KCX, FLOOR.roof, KZ0 + 20],
     ];

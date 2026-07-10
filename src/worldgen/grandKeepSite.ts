@@ -25,6 +25,16 @@ import {
 } from './grandKeepKeep';
 import { buildDungeon } from './grandKeepDungeon';
 import {
+  dressCourtyard,
+  dressGreatHall,
+  dressThroneFloor,
+  dressResidentialFloor,
+  dressHighCastleFloor,
+  polishGrandStair,
+  polishExteriorSilhouette,
+  dressDungeon,
+} from './grandKeepDressing';
+import {
   G,
   CX,
   Z0,
@@ -44,11 +54,12 @@ import type { Overlay } from './Generator';
  * Spawn road → gate → courtyard → keep entrance → grand-stair doorways → dungeon shaft mouth.
  */
 function clearProcessional(s: CitadelStamp): void {
-  // Gate passage through the south wall / gatehouse (monumental headroom)
-  s.fill(CX - GATE_HALF, G + 1, Z0 - 2, CX + GATE_HALF, GATE_TOP + 1, KZ0 - 1, AIR);
+  // Gate passage only through the south wall / gatehouse (do not wipe courtyard props)
+  const gateInner = Z0 + 16;
+  s.fill(CX - GATE_HALF, G + 1, Z0 - 2, CX + GATE_HALF, GATE_TOP + 1, gateInner, AIR);
 
-  // Keep south entrance (wide + tall)
-  s.fill(KCX - 4, FLOOR.ground, KZ0, KCX + 4, FLOOR.ground + 6, KZ0 + 2, AIR);
+  // Keep south entrance (wide + tall) including chapel bay join
+  s.fill(KCX - 4, FLOOR.ground, KZ0 - 4, KCX + 4, FLOOR.ground + 6, KZ0 + 2, AIR);
 
   // Ground-floor door into grand stair well (west face)
   s.fill(STAIR_X0, FLOOR.ground + 1, STAIR_Z0 + 2, STAIR_X0, FLOOR.ground + 4, STAIR_Z0 + 10, AIR);
@@ -69,8 +80,8 @@ function clearProcessional(s: CitadelStamp): void {
 /**
  * The Grand Keep site overlay — deterministic fortress complex stamped per chunk.
  *
- * Composition (Milestone 1):
- * approach → moat → gatehouse → courtyard → multi-storey keep → towers → roof → dungeon
+ * M1: composition + circulation shell.
+ * M2: courtyard wayfinding, key-room dressing, stair lighting, exterior silhouette.
  *
  * Navigation spine:
  * spawn overlook → approach → Grand Gate → Inner Court → Great Hall → Grand Stair →
@@ -100,7 +111,7 @@ export function grandKeepSite(): Overlay {
     buildGrandStaircase(s);
     buildSecondaryStair(s);
 
-    // Interior volumes (light anchors only for M1)
+    // Interior volumes
     buildGreatHall(s);
     buildThroneFloor(s);
     buildResidentialFloor(s);
@@ -111,6 +122,16 @@ export function grandKeepSite(): Overlay {
     buildMajorTowers(s);
     buildDungeonAccess(s);
     buildDungeon(s);
+
+    // Milestone 2 polish (dressing / wayfinding / silhouette)
+    polishExteriorSilhouette(s);
+    dressCourtyard(s);
+    dressGreatHall(s);
+    dressThroneFloor(s);
+    dressResidentialFloor(s);
+    dressHighCastleFloor(s);
+    polishGrandStair(s);
+    dressDungeon(s);
 
     // Last: guarantee primary circulation openings
     clearProcessional(s);

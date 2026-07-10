@@ -1,6 +1,37 @@
-# The Grand Keep — Milestone 1 Self-Critique
+# The Grand Keep — Self-Critique
 
-**Status: AWAITING EDGAR REVIEW — MILESTONE 1**
+**Status: AWAITING EDGAR REVIEW — MILESTONE 2**
+
+---
+
+## Milestone 2 (after Edgar “looks good / proceed”)
+
+### What improved
+
+| Area | Change |
+|------|--------|
+| Courtyard | Fountain, banners, keep door arch + braziers, side paths to wall stairs |
+| Great Hall | Feast tables, high table, aisle rugs/sconces, stair mouth markers |
+| Throne | Carpet runner, benches, banners, gallery pedestals |
+| Residential | Beds, library tables, private hall seating |
+| War room | Map table with tokens, armory racks, guard bunks, council table |
+| Grand stair | Wall lanterns, landing glow, glass overlook into hall |
+| Exterior | Chapel bay, shoulder turrets, roof ridges, approach banners |
+
+### Still weak / next risks
+
+- Some rooms remain lightly dressed (noble suite, council) — intentional M2 scope cap
+- Live stair climb still best verified on foot in Chrome
+- No ship/manifest yet
+
+### Recommended next (only if Edgar wants)
+
+- M3: playtest fixes + capture pack refresh + optional package/save polish
+- Or approve for merge candidacy of world content (still no auto-ship)
+
+---
+
+## Milestone 1
 
 ## What works
 

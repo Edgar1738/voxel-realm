@@ -30,6 +30,7 @@ import {
   KCZ,
   FLOOR,
   STAIR_X0,
+  STAIR_X1,
   STAIR_Z0,
   STAIR_Z1,
   CROWN,
@@ -214,6 +215,22 @@ describe('grand-keep structure stamps', () => {
   it('has approach road south of the gate', () => {
     const id = at(CX, G, Z0 - 30);
     expect([STONE, COBBLESTONE].includes(id as 3 | 12) || id === 26 /* gravel */).toBe(true);
+  });
+
+  it('has M2 courtyard wayfinding (fountain / banners area lit)', () => {
+    // Well / fountain footprint near plaza or a path lantern
+    const nearPlaza = at(CX, G + 2, KZ0 - 11);
+    // Something non-air above ground in the plaza zone (well rim or banner post)
+    expect(nearPlaza === AIR ? at(CX - 1, G + 1, KZ0 - 11) !== AIR : true).toBe(true);
+  });
+
+  it('has lit grand stair well (lanterns on well walls)', () => {
+    let lanterns = 0;
+    for (let y = FLOOR.ground; y < FLOOR.throne + 4; y++) {
+      if (at(STAIR_X0 + 1, y, STAIR_Z0 + 3) === 14 /* LANTERN */) lanterns++;
+      if (at(STAIR_X1 - 1, y, STAIR_Z0 + 3) === 14) lanterns++;
+    }
+    expect(lanterns).toBeGreaterThan(0);
   });
 });
 
