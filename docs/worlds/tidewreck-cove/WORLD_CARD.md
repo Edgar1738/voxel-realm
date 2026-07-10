@@ -13,7 +13,11 @@
 - **Registry evidence:** Entry in `world-manifest.json` (slug `tidewreck-cove`, preset `flat`, seed 1337) + bundle `public/worlds/tidewreck-cove.json`
 - **Current risks:** None known.
 - **Next required approval:** None — already shipped.
-- **Last verified date:** 2026-07-08
+- **Last verified date:** 2026-07-09
+- **2026-07-09 update:** Wired in the new ladder/door blocks — a climbable interior shaft up
+  the lighthouse (entrance door on the east face, ladder to the lamp room + gallery deck) and
+  oak doors on the stilt houses' doorways and the upper-terrace entries (9 doors, 13 ladders).
+  Bundle regenerated; save backup at `.saves/.backups/tidewreck-cove-20260709-preLadderDoor.json`.
 
 ## Unknowns
 
