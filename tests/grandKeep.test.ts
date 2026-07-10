@@ -267,6 +267,17 @@ describe('grand-keep structure stamps', () => {
     const tcz = Z0 - 45;
     expect(isSolid(at(tcx + 6, G + 20, tcz))).toBe(true);
   });
+
+  it("has open multi-storey King's Solar atrium", () => {
+    // Center of keep at mid-height of king volume should be air (open ceiling)
+    const midY = FLOOR.king + 15;
+    expect(at(KCX, midY, KCZ)).toBe(AIR);
+    // Royal floor underfoot
+    expect(at(KCX, FLOOR.king, KCZ)).not.toBe(AIR);
+    // Skylight level has glass or stone ribs
+    const sky = at(KCX + 1, FLOOR.kingTop, KCZ + 1);
+    expect(sky === AIR || sky === 7 /* GLASS */ || isSolid(sky)).toBe(true);
+  });
 });
 
 describe('grand-keep storey separations', () => {

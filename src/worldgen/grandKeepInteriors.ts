@@ -28,6 +28,7 @@ import {
   FLOOR,
   STACK,
   INTERIOR_STACK,
+  KING_GALLERIES,
   STOREY_RISE,
   STAIR_X0,
   STAIR_Z0,
@@ -530,6 +531,9 @@ export function buildDeepInteriors(s: CitadelStamp): void {
     FLOOR.throne,
     FLOOR.residential,
     FLOOR.high,
+    // King's Solar multi-storey atrium (base + intermediate galleries)
+    FLOOR.king,
+    ...KING_GALLERIES,
   ]);
   for (const y of INTERIOR_STACK) {
     if (specialized.has(y)) continue;

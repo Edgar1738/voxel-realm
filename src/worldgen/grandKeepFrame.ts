@@ -74,7 +74,13 @@ export const FLOOR = {
   gallery: STACK[1],
   throne: STACK[3],
   state: STACK[6],
-  residential: STACK[10],
+  /**
+   * King's Solar — multi-storey open royal apartment (full keep footprint).
+   * Occupies STACK[10]..STACK[14] as one continuous atrium (~5 storeys / 50 blocks tall).
+   */
+  king: STACK[10],
+  kingTop: STACK[14], // open ceiling / skylight level
+  residential: STACK[10], // alias: former residential band is now the King's Solar base
   guest: STACK[14],
   library: STACK[18],
   high: STACK[22],
@@ -82,6 +88,9 @@ export const FLOOR = {
   observatory: STACK[STOREY_RISES - 1],
   roof: STACK[STOREY_RISES],
 } as const;
+
+/** Intermediate gallery levels inside the King's Solar atrium (between floor and skylight). */
+export const KING_GALLERIES: readonly number[] = [STACK[11], STACK[12], STACK[13]];
 
 /** Interior storeys only (excludes roof). */
 export const INTERIOR_STACK: readonly number[] = STACK.slice(0, -1);

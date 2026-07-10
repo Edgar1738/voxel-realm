@@ -38,6 +38,7 @@ import { buildDeepInteriors, NORTH_STAIR, MID_STAIR } from './grandKeepInteriors
 import { buildKeepBalconies } from './grandKeepBalconies';
 import { buildVillage } from './grandKeepVillage';
 import { buildSkyways } from './grandKeepSkyways';
+import { buildKingsSolar } from './grandKeepKingsSolar';
 import {
   G,
   CX,
@@ -142,6 +143,9 @@ export function grandKeepSite(): Overlay {
 
     // Deep walkable network: corridors, room chains, extra stairs
     buildDeepInteriors(s);
+
+    // King's Solar — multi-storey open royal apartment (wins over mid-floor clutter)
+    buildKingsSolar(s);
 
     // Exterior balconies on every storey
     buildKeepBalconies(s);
