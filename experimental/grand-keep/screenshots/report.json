@@ -1,0 +1,260 @@
+{
+  "shots": [
+    {
+      "name": "01-spawn-approach",
+      "kind": "pov",
+      "eye": [
+        8,
+        78,
+        -95
+      ],
+      "look": [
+        8,
+        95,
+        30
+      ],
+      "note": "Castle from spawn overlook",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-01-spawn-approach.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\01-spawn-approach.jpg"
+    },
+    {
+      "name": "02-courtyard-reveal",
+      "kind": "pov",
+      "eye": [
+        8,
+        78,
+        -20
+      ],
+      "look": [
+        8,
+        100,
+        55
+      ],
+      "note": "Inner court looking at keep",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-02-courtyard-reveal.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\02-courtyard-reveal.jpg"
+    },
+    {
+      "name": "03-great-hall",
+      "kind": "pov",
+      "eye": [
+        8,
+        78,
+        28
+      ],
+      "look": [
+        8,
+        82,
+        72
+      ],
+      "note": "Great Hall interior",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-03-great-hall.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\03-great-hall.jpg"
+    },
+    {
+      "name": "04-grand-stair",
+      "kind": "pov",
+      "eye": [
+        42,
+        80,
+        34
+      ],
+      "look": [
+        50,
+        95,
+        50
+      ],
+      "note": "Grand staircase",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-04-grand-stair.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\04-grand-stair.jpg"
+    },
+    {
+      "name": "05-throne-floor",
+      "kind": "pov",
+      "eye": [
+        8,
+        90,
+        38
+      ],
+      "look": [
+        8,
+        92,
+        74
+      ],
+      "note": "Throne / state floor",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-05-throne-floor.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\05-throne-floor.jpg"
+    },
+    {
+      "name": "06-dungeon",
+      "kind": "pov",
+      "eye": [
+        -10,
+        64,
+        50
+      ],
+      "look": [
+        8,
+        64,
+        70
+      ],
+      "note": "Deep dungeon vault approach",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-06-dungeon.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\06-dungeon.jpg"
+    },
+    {
+      "name": "07-roof-battlements",
+      "kind": "pov",
+      "eye": [
+        8,
+        126,
+        32
+      ],
+      "look": [
+        48,
+        145,
+        74
+      ],
+      "note": "Roof battlements toward Crown Tower",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-07-roof-battlements.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\07-roof-battlements.jpg"
+    },
+    {
+      "name": "08-exterior-overview",
+      "kind": "overview",
+      "target": [
+        8,
+        90,
+        20
+      ],
+      "radius": 110,
+      "angle": 0.85,
+      "height": 70,
+      "note": "High exterior overview",
+      "saved": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\.captures\\gk-08-exterior-overview.jpg",
+      "dest": "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\grok+grand-keep\\experimental\\grand-keep\\screenshots\\08-exterior-overview.jpg"
+    }
+  ],
+  "reach": [
+    {
+      "from": "spawn",
+      "to": "gate",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 74.5,
+          "z": -38
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "gate",
+      "to": "court",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 74.5,
+          "z": 8
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "court",
+      "to": "hall",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 75.5,
+          "z": 40
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "hall",
+      "to": "stair",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 48,
+          "y": 78,
+          "z": 40
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "stair",
+      "to": "throne",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 87.5,
+          "z": 58
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "throne",
+      "to": "high",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 111.5,
+          "z": 52
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "high",
+      "to": "roof",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": 8,
+          "y": 122.5,
+          "z": 40
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    },
+    {
+      "from": "roof",
+      "to": "dungeon",
+      "result": {
+        "arrived": false,
+        "frames": 600,
+        "finalPos": {
+          "x": -8,
+          "y": 62.5,
+          "z": 52
+        },
+        "remaining": null,
+        "stuck": false
+      }
+    }
+  ]
+}

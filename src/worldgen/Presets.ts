@@ -14,6 +14,8 @@ import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGene
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
+import { createGrandKeepGenerator, grandKeepSurfaceAt, GRAND_KEEP } from './GrandKeepGenerator';
+import { grandKeepSite } from './grandKeepSite';
 import {
   cottage,
   well,
@@ -53,7 +55,8 @@ export type WorldPreset =
   | 'caverns'
   | 'frontier'
   | 'citadel'
-  | 'harbor';
+  | 'harbor'
+  | 'grand-keep';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -68,6 +71,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'frontier',
   'citadel',
   'harbor',
+  'grand-keep',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -318,6 +322,35 @@ export function createGenerator(preset: WorldPreset): {
           // the authored harbor stamps in — houses clear any tree that falls inside their footprint.
           scatterOaks(harborSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 11 }),
           harborSite(),
+        ],
+      };
+    case 'grand-keep':
+      return {
+        generator: createGrandKeepGenerator(),
+        overlays: [
+          grandKeepSite(),
+          // Sparse ruins only on the plains below the mesa — keep the fortress silhouette clean.
+          scatterStructures(
+            [
+              ruinedWatchtower(),
+              standingStones(),
+              ruinedCottage(),
+              deadTree(),
+              campShrine(),
+              statue(),
+            ],
+            {
+              cellSize: 80,
+              density: 0.4,
+              clusterCount: 2,
+              clusterRadius: 12,
+              clearFootprint: true,
+              surfaceAt: grandKeepSurfaceAt,
+              maxSurfaceY: GRAND_KEEP.groundY - 6,
+              rotate: true,
+              anchor: 'min',
+            },
+          ),
         ],
       };
     case 'default':
