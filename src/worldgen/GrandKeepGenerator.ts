@@ -22,10 +22,13 @@ export const GRAND_KEEP = {
   centerZ: 20,
   /** Top solid block of the courtyard / plateau. Buildings stamp from groundY+1 up. */
   groundY: 72,
-  /** Chebyshev half-width of the flat mesa top (walls + towers + margin). */
-  plateauRadius: 72,
+  /**
+   * Chebyshev half-width of the flat mesa top.
+   * Expanded so outer city walls, village ring, and sky-bridge towers sit on flat ground.
+   */
+  plateauRadius: 140,
   /** Chebyshev distance where the slope returns to surrounding plains. */
-  skirtRadius: 140,
+  skirtRadius: 220,
   /** Surrounding plains height. */
   plainsY: 64,
 } as const;

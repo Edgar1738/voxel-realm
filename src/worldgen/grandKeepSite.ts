@@ -36,6 +36,8 @@ import {
 } from './grandKeepDressing';
 import { buildDeepInteriors, NORTH_STAIR, MID_STAIR } from './grandKeepInteriors';
 import { buildKeepBalconies } from './grandKeepBalconies';
+import { buildVillage } from './grandKeepVillage';
+import { buildSkyways } from './grandKeepSkyways';
 import {
   G,
   CX,
@@ -120,6 +122,10 @@ export function grandKeepSite(): Overlay {
     buildCornerTowers(s);
     buildWallAccess(s);
     buildButtresses(s);
+
+    // Village (inner bailey + outer town) + sky towers / multi-story bridges
+    buildVillage(s);
+    buildSkyways(s);
 
     // Main keep massing + vertical circulation
     buildKeepShell(s);

@@ -12,6 +12,7 @@ import {
   WATER,
   GLOWSTONE,
   STAIRS_STONE,
+  GRAVEL,
   BLOCK_DEFS,
 } from '../src/blocks/blocks';
 import {
@@ -113,9 +114,9 @@ describe('grand-keep terrain (mesa)', () => {
 });
 
 describe('grand-keep massing scale', () => {
-  it('has outer curtain footprint ≥ 120 on both axes', () => {
-    expect(X1 - X0 + 1).toBeGreaterThanOrEqual(120);
-    expect(Z1 - Z0 + 1).toBeGreaterThanOrEqual(120);
+  it('has expanded outer curtain footprint ≥ 200 on both axes', () => {
+    expect(X1 - X0 + 1).toBeGreaterThanOrEqual(200);
+    expect(Z1 - Z0 + 1).toBeGreaterThanOrEqual(200);
   });
 
   it('has main keep footprint ~96×60', () => {
@@ -133,16 +134,15 @@ describe('grand-keep massing scale', () => {
     expect(WATCH.topY).toBeLessThan(512);
     expect(STACK.length).toBeGreaterThanOrEqual(31); // 30 rises + ground
   });
-
 });
 
 describe('grand-keep structure stamps', () => {
   const { at } = makeSampler();
 
   it('places solid curtain wall on the south gate axis sides', () => {
-    // West curtain mass away from the gatehouse (gatehouse spans CX±GATE_HALF±6)
+    // West curtain mass away from the gatehouse and village side-gates
     expect(isSolid(at(CX - 30, G + 4, Z0 + 1))).toBe(true);
-    expect(isSolid(at(X0 + 1, G + 6, CZ))).toBe(true);
+    expect(isSolid(at(X0 + 1, G + 6, CZ + 20))).toBe(true);
   });
 
   it('has a clear gate passage on the south wall', () => {
@@ -253,6 +253,19 @@ describe('grand-keep structure stamps', () => {
   it('has north service stair shaft above ground', () => {
     // Spiral newel is solid at well center
     expect(isSolid(at(KX0 + 7, FLOOR.gallery + 1, KZ1 - 15))).toBe(true);
+  });
+
+  it('has village paving outside the keep mass', () => {
+    // East bailey street near keep
+    const id = at(KX1 + 8, G, KZ0 + 10);
+    expect([STONE, COBBLESTONE, GRAVEL].includes(id as 3 | 12 | 26) || id === 26).toBe(true);
+  });
+
+  it('has a landscape sky tower shell', () => {
+    // South sky tower at (CX, Z0-45)
+    const tcx = CX;
+    const tcz = Z0 - 45;
+    expect(isSolid(at(tcx + 6, G + 20, tcz))).toBe(true);
   });
 });
 

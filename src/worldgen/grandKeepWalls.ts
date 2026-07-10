@@ -36,6 +36,8 @@ import {
   GATE_TOP,
   GATEHOUSE_DEPTH,
   KZ0,
+  MOAT_IN,
+  MOAT_OUT,
 } from './grandKeepFrame';
 import { battlements, hollowTower, stairFlightZ } from './grandKeepPrimitives';
 
@@ -43,7 +45,7 @@ import { battlements, hollowTower, stairFlightZ } from './grandKeepPrimitives';
 
 /** Stone road from southern spawn approach to the gatehouse. */
 export function buildApproach(s: CitadelStamp): void {
-  const roadZ0 = Z0 - 55; // ~-97
+  const roadZ0 = Z0 - 70; // further back for the expanded walls
   const roadZ1 = Z0 - 1;
   const halfW = 3;
   for (let wz = Math.max(roadZ0, s.wz0); wz <= Math.min(roadZ1, s.wz1); wz++) {
@@ -74,18 +76,16 @@ export function buildApproach(s: CitadelStamp): void {
  * Square moat just outside the curtain, crossed only on the south gate axis by a plank bridge.
  */
 export function buildMoat(s: CitadelStamp): void {
-  const moatIn = OUTER_MOAT_IN;
-  const moatOut = OUTER_MOAT_OUT;
   const waterTop = G - 1;
   const floor = G - 5;
-  const ax = Math.max(CX - moatOut, s.wx0);
-  const bx = Math.min(CX + moatOut, s.wx1);
-  const az = Math.max(CZ - moatOut, s.wz0);
-  const bz = Math.min(CZ + moatOut, s.wz1);
+  const ax = Math.max(CX - MOAT_OUT, s.wx0);
+  const bx = Math.min(CX + MOAT_OUT, s.wx1);
+  const az = Math.max(CZ - MOAT_OUT, s.wz0);
+  const bz = Math.min(CZ + MOAT_OUT, s.wz1);
   for (let wz = az; wz <= bz; wz++) {
     for (let wx = ax; wx <= bx; wx++) {
       const cheb = Math.max(Math.abs(wx - CX), Math.abs(wz - CZ));
-      if (cheb < moatIn || cheb > moatOut) continue;
+      if (cheb < MOAT_IN || cheb > MOAT_OUT) continue;
       const onBridge = Math.abs(wx - CX) <= GATE_HALF && wz <= Z0;
       s.set(wx, floor, wz, STONE);
       s.fill(wx, floor + 1, wz, wx, waterTop, wz, WATER);
@@ -98,9 +98,6 @@ export function buildMoat(s: CitadelStamp): void {
     }
   }
 }
-
-const OUTER_MOAT_IN = 66;
-const OUTER_MOAT_OUT = 70;
 
 // ── Courtyard paving ───────────────────────────────────────────────────────────────────────
 

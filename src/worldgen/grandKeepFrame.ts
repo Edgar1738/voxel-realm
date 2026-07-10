@@ -12,25 +12,30 @@ export const G = GRAND_KEEP.groundY; // 72
 export const CX = GRAND_KEEP.centerX; // 8
 export const CZ = GRAND_KEEP.centerZ; // 20
 
-// ── Outer curtain walls ────────────────────────────────────────────────────────────────────
-export const OUTER_HW = 62;
-export const X0 = CX - OUTER_HW;
-export const X1 = CX + OUTER_HW;
-export const Z0 = CZ - OUTER_HW;
-export const Z1 = CZ + OUTER_HW;
-export const WT = 4;
+// ── Outer city walls (expanded for village bailey) ─────────────────────────────────────────
+/** Half-extent of the outer curtain — ~200×200 footprint (was 124×124). */
+export const OUTER_HW = 100;
+export const X0 = CX - OUTER_HW; // -92
+export const X1 = CX + OUTER_HW; // 108
+export const Z0 = CZ - OUTER_HW; // -80  south (approach / gate)
+export const Z1 = CZ + OUTER_HW; // 120  north
+export const WT = 5;
 export const IN_X0 = X0 + WT;
 export const IN_X1 = X1 - WT;
 export const IN_Z0 = Z0 + WT;
 export const IN_Z1 = Z1 - WT;
 
 export const WALL_Y0 = G + 1;
-export const WALK_Y = G + 12;
+export const WALK_Y = G + 14; // taller city-wall walk for bridge docks
 export const MERLON_Y = WALK_Y + 1;
 
-export const GATE_HALF = 4;
-export const GATE_TOP = G + 7;
-export const GATEHOUSE_DEPTH = 14;
+export const GATE_HALF = 5; // 11-wide monumental gate
+export const GATE_TOP = G + 8;
+export const GATEHOUSE_DEPTH = 16;
+
+/** Moat ring just outside the outer curtain. */
+export const MOAT_IN = OUTER_HW + 4; // 104
+export const MOAT_OUT = OUTER_HW + 9; // 109
 
 // ── Main keep ──────────────────────────────────────────────────────────────────────────────
 export const KX0 = CX - 48;
