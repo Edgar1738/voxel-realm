@@ -232,6 +232,17 @@ describe('grand-keep structure stamps', () => {
     }
     expect(lanterns).toBeGreaterThan(0);
   });
+
+  it('has deep corridor network on residential floor', () => {
+    // E-W hotel corridor should be air at body height
+    expect(at(KCX, FLOOR.residential + 2, KCZ - 6)).toBe(AIR);
+    expect(at(KCX, FLOOR.residential + 2, KCZ + 6)).toBe(AIR);
+  });
+
+  it('has extra vertical cores (north service stair hollow)', () => {
+    // North stair well interior air mid-height
+    expect(at(KX0 + 7, FLOOR.throne + 2, KZ1 - 14)).toBe(AIR);
+  });
 });
 
 describe('grand-keep storey separations', () => {

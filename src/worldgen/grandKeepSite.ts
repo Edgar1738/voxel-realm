@@ -34,6 +34,7 @@ import {
   polishExteriorSilhouette,
   dressDungeon,
 } from './grandKeepDressing';
+import { buildDeepInteriors, NORTH_STAIR, MID_STAIR } from './grandKeepInteriors';
 import {
   G,
   CX,
@@ -46,6 +47,9 @@ import {
   GATE_HALF,
   GATE_TOP,
   DUNGEON_SHAFT,
+  SEC_X1,
+  SEC_Z0,
+  SEC_Z1,
 } from './grandKeepFrame';
 import type { Overlay } from './Generator';
 
@@ -70,6 +74,20 @@ function clearProcessional(s: CitadelStamp): void {
 
   // Corridor from hall center toward stair well at ground
   s.fill(KCX + 8, FLOOR.ground + 1, STAIR_Z0 + 4, STAIR_X0, FLOOR.ground + 4, STAIR_Z0 + 8, AIR);
+
+  // Doors into north service stair + mid gallery stair on each major floor
+  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof]) {
+    const ncx = (NORTH_STAIR.x0 + NORTH_STAIR.x1) >> 1;
+    s.fill(ncx - 1, fy + 1, NORTH_STAIR.z0, ncx + 1, fy + 3, NORTH_STAIR.z0, AIR);
+  }
+  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
+    const mz = (MID_STAIR.z0 + MID_STAIR.z1) >> 1;
+    s.fill(MID_STAIR.x0, fy + 1, mz - 1, MID_STAIR.x0, fy + 3, mz + 1, AIR);
+    s.fill(MID_STAIR.x1, fy + 1, mz - 1, MID_STAIR.x1, fy + 3, mz + 1, AIR);
+  }
+  // Secondary stair → roof exit
+  const scz = (SEC_Z0 + SEC_Z1) >> 1;
+  s.fill(SEC_X1, FLOOR.roof + 1, scz - 1, SEC_X1, FLOOR.roof + 3, scz + 1, AIR);
 
   // Dungeon shaft mouth open in Great Hall (do not re-hollow the spiral post — dungeon rebuilds it)
   const sx = DUNGEON_SHAFT.x;
@@ -117,6 +135,9 @@ export function grandKeepSite(): Overlay {
     buildResidentialFloor(s);
     buildHighCastleFloor(s);
     buildRoof(s);
+
+    // Deep walkable network: corridors, room chains, extra stairs
+    buildDeepInteriors(s);
 
     // Towers + underground
     buildMajorTowers(s);
