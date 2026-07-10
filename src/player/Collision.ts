@@ -45,7 +45,7 @@ function axisOverlap(aMin: number, aMax: number, bMin: number, bMax: number): bo
 }
 
 /** True if the player AABB (center ± half) overlaps any solid box. */
-function overlapsSolid(sampler: SoliditySampler, center: Vec3, half: Vec3): boolean {
+export function overlapsSolid(sampler: SoliditySampler, center: Vec3, half: Vec3): boolean {
   const pMinX = center.x - half.x;
   const pMaxX = center.x + half.x;
   const pMinY = center.y - half.y;

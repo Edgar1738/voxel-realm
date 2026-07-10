@@ -161,6 +161,15 @@ export class BlockRegistry {
   }
 
   /**
+   * True for 1.5-tall shapes whose purpose is being impassable (fences/walls/gates/doors).
+   * Movement tricks that defeat height (mantling) must refuse these.
+   */
+  isBarrier(id: BlockId): boolean {
+    const shape = this.shape(id);
+    return shape === 'fence' || shape === 'wall' || shape === 'gate' || shape === 'door';
+  }
+
+  /**
    * True for shapes whose facing bits are meaningful (stairs, gates, doors, ladders). Copy
    * paths must keep even a ZERO state for these — facing N packs to 0 — or rotate/mirror
    * cannot turn them.
