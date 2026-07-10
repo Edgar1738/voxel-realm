@@ -206,39 +206,112 @@ export function dressThroneFloor(s: CitadelStamp): void {
   s.set(KX0 + 6, y, KZ0 + 26, BOOKSHELF);
 }
 
-// ── Residential ────────────────────────────────────────────────────────────────────────────
+// ── Guest hotel wing (above solar skylight) ────────────────────────────────────────────────
 
 export function dressResidentialFloor(s: CitadelStamp): void {
   const y = FLOOR.residential + 1;
 
-  // Royal chamber (SW)
-  bed(s, KX0 + 8, y, KZ0 + 10, 's');
-  bed(s, KX0 + 12, y, KZ0 + 10, 's');
-  s.fill(KX0 + 6, y, KZ0 + 14, KX0 + 10, y, KZ0 + 14, PLANKS); // wardrobe line
-  s.set(KX0 + 16, y, KZ0 + 12, FURNACE);
-  s.set(KX0 + 8, y, KZ0 + 16, LANTERN);
-  // Carpet
-  for (let z = KZ0 + 10; z <= KZ0 + 15; z++) {
-    for (let x = KX0 + 8; x <= KX0 + 14; x++) s.set(x, FLOOR.residential, z, TERRACOTTA);
+  // Suite row — beds + carpets along south chambers
+  for (let i = 0; i < 5; i++) {
+    const x = KX0 + 8 + i * 10;
+    if (x + 4 >= STAIR_X0 - 4) break;
+    bed(s, x, y, KZ0 + 10, 's');
+    for (let z = KZ0 + 8; z <= KZ0 + 12; z++) {
+      for (let dx = 0; dx <= 3; dx++) s.set(x - 1 + dx, FLOOR.residential, z, TERRACOTTA);
+    }
+    s.set(x + 2, y, KZ0 + 12, LANTERN);
   }
 
-  // Noble chamber (NW)
+  // Noble suite (NW corner)
   bed(s, KX0 + 10, y, KZ1 - 12, 'n');
-  s.fill(KX0 + 8, y, KZ1 - 14, KX0 + 14, y, KZ1 - 14, PLANKS);
+  bed(s, KX0 + 14, y, KZ1 - 12, 'n');
+  s.fill(KX0 + 8, y, KZ1 - 14, KX0 + 16, y, KZ1 - 14, PLANKS);
   s.set(KX0 + 12, y + 1, KZ1 - 14, LANTERN);
+  s.fill(KX0 + 8, y, KZ1 - 10, KX0 + 8, y + 2, KZ1 - 8, BOOKSHELF);
 
-  // Private hall — seating ring
-  s.fill(KCX - 4, y, KZ0 + 10, KCX + 4, y, KZ0 + 10, PLANKS);
-  s.fill(KCX - 4, y, KZ0 + 14, KCX + 4, y, KZ0 + 14, PLANKS);
-  s.set(KCX, y + 1, KZ0 + 12, GLOWSTONE);
+  // Private hall — seating ring + hearth
+  s.fill(KCX - 4, y, KZ0 + 18, KCX + 4, y, KZ0 + 18, PLANKS);
+  s.fill(KCX - 4, y, KZ0 + 22, KCX + 4, y, KZ0 + 22, PLANKS);
+  s.set(KCX, y + 1, KZ0 + 20, GLOWSTONE);
+  s.set(KCX, y, KZ0 + 20, FURNACE);
 
-  // Library reading tables
-  s.fill(KCX + 14, y, KZ0 + 12, KCX + 18, y, KZ0 + 12, PLANKS);
-  s.fill(KCX + 14, y, KZ0 + 16, KCX + 18, y, KZ0 + 16, PLANKS);
-  s.set(KCX + 16, y + 1, KZ0 + 12, LANTERN);
-  s.set(KCX + 16, y + 1, KZ0 + 16, LANTERN);
-  // Extra shelf stacks
-  s.fill(KCX + 12, y, KZ0 + 8, KCX + 12, y + 2, KZ0 + 18, BOOKSHELF);
+  // Study nook east
+  s.fill(KCX + 14, y, KZ0 + 18, KCX + 18, y, KZ0 + 18, PLANKS);
+  s.fill(KCX + 14, y, KZ0 + 22, KCX + 18, y, KZ0 + 22, PLANKS);
+  s.set(KCX + 16, y + 1, KZ0 + 18, LANTERN);
+  s.fill(KCX + 12, y, KZ0 + 16, KCX + 12, y + 2, KZ0 + 24, BOOKSHELF);
+
+  // Guest floor densifier (one storey above hotel)
+  const gy = FLOOR.guest + 1;
+  for (let i = 0; i < 4; i++) {
+    const x = KX0 + 10 + i * 12;
+    if (x + 2 >= STAIR_X0 - 4) break;
+    bed(s, x, gy, KZ0 + 10, 's');
+    bed(s, x, gy, KZ1 - 12, 'n');
+    s.set(x + 2, gy, KZ0 + 12, LANTERN);
+  }
+  // Guest salon
+  s.fill(KCX - 6, gy, KCZ - 2, KCX + 6, gy, KCZ - 2, PLANKS);
+  s.fill(KCX - 6, gy, KCZ + 2, KCX + 6, gy, KCZ + 2, PLANKS);
+  s.set(KCX, gy + 1, KCZ, GLOWSTONE);
+  banner(s, KCX - 8, gy, KCZ, 4);
+  banner(s, KCX + 8, gy, KCZ, 4);
+}
+
+// ── State / gallery dressing ───────────────────────────────────────────────────────────────
+
+export function dressStateAndGallery(s: CitadelStamp): void {
+  // Gallery: pedestals + banner line overlooking hall void
+  const gy = FLOOR.gallery + 1;
+  for (const x of [KCX - 10, KCX - 4, KCX + 4, KCX + 10]) {
+    s.set(x, gy, KZ0 + 22, STONE);
+    s.set(x, gy + 1, KZ0 + 22, CRYSTAL);
+  }
+  for (let x = KCX - 12; x <= KCX + 12; x += 4) {
+    banner(s, x, gy, KZ0 + 18, 4);
+  }
+
+  // State floor: conference table + map tokens + side desks
+  const sy = FLOOR.state + 1;
+  s.fill(KCX - 6, sy, KCZ - 2, KCX + 6, sy, KCZ + 2, PLANKS);
+  s.set(KCX - 3, sy + 1, KCZ, GOLD_ORE);
+  s.set(KCX + 3, sy + 1, KCZ, CRYSTAL);
+  s.set(KCX, sy + 1, KCZ, LANTERN);
+  for (const z of [KCZ - 6, KCZ + 6]) {
+    s.fill(KCX - 8, sy, z, KCX + 8, sy, z, PLANKS); // benches
+  }
+  s.fill(KX0 + 8, sy, KZ0 + 20, KX0 + 14, sy, KZ0 + 20, PLANKS);
+  s.set(KX0 + 10, sy + 1, KZ0 + 20, BOOKSHELF);
+  s.set(KX0 + 12, sy + 1, KZ0 + 20, LANTERN);
+  banner(s, KCX - 12, sy, KCZ, 5);
+  banner(s, KCX + 12, sy, KCZ, 5);
+}
+
+// ── Library / barracks thematic props ──────────────────────────────────────────────────────
+
+export function dressLibraryAndBarracks(s: CitadelStamp): void {
+  const ly = FLOOR.library + 1;
+  // Carpet runner through reading hall
+  for (let z = KZ0 + 14; z <= KZ1 - 14; z++) {
+    for (let x = KCX - 2; x <= KCX + 2; x++) s.set(x, FLOOR.library, z, TERRACOTTA);
+  }
+  // Lectern row
+  for (let x = KCX - 10; x <= KCX + 10; x += 5) {
+    s.set(x, ly, KCZ - 8, PLANKS);
+    s.set(x, ly + 1, KCZ - 8, BOOKSHELF);
+  }
+
+  const by = FLOOR.barracks + 1;
+  // Mess tables
+  for (const z of [KCZ - 4, KCZ, KCZ + 4]) {
+    s.fill(KCX - 8, by, z, KCX + 8, by, z, PLANKS);
+    s.set(KCX, by + 1, z, LANTERN);
+  }
+  // Weapon practice dummies (fence posts)
+  for (const x of [KX0 + 20, KX0 + 24, KX0 + 28]) {
+    s.fill(x, by, KZ1 - 14, x, by + 2, KZ1 - 14, OAK_FENCE);
+    s.set(x, by + 3, KZ1 - 14, PLANKS);
+  }
 }
 
 // ── High castle / war room ─────────────────────────────────────────────────────────────────

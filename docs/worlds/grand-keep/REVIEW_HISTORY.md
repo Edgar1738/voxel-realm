@@ -1,5 +1,27 @@
 # Review History — The Grand Keep
 
+## 2026-07-09 — M3 polish + re-ship (Grok)
+
+**Status set to:** IMPLEMENTED WORLD (M3 polish on showcase package)
+
+### Edgar signal
+
+- “yes proceed all 1-4” — playtest, merge kings-chamber, more build, merge/ship
+
+### Scope completed (M3)
+
+- Fixed hotel/solar floor collision: guest hotel moved to STACK[15–16] above solar skylight
+- Guest suites, state/gallery props, library carrels, barracks bunks densified
+- Village: lived-in houses, market goods, gardens, smithy benches, tavern/chapel props
+- Processional spine clear (approach + courtyard) without wiping fountain plaza
+- Structural tests: 34/34 green (processional, stair doors, library/barracks props)
+
+### Ship
+
+- Re-bake `public/worlds/grand-keep.json` + merge to `main` / live demo
+
+---
+
 ## 2026-07-09 — Showcase ship (Grok)
 
 **Status set to:** IMPLEMENTED WORLD (showcase package)

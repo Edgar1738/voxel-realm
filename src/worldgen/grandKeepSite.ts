@@ -30,6 +30,8 @@ import {
   dressThroneFloor,
   dressResidentialFloor,
   dressHighCastleFloor,
+  dressStateAndGallery,
+  dressLibraryAndBarracks,
   polishGrandStair,
   polishExteriorSilhouette,
   dressDungeon,
@@ -67,6 +69,13 @@ function clearProcessional(s: CitadelStamp): void {
   const gateInner = Z0 + 16;
   s.fill(CX - GATE_HALF, G + 1, Z0 - 2, CX + GATE_HALF, GATE_TOP + 1, gateInner, AIR);
 
+  // Approach road air column (keeps stall overhangs / banners from choking the processional)
+  s.fill(CX - 2, G + 1, Z0 - 50, CX + 2, G + 4, Z0 - 2, AIR);
+
+  // Courtyard spine in two segments so the central fountain / plaza props (≈ KZ0-14..-8) stay
+  s.fill(CX - 2, G + 1, gateInner, CX + 2, G + 4, KZ0 - 16, AIR);
+  s.fill(CX - 2, G + 1, KZ0 - 8, CX + 2, G + 4, KZ0 - 2, AIR);
+
   // Keep south entrance (wide + tall) including chapel bay join
   s.fill(KCX - 4, FLOOR.ground, KZ0 - 4, KCX + 4, FLOOR.ground + 6, KZ0 + 2, AIR);
 
@@ -94,6 +103,11 @@ function clearProcessional(s: CitadelStamp): void {
   const sx = DUNGEON_SHAFT.x;
   const sz = DUNGEON_SHAFT.z;
   s.fill(sx - 2, FLOOR.ground, sz + 3, sx + 2, FLOOR.ground + 3, sz + 4, AIR); // south doorway only
+
+  // Hotel-wing stair doors stay open (residential / guest are above the solar)
+  for (const fy of [FLOOR.residential, FLOOR.guest, FLOOR.library, FLOOR.barracks]) {
+    s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 2, STAIR_X0, fy + 4, STAIR_Z0 + 10, AIR);
+  }
 }
 
 /**
@@ -160,7 +174,9 @@ export function grandKeepSite(): Overlay {
     dressCourtyard(s);
     dressGreatHall(s);
     dressThroneFloor(s);
+    dressStateAndGallery(s);
     dressResidentialFloor(s);
+    dressLibraryAndBarracks(s);
     dressHighCastleFloor(s);
     polishGrandStair(s);
     dressDungeon(s);

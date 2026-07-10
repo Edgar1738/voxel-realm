@@ -1,6 +1,25 @@
 # The Grand Keep — Self-Critique
 
-**Status: AWAITING EDGAR REVIEW — MILESTONE 2**
+**Status: IMPLEMENTED WORLD — M3 polish shipped (2026-07-09)**
+
+---
+
+## Milestone 3 (playtest + dress + village + re-ship)
+
+### What improved
+
+| Area | Change |
+|------|--------|
+| Floor programme | Guest hotel moved above solar skylight (was colliding with atrium) |
+| Mid interiors | State/gallery props, library carrels, barracks bunks, guest salons |
+| Village | Lived-in houses, market goods, gardens, smithy, tavern/chapel props |
+| Circulation | Processional air column approach→gate→keep; fountain plaza preserved |
+| Tests | 34 structural stamps green |
+
+### Residual risks
+
+- Live stair climb still best verified on foot in Chrome (headless beeline still weak on switchbacks)
+- Far skyway / outer town beyond bake still streams in from generator
 
 ---
 

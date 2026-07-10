@@ -80,8 +80,12 @@ export const FLOOR = {
    */
   king: STACK[10],
   kingTop: STACK[14], // open ceiling / skylight level
-  residential: STACK[10], // alias: former residential band is now the King's Solar base
-  guest: STACK[14],
+  /**
+   * Guest hotel wing — *above* the solar skylight so chambers are not hollowed by the atrium.
+   * (Formerly aliased to king / kingTop; that collided with the Solar.)
+   */
+  residential: STACK[15],
+  guest: STACK[16],
   library: STACK[18],
   high: STACK[22],
   barracks: STACK[26],

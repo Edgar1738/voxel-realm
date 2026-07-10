@@ -19,6 +19,7 @@ import {
   BOOKSHELF,
   TERRACOTTA,
   DEEPSLATE,
+  GOLD_ORE,
 } from '../blocks/blocks';
 import { CitadelStamp, hash2 } from './CitadelStamp';
 import {
@@ -40,7 +41,7 @@ import {
   WT,
 } from './grandKeepFrame';
 
-/** Simple multi-story house (hollow) with door facing `door` and roof parapet. */
+/** Simple multi-story house (hollow) with door facing `door`, roof parapet, and lived-in props. */
 function house(
   s: CitadelStamp,
   x0: number,
@@ -80,6 +81,20 @@ function house(
   // Roof
   s.slab(x0, z0, x1, z1, top, WOOD);
   s.set(mx, top + 1, mz, LANTERN);
+
+  // Lived-in ground floor: table, bed, hearth when room is large enough
+  if (w >= 6 && d >= 6) {
+    s.fill(mx - 1, G + 1, mz, mx + 1, G + 1, mz, PLANKS); // table
+    s.set(mx, G + 2, mz, LANTERN);
+    // Bed in back corner
+    s.set(x0 + 2, G + 1, z0 + 2, PLANKS);
+    s.set(x0 + 3, G + 1, z0 + 2, PLANKS);
+    s.set(x0 + 2, G + 2, z0 + 2, WOOD); // headboard
+    // Corner hearth
+    s.set(x1 - 2, G + 1, z1 - 2, FURNACE);
+    // Occasional bookshelf for larger homes
+    if (stories >= 2) s.set(x1 - 2, G + 1, z0 + 2, BOOKSHELF);
+  }
 }
 
 function streetEW(s: CitadelStamp, x0: number, x1: number, z: number, halfW = 1): void {
@@ -110,7 +125,7 @@ function streetNS(s: CitadelStamp, z0: number, z1: number, x: number, halfW = 1)
   }
 }
 
-/** Market stalls — simple open frames. */
+/** Market stalls — open frames with goods on the counter. */
 function stall(s: CitadelStamp, x: number, z: number): void {
   s.fill(x, G + 1, z, x + 2, G + 1, z + 1, PLANKS);
   s.set(x, G + 2, z, OAK_FENCE);
@@ -119,6 +134,29 @@ function stall(s: CitadelStamp, x: number, z: number): void {
   s.set(x + 1, G + 3, z, PLANKS);
   s.set(x + 2, G + 3, z, PLANKS);
   s.set(x + 1, G + 2, z, LANTERN);
+  // Goods on the counter (rotate by position hash)
+  const r = hash2(x, z, 0xba5a);
+  if (r < 0.33) {
+    s.set(x + 1, G + 2, z + 1, TERRACOTTA);
+  } else if (r < 0.66) {
+    s.set(x + 1, G + 2, z + 1, PLANKS);
+    s.set(x, G + 2, z + 1, BOOKSHELF);
+  } else {
+    s.set(x + 1, G + 2, z + 1, GOLD_ORE);
+  }
+}
+
+/** Small garden / green patch for village plazas. */
+function garden(s: CitadelStamp, x0: number, z0: number, w: number, d: number): void {
+  for (let z = z0; z < z0 + d; z++) {
+    for (let x = x0; x < x0 + w; x++) {
+      s.set(x, G, z, TERRACOTTA);
+      if (((x + z) & 1) === 0) s.set(x, G + 1, z, OAK_FENCE);
+    }
+  }
+  // Center shrub markers
+  s.set(x0 + (w >> 1), G + 1, z0 + (d >> 1), WOOD);
+  s.set(x0 + (w >> 1), G + 2, z0 + (d >> 1), WOOD);
 }
 
 /**
@@ -171,25 +209,47 @@ export function buildInnerBaileyVillage(s: CitadelStamp): void {
       s.set(x, G, z, STONE);
     }
   }
-  for (let i = 0; i < 4; i++) {
-    stall(s, mx0 + 2 + i * 5, mz0 + 3);
-    stall(s, mx0 + 2 + i * 5, mz0 + 10);
+  for (let i = 0; i < 5; i++) {
+    stall(s, mx0 + 1 + i * 4, mz0 + 2);
+    stall(s, mx0 + 1 + i * 4, mz0 + 11);
+  }
+  // Center aisle kept clear for walking
+  for (let x = mx0 + 2; x <= mx0 + 18; x++) {
+    s.set(x, G, mz0 + 7, COBBLESTONE);
+    s.set(x, G, mz0 + 8, COBBLESTONE);
+    s.fill(x, G + 1, mz0 + 7, x, G + 3, mz0 + 8, AIR);
   }
   s.fill(mx0 + 8, G + 1, mz0 + 7, mx0 + 10, G + 1, mz0 + 9, COBBLESTONE); // fountain base
   s.set(mx0 + 9, G + 2, mz0 + 8, GLOWSTONE);
+  // Market banners
+  s.fill(mx0 + 2, G + 1, mz0, mx0 + 2, G + 5, mz0, WOOD);
+  s.set(mx0 + 2, G + 5, mz0 + 1, BRICK);
+  s.fill(mx0 + 18, G + 1, mz0, mx0 + 18, G + 5, mz0, WOOD);
+  s.set(mx0 + 18, G + 5, mz0 + 1, BRICK);
 
-  // Western square with well-like marker
+  // Western square with well-like marker + garden
   for (let z = KZ0 + 20; z <= KZ0 + 32; z++) {
     for (let x = KX0 - 48; x <= KX0 - 28; x++) s.set(x, G, z, COBBLESTONE);
   }
   s.set(KX0 - 38, G + 1, KZ0 + 26, COBBLE_WALL);
   s.set(KX0 - 38, G + 2, KZ0 + 26, LANTERN);
+  garden(s, KX0 - 46, KZ0 + 22, 5, 5);
 
-  // Workshop row (furnaces)
+  // East bailey garden pocket
+  garden(s, KX1 + 14, KZ0 + 24, 6, 6);
+
+  // Workshop / smithy row (furnaces + outdoor anvil tables)
   for (let i = 0; i < 4; i++) {
     const x = KX1 + 10 + i * 10;
     house(s, x, KZ0 - 28, 6, 6, 1, 's');
     s.set(x + 2, G + 1, KZ0 - 26, FURNACE);
+    s.fill(x + 1, G + 1, KZ0 - 22, x + 3, G + 1, KZ0 - 22, DEEPSLATE); // anvil bench
+    s.set(x + 2, G + 2, KZ0 - 22, LANTERN);
+  }
+
+  // Extra west market strip
+  for (let i = 0; i < 4; i++) {
+    stall(s, KX0 - 30 + i * 5, KZ0 - 18);
   }
 }
 
@@ -241,19 +301,35 @@ export function buildOuterTown(s: CitadelStamp): void {
   streetEW(s, X0 - 20, X0, CZ, 2);
   streetNS(s, Z1, Z1 + 20, CX, 2);
 
-  // Outer tavern / large inn SE
+  // Outer tavern / large inn SE — common room tables
   house(s, X1 + 20, Z0 - 40, 12, 10, 3, 'w');
   s.fill(X1 + 22, G + 1, Z0 - 36, X1 + 28, G + 1, Z0 - 36, PLANKS);
   s.set(X1 + 24, G + 2, Z0 - 36, LANTERN);
+  s.fill(X1 + 24, G + 1, Z0 - 34, X1 + 28, G + 1, Z0 - 34, PLANKS); // second table
+  s.set(X1 + 26, G + 2, Z0 - 34, LANTERN);
+  s.set(X1 + 22, G + 1, Z0 - 32, FURNACE); // kitchen hearth
+  // Signpost outside
+  s.fill(X1 + 18, G + 1, Z0 - 35, X1 + 18, G + 4, Z0 - 35, WOOD);
+  s.set(X1 + 18, G + 4, Z0 - 34, BRICK);
 
   // Chapel outside NE
   house(s, X1 + 18, Z1 + 20, 10, 10, 2, 's');
   s.set(X1 + 23, G + 1, Z1 + 24, GLOWSTONE);
   s.fill(X1 + 20, G + 1, Z1 + 22, X1 + 20, G + 3, Z1 + 26, BOOKSHELF);
+  // Pew rows
+  s.fill(X1 + 21, G + 1, Z1 + 23, X1 + 25, G + 1, Z1 + 23, PLANKS);
+  s.fill(X1 + 21, G + 1, Z1 + 25, X1 + 25, G + 1, Z1 + 25, PLANKS);
+
+  // South approach gardens flanking the road
+  garden(s, CX - 18, Z0 - 42, 5, 5);
+  garden(s, CX + 12, Z0 - 42, 5, 5);
+
+  // More south market depth
+  for (let i = 0; i < 4; i++) {
+    stall(s, CX - 10 + i * 5, Z0 - 42);
+  }
 
   void ringIn;
-  void TERRACOTTA;
-  void DEEPSLATE;
 }
 
 /** Cut extra gates in the outer wall for village access (E/W/N) and dock bridges later. */

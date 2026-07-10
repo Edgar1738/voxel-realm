@@ -530,26 +530,81 @@ export function buildDeepInteriors(s: CitadelStamp): void {
     FLOOR.gallery,
     FLOOR.throne,
     FLOOR.residential,
+    FLOOR.guest,
     FLOOR.high,
-    // King's Solar multi-storey atrium (base + intermediate galleries)
+    // King's Solar multi-storey atrium (base + galleries + skylight)
     FLOOR.king,
+    FLOOR.kingTop,
     ...KING_GALLERIES,
   ]);
   for (const y of INTERIOR_STACK) {
     if (specialized.has(y)) continue;
     buildGenericFloorNetwork(s, y);
   }
-  // Library denser books
+
+  // Guest floor — lighter hotel densifier above residential
+  {
+    const y = FLOOR.guest;
+    corridorEW(s, KX0 + 6, STAIR_X0 - 2, KCZ, y, 2, 4);
+    corridorNS(s, KZ0 + 8, KZ1 - 8, KCX, y, 1, 4);
+    for (let i = 0; i < 4; i++) {
+      const x0 = KX0 + 6 + i * 12;
+      if (x0 + 10 >= STAIR_X0 - 2) break;
+      room(s, x0, y, KZ0 + 6, x0 + 10, y + 6, KZ0 + 14, 'n');
+      s.fill(x0 + 2, y + 1, KZ0 + 8, x0 + 5, y + 1, KZ0 + 9, PLANKS);
+      s.set(x0 + 3, y + 2, KZ0 + 8, LANTERN);
+      room(s, x0, y, KZ1 - 16, x0 + 10, y + 6, KZ1 - 8, 's');
+      s.fill(x0 + 2, y + 1, KZ1 - 12, x0 + 5, y + 1, KZ1 - 11, PLANKS);
+    }
+  }
+
+  // Library denser books + reading carrels
   {
     const y = FLOOR.library;
     s.fill(KCX - 8, y + 1, KCZ - 2, KCX - 8, y + 4, KCZ + 2, BOOKSHELF);
     s.fill(KCX + 8, y + 1, KCZ - 2, KCX + 8, y + 4, KCZ + 2, BOOKSHELF);
+    for (let z = KZ0 + 12; z < KZ1 - 12; z += 6) {
+      s.fill(KX0 + 8, y + 1, z, KX0 + 8, y + 4, z + 2, BOOKSHELF);
+      s.fill(STAIR_X0 - 10, y + 1, z, STAIR_X0 - 10, y + 4, z + 2, BOOKSHELF);
+      s.fill(KX0 + 10, y + 1, z + 1, KX0 + 14, y + 1, z + 1, PLANKS); // carrel desk
+      s.set(KX0 + 12, y + 2, z + 1, LANTERN);
+    }
+    // Central reading tables
+    s.fill(KCX - 4, y + 1, KCZ - 2, KCX + 4, y + 1, KCZ - 2, PLANKS);
+    s.fill(KCX - 4, y + 1, KCZ + 2, KCX + 4, y + 1, KCZ + 2, PLANKS);
+    s.set(KCX, y + 2, KCZ, GLOWSTONE);
+  }
+  // Barracks densifier — bunk rows (east of secondary stair shaft at KX0+3..10)
+  {
+    const y = FLOOR.barracks;
+    for (let i = 0; i < 5; i++) {
+      const z = KZ0 + 18 + i * 8;
+      if (z + 1 >= KZ1 - 10) break;
+      s.fill(KX0 + 14, y + 1, z, KX0 + 18, y + 1, z + 1, PLANKS);
+      s.fill(KX0 + 22, y + 1, z, KX0 + 26, y + 1, z + 1, PLANKS);
+      s.set(KX0 + 16, y + 2, z, LANTERN);
+      s.set(KX0 + 24, y + 2, z, LANTERN);
+    }
+    // Armory racks along east wall before stair
+    for (let z = KZ0 + 16; z < KZ1 - 12; z += 3) {
+      s.fill(STAIR_X0 - 8, y + 1, z, STAIR_X0 - 8, y + 3, z, COBBLE_WALL);
+    }
   }
   // Observatory glow chamber
   {
     const y = FLOOR.observatory;
     s.set(KCX, y + 1, KCZ, GLOWSTONE);
     s.set(KCX, y + 2, KCZ, CRYSTAL);
+    // Instrument ring
+    for (const [dx, dz] of [
+      [-4, 0],
+      [4, 0],
+      [0, -4],
+      [0, 4],
+    ] as const) {
+      s.set(KCX + dx, y + 1, KCZ + dz, PLANKS);
+      s.set(KCX + dx, y + 2, KCZ + dz, CRYSTAL);
+    }
   }
 
   buildInnerWallPassage(s);

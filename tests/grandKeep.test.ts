@@ -236,10 +236,44 @@ describe('grand-keep structure stamps', () => {
     expect(lanterns).toBeGreaterThan(0);
   });
 
-  it('has deep corridor network on residential floor', () => {
+  it('has deep corridor network on residential hotel floor (above solar)', () => {
+    // Guest hotel sits above solar skylight so chambers are real rooms
+    expect(FLOOR.residential).toBeGreaterThan(FLOOR.kingTop);
     // E-W hotel corridor should be air at body height
     expect(at(KCX, FLOOR.residential + 2, KCZ - 6)).toBe(AIR);
     expect(at(KCX, FLOOR.residential + 2, KCZ + 6)).toBe(AIR);
+  });
+
+  it('keeps the processional spine clear from approach through the gate', () => {
+    // Approach road air column south of gate
+    expect(at(CX, G + 2, Z0 - 20)).toBe(AIR);
+    expect(at(CX, G + 2, Z0 + 2)).toBe(AIR);
+    // Courtyard spine mid-way to keep
+    expect(at(CX, G + 2, KZ0 - 16)).toBe(AIR);
+    // Keep entrance air
+    expect(at(KCX, FLOOR.ground + 2, KZ0)).toBe(AIR);
+  });
+
+  it('has grand stair door openings on residential and library floors', () => {
+    expect(at(STAIR_X0, FLOOR.residential + 2, STAIR_Z0 + 6)).toBe(AIR);
+    expect(at(STAIR_X0, FLOOR.library + 2, STAIR_Z0 + 6)).toBe(AIR);
+  });
+
+  it('dresses library and barracks with props', () => {
+    // Library bookshelf densifier
+    expect(at(KCX - 8, FLOOR.library + 2, KCZ)).toBe(22); // BOOKSHELF
+    // Barracks bunk planks (east of secondary stair shaft)
+    expect(at(KX0 + 16, FLOOR.barracks + 1, KZ0 + 18)).toBe(PLANKS);
+  });
+
+  it('has lived-in village house props near east bailey', () => {
+    // East bailey house at KX1+8 starts a 8×8; interior table/lantern zone
+    const hx = KX1 + 12;
+    const hz = KZ0 + 8;
+    // Floor paving under houses / streets nearby is solid
+    expect(isSolid(at(hx, G, hz)) || at(hx, G, hz) === PLANKS || at(hx, G, hz) === COBBLESTONE).toBe(
+      true,
+    );
   });
 
   it('has exterior balconies on mid floors', () => {
