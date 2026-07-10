@@ -1,5 +1,29 @@
 # Review History — The Grand Keep
 
+## 2026-07-09 — Showcase ship (Grok)
+
+**Status set to:** IMPLEMENTED WORLD (showcase package)
+
+### Edgar signal
+
+- M1: looks good → M2
+- Interior/height/village expansions continued with approval
+- **“lets save this as a showcase world. approved. proceed”**
+
+### Shipped
+
+- Baked package: `.saves/grand-keep.json` → `public/worlds/grand-keep.json` (~196 chunks, ~11 MB)
+- Manifest entry with tags `castle,fantasy,exploration,village`
+- Preview: `public/worlds/previews/grand-keep.jpg`
+- Engine: `WORLD_HEIGHT` 512, `SAVE_VERSION` 2 (other showcase metas bumped to v2 for CI)
+
+### Notes
+
+- Generator preset `grand-keep` remains the full-world source; package bakes approach + keep neighborhood for cold start.
+- Vault `world:package` archive step may hang on large saves; manifest + bundle done manually after bake.
+
+---
+
 ## 2026-07-09 — Milestone 2 handoff (Grok)
 
 **Status set to:** AWAITING EDGAR REVIEW — MILESTONE 2
