@@ -15,7 +15,7 @@ import {
   WOOD,
 } from '../blocks/blocks';
 import { ASHEN_REACH, ashenReachSurfaceAt } from './AshenReachGenerator';
-import { CitadelStamp, spiralStair } from './CitadelStamp';
+import { CitadelStamp, floorWithStairHole, spiralStair } from './CitadelStamp';
 import type { Overlay } from './Generator';
 
 const A = ASHEN_REACH;
@@ -35,6 +35,9 @@ function buildApproach(s: CitadelStamp): void {
   // the lava channel. The unbroken center lane keeps the whole route walkable.
   for (let z = 42; z <= 90; z++) {
     const y = 80 + Math.floor((z - 42) / 2);
+    // Carve headroom first: the upper half of the descent cuts a walkable trench through the
+    // overlook plateau (solid to overlookY), otherwise the steps would be entombed in rock.
+    s.fill(-4, y + 1, z, 4, y + 6, z, AIR);
     s.slab(-3, z, 3, z, y, GRAVEL);
     if (z % 8 === 2) {
       s.set(-4, y + 1, z, LANTERN);
@@ -63,8 +66,10 @@ function buildCurtainWall(s: CitadelStamp): void {
   s.fill(x1 - 2, G + 1, z0, x1, G + 12, z1, DEEPSLATE);
   s.fill(x0, G + 1, z0, x1, G + 12, z0 + 2, DEEPSLATE);
   s.fill(x0, G + 1, z1 - 2, x1, G + 12, z1, DEEPSLATE);
-  // South gate: the direct continuation of the bridge opens into the courtyard.
-  s.fill(-3, G + 1, z1 - 2, 3, G + 6, z1, AIR);
+  // South gate: the direct continuation of the bridge opens into the courtyard. The carve
+  // starts one block above the bridge deck (G + 1) so the wall base doubles as the gate
+  // threshold instead of deleting the bridge's last rows.
+  s.fill(-3, G + 2, z1 - 2, 3, G + 6, z1, AIR);
   s.fill(-5, G + 7, z1 - 2, 5, G + 8, z1, DEEPSLATE);
   for (let x = x0; x <= x1; x += 2) {
     s.set(x, G + 13, z0, STONEBRICK_WALL);
@@ -107,7 +112,12 @@ function buildCinderkeep(s: CitadelStamp): void {
   s.walls(x0, G + 1, z0, x1, roof, z1, DEEPSLATE);
   s.slab(x0, z0, x1, z1, roof, COBBLESTONE);
   s.fill(-3, G + 1, z1, 3, G + 5, z1, AIR);
-  for (const y of [G + 10, G + 19]) s.slab(x0 + 1, z0 + 1, x1 - 1, z1 - 1, y, PLANKS);
+  // Keep the 3x3 stair shaft open through every floor and the roof so the spiral actually
+  // climbs from the hall to the battlements.
+  for (const y of [G + 10, G + 19]) {
+    floorWithStairHole(s, x0 + 1, z0 + 1, x1 - 1, z1 - 1, y, 10, -78, PLANKS);
+  }
+  s.fill(9, roof, -79, 11, roof, -77, AIR);
   spiralStair(s, 10, -78, G + 1, roof, STAIRS_COBBLE, DEEPSLATE);
   for (const y of [G + 5, G + 14, G + 23]) {
     for (let x = -11; x <= 11; x += 5) {
