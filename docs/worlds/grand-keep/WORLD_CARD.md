@@ -7,7 +7,7 @@
 - **Builder / owner:** Grok
 - **Branch:** `grok/grand-keep`
 - **Worktree:** `.claude/worktrees/grok+grand-keep`
-- **Current commit:** `ffcf10d`
+- **Current commit:** `d6e8522`
 - **Main status:** **Not merged.** Prototype only. Do not ship. Do not edit `world-manifest.json`.
 - **Source assets:** Generator/source world — `?world=grand-keep` (and optional `?save=grand-keep` with `experimental/grand-keep/save-meta.json`). Not a full chunk bundle.
 - **Registry evidence:** Branch `grok/grand-keep`; this card; `docs/worlds/WORLD_REGISTRY.md` entry.
