@@ -840,7 +840,7 @@ export class Game {
 
     const selectionBox = new SelectionBox();
     selectionBox.attach((o) => renderer.add(o));
-    const pasteGhost = new PasteGhost();
+    const pasteGhost = new PasteGhost(mapPalette); // same block colors as the world map
     pasteGhost.attach((o) => renderer.add(o));
 
     // Visible player character, shown only in third-person view.
@@ -1320,7 +1320,12 @@ export class Game {
         targetOverlay.update(undefined, false);
         selectionBox.update(builder.selectionBox(), true);
         if (builder.mode === 'pasting') {
-          pasteGhost.update(builder.transformedClipboard()?.dims, pasteOrigin(), true);
+          pasteGhost.update(
+            builder.transformedClipboard(),
+            pasteOrigin(),
+            true,
+            builder.clipboardRevision,
+          );
         } else {
           pasteGhost.update(undefined, undefined, false);
         }

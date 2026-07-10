@@ -32,6 +32,12 @@ export class BuilderState {
   };
   /** Whole-block offset dialed in on top of the live aim so a paste can be placed precisely. */
   nudge: Vec3i = { x: 0, y: 0, z: 0 };
+  /**
+   * Bumped whenever the transformed clipboard's CONTENT changes (new clipboard, rotate,
+   * mirror, array) — the paste ghost rebuilds its voxel mesh only when this moves, and
+   * repositions cheaply every frame otherwise. Nudge changes only the origin, not content.
+   */
+  clipboardRevision = 0;
   private nextCorner: 'a' | 'b' = 'a';
 
   /** off ↔ selecting. Leaving Build mode clears the selection and any paste session. */
@@ -78,6 +84,7 @@ export class BuilderState {
     this.transform = { turns: 0, mirrorX: false, mirrorZ: false, arrayCount: 1, arrayAxis: 'x' };
     this.resetNudge();
     this.mode = 'pasting';
+    this.clipboardRevision++;
   }
 
   /** Leave paste mode but keep the clipboard for another paste. */
@@ -103,16 +110,19 @@ export class BuilderState {
 
   rotate(delta: number): void {
     this.transform.turns = (((this.transform.turns + delta) % 4) + 4) % 4;
+    this.clipboardRevision++;
   }
 
   mirrorAxis(axis: 'x' | 'z'): void {
     if (axis === 'x') this.transform.mirrorX = !this.transform.mirrorX;
     else this.transform.mirrorZ = !this.transform.mirrorZ;
+    this.clipboardRevision++;
   }
 
   arrayAdjust(delta: number, axis: 'x' | 'z'): void {
     this.transform.arrayAxis = axis;
     this.transform.arrayCount = Math.max(1, this.transform.arrayCount + delta);
+    this.clipboardRevision++;
   }
 
   /** Apply mirror(x) → mirror(z) → rotate → array, composing the tested Prefab functions. */

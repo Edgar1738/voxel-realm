@@ -46,6 +46,20 @@ describe('BuilderState clipboard + transform', () => {
     });
   });
 
+  it('clipboardRevision bumps on every content change and never on nudges', () => {
+    const b = new BuilderState();
+    const r0 = b.clipboardRevision;
+    b.setClipboard({ dims: [1, 1, 1], blocks: [[0, 0, 0, ID]] });
+    expect(b.clipboardRevision).toBe(r0 + 1);
+    b.rotate(1);
+    b.mirrorAxis('x');
+    b.arrayAdjust(1, 'z');
+    expect(b.clipboardRevision).toBe(r0 + 4);
+    b.nudgeBy(1, 0, 0); // origin-only — the ghost must not rebuild
+    b.resetNudge();
+    expect(b.clipboardRevision).toBe(r0 + 4);
+  });
+
   it('rotate wraps modulo 4 in both directions', () => {
     const b = new BuilderState();
     b.setClipboard({ dims: [1, 1, 1], blocks: [[0, 0, 0, ID]] });
