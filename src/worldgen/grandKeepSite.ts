@@ -35,6 +35,7 @@ import {
   dressDungeon,
 } from './grandKeepDressing';
 import { buildDeepInteriors, NORTH_STAIR, MID_STAIR } from './grandKeepInteriors';
+import { buildKeepBalconies } from './grandKeepBalconies';
 import {
   G,
   CX,
@@ -136,12 +137,15 @@ export function grandKeepSite(): Overlay {
     // Deep walkable network: corridors, room chains, extra stairs
     buildDeepInteriors(s);
 
+    // Exterior balconies on every storey
+    buildKeepBalconies(s);
+
     // Towers + underground
     buildMajorTowers(s);
     buildDungeonAccess(s);
     buildDungeon(s);
 
-    // Milestone 2 polish (dressing / wayfinding / silhouette)
+    // Polish (dressing / wayfinding / silhouette)
     polishExteriorSilhouette(s);
     dressCourtyard(s);
     dressGreatHall(s);

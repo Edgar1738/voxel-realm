@@ -523,8 +523,16 @@ export function buildDeepInteriors(s: CitadelStamp): void {
   buildResidentialNetwork(s);
   buildHighCastleNetwork(s);
 
-  // Extra themed / generic floors for the taller keep
-  for (const y of [FLOOR.state, FLOOR.guest, FLOOR.library, FLOOR.barracks, FLOOR.observatory]) {
+  // Every interior storey without a specialized program gets a full corridor/room ring.
+  const specialized = new Set([
+    FLOOR.ground,
+    FLOOR.gallery,
+    FLOOR.throne,
+    FLOOR.residential,
+    FLOOR.high,
+  ]);
+  for (const y of INTERIOR_STACK) {
+    if (specialized.has(y)) continue;
     buildGenericFloorNetwork(s, y);
   }
   // Library denser books

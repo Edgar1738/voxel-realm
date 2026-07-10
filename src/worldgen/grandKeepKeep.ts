@@ -68,10 +68,12 @@ export function buildKeepShell(s: CitadelStamp): void {
   ] as const) {
     s.fill(px - 1, FLOOR.ground, pz - 1, px + 1, FLOOR.roof + 2, pz + 1, BRICK);
   }
-  // Upper setback band from high castle upward
-  s.walls(KX0 + 1, FLOOR.high, KZ0 + 1, KX1 - 1, FLOOR.roof, KZ1 - 1, BRICK);
-  // Extra stepped crown mass near the top for silhouette
-  s.walls(KX0 + 2, FLOOR.barracks, KZ0 + 2, KX1 - 2, FLOOR.roof, KZ1 - 2, STONE);
+  // Stepped setbacks for a taller silhouette (thirds of the tower)
+  const third = STACK[Math.floor(STACK.length / 3)] ?? FLOOR.residential;
+  const twoThirds = STACK[Math.floor((STACK.length * 2) / 3)] ?? FLOOR.high;
+  s.walls(KX0 + 1, third, KZ0 + 1, KX1 - 1, FLOOR.roof, KZ1 - 1, BRICK);
+  s.walls(KX0 + 2, twoThirds, KZ0 + 2, KX1 - 2, FLOOR.roof, KZ1 - 2, STONE);
+  s.walls(KX0 + 3, FLOOR.observatory, KZ0 + 3, KX1 - 3, FLOOR.roof, KZ1 - 3, BRICK);
 
   // Hollow entire interior volume (floors added separately)
   s.fill(KX0 + 1, FLOOR.ground, KZ0 + 1, KX1 - 1, FLOOR.roof - 1, KZ1 - 1, AIR);

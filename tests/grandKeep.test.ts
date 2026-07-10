@@ -123,24 +123,17 @@ describe('grand-keep massing scale', () => {
     expect(KZ1 - KZ0 + 1).toBeGreaterThanOrEqual(55);
   });
 
-  it('has many above-ground floors + dungeon + roof (tall keep)', () => {
+  it('has a very tall stack (~3× prior height) + dungeon + roof', () => {
     expect(FLOOR.dungeon).toBeLessThan(G);
     expect(FLOOR.ground).toBeGreaterThan(G);
-    expect(FLOOR.gallery).toBeGreaterThan(FLOOR.ground);
-    expect(FLOOR.throne).toBeGreaterThan(FLOOR.gallery);
-    expect(FLOOR.state).toBeGreaterThan(FLOOR.throne);
-    expect(FLOOR.residential).toBeGreaterThan(FLOOR.state);
-    expect(FLOOR.guest).toBeGreaterThan(FLOOR.residential);
-    expect(FLOOR.library).toBeGreaterThan(FLOOR.guest);
-    expect(FLOOR.high).toBeGreaterThan(FLOOR.library);
-    expect(FLOOR.barracks).toBeGreaterThan(FLOOR.high);
-    expect(FLOOR.observatory).toBeGreaterThan(FLOOR.barracks);
-    expect(FLOOR.roof).toBeGreaterThan(FLOOR.observatory);
-    expect(FLOOR.roof).toBeLessThan(192);
+    expect(FLOOR.roof).toBeGreaterThan(FLOOR.ground + 250); // ~300 blocks of stack
+    expect(FLOOR.roof).toBeLessThan(512);
     expect(CROWN.topY).toBeGreaterThan(FLOOR.roof);
-    expect(CROWN.topY).toBeLessThan(192);
-    expect(WATCH.topY).toBeLessThan(192);
+    expect(CROWN.topY).toBeLessThan(512);
+    expect(WATCH.topY).toBeLessThan(512);
+    expect(STACK.length).toBeGreaterThanOrEqual(31); // 30 rises + ground
   });
+
 });
 
 describe('grand-keep structure stamps', () => {
@@ -249,9 +242,17 @@ describe('grand-keep structure stamps', () => {
     expect(at(KCX, FLOOR.residential + 2, KCZ + 6)).toBe(AIR);
   });
 
-  it('has extra vertical cores (north service stair hollow)', () => {
-    // North stair well interior air mid-height
-    expect(at(KX0 + 7, FLOOR.throne + 2, KZ1 - 14)).toBe(AIR);
+  it('has exterior balconies on mid floors', () => {
+    const fy = FLOOR.residential;
+    // First south balcony bay starts at KX0+4, depth KZ0-2..KZ0-1
+    expect(isSolid(at(KX0 + 4, fy, KZ0 - 2))).toBe(true);
+    // Door opening through south keep wall into that bay
+    expect(at(KX0 + 5, fy + 1, KZ0)).toBe(AIR);
+  });
+
+  it('has north service stair shaft above ground', () => {
+    // Spiral newel is solid at well center
+    expect(isSolid(at(KX0 + 7, FLOOR.gallery + 1, KZ1 - 15))).toBe(true);
   });
 });
 
@@ -261,6 +262,6 @@ describe('grand-keep storey separations', () => {
       expect(STACK[i + 1] - STACK[i]).toBe(STOREY_RISE);
     }
     expect(STOREY_RISE).toBe(10);
-    expect(STACK.length).toBeGreaterThanOrEqual(11); // 10 storeys + roof
+    expect(STACK.length).toBe(31); // 30 rises → 31 floors including ground & roof
   });
 });
