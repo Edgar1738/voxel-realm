@@ -87,7 +87,8 @@
         "dungeon"
       ],
       "packageVersion": 1,
-      "chunkCount": 54
+      "chunkCount": 54,
+      "preview": "worlds/previews/tidewreck-cove.jpg"
     },
     {
       "slug": "caverns",
@@ -193,7 +194,8 @@
         "crystal"
       ],
       "packageVersion": 1,
-      "chunkCount": 32
+      "chunkCount": 32,
+      "preview": "worlds/previews/caverns.jpg"
     },
     {
       "slug": "giza",
@@ -269,7 +271,8 @@
         "osm"
       ],
       "packageVersion": 1,
-      "chunkCount": 2300
+      "chunkCount": 2300,
+      "preview": "worlds/previews/giza.jpg"
     },
     {
       "slug": "wash-park",
@@ -369,7 +372,8 @@
         "osm"
       ],
       "packageVersion": 1,
-      "chunkCount": 2003
+      "chunkCount": 2003,
+      "preview": "worlds/previews/wash-park.jpg"
     },
     {
       "slug": "moonspire-realm",
@@ -475,7 +479,8 @@
         "fantasy"
       ],
       "packageVersion": 1,
-      "chunkCount": 139
+      "chunkCount": 139,
+      "preview": "worlds/previews/moonspire-realm.jpg"
     }
   ]
 }

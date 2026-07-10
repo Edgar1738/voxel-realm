@@ -38,8 +38,10 @@ export interface WorldCard {
   tourCount: number;
   chunkCount?: number;
   url: string;
-  /** Stable per-slug hue for the card art (no preview images are shipped yet). */
+  /** Stable per-slug hue for the card art — the fallback when no preview image ships. */
   hue: number;
+  /** Relative path to the card's preview screenshot, when the manifest ships one. */
+  preview?: string;
 }
 
 /** Deterministic hue in [0, 360) so a card's gradient is stable across visits. */
@@ -59,6 +61,7 @@ export function worldCards(manifest: WorldManifest): WorldCard[] {
     landmarkCount: w.landmarks.length,
     tourCount: w.tour.length,
     ...(w.chunkCount !== undefined ? { chunkCount: w.chunkCount } : {}),
+    ...(w.preview !== undefined ? { preview: w.preview } : {}),
     url: shippedWorldUrl(w.slug),
     hue: cardHue(w.slug),
   }));

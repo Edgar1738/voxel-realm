@@ -17,17 +17,27 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function cardBanner(hue: number, label: string): HTMLElement {
+function cardBanner(hue: number, label: string, preview?: string): HTMLElement {
   const banner = el('div', 'menu-card-banner');
+  // The gradient always paints first — it doubles as the loading placeholder and the
+  // fallback when a preview image is missing or 404s (the broken <img> is removed).
   banner.style.background = `linear-gradient(135deg, hsl(${hue} 55% 42%), hsl(${(hue + 45) % 360} 60% 26%))`;
-  banner.appendChild(el('span', 'menu-card-banner-glyph', label.slice(0, 1).toUpperCase()));
+  if (preview) {
+    const img = el('img', 'menu-card-preview');
+    img.src = preview; // manifest-relative path; attribute assignment, never innerHTML
+    img.alt = '';
+    img.addEventListener('error', () => img.remove());
+    banner.appendChild(img);
+  } else {
+    banner.appendChild(el('span', 'menu-card-banner-glyph', label.slice(0, 1).toUpperCase()));
+  }
   return banner;
 }
 
 function worldCardEl(card: WorldCard): HTMLAnchorElement {
   const a = el('a', 'menu-card');
   a.href = card.url;
-  a.appendChild(cardBanner(card.hue, card.title));
+  a.appendChild(cardBanner(card.hue, card.title, card.preview));
 
   const body = el('div', 'menu-card-body');
   body.appendChild(el('h3', 'menu-card-title', card.title));
