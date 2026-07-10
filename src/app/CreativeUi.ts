@@ -107,6 +107,9 @@ export interface PauseDialogOpts {
   muted: boolean;
   onVolume(volume: number): void;
   onMute(muted: boolean): void;
+  /** View-bob setting (motion-sickness opt-out); toggles apply live via the callback. */
+  viewBob: boolean;
+  onViewBob(on: boolean): void;
 }
 
 /** What the tour HUD displays for the active waypoint. */
@@ -1051,7 +1054,22 @@ export function createCreativeUi(
       syncSound();
       soundRow.append(mute, slider);
 
-      actions.append(resume, guide, soundRow, worlds);
+      // View-bob toggle (motion-sickness opt-out) — label reflects the live state.
+      let viewBob = opts.viewBob;
+      const bobBtn = button('');
+      bobBtn.className = 'dialog-btn pause-btn';
+      const syncBob = (): void => {
+        bobBtn.textContent = `View bob: ${viewBob ? 'on' : 'off'}`;
+        bobBtn.setAttribute('aria-pressed', String(viewBob));
+      };
+      bobBtn.addEventListener('click', () => {
+        viewBob = !viewBob;
+        opts.onViewBob(viewBob);
+        syncBob();
+      });
+      syncBob();
+
+      actions.append(resume, guide, soundRow, bobBtn, worlds);
       panel.append(title, worldLine, actions);
       const close = openDialogPanel(panel, () => finish('resume'));
     });

@@ -237,11 +237,13 @@ export class Game {
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
       isClimbable(x: number, y: number, z: number): boolean;
+      isBarrier(x: number, y: number, z: number): boolean;
     } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
       isClimbable: (x: number, y: number, z: number) =>
         registry.isClimbable(manager.getBlock(x, y, z)),
+      isBarrier: (x: number, y: number, z: number) => registry.isBarrier(manager.getBlock(x, y, z)),
     };
 
     const edit = new EditService(manager);
@@ -807,6 +809,8 @@ export class Game {
             audio.setMuted(m);
             ui.setSoundUi(audio.volume, audio.muted);
           },
+          viewBob: viewBobOn,
+          onViewBob: (on) => setViewBob(on),
         });
         if (action === 'resume') {
           // Chrome enforces a ~1.25s cooldown after an Escape-exit; when the request is
@@ -1112,6 +1116,23 @@ export class Game {
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
+    // View bob: on by default, toggleable from the pause menu (motion-sickness opt-out).
+    let viewBobOn = true;
+    try {
+      viewBobOn = localStorage.getItem('vr.viewBob') !== 'off';
+    } catch {
+      /* localStorage unavailable — keep the default */
+    }
+    const setViewBob = (on: boolean): void => {
+      viewBobOn = on;
+      try {
+        localStorage.setItem('vr.viewBob', on ? 'on' : 'off');
+      } catch {
+        /* ignore persistence failure */
+      }
+    };
+    let bobPhase = 0;
+    let bobAmp = 0;
     // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
     let avatarPrevX = player.position.x;
     let avatarPrevZ = player.position.z;
@@ -1146,6 +1167,22 @@ export class Game {
         smoothEyeY = eye.y;
       }
       const viewEye = { x: eye.x, y: smoothEyeY, z: eye.z };
+      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
+      avatarPrevX = player.position.x;
+      avatarPrevZ = player.position.z;
+      // View bob: stride-driven sway while walking on the ground, first-person only. The
+      // amplitude eases in/out so starts and stops never snap the camera; phase advances by
+      // ground covered, so bob speed tracks walk vs sprint automatically.
+      const bobTarget =
+        viewBobOn && player.grounded && rig.mode === 'first' && avatarDh > 0.0005 ? 1 : 0;
+      bobAmp += (bobTarget - bobAmp) * Math.min(1, cdt * 8);
+      if (bobAmp > 0.002) {
+        bobPhase += avatarDh * 1.7;
+        const lateral = Math.cos(bobPhase) * 0.022 * bobAmp;
+        viewEye.y += Math.sin(bobPhase * 2) * 0.042 * bobAmp;
+        viewEye.x += Math.cos(rig.yaw) * lateral;
+        viewEye.z += -Math.sin(rig.yaw) * lateral;
+      }
       // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
       let thirdDistance = THIRD_PERSON_DISTANCE;
       if (rig.mode === 'third') {
@@ -1158,9 +1195,6 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
-      avatarPrevX = player.position.x;
-      avatarPrevZ = player.position.z;
       avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
       const move = movementSounds.update(
         cdt,
