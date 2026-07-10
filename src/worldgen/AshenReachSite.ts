@@ -30,6 +30,22 @@ function buildLavaValley(s: CitadelStamp): void {
   s.fill(7, 62, 6, 8, 64, 36, DEEPSLATE);
 }
 
+function buildSpawnPlatform(s: CitadelStamp): void {
+  // Raised basalt viewing deck just behind the trench mouth: spawn stands two blocks above the
+  // plateau so Cinderkeep reads across the valley on arrival instead of a trench wall.
+  s.fill(-3, 105, 93, 3, 106, 97, DEEPSLATE);
+  s.slab(-3, 93, 3, 97, 106, COBBLESTONE);
+  for (let x = -3; x <= 3; x += 2) s.set(x, 107, 97, STONEBRICK_WALL);
+  for (let z = 93; z <= 97; z += 2) {
+    s.set(-3, 107, z, STONEBRICK_WALL);
+    s.set(3, 107, z, STONEBRICK_WALL);
+  }
+  s.set(-3, 108, 97, LANTERN);
+  s.set(3, 108, 97, LANTERN);
+  // A single open step down onto the plateau, straight toward the trench mouth.
+  s.fill(-1, 105, 92, 1, 105, 92, GRAVEL);
+}
+
 function buildApproach(s: CitadelStamp): void {
   // A broad stepped descent deliberately frames Cinderkeep, then becomes a damaged bridge over
   // the lava channel. The unbroken center lane keeps the whole route walkable.
@@ -182,6 +198,7 @@ function buildExplorationProps(s: CitadelStamp): void {
 export function ashenReachSite(): Overlay {
   return (chunk, cx, cz, seed) => {
     const stamp = new CitadelStamp(chunk, cx, cz);
+    buildSpawnPlatform(stamp);
     buildLavaValley(stamp);
     buildApproach(stamp);
     buildCinderkeep(stamp);
