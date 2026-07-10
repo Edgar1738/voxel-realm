@@ -271,9 +271,9 @@ describe('grand-keep structure stamps', () => {
     const hx = KX1 + 12;
     const hz = KZ0 + 8;
     // Floor paving under houses / streets nearby is solid
-    expect(isSolid(at(hx, G, hz)) || at(hx, G, hz) === PLANKS || at(hx, G, hz) === COBBLESTONE).toBe(
-      true,
-    );
+    expect(
+      isSolid(at(hx, G, hz)) || at(hx, G, hz) === PLANKS || at(hx, G, hz) === COBBLESTONE,
+    ).toBe(true);
   });
 
   it('has exterior balconies on mid floors', () => {

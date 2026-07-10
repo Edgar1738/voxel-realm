@@ -111,4 +111,13 @@ describe('cards', () => {
     // Free Build is first and targets the legacy default world.
     expect(CREATE_CARDS[0].url).toBe('?save=default');
   });
+
+  it('offers Ashen Reach as an explorable volcanic frontier', () => {
+    expect(CREATE_CARDS).toContainEqual(
+      expect.objectContaining({
+        name: 'Ashen Reach',
+        url: '?world=ashen-reach&save=ashen-reach-world',
+      }),
+    );
+  });
 });
