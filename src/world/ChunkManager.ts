@@ -686,6 +686,13 @@ export class ChunkManager {
   }
 
   /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] or [voxelIndex, blockId, state] entries (for persistence). */
+  /** A deep copy of every chunk's live edit delta — the world-share export source. */
+  allDeltas(): WorldDeltas {
+    const out: WorldDeltas = new Map();
+    for (const [key, map] of this.deltas) out.set(key, new Map(map));
+    return out;
+  }
+
   getChunkDelta(key: string): ChunkDeltaEntries {
     return [...(this.deltas.get(key)?.entries() ?? [])]
       .sort((a, b) => a[0] - b[0])

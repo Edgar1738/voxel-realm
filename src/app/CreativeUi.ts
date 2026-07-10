@@ -110,6 +110,8 @@ export interface PauseDialogOpts {
   /** View-bob setting (motion-sickness opt-out); toggles apply live via the callback. */
   viewBob: boolean;
   onViewBob(on: boolean): void;
+  /** Downloads a shareable copy of the world (the dialog stays open; a toast confirms). */
+  onShare(): void;
 }
 
 /** What the tour HUD displays for the active waypoint. */
@@ -1086,7 +1088,12 @@ export function createCreativeUi(
       });
       syncBob();
 
-      actions.append(resume, guide, soundRow, bobBtn, worlds);
+      const share = button('Download world copy');
+      share.className = 'dialog-btn pause-btn';
+      share.title = 'Save this world as a file you can share; others import it from the menu';
+      share.addEventListener('click', () => opts.onShare());
+
+      actions.append(resume, guide, soundRow, bobBtn, share, worlds);
       panel.append(title, worldLine, actions);
       const close = openDialogPanel(panel, () => finish('resume'));
     });

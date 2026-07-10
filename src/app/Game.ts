@@ -40,6 +40,7 @@ import { createCreativeUi, type DialogAction, type BlueprintEntry } from './Crea
 import { createWorldMapUi } from './WorldMapUi';
 import { buildMapPalette } from './worldMapRender';
 import { LandmarkDiscovery } from './landmarkDiscovery';
+import { exportWorldJson, exportFileName } from '../persistence/worldShare';
 import { createBootStore } from './bootStore';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -811,6 +812,21 @@ export class Game {
           },
           viewBob: viewBobOn,
           onViewBob: (on) => setViewBob(on),
+          onShare: () => {
+            void (async () => {
+              // Fresh meta (dev setMeta can change it after boot) + the live delta map, so
+              // the export never waits on (or races) the debounced persistence flush.
+              const meta = (await store.loadMeta().catch(() => undefined)) ?? bootMeta.meta;
+              const json = exportWorldJson(meta, manager.allDeltas());
+              const blob = new Blob([json], { type: 'application/json' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = exportFileName(meta?.title, worldName);
+              link.click();
+              window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+              setStatus('World copy downloaded — import it from the menu on any device');
+            })();
+          },
         });
         if (action === 'resume') {
           // Chrome enforces a ~1.25s cooldown after an Escape-exit; when the request is
