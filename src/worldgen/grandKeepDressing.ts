@@ -34,6 +34,8 @@ import {
   KCX,
   KCZ,
   FLOOR,
+  STACK,
+  STOREY_RISE,
   STAIR_X0,
   STAIR_X1,
   STAIR_Z0,
@@ -299,16 +301,15 @@ export function polishGrandStair(s: CitadelStamp): void {
     }
   }
 
-  // Glowstone under mid-landings for readable flights
-  const levels = [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high];
-  for (const y0 of levels) {
-    const mid = y0 + 6;
+  // Glowstone under mid-landings for readable flights (every storey)
+  for (let i = 0; i < STACK.length - 1; i++) {
+    const mid = STACK[i] + STOREY_RISE / 2;
     s.set(STAIR_X0 + 3, mid - 1, STAIR_Z0 + 10, GLOWSTONE);
     s.set(STAIR_X0 + 5, mid - 1, STAIR_Z1 - 4, GLOWSTONE);
   }
 
-  // Overlook windows from stair well into Great Hall (west wall openings with glass + air walk)
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential]) {
+  // Overlook windows from stair well into interiors on lower/mid floors
+  for (const fy of [FLOOR.ground, FLOOR.gallery, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
     // Wider viewing slit looking west into hall
     s.fill(STAIR_X0, fy + 3, STAIR_Z0 + 12, STAIR_X0, fy + 6, STAIR_Z0 + 18, AIR);
     for (let z = STAIR_Z0 + 12; z <= STAIR_Z0 + 18; z += 2) {
@@ -353,9 +354,8 @@ export function polishExteriorSilhouette(s: CitadelStamp): void {
     s.fill(x - 1, FLOOR.roof + 1, KZ0 + 8, x + 1, FLOOR.roof + 3, KZ1 - 8, BRICK);
   }
 
-  // Taller gatehouse corner turrets (already hollow towers — add spire tops)
-  // Handled in walls polish via extra fill if towers exist; add keep SE/SW shoulder towers
-  const shoulderY = FLOOR.high + 6;
+  // Shoulder turrets climb farther on the taller keep
+  const shoulderY = FLOOR.barracks + 6;
   for (const [cx, cz] of [
     [KX0 + 4, KZ0 + 4],
     [KX1 - 4, KZ0 + 4],

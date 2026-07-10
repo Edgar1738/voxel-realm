@@ -15,6 +15,7 @@ import {
   COBBLESTONE,
   STAIRS_STONE,
   CRYSTAL,
+  COBBLE_WALL,
 } from '../blocks/blocks';
 import { CitadelStamp, spiralStair, floorWithStairHole } from './CitadelStamp';
 import {
@@ -25,6 +26,9 @@ import {
   KCX,
   KCZ,
   FLOOR,
+  STACK,
+  INTERIOR_STACK,
+  STOREY_RISE,
   STAIR_X0,
   STAIR_Z0,
   STAIR_Z1,
@@ -128,12 +132,11 @@ function corridorNS(
   }
 }
 
-/** Punch stair wells through existing floors for new stairs. */
+/** Punch stair wells through every storey for north + mid stairs. */
 export function punchExtraStairWells(s: CitadelStamp): void {
-  for (const fy of [FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof]) {
+  for (const fy of STACK) {
+    if (fy === FLOOR.ground) continue;
     s.fill(NORTH_STAIR.x0, fy, NORTH_STAIR.z0, NORTH_STAIR.x1, fy, NORTH_STAIR.z1, AIR);
-  }
-  for (const fy of [FLOOR.throne, FLOOR.residential, FLOOR.high]) {
     s.fill(MID_STAIR.x0, fy, MID_STAIR.z0, MID_STAIR.x1, fy, MID_STAIR.z1, AIR);
   }
 }
@@ -145,43 +148,36 @@ export function buildNorthServiceStair(s: CitadelStamp): void {
   const cx = (x0 + x1) >> 1;
   const cz = (z0 + z1) >> 1;
   spiralStair(s, cx, cz, FLOOR.ground, FLOOR.roof, COBBLESTONE, STONE);
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof]) {
-    // Door south into keep
+  for (const fy of STACK) {
     s.fill(cx - 1, fy + 1, z0, cx + 1, fy + 3, z0, AIR);
     s.set(x0 + 1, fy + 1, z0 + 1, LANTERN);
   }
 }
 
+/** Mid-keep switchback from ground all the way to roof. */
 export function buildMidGalleryStair(s: CitadelStamp): void {
   const { x0, x1, z0, z1 } = MID_STAIR;
-  s.walls(x0, FLOOR.ground, z0, x1, FLOOR.high, z1, BRICK);
-  s.fill(x0 + 1, FLOOR.ground, z0 + 1, x1 - 1, FLOOR.high - 1, z1 - 1, AIR);
+  s.walls(x0, FLOOR.ground, z0, x1, FLOOR.roof, z1, BRICK);
+  s.fill(x0 + 1, FLOOR.ground, z0 + 1, x1 - 1, FLOOR.roof - 1, z1 - 1, AIR);
   const stepX0 = x0 + 2;
   const stepX1 = x0 + 5;
-  const levels = [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high];
-  for (let i = 0; i < levels.length - 1; i++) {
-    const y0 = levels[i];
-    const mid = y0 + 6;
-    stairFlightZ(s, stepX0, stepX1, z0 + 1, y0, 6, 1, STAIRS_STONE);
+  const flight = STOREY_RISE / 2;
+  for (let i = 0; i < STACK.length - 1; i++) {
+    const y0 = STACK[i];
+    const mid = y0 + flight;
+    stairFlightZ(s, stepX0, stepX1, z0 + 1, y0, flight, 1, STAIRS_STONE);
     s.fill(x0 + 1, mid, z0 + 1, x1 - 1, mid, z1 - 1, PLANKS);
-    stairFlightZ(s, stepX0, stepX1, z1 - 1, mid, 6, -1, STAIRS_STONE);
-    s.fill(x0, y0 + 1, (z0 + z1) >> 1, x0, y0 + 3, (z0 + z1) >> 1, AIR); // door west
-    s.fill(x1, y0 + 1, (z0 + z1) >> 1, x1, y0 + 3, (z0 + z1) >> 1, AIR); // door east
+    stairFlightZ(s, stepX0, stepX1, z1 - 1, mid, flight, -1, STAIRS_STONE);
+    s.fill(x0, y0 + 1, (z0 + z1) >> 1, x0, y0 + 3, (z0 + z1) >> 1, AIR);
+    s.fill(x1, y0 + 1, (z0 + z1) >> 1, x1, y0 + 3, (z0 + z1) >> 1, AIR);
     s.set(x0 + 1, mid + 1, z0 + 2, LANTERN);
   }
-  s.fill(x0, FLOOR.high + 1, (z0 + z1) >> 1, x0, FLOOR.high + 3, (z0 + z1) >> 1, AIR);
-  s.fill(x1, FLOOR.high + 1, (z0 + z1) >> 1, x1, FLOOR.high + 3, (z0 + z1) >> 1, AIR);
 }
 
-/** Extend secondary stair from high to roof. */
+/** Secondary stair already runs ground→roof in keep module; ensure roof hole + door. */
 export function extendSecondaryToRoof(s: CitadelStamp): void {
-  s.walls(SEC_X0, FLOOR.high, SEC_Z0, SEC_X1, FLOOR.roof, SEC_Z1, STONE);
-  s.fill(SEC_X0 + 1, FLOOR.high, SEC_Z0 + 1, SEC_X1 - 1, FLOOR.roof - 1, SEC_Z1 - 1, AIR);
-  // Hole in roof
   s.fill(SEC_X0, FLOOR.roof, SEC_Z0, SEC_X1, FLOOR.roof, SEC_Z1, AIR);
-  const cx = (SEC_X0 + SEC_X1) >> 1;
   const cz = (SEC_Z0 + SEC_Z1) >> 1;
-  spiralStair(s, cx, cz, FLOOR.high, FLOOR.roof, COBBLESTONE, STONE);
   s.fill(SEC_X1, FLOOR.roof + 1, cz - 1, SEC_X1, FLOOR.roof + 3, cz + 1, AIR);
 }
 
@@ -422,50 +418,98 @@ export function buildInnerWallPassage(s: CitadelStamp): void {
 // ── Connecting bridges between stair systems ───────────────────────────────────────────────
 
 export function buildStairLinks(s: CitadelStamp): void {
-  for (const y of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
-    // Grand stair ↔ mid stair
+  for (const y of INTERIOR_STACK) {
     corridorEW(s, MID_STAIR.x1, STAIR_X0, (STAIR_Z0 + STAIR_Z1) >> 1, y, 1, 4);
-    // Secondary ↔ west corridor
     corridorEW(s, SEC_X1, KX0 + 16, (SEC_Z0 + SEC_Z1) >> 1, y, 1, 4);
-    // North stair ↔ west corridor
     corridorNS(s, KCZ, NORTH_STAIR.z0, KX0 + 14, y, 1, 4);
   }
-  // Roof: connect north stair exit toward crown / grand stair
   corridorEW(s, NORTH_STAIR.x1, STAIR_X0, (NORTH_STAIR.z0 + NORTH_STAIR.z1) >> 1, FLOOR.roof, 1, 3);
   corridorNS(s, NORTH_STAIR.z1, CROWN.cz - CROWN.half, CROWN.cx, FLOOR.roof, 1, 3);
 }
 
-// ── Extra mid towers (interior vertical cores) ─────────────────────────────────────────────
+// ── Extra mid towers (full-height interior cores) ──────────────────────────────────────────
 
 export function buildInteriorStairTurrets(s: CitadelStamp): void {
-  // Small spiral turret in SW quadrant of keep (ground → residential)
+  // SW spiral: ground → roof
   const tx = KX0 + 22;
   const tz = KZ0 + 20;
-  s.walls(tx - 2, FLOOR.ground, tz - 2, tx + 2, FLOOR.residential, tz + 2, STONE);
-  s.fill(tx - 1, FLOOR.ground, tz - 1, tx + 1, FLOOR.residential - 1, tz + 1, AIR);
-  for (const fy of [FLOOR.throne, FLOOR.residential]) {
-    floorWithStairHole(s, tx - 1, tz - 1, tx + 1, tz + 1, fy, tx, tz, PLANKS);
-    s.fill(tx - 2, fy + 1, tz + 2, tx + 2, fy + 3, tz + 2, AIR); // door south-ish
+  s.walls(tx - 2, FLOOR.ground, tz - 2, tx + 2, FLOOR.roof, tz + 2, STONE);
+  s.fill(tx - 1, FLOOR.ground, tz - 1, tx + 1, FLOOR.roof - 1, tz + 1, AIR);
+  for (const fy of STACK) {
+    if (fy !== FLOOR.ground) {
+      floorWithStairHole(s, tx - 1, tz - 1, tx + 1, tz + 1, fy, tx, tz, PLANKS);
+    }
+    s.fill(tx - 1, fy + 1, tz + 2, tx + 1, fy + 3, tz + 2, AIR);
   }
-  spiralStair(s, tx, tz, FLOOR.ground, FLOOR.residential, COBBLESTONE, STONE);
-  s.fill(tx - 1, FLOOR.ground + 1, tz + 2, tx + 1, FLOOR.ground + 3, tz + 2, AIR);
-  s.fill(tx - 1, FLOOR.throne + 1, tz + 2, tx + 1, FLOOR.throne + 3, tz + 2, AIR);
+  spiralStair(s, tx, tz, FLOOR.ground, FLOOR.roof, COBBLESTONE, STONE);
 
-  // SE companion turret ground → high near grand stair
+  // SE companion spiral near grand stair: ground → roof
   const ex = STAIR_X0 - 10;
   const ez = KZ0 + 22;
-  s.walls(ex - 2, FLOOR.ground, ez - 2, ex + 2, FLOOR.high, ez + 2, BRICK);
-  s.fill(ex - 1, FLOOR.ground, ez - 1, ex + 1, FLOOR.high - 1, ez + 1, AIR);
-  spiralStair(s, ex, ez, FLOOR.ground, FLOOR.high, COBBLESTONE, BRICK);
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
+  s.walls(ex - 2, FLOOR.ground, ez - 2, ex + 2, FLOOR.roof, ez + 2, BRICK);
+  s.fill(ex - 1, FLOOR.ground, ez - 1, ex + 1, FLOOR.roof - 1, ez + 1, AIR);
+  spiralStair(s, ex, ez, FLOOR.ground, FLOOR.roof, COBBLESTONE, BRICK);
+  for (const fy of STACK) {
     s.fill(ex + 2, fy + 1, ez - 1, ex + 2, fy + 3, ez + 1, AIR);
-    if (fy > FLOOR.ground) {
+    if (fy !== FLOOR.ground) {
       floorWithStairHole(s, ex - 1, ez - 1, ex + 1, ez + 1, fy, ex, ez, PLANKS);
     }
   }
 }
 
-/** Master entry: all deep-interior systems. */
+/**
+ * Generic corridor + room ring for every storey that is not a special themed floor.
+ * Applied to gallery, state, guest, library, barracks, observatory (and as densifier).
+ */
+export function buildGenericFloorNetwork(s: CitadelStamp, y: number): void {
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KCZ - 6, y, 2, 4);
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KCZ + 6, y, 2, 4);
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KZ0 + 12, y, 1, 4);
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KZ1 - 12, y, 1, 4);
+  corridorNS(s, KZ0 + 8, KZ1 - 8, KX0 + 14, y, 2, 4);
+  corridorNS(s, KZ0 + 8, KZ1 - 8, KCX, y, 1, 4);
+  corridorNS(s, KZ0 + 8, KZ1 - 8, STAIR_X0 - 8, y, 2, 4);
+
+  // Chamber rows
+  for (let i = 0; i < 4; i++) {
+    const x0 = KX0 + 6 + i * 12;
+    if (x0 + 10 >= STAIR_X0 - 2) break;
+    room(s, x0, y, KZ0 + 6, x0 + 10, y + 6, KZ0 + 14, 'n');
+    room(s, x0, y, KZ1 - 16, x0 + 10, y + 6, KZ1 - 8, 's');
+  }
+  for (let i = 0; i < 3; i++) {
+    const z0 = KZ0 + 18 + i * 14;
+    room(s, KX0 + 4, y, z0, KX0 + 16, y + 6, z0 + 10, 'e');
+    room(s, STAIR_X0 - 16, y, z0, STAIR_X0 - 4, y + 6, z0 + 10, 'w');
+  }
+
+  // Central salon
+  room(s, KCX - 10, y, KCZ - 4, KCX + 10, y + 7, KCZ + 4, 's');
+  s.set(KCX, y + 1, KCZ, LANTERN);
+}
+
+/** Gallery floor — open walkways overlooking Great Hall + side museums. */
+export function buildGalleryFloor(s: CitadelStamp): void {
+  const y = FLOOR.gallery;
+  // Keep the central void over the hall (already punched in buildGreatHall)
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KZ0 + 20, y, 2, 4);
+  corridorEW(s, KX0 + 6, STAIR_X0 - 2, KCZ, y, 2, 4);
+  corridorNS(s, KZ0 + 10, KZ1 - 8, KX0 + 12, y, 2, 4);
+  corridorNS(s, KZ0 + 10, KZ1 - 8, STAIR_X0 - 6, y, 2, 4);
+  // Side galleries as rooms
+  for (let i = 0; i < 3; i++) {
+    const z0 = KZ0 + 24 + i * 12;
+    room(s, KX0 + 4, y, z0, KX0 + 16, y + 6, z0 + 10, 'e');
+    room(s, STAIR_X0 - 16, y, z0, STAIR_X0 - 4, y + 6, z0 + 10, 'w');
+    s.fill(KX0 + 6, y + 1, z0 + 4, KX0 + 6, y + 3, z0 + 8, BOOKSHELF);
+  }
+  // Balcony rails denser around hall void
+  for (let x = KCX - 12; x <= KCX + 12; x++) {
+    s.set(x, y + 1, KZ0 + 16, COBBLE_WALL);
+  }
+}
+
+/** Master entry: all deep-interior systems across the tall stack. */
 export function buildDeepInteriors(s: CitadelStamp): void {
   punchExtraStairWells(s);
   buildNorthServiceStair(s);
@@ -474,9 +518,41 @@ export function buildDeepInteriors(s: CitadelStamp): void {
   buildInteriorStairTurrets(s);
 
   buildGroundFloorNetwork(s);
+  buildGalleryFloor(s);
   buildThroneFloorNetwork(s);
   buildResidentialNetwork(s);
   buildHighCastleNetwork(s);
+
+  // Extra themed / generic floors for the taller keep
+  for (const y of [FLOOR.state, FLOOR.guest, FLOOR.library, FLOOR.barracks, FLOOR.observatory]) {
+    buildGenericFloorNetwork(s, y);
+  }
+  // Library denser books
+  {
+    const y = FLOOR.library;
+    s.fill(KCX - 8, y + 1, KCZ - 2, KCX - 8, y + 4, KCZ + 2, BOOKSHELF);
+    s.fill(KCX + 8, y + 1, KCZ - 2, KCX + 8, y + 4, KCZ + 2, BOOKSHELF);
+  }
+  // Observatory glow chamber
+  {
+    const y = FLOOR.observatory;
+    s.set(KCX, y + 1, KCZ, GLOWSTONE);
+    s.set(KCX, y + 2, KCZ, CRYSTAL);
+  }
+
   buildInnerWallPassage(s);
+  // Wall passages also on residential + high for vertical labyrinth feel
+  const ySave = FLOOR.throne;
+  // re-run pattern at residential / high by temporarily using those floors
+  for (const y of [FLOOR.residential, FLOOR.high, FLOOR.observatory]) {
+    const inset = 2;
+    s.fill(KX0 + inset, y + 1, KZ0 + inset, KX1 - inset, y + 3, KZ0 + inset + 1, AIR);
+    s.fill(KX0 + inset, y + 1, KZ1 - inset - 1, KX1 - inset, y + 3, KZ1 - inset, AIR);
+    s.fill(KX0 + inset, y + 1, KZ0 + inset, KX0 + inset + 1, y + 3, KZ1 - inset, AIR);
+    s.fill(KX1 - inset - 1, y + 1, KZ0 + inset, KX1 - inset, y + 3, STAIR_Z0 - 1, AIR);
+    s.fill(KX0 + 12, y + 1, KZ0 + inset + 1, KX0 + 14, y + 3, KZ0 + inset + 1, AIR);
+  }
+  void ySave;
+
   buildStairLinks(s);
 }

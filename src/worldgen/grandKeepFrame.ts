@@ -1,14 +1,12 @@
 import { GRAND_KEEP } from './GrandKeepGenerator';
 
 /**
- * Shared world-space frame for The Grand Keep. All site modules import these constants so walls,
- * keep, towers, stairs, and dungeon stay locked together.
+ * Shared world-space frame for The Grand Keep.
  *
- * Scale targets (Milestone 1):
- * - Outer curtain ~124×124 blocks
- * - Main keep shell ~96×60
- * - Four above-ground storeys + dungeon + walkable roof
- * - Crown + Watch towers above the roofline
+ * Vertical programme (WORLD_HEIGHT = 192):
+ * - 1 dungeon level
+ * - 10 above-ground storeys + walkable roof
+ * - Crown / Watch towers above the roof (capped under y=191)
  */
 export const G = GRAND_KEEP.groundY; // 72
 export const CX = GRAND_KEEP.centerX; // 8
@@ -20,72 +18,98 @@ export const X0 = CX - OUTER_HW; // -54
 export const X1 = CX + OUTER_HW; // 70
 export const Z0 = CZ - OUTER_HW; // -42  south (approach / gate)
 export const Z1 = CZ + OUTER_HW; // 82   north
-export const WT = 4; // curtain thickness
+export const WT = 4;
 export const IN_X0 = X0 + WT;
 export const IN_X1 = X1 - WT;
 export const IN_Z0 = Z0 + WT;
 export const IN_Z1 = Z1 - WT;
 
 export const WALL_Y0 = G + 1;
-export const WALK_Y = G + 12; // wall-walk surface
+export const WALK_Y = G + 12;
 export const MERLON_Y = WALK_Y + 1;
 
-// Gatehouse (south wall): monumental opening
-export const GATE_HALF = 4; // 9-wide passage
+export const GATE_HALF = 4;
 export const GATE_TOP = G + 7;
-export const GATEHOUSE_DEPTH = 14; // how far the gatehouse projects inward
+export const GATEHOUSE_DEPTH = 14;
 
-// ── Main keep (north of courtyard) ─────────────────────────────────────────────────────────
-// Footprint ~96 × 60, north end of the bailey.
+// ── Main keep ──────────────────────────────────────────────────────────────────────────────
 export const KX0 = CX - 48; // -40
 export const KX1 = CX + 48; // 56
-export const KZ0 = CZ + 2; // 22  south face of keep (courtyard side)
-export const KZ1 = CZ + 62; // 82  north face (flush with outer wall north)
+export const KZ0 = CZ + 2; // 22
+export const KZ1 = CZ + 62; // 82
 export const KCX = (KX0 + KX1) >> 1; // 8
 export const KCZ = (KZ0 + KZ1) >> 1; // 52
 
+/** Blocks between storey floor surfaces (two stair flights of 5). */
+export const STOREY_RISE = 10;
+
 /**
- * Vertical programme — storey floors are the solid floor surface the player stands on.
- * Great Hall has double-height volume (floor G+1, ceiling under L2).
+ * Named floors. Great Hall (ground) is double-height up into the gallery underside.
+ * Order is bottom → top for stacking.
  */
 export const FLOOR = {
   dungeon: G - 12, // 60
   ground: G + 1, // 73  Great Hall
-  throne: G + 13, // 85  (+12 storey rise — two stair flights of 6)
-  residential: G + 25, // 97
-  high: G + 37, // 109
-  roof: G + 49, // 121
+  gallery: G + 1 + STOREY_RISE, // 83  upper gallery / mezzanine
+  throne: G + 1 + STOREY_RISE * 2, // 93
+  state: G + 1 + STOREY_RISE * 3, // 103  ceremonial apartments
+  residential: G + 1 + STOREY_RISE * 4, // 113
+  guest: G + 1 + STOREY_RISE * 5, // 123  guest wing
+  library: G + 1 + STOREY_RISE * 6, // 133
+  high: G + 1 + STOREY_RISE * 7, // 143  war / high castle
+  barracks: G + 1 + STOREY_RISE * 8, // 153
+  observatory: G + 1 + STOREY_RISE * 9, // 163
+  roof: G + 1 + STOREY_RISE * 10, // 173
 } as const;
 
-export const STOREYS: readonly number[] = [
+/**
+ * Every walkable keep floor from ground up through roof (for stairs, wells, windows, corridors).
+ */
+export const STACK: readonly number[] = [
   FLOOR.ground,
+  FLOOR.gallery,
   FLOOR.throne,
+  FLOOR.state,
   FLOOR.residential,
+  FLOOR.guest,
+  FLOOR.library,
   FLOOR.high,
+  FLOOR.barracks,
+  FLOOR.observatory,
   FLOOR.roof,
 ];
 
-/** Ceiling clearance under the floor above (air volume height). */
-export const STOREY_CLEAR = 11;
+/** Interior storeys only (excludes roof) — room/corridor programs. */
+export const INTERIOR_STACK: readonly number[] = STACK.filter((y) => y !== FLOOR.roof);
 
-// Grand stair well — east wing, mid-south (keeps north free for Crown Tower)
+/** @deprecated use STACK — kept as alias for older call sites */
+export const STOREYS: readonly number[] = STACK;
+
+/** Ceiling clearance under the floor above. */
+export const STOREY_CLEAR = STOREY_RISE - 1;
+
+// Grand stair well — east wing
 export const STAIR_X0 = KX1 - 12; // 44
 export const STAIR_X1 = KX1 - 3; // 53
-export const STAIR_WIDTH = 5; // walkable steps
+export const STAIR_WIDTH = 5;
 export const STAIR_Z0 = KZ0 + 4; // 26
-export const STAIR_Z1 = KZ0 + 36; // 58 — short of north towers
+export const STAIR_Z1 = KZ0 + 36; // 58
 
-// Secondary stair — west wing (south)
+// Secondary stair — west wing
 export const SEC_X0 = KX0 + 3;
 export const SEC_X1 = KX0 + 10;
 export const SEC_Z0 = KZ0 + 4;
 export const SEC_Z1 = KZ0 + 16;
 
-// Crown tower (NE) and Watch tower (NW) — clear of stair wells
-export const CROWN = { cx: KX1 - 8, cz: KZ1 - 9, half: 6, topY: FLOOR.roof + 28 } as const;
-export const WATCH = { cx: KX0 + 8, cz: KZ1 - 9, half: 6, topY: FLOOR.roof + 22 } as const;
+// Major towers — stay under WORLD_HEIGHT 192
+export const CROWN = { cx: KX1 - 8, cz: KZ1 - 9, half: 6, topY: FLOOR.roof + 16 } as const; // 189
+export const WATCH = { cx: KX0 + 8, cz: KZ1 - 9, half: 6, topY: FLOOR.roof + 14 } as const; // 187
 
-// Dungeon
 export const DUNGEON_FLOOR = FLOOR.dungeon;
 export const DUNGEON_CEIL = G - 2;
 export const DUNGEON_SHAFT = { x: KCX - 20, z: KCZ } as const;
+
+/** Half-rise mid-landing height between two floors. */
+export function midLanding(floorY: number): number {
+  return floorY + STOREY_RISE / 2;
+}

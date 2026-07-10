@@ -29,6 +29,8 @@ import {
   KCX,
   KCZ,
   FLOOR,
+  STACK,
+  STOREY_RISE,
   STAIR_X0,
   STAIR_X1,
   STAIR_Z0,
@@ -121,15 +123,23 @@ describe('grand-keep massing scale', () => {
     expect(KZ1 - KZ0 + 1).toBeGreaterThanOrEqual(55);
   });
 
-  it('has four above-ground floors + dungeon + roof', () => {
+  it('has many above-ground floors + dungeon + roof (tall keep)', () => {
     expect(FLOOR.dungeon).toBeLessThan(G);
     expect(FLOOR.ground).toBeGreaterThan(G);
-    expect(FLOOR.throne).toBeGreaterThan(FLOOR.ground);
-    expect(FLOOR.residential).toBeGreaterThan(FLOOR.throne);
-    expect(FLOOR.high).toBeGreaterThan(FLOOR.residential);
-    expect(FLOOR.roof).toBeGreaterThan(FLOOR.high);
+    expect(FLOOR.gallery).toBeGreaterThan(FLOOR.ground);
+    expect(FLOOR.throne).toBeGreaterThan(FLOOR.gallery);
+    expect(FLOOR.state).toBeGreaterThan(FLOOR.throne);
+    expect(FLOOR.residential).toBeGreaterThan(FLOOR.state);
+    expect(FLOOR.guest).toBeGreaterThan(FLOOR.residential);
+    expect(FLOOR.library).toBeGreaterThan(FLOOR.guest);
+    expect(FLOOR.high).toBeGreaterThan(FLOOR.library);
+    expect(FLOOR.barracks).toBeGreaterThan(FLOOR.high);
+    expect(FLOOR.observatory).toBeGreaterThan(FLOOR.barracks);
+    expect(FLOOR.roof).toBeGreaterThan(FLOOR.observatory);
+    expect(FLOOR.roof).toBeLessThan(192);
     expect(CROWN.topY).toBeGreaterThan(FLOOR.roof);
-    expect(WATCH.topY).toBeGreaterThan(FLOOR.roof);
+    expect(CROWN.topY).toBeLessThan(192);
+    expect(WATCH.topY).toBeLessThan(192);
   });
 });
 
@@ -246,10 +256,11 @@ describe('grand-keep structure stamps', () => {
 });
 
 describe('grand-keep storey separations', () => {
-  it('uses 12-block rises between major floors (stair-friendly)', () => {
-    expect(FLOOR.throne - FLOOR.ground).toBe(12);
-    expect(FLOOR.residential - FLOOR.throne).toBe(12);
-    expect(FLOOR.high - FLOOR.residential).toBe(12);
-    expect(FLOOR.roof - FLOOR.high).toBe(12);
+  it('uses consistent rises between stacked floors (stair-friendly)', () => {
+    for (let i = 0; i < STACK.length - 1; i++) {
+      expect(STACK[i + 1] - STACK[i]).toBe(STOREY_RISE);
+    }
+    expect(STOREY_RISE).toBe(10);
+    expect(STACK.length).toBeGreaterThanOrEqual(11); // 10 storeys + roof
   });
 });

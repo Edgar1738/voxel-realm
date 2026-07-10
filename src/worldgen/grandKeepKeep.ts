@@ -28,6 +28,9 @@ import {
   KCX,
   KCZ,
   FLOOR,
+  STACK,
+  INTERIOR_STACK,
+  STOREY_RISE,
   STAIR_X0,
   STAIR_X1,
   STAIR_Z0,
@@ -65,8 +68,10 @@ export function buildKeepShell(s: CitadelStamp): void {
   ] as const) {
     s.fill(px - 1, FLOOR.ground, pz - 1, px + 1, FLOOR.roof + 2, pz + 1, BRICK);
   }
-  // Slight upper setback band (refined upper courses)
+  // Upper setback band from high castle upward
   s.walls(KX0 + 1, FLOOR.high, KZ0 + 1, KX1 - 1, FLOOR.roof, KZ1 - 1, BRICK);
+  // Extra stepped crown mass near the top for silhouette
+  s.walls(KX0 + 2, FLOOR.barracks, KZ0 + 2, KX1 - 2, FLOOR.roof, KZ1 - 2, STONE);
 
   // Hollow entire interior volume (floors added separately)
   s.fill(KX0 + 1, FLOOR.ground, KZ0 + 1, KX1 - 1, FLOOR.roof - 1, KZ1 - 1, AIR);
@@ -77,12 +82,12 @@ export function buildKeepShell(s: CitadelStamp): void {
   s.fill(KCX - 5, FLOOR.ground + 5, KZ0, KCX + 5, FLOOR.ground + 6, KZ0, STONE);
   s.fill(KCX - 3, FLOOR.ground + 6, KZ0, KCX + 3, FLOOR.ground + 7, KZ0, STONE);
 
-  // Windows by storey on each face
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
-    windowRow(s, 'x', KX0, KX1, KZ0, fy + 3, 5, 3);
-    windowRow(s, 'x', KX0, KX1, KZ1, fy + 3, 5, 3);
-    windowRow(s, 'z', KZ0, KZ1, KX0, fy + 3, 5, 3);
-    windowRow(s, 'z', KZ0, KZ1, KX1, fy + 3, 5, 3);
+  // Windows on every interior storey
+  for (const fy of INTERIOR_STACK) {
+    windowRow(s, 'x', KX0, KX1, KZ0, fy + 3, 5, 2);
+    windowRow(s, 'x', KX0, KX1, KZ1, fy + 3, 5, 2);
+    windowRow(s, 'z', KZ0, KZ1, KX0, fy + 3, 5, 2);
+    windowRow(s, 'z', KZ0, KZ1, KX1, fy + 3, 5, 2);
   }
 
   // Keep entrance steps from courtyard
@@ -93,84 +98,70 @@ export function buildKeepShell(s: CitadelStamp): void {
   }
 }
 
-/** Lay storey floors with holes for grand + secondary stairs + dungeon shaft. */
+/** Lay every storey floor (gallery through roof) with holes for stair wells. */
 export function buildKeepFloors(s: CitadelStamp): void {
-  const floors = [FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof];
-  for (const fy of floors) {
-    const mat = fy === FLOOR.roof ? STONE : fy === FLOOR.throne ? STONE : PLANKS;
-    // Start with full floor then re-punch holes (simpler than multi-hole helper)
+  for (const fy of STACK) {
+    if (fy === FLOOR.ground) continue; // paved separately at G
+    const mat =
+      fy === FLOOR.roof ? STONE : fy === FLOOR.throne || fy === FLOOR.gallery ? STONE : PLANKS;
     s.slab(KX0 + 1, KZ0 + 1, KX1 - 1, KZ1 - 1, fy, mat);
     // Grand stair well (east)
     s.fill(STAIR_X0, fy, STAIR_Z0, STAIR_X1, fy, STAIR_Z1, AIR);
-    // Secondary stair well (west, not on roof — roof access via grand only + towers)
-    if (fy !== FLOOR.roof) {
-      s.fill(SEC_X0, fy, SEC_Z0, SEC_X1, fy, SEC_Z1, AIR);
-    }
-    // Dungeon shaft hole only on ground foundation level handled in dungeon module
+    // Secondary stair well (west) through every floor including roof
+    s.fill(SEC_X0, fy, SEC_Z0, SEC_X1, fy, SEC_Z1, AIR);
   }
 
-  // Ground floor is courtyard/foundation — pave Great Hall floor
+  // Great Hall paving on foundation top
   s.slab(KX0 + 1, KZ0 + 1, KX1 - 1, KZ1 - 1, G, STONE);
-  // Punch grand + secondary wells through ground floor air starts at FLOOR.ground
 }
 
 /**
- * Wide ceremonial switchback stair on the east wing connecting all major floors to the roof.
+ * Wide ceremonial switchback stair on the east wing — every storey ground → roof.
+ * Two flights of STOREY_RISE/2 per storey.
  */
 export function buildGrandStaircase(s: CitadelStamp): void {
   const wall = STONE;
-  // East stair wing enclosure walls (interior of keep)
-  s.fill(STAIR_X0, FLOOR.ground, STAIR_Z0, STAIR_X0, FLOOR.roof, STAIR_Z1, wall); // west face of well
+  s.fill(STAIR_X0, FLOOR.ground, STAIR_Z0, STAIR_X0, FLOOR.roof, STAIR_Z1, wall);
   s.fill(STAIR_X1, FLOOR.ground, STAIR_Z0, STAIR_X1, FLOOR.roof, STAIR_Z1, wall);
   s.fill(STAIR_X0, FLOOR.ground, STAIR_Z0, STAIR_X1, FLOOR.roof, STAIR_Z0, wall);
   s.fill(STAIR_X0, FLOOR.ground, STAIR_Z1, STAIR_X1, FLOOR.roof, STAIR_Z1, wall);
-  // Hollow well
   s.fill(STAIR_X0 + 1, FLOOR.ground, STAIR_Z0 + 1, STAIR_X1 - 1, FLOOR.roof - 1, STAIR_Z1 - 1, AIR);
 
   const stepX0 = STAIR_X0 + 2;
   const stepX1 = stepX0 + 4; // 5-wide
+  const flight = STOREY_RISE / 2; // 5
 
-  // Build storey-by-storey: two flights of 6 between floors (rise 12)
-  const levels = [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof];
-  for (let li = 0; li < levels.length - 1; li++) {
-    const y0 = levels[li];
-    const y1 = levels[li + 1];
-    const mid = y0 + 6;
-    // Flight 1: +z from south of well
-    stairFlightZ(s, stepX0, stepX1, STAIR_Z0 + 2, y0, 6, 1, STAIRS_STONE);
-    // Mid landing
+  for (let li = 0; li < STACK.length - 1; li++) {
+    const y0 = STACK[li];
+    const y1 = STACK[li + 1];
+    const mid = y0 + flight;
+    stairFlightZ(s, stepX0, stepX1, STAIR_Z0 + 2, y0, flight, 1, STAIRS_STONE);
     s.fill(STAIR_X0 + 1, mid, STAIR_Z0 + 8, STAIR_X1 - 1, mid, STAIR_Z1 - 2, PLANKS);
     s.set(STAIR_X0 + 2, mid + 1, STAIR_Z1 - 3, LANTERN);
-    // Flight 2: -z toward north then up to next floor
-    stairFlightZ(s, stepX0, stepX1, STAIR_Z1 - 2, mid, 6, -1, STAIRS_STONE);
-    // Top landing at next floor (floor already has hole; pad edges)
+    stairFlightZ(s, stepX0, stepX1, STAIR_Z1 - 2, mid, flight, -1, STAIRS_STONE);
     s.fill(STAIR_X0 + 1, y1, STAIR_Z0 + 2, STAIR_X1 - 1, y1, STAIR_Z0 + 5, PLANKS);
-
-    // Doorways from well into keep interior on each floor (west wall of well)
     s.fill(STAIR_X0, y0 + 1, STAIR_Z0 + 3, STAIR_X0, y0 + 3, STAIR_Z0 + 7, AIR);
     s.fill(STAIR_X0, y1 + 1, STAIR_Z0 + 3, STAIR_X0, y1 + 3, STAIR_Z0 + 7, AIR);
   }
 
-  // Grand stair visual support piers
   for (const z of [STAIR_Z0 + 4, STAIR_Z1 - 4]) {
     s.fill(STAIR_X0, FLOOR.ground, z, STAIR_X0, FLOOR.roof, z, BRICK);
   }
 }
 
-/** Compact service stair on the west wing (ground → high). */
+/** Compact service stair on the west wing — ground → roof on every storey. */
 export function buildSecondaryStair(s: CitadelStamp): void {
-  s.fill(SEC_X0, FLOOR.ground, SEC_Z0, SEC_X1, FLOOR.high, SEC_Z0, STONE);
-  s.fill(SEC_X0, FLOOR.ground, SEC_Z1, SEC_X1, FLOOR.high, SEC_Z1, STONE);
-  s.fill(SEC_X0, FLOOR.ground, SEC_Z0, SEC_X0, FLOOR.high, SEC_Z1, STONE);
-  s.fill(SEC_X1, FLOOR.ground, SEC_Z0, SEC_X1, FLOOR.high, SEC_Z1, STONE);
-  s.fill(SEC_X0 + 1, FLOOR.ground, SEC_Z0 + 1, SEC_X1 - 1, FLOOR.high - 1, SEC_Z1 - 1, AIR);
+  s.fill(SEC_X0, FLOOR.ground, SEC_Z0, SEC_X1, FLOOR.roof, SEC_Z0, STONE);
+  s.fill(SEC_X0, FLOOR.ground, SEC_Z1, SEC_X1, FLOOR.roof, SEC_Z1, STONE);
+  s.fill(SEC_X0, FLOOR.ground, SEC_Z0, SEC_X0, FLOOR.roof, SEC_Z1, STONE);
+  s.fill(SEC_X1, FLOOR.ground, SEC_Z0, SEC_X1, FLOOR.roof, SEC_Z1, STONE);
+  s.fill(SEC_X0 + 1, FLOOR.ground, SEC_Z0 + 1, SEC_X1 - 1, FLOOR.roof - 1, SEC_Z1 - 1, AIR);
 
   const cx = Math.floor((SEC_X0 + SEC_X1) / 2);
   const cz = Math.floor((SEC_Z0 + SEC_Z1) / 2);
-  spiralStair(s, cx, cz, FLOOR.ground, FLOOR.high, COBBLESTONE, STONE);
+  spiralStair(s, cx, cz, FLOOR.ground, FLOOR.roof, COBBLESTONE, STONE);
 
-  // Openings into each floor
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
+  for (const fy of STACK) {
     s.fill(SEC_X1, fy + 1, cz - 1, SEC_X1, fy + 3, cz + 1, AIR);
   }
 }
@@ -179,7 +170,7 @@ export function buildSecondaryStair(s: CitadelStamp): void {
 
 export function buildGreatHall(s: CitadelStamp): void {
   const y0 = FLOOR.ground;
-  const yCeil = FLOOR.throne - 1; // double-height into throne floor underside
+  const yCeil = FLOOR.gallery - 1; // double-height into gallery underside
 
   // Ensure double-height: no mid-floor in central hall (already hollow)
   // Columns along the nave
@@ -371,8 +362,8 @@ export function buildMajorTowers(s: CitadelStamp): void {
     doorFace: 's',
   });
 
-  // Connect towers to keep at ground, high, and roof levels
-  for (const fy of [FLOOR.ground, FLOOR.high, FLOOR.roof]) {
+  // Connect towers at several heights including roof
+  for (const fy of [FLOOR.ground, FLOOR.residential, FLOOR.high, FLOOR.observatory, FLOOR.roof]) {
     // Crown: doorway from keep into tower (south face of tower is inside keep north zone)
     s.fill(
       CROWN.cx - 2,

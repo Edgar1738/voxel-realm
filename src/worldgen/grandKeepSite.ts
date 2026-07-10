@@ -42,6 +42,7 @@ import {
   KZ0,
   KCX,
   FLOOR,
+  STACK,
   STAIR_X0,
   STAIR_Z0,
   GATE_HALF,
@@ -65,22 +66,18 @@ function clearProcessional(s: CitadelStamp): void {
   // Keep south entrance (wide + tall) including chapel bay join
   s.fill(KCX - 4, FLOOR.ground, KZ0 - 4, KCX + 4, FLOOR.ground + 6, KZ0 + 2, AIR);
 
-  // Ground-floor door into grand stair well (west face)
-  s.fill(STAIR_X0, FLOOR.ground + 1, STAIR_Z0 + 2, STAIR_X0, FLOOR.ground + 4, STAIR_Z0 + 10, AIR);
-  // Same on each major floor
-  for (const fy of [FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof]) {
+  // Grand stair well doors on every storey
+  for (const fy of STACK) {
     s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 2, STAIR_X0, fy + 4, STAIR_Z0 + 10, AIR);
   }
 
   // Corridor from hall center toward stair well at ground
   s.fill(KCX + 8, FLOOR.ground + 1, STAIR_Z0 + 4, STAIR_X0, FLOOR.ground + 4, STAIR_Z0 + 8, AIR);
 
-  // Doors into north service stair + mid gallery stair on each major floor
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high, FLOOR.roof]) {
+  // Doors into north service stair + mid gallery stair on every storey
+  for (const fy of STACK) {
     const ncx = (NORTH_STAIR.x0 + NORTH_STAIR.x1) >> 1;
     s.fill(ncx - 1, fy + 1, NORTH_STAIR.z0, ncx + 1, fy + 3, NORTH_STAIR.z0, AIR);
-  }
-  for (const fy of [FLOOR.ground, FLOOR.throne, FLOOR.residential, FLOOR.high]) {
     const mz = (MID_STAIR.z0 + MID_STAIR.z1) >> 1;
     s.fill(MID_STAIR.x0, fy + 1, mz - 1, MID_STAIR.x0, fy + 3, mz + 1, AIR);
     s.fill(MID_STAIR.x1, fy + 1, mz - 1, MID_STAIR.x1, fy + 3, mz + 1, AIR);
