@@ -34,7 +34,7 @@ import {
   GLOWSTONE,
   GOLD_ORE,
   CRYSTAL,
-  BOOKSHELF,
+  EMERALD_ORE,
   FURNACE,
   OAK_FENCE,
   COBBLE_WALL,
@@ -42,6 +42,7 @@ import {
   DEEPSLATE,
   STAIRS_STONE,
   STAIRS_PLANK,
+  STAIRS_BRICK,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp } from './CitadelStamp';
@@ -244,49 +245,146 @@ function buildColumns(s: CitadelStamp): void {
   }
 }
 
-/** Royal bed canopy (north focal), audience dais (center-south), hearths, furnishings. */
+/**
+ * King's Chamber focal zone — monumental red-draped four-poster, treasure vault flanks,
+ * audience dais, hearths, and council table. Red read uses BRICK (deep red) + TERRACOTTA accents.
+ */
 function dressRoyalFocus(s: CitadelStamp): void {
   const y0 = Y0();
 
-  // ── North: King's bed platform (solar bedchamber focus) ─────────────────
-  const bedZ = KZ1 - 14;
-  s.fill(KCX - 8, y0, bedZ - 4, KCX + 8, y0, bedZ + 2, DEEPSLATE); // raised platform step
-  s.fill(KCX - 6, y0 + 1, bedZ - 2, KCX + 6, y0 + 1, bedZ + 1, PLANKS); // bed deck
-  // Four-poster canopy
-  for (const [px, pz] of [
-    [KCX - 5, bedZ - 2],
-    [KCX + 5, bedZ - 2],
-    [KCX - 5, bedZ + 1],
-    [KCX + 5, bedZ + 1],
-  ] as const) {
-    s.fill(px, y0 + 2, pz, px, y0 + 10, pz, WOOD);
+  // ── King's Chamber dais (north third of the solar) ──────────────────────
+  const bedZ = KZ1 - 16;
+  // Wide raised marble/stone plinth
+  s.fill(KCX - 14, y0, bedZ - 6, KCX + 14, y0, bedZ + 4, DEEPSLATE);
+  s.fill(KCX - 12, y0 + 1, bedZ - 5, KCX + 12, y0 + 1, bedZ + 3, STONE);
+  // Red carpet runner up onto the dais
+  for (let z = KCZ + 4; z <= bedZ + 3; z++) {
+    for (let x = KCX - 3; x <= KCX + 3; x++) s.set(x, y0, z, BRICK);
   }
-  s.fill(KCX - 5, y0 + 10, bedZ - 2, KCX + 5, y0 + 10, bedZ + 1, PLANKS); // canopy top
-  s.fill(KCX - 4, y0 + 2, bedZ - 1, KCX + 4, y0 + 2, bedZ, PLANKS); // mattress
-  s.set(KCX, y0 + 3, bedZ - 1, TERRACOTTA); // bolster
-  // Curtain suggestion
-  for (const x of [KCX - 5, KCX + 5]) {
-    s.set(x, y0 + 6, bedZ - 1, BRICK);
-    s.set(x, y0 + 7, bedZ - 1, BRICK);
-  }
-  s.set(KCX, y0 + 11, bedZ, GLOWSTONE); // canopy light
-  s.set(KCX - 3, y0 + 2, bedZ + 2, LANTERN);
-  s.set(KCX + 3, y0 + 2, bedZ + 2, LANTERN);
+  s.fill(KCX - 10, y0 + 1, bedZ - 4, KCX + 10, y0 + 1, bedZ + 2, BRICK); // red rug under bed
 
-  // Wardrobe / treasure nooks flanking bed
-  s.fill(KCX - 14, y0 + 1, bedZ - 2, KCX - 10, y0 + 4, bedZ + 1, BOOKSHELF);
-  s.fill(KCX + 10, y0 + 1, bedZ - 2, KCX + 14, y0 + 4, bedZ + 1, BOOKSHELF);
-  s.set(KCX - 12, y0 + 1, bedZ, GOLD_ORE);
-  s.set(KCX + 12, y0 + 1, bedZ, CRYSTAL);
+  // ── Monumental king bed (about 11×6 footprint) ─────────────────────────
+  // Gold-trimmed wooden frame
+  s.fill(KCX - 5, y0 + 2, bedZ - 3, KCX + 5, y0 + 2, bedZ + 2, WOOD);
+  s.fill(KCX - 5, y0 + 2, bedZ - 3, KCX + 5, y0 + 3, bedZ - 3, GOLD_ORE); // headboard gold bar
+  s.fill(KCX - 5, y0 + 2, bedZ + 2, KCX + 5, y0 + 3, bedZ + 2, GOLD_ORE); // footboard gold
+  // Thick layered mattress (red bedding)
+  s.fill(KCX - 4, y0 + 3, bedZ - 2, KCX + 4, y0 + 3, bedZ + 1, BRICK); // lower red
+  s.fill(KCX - 4, y0 + 4, bedZ - 2, KCX + 4, y0 + 4, bedZ + 1, TERRACOTTA); // upper coverlet
+  // Pillows at head (north)
+  s.fill(KCX - 3, y0 + 5, bedZ - 2, KCX - 1, y0 + 5, bedZ - 1, BRICK);
+  s.fill(KCX + 1, y0 + 5, bedZ - 2, KCX + 3, y0 + 5, bedZ - 1, BRICK);
+  s.set(KCX - 2, y0 + 6, bedZ - 2, TERRACOTTA);
+  s.set(KCX + 2, y0 + 6, bedZ - 2, TERRACOTTA);
+  // Folded foot blanket
+  s.fill(KCX - 4, y0 + 5, bedZ + 1, KCX + 4, y0 + 5, bedZ + 1, BRICK);
+  s.fill(KCX - 3, y0 + 5, bedZ, KCX + 3, y0 + 5, bedZ, TERRACOTTA);
+
+  // Four-poster posts (tall) with gold finials
+  for (const [px, pz] of [
+    [KCX - 5, bedZ - 3],
+    [KCX + 5, bedZ - 3],
+    [KCX - 5, bedZ + 2],
+    [KCX + 5, bedZ + 2],
+  ] as const) {
+    s.fill(px, y0 + 2, pz, px, y0 + 14, pz, WOOD);
+    s.set(px, y0 + 15, pz, GOLD_ORE);
+    s.set(px, y0 + 16, pz, CRYSTAL);
+  }
+  // Canopy roof — red underside + wood top
+  s.fill(KCX - 5, y0 + 13, bedZ - 3, KCX + 5, y0 + 13, bedZ + 2, BRICK);
+  s.fill(KCX - 5, y0 + 14, bedZ - 3, KCX + 5, y0 + 14, bedZ + 2, WOOD);
+  s.set(KCX, y0 + 15, bedZ, GLOWSTONE);
+  s.fill(KCX - 1, y0 + 15, bedZ, KCX + 1, y0 + 15, bedZ, GOLD_ORE);
+
+  // Heavy red bed curtains (brick hangs) on all four sides, open at foot center
+  for (let y = y0 + 5; y <= y0 + 12; y++) {
+    for (const x of [KCX - 5, KCX + 5]) {
+      s.set(x, y, bedZ - 2, BRICK);
+      s.set(x, y, bedZ - 1, BRICK);
+      s.set(x, y, bedZ, BRICK);
+      s.set(x, y, bedZ + 1, BRICK);
+    }
+    // Head curtain wall
+    for (let x = KCX - 4; x <= KCX + 4; x++) s.set(x, y, bedZ - 3, BRICK);
+    // Foot curtains (leave center open to walk up)
+    s.set(KCX - 4, y, bedZ + 2, BRICK);
+    s.set(KCX - 3, y, bedZ + 2, BRICK);
+    s.set(KCX + 3, y, bedZ + 2, BRICK);
+    s.set(KCX + 4, y, bedZ + 2, BRICK);
+  }
+
+  // Nightstands
+  for (const nx of [KCX - 7, KCX + 7]) {
+    s.fill(nx, y0 + 2, bedZ - 1, nx, y0 + 3, bedZ, WOOD);
+    s.set(nx, y0 + 4, bedZ, LANTERN);
+    s.set(nx, y0 + 4, bedZ - 1, GOLD_ORE);
+  }
+
+  // ── Treasure vault flanks (open chests / pedestals) ────────────────────
+  // West treasure alcove
+  s.fill(KCX - 18, y0 + 1, bedZ - 4, KCX - 12, y0 + 1, bedZ + 2, DEEPSLATE);
+  // Chest blocks (wood crates)
+  s.fill(KCX - 17, y0 + 2, bedZ - 3, KCX - 15, y0 + 3, bedZ - 1, WOOD);
+  s.fill(KCX - 17, y0 + 2, bedZ, KCX - 15, y0 + 3, bedZ + 1, WOOD);
+  // Spilled treasure on and around chests
+  s.set(KCX - 16, y0 + 4, bedZ - 2, GOLD_ORE);
+  s.set(KCX - 15, y0 + 4, bedZ - 1, GOLD_ORE);
+  s.set(KCX - 17, y0 + 4, bedZ, EMERALD_ORE);
+  s.set(KCX - 16, y0 + 4, bedZ + 1, CRYSTAL);
+  s.set(KCX - 14, y0 + 2, bedZ - 2, GOLD_ORE);
+  s.set(KCX - 14, y0 + 2, bedZ, EMERALD_ORE);
+  s.set(KCX - 13, y0 + 2, bedZ - 1, GOLD_ORE);
+  s.set(KCX - 13, y0 + 2, bedZ + 1, CRYSTAL);
+  // Pedestal with crown jewel
+  s.fill(KCX - 18, y0 + 2, bedZ - 1, KCX - 18, y0 + 3, bedZ - 1, STONE);
+  s.set(KCX - 18, y0 + 4, bedZ - 1, CRYSTAL);
+  s.set(KCX - 18, y0 + 5, bedZ - 1, GOLD_ORE);
+
+  // East treasure alcove (mirror)
+  s.fill(KCX + 12, y0 + 1, bedZ - 4, KCX + 18, y0 + 1, bedZ + 2, DEEPSLATE);
+  s.fill(KCX + 15, y0 + 2, bedZ - 3, KCX + 17, y0 + 3, bedZ - 1, WOOD);
+  s.fill(KCX + 15, y0 + 2, bedZ, KCX + 17, y0 + 3, bedZ + 1, WOOD);
+  s.set(KCX + 16, y0 + 4, bedZ - 2, GOLD_ORE);
+  s.set(KCX + 15, y0 + 4, bedZ - 1, EMERALD_ORE);
+  s.set(KCX + 17, y0 + 4, bedZ, GOLD_ORE);
+  s.set(KCX + 16, y0 + 4, bedZ + 1, CRYSTAL);
+  s.set(KCX + 14, y0 + 2, bedZ - 2, GOLD_ORE);
+  s.set(KCX + 14, y0 + 2, bedZ, CRYSTAL);
+  s.set(KCX + 13, y0 + 2, bedZ - 1, EMERALD_ORE);
+  s.set(KCX + 13, y0 + 2, bedZ + 1, GOLD_ORE);
+  s.fill(KCX + 18, y0 + 2, bedZ - 1, KCX + 18, y0 + 3, bedZ - 1, STONE);
+  s.set(KCX + 18, y0 + 4, bedZ - 1, CRYSTAL);
+  s.set(KCX + 18, y0 + 5, bedZ - 1, GOLD_ORE);
+
+  // Coin scatter (gold ore) on red rug before the bed
+  for (const [dx, dz] of [
+    [-2, 3],
+    [0, 4],
+    [2, 3],
+    [-1, 5],
+    [1, 5],
+    [-3, 4],
+    [3, 4],
+  ] as const) {
+    s.set(KCX + dx, y0 + 2, bedZ + dz, GOLD_ORE);
+  }
+
+  // Red banner poles behind the bed (north wall)
+  for (const bx of [KCX - 8, KCX - 3, KCX + 3, KCX + 8]) {
+    s.fill(bx, y0 + 2, KZ1 - 3, bx, y0 + 12, KZ1 - 3, WOOD);
+    s.fill(bx, y0 + 8, KZ1 - 4, bx, y0 + 11, KZ1 - 4, BRICK);
+    s.set(bx, y0 + 12, KZ1 - 3, GOLD_ORE);
+  }
 
   // ── Center-south: private audience dais ────────────────────────────────
   s.fill(KCX - 10, y0, KCZ - 8, KCX + 10, y0, KCZ - 2, STONE);
   s.fill(KCX - 6, y0 + 1, KCZ - 6, KCX + 6, y0 + 1, KCZ - 3, STONE);
-  s.fill(KCX - 2, y0 + 2, KCZ - 5, KCX + 2, y0 + 2, KCZ - 4, PLANKS); // seat
+  s.fill(KCX - 2, y0 + 2, KCZ - 5, KCX + 2, y0 + 2, KCZ - 4, PLANKS);
   s.set(KCX, y0 + 3, KCZ - 4, GOLD_ORE);
   s.set(KCX, y0 + 4, KCZ - 4, CRYSTAL);
   for (const bx of [KCX - 8, KCX + 8]) {
-    s.fill(bx, y0 + 1, KCZ - 5, bx, y0 + 8, KCZ - 5, WOOD); // banner poles
+    s.fill(bx, y0 + 1, KCZ - 5, bx, y0 + 8, KCZ - 5, WOOD);
     s.set(bx, y0 + 7, KCZ - 4, BRICK);
   }
 
@@ -303,15 +401,24 @@ function dressRoyalFocus(s: CitadelStamp): void {
   s.fill(KCX - 14, y0 + 1, KCZ + 6, KCX + 14, y0 + 1, KCZ + 8, PLANKS);
   for (let x = KCX - 12; x <= KCX + 12; x += 4) {
     s.set(x, y0 + 2, KCZ + 7, LANTERN);
-    // Benches
     s.set(x, y0 + 1, KCZ + 5, STAIRS_PLANK, packState(FACING.S, 0));
     s.set(x, y0 + 1, KCZ + 9, STAIRS_PLANK, packState(FACING.N, 0));
   }
 
-  // Processional carpet already on floor; add gold edge markers
+  // Red carpet spine + gold edge markers
+  for (let z = KZ0 + 8; z < bedZ - 6; z++) {
+    for (let x = KCX - 2; x <= KCX + 2; x++) s.set(x, y0, z, BRICK);
+  }
   for (let z = KZ0 + 8; z < KZ1 - 10; z += 6) {
     s.set(KCX - 4, y0, z, GOLD_ORE);
     s.set(KCX + 4, y0, z, GOLD_ORE);
+  }
+
+  // Steps of brick onto the bed dais (visible approach)
+  for (let i = 0; i < 2; i++) {
+    for (let x = KCX - 6; x <= KCX + 6; x++) {
+      s.set(x, y0 + 1 + i, bedZ + 4 - i, STAIRS_BRICK, packState(FACING.N, 0));
+    }
   }
 }
 

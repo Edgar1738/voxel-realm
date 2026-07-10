@@ -278,6 +278,18 @@ describe('grand-keep structure stamps', () => {
     const sky = at(KCX + 1, FLOOR.kingTop, KCZ + 1);
     expect(sky === AIR || sky === 7 /* GLASS */ || isSolid(sky)).toBe(true);
   });
+
+  it('has a king bed with red bedding and nearby treasure', () => {
+    const y0 = FLOOR.king;
+    const bedZ = KZ1 - 16;
+    // Red mattress / coverlet (brick or terracotta)
+    const mattress = at(KCX, y0 + 3, bedZ);
+    expect([13, 25].includes(mattress as 13 | 25)).toBe(true); // BRICK | TERRACOTTA
+    // Bed post solid
+    expect(isSolid(at(KCX - 5, y0 + 2, bedZ - 3))).toBe(true);
+    // Gold treasure near west alcove
+    expect(at(KCX - 16, y0 + 4, bedZ - 2)).toBe(17); // GOLD_ORE
+  });
 });
 
 describe('grand-keep storey separations', () => {
