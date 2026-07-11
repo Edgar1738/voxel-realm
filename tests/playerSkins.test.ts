@@ -18,6 +18,10 @@ describe('built-in player skins', () => {
       'dawn-guard',
       'keep-mage',
       'shadow-wanderer',
+      'forest-ranger',
+      'ember-smith',
+      'frost-knight',
+      'night-rogue',
     ]);
   });
 
@@ -50,7 +54,11 @@ describe('built-in player skins', () => {
     expect(nextPlayerSkinId('castle-mason')).toBe('dawn-guard');
     expect(nextPlayerSkinId('dawn-guard')).toBe('keep-mage');
     expect(nextPlayerSkinId('keep-mage')).toBe('shadow-wanderer');
-    expect(nextPlayerSkinId('shadow-wanderer')).toBe('realm-scout');
+    expect(nextPlayerSkinId('shadow-wanderer')).toBe('forest-ranger');
+    expect(nextPlayerSkinId('forest-ranger')).toBe('ember-smith');
+    expect(nextPlayerSkinId('ember-smith')).toBe('frost-knight');
+    expect(nextPlayerSkinId('frost-knight')).toBe('night-rogue');
+    expect(nextPlayerSkinId('night-rogue')).toBe('realm-scout');
     expect(nextPlayerSkinId('unknown')).toBe('castle-mason');
   });
 
