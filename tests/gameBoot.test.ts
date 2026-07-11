@@ -82,6 +82,7 @@ function makeUi(): FakeUi {
     setNotice: vi.fn(),
     setSoundUi: vi.fn(),
     renderHotbar: vi.fn(),
+    setLoadingHud: vi.fn(),
     setInventoryOpen: vi.fn((open: boolean) => {
       ui.inventoryOpen = open;
     }),
@@ -229,6 +230,27 @@ vi.mock('../src/render/CameraRig', () => ({
     boot.rigInstance = rig;
     return rig;
   }),
+}));
+
+vi.mock('../src/render/HeldBlock', () => ({
+  HeldBlock: vi.fn(function HeldBlock() {
+    return {
+      attach: vi.fn(),
+      punch: vi.fn(),
+      setBlock: vi.fn(),
+      update: vi.fn(),
+      dispose: vi.fn(),
+    };
+  }),
+}));
+
+vi.mock('../src/app/WorldMapUi', () => ({
+  createWorldMapUi: vi.fn(() => ({
+    toggle: vi.fn(() => true),
+    close: vi.fn(),
+    isOpen: vi.fn(() => false),
+    dispose: vi.fn(),
+  })),
 }));
 
 vi.mock('../src/world/ChunkManager', () => ({
@@ -412,6 +434,9 @@ describe('Game.boot composition', () => {
     vi.stubGlobal('document', {
       getElementById: vi.fn(() => undefined),
       exitPointerLock: vi.fn(),
+      // The pause menu listens for pointer-lock changes on the document.
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     });
   });
 

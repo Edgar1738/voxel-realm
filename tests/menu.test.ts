@@ -74,6 +74,23 @@ describe('cards', () => {
     ]);
   });
 
+  it('passes a manifest preview path through to the card; omits it when absent', () => {
+    const withPreview = upsertManifestEntry(
+      emptyManifest(),
+      buildManifestEntry('Test Cove', meta, {
+        tags: [],
+        preview: 'worlds/previews/test-cove.jpg',
+      }),
+    );
+    expect(worldCards(withPreview)[0].preview).toBe('worlds/previews/test-cove.jpg');
+
+    const without = upsertManifestEntry(
+      emptyManifest(),
+      buildManifestEntry('Test Cove', meta, { tags: [] }),
+    );
+    expect('preview' in worldCards(without)[0]).toBe(false);
+  });
+
   it('gives every slug a stable hue in [0, 360)', () => {
     for (const slug of ['tidewreck-cove', 'giza', 'x']) {
       const hue = cardHue(slug);
@@ -93,5 +110,14 @@ describe('cards', () => {
     }
     // Free Build is first and targets the legacy default world.
     expect(CREATE_CARDS[0].url).toBe('?save=default');
+  });
+
+  it('offers Ashen Reach as an explorable volcanic frontier', () => {
+    expect(CREATE_CARDS).toContainEqual(
+      expect.objectContaining({
+        name: 'Ashen Reach',
+        url: '?world=ashen-reach&save=ashen-reach-world',
+      }),
+    );
   });
 });

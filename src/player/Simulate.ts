@@ -15,6 +15,7 @@ const NEUTRAL: InputState = {
   right: false,
   up: false,
   down: false,
+  sprint: false,
   toggleFly: false,
 };
 

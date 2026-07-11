@@ -84,6 +84,8 @@ const SHAPED_SHAPES: ReadonlySet<string> = new Set([
   'fence',
   'wall',
   'gate',
+  'door',
+  'ladder',
   'cross',
 ]);
 
@@ -173,6 +175,12 @@ export class ChunkManager {
   /** Main-thread cost (ms) of the most recent applyEdits batch — relight + mesh dispatch (dev). */
   get lastEditRelight(): number {
     return this.lastEditRelightMs;
+  }
+
+  /** How many chunks the current view distance wants loaded ((2·vd+1)², the desired set). */
+  desiredChunkCount(): number {
+    const side = 2 * this.opts.viewDistance + 1;
+    return side * side;
   }
 
   /** Whether chunks are still streaming in (generation/mesh backlog not yet drained). */
@@ -383,6 +391,23 @@ export class ChunkManager {
     return boxes.map(
       (b) => [wx + b[0], wy + b[1], wz + b[2], wx + b[3], wy + b[4], wz + b[5]] as AABB,
     );
+  }
+
+  /**
+   * The top-most non-air block + its height at a world column, or undefined when the chunk
+   * is unloaded (the world map paints those transparent). Bounded by the chunk's maxSolidY,
+   * so empty sky never costs a full-height scan.
+   */
+  surfaceAt(wx: number, wz: number): { id: number; y: number } | undefined {
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return undefined;
+    const lx = worldToLocal(wx);
+    const lz = worldToLocal(wz);
+    for (let y = entry.data.maxSolidY; y >= 0; y--) {
+      const id = entry.data.get(lx, y, lz);
+      if (id !== AIR) return { id, y };
+    }
+    return undefined;
   }
 
   /** Orientation/open state at a world coord; 0 for out-of-world or unloaded chunks. */
@@ -661,6 +686,13 @@ export class ChunkManager {
   }
 
   /** A chunk's edit delta as stable, sorted [voxelIndex, blockId] or [voxelIndex, blockId, state] entries (for persistence). */
+  /** A deep copy of every chunk's live edit delta — the world-share export source. */
+  allDeltas(): WorldDeltas {
+    const out: WorldDeltas = new Map();
+    for (const [key, map] of this.deltas) out.set(key, new Map(map));
+    return out;
+  }
+
   getChunkDelta(key: string): ChunkDeltaEntries {
     return [...(this.deltas.get(key)?.entries() ?? [])]
       .sort((a, b) => a[0] - b[0])

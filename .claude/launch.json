@@ -12,6 +12,20 @@
       "autoPort": true
     },
     {
+      "name": "crosshair",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5250",
+        "--strictPort"
+      ],
+      "port": 5250,
+      "autoPort": false
+    },
+    {
       "name": "richtrees",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
@@ -121,6 +135,36 @@
         "--strictPort"
       ],
       "port": 5231,
+      "autoPort": false
+    },
+    {
+      "name": "texfix",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5245",
+        "--strictPort"
+      ],
+      "port": 5245,
+      "autoPort": false
+    },
+    {
+      "name": "stonehaven",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\experiment+project-stonehaven",
+        "--",
+        "--port",
+        "5240",
+        "--strictPort"
+      ],
+      "port": 5240,
       "autoPort": false
     }
   ]

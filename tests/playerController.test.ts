@@ -37,6 +37,7 @@ function input(partial: Partial<InputState> = {}): InputState {
     right: false,
     up: false,
     down: false,
+    sprint: false,
     toggleFly: false,
     ...partial,
   };

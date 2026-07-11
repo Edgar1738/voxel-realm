@@ -96,6 +96,16 @@ function isFiniteNumber(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }
 
+/**
+ * Player-facing name of a landmark/tour entry. `name` is canonical, but historical
+ * `__vr.world.setTour` authoring wrote `label`, so shipped saves carry either key.
+ */
+function parseName(value: unknown): string | undefined {
+  const entry = value as Record<string, unknown> | null;
+  const name = entry?.name ?? entry?.label;
+  return typeof name === 'string' ? name : undefined;
+}
+
 /** A `{x,y,z}` object with finite coords, or undefined if malformed. */
 function parsePoint(value: unknown): MetaPoint | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -130,8 +140,8 @@ function parseMeta(value: unknown): WorldMeta | undefined {
     const landmarks: Array<{ name: string } & MetaPoint> = [];
     for (const raw of m.landmarks) {
       const point = parsePoint(raw);
-      const name = (raw as Record<string, unknown> | null)?.name;
-      if (point && typeof name === 'string') landmarks.push({ name, ...point });
+      const name = parseName(raw);
+      if (point && name !== undefined) landmarks.push({ name, ...point });
     }
     if (landmarks.length > 0) meta.landmarks = landmarks;
   }
@@ -141,8 +151,8 @@ function parseMeta(value: unknown): WorldMeta | undefined {
     for (const raw of m.tour) {
       const point = parsePoint(raw);
       if (!point) continue;
-      const name = (raw as Record<string, unknown>).name;
-      tour.push(typeof name === 'string' ? { name, ...point } : point);
+      const name = parseName(raw);
+      tour.push(name !== undefined ? { name, ...point } : point);
     }
     if (tour.length > 0) meta.tour = tour;
   }

@@ -34,17 +34,34 @@
            overlay eats the entire toolbar whenever the mouse isn't captured. */
         pointer-events: none;
       }
+      /* Minecraft-style cross; difference blending inverts against bright sky and dark caves. */
       #crosshair {
         position: fixed;
         left: 50%;
         top: 50%;
-        width: 6px;
-        height: 6px;
-        margin: -3px 0 0 -3px;
-        background: #fff;
-        border-radius: 50%;
-        opacity: 0.8;
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
         pointer-events: none;
+        mix-blend-mode: difference;
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: '';
+        position: absolute;
+        background: #ddd;
+      }
+      #crosshair::before {
+        left: 8px;
+        top: 0;
+        width: 2px;
+        height: 18px;
+      }
+      #crosshair::after {
+        left: 0;
+        top: 8px;
+        width: 18px;
+        height: 2px;
       }
       #creative-ui {
         position: fixed;
@@ -606,6 +623,152 @@
       .dialog-btn.danger:hover {
         background: rgba(150, 70, 58, 0.55);
       }
+      .info-landmarks .is-undiscovered {
+        color: rgba(238, 242, 246, 0.4);
+        font-style: italic;
+      }
+
+      /* ---- Desktop-required shell (touch-only devices) ---- */
+      #desktop-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(ellipse at 50% 30%, rgba(90, 209, 255, 0.08), transparent 60%),
+          #10141a;
+        color: #eef2f6;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      .desktop-shell-panel {
+        max-width: 420px;
+        text-align: center;
+      }
+      .desktop-shell-panel h1 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      .desktop-shell-panel p {
+        margin: 0 0 14px;
+        color: rgba(238, 242, 246, 0.78);
+        line-height: 1.5;
+      }
+      .desktop-shell-url {
+        font-family: ui-monospace, monospace;
+        color: #5ad1ff;
+      }
+      .desktop-shell-try {
+        padding: 9px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(238, 242, 246, 0.7);
+        font: inherit;
+      }
+
+      /* ---- Cold-start loading banner ---- */
+      .loading-hud {
+        position: fixed;
+        left: 50%;
+        top: 34%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font:
+          13px system-ui,
+          sans-serif;
+        color: #eef2f6;
+        pointer-events: none;
+        animation: loading-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes loading-pulse {
+        0%,
+        100% {
+          opacity: 0.85;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      /* ---- World map (M) ---- */
+      #world-map {
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 10, 14, 0.55);
+        pointer-events: none;
+      }
+      #world-map.is-open {
+        display: flex;
+      }
+      .world-map-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 14px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+      .world-map-title {
+        font:
+          600 15px system-ui,
+          sans-serif;
+        color: #eef2f6;
+      }
+      .world-map-canvas {
+        width: min(66vmin, 560px);
+        height: min(66vmin, 560px);
+        image-rendering: pixelated;
+        border-radius: 6px;
+        background:
+          repeating-conic-gradient(rgba(255, 255, 255, 0.04) 0 25%, transparent 0 50%) 0 0 / 16px
+          16px; /* checker under unloaded (transparent) columns */
+      }
+      .world-map-hint {
+        font:
+          11px system-ui,
+          sans-serif;
+        color: rgba(238, 242, 246, 0.55);
+      }
+
+      /* ---- Escape pause menu ---- */
+      .pause-panel {
+        max-width: 300px;
+      }
+      .pause-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .pause-btn {
+        width: 100%;
+        padding: 9px 12px;
+        text-align: center;
+      }
+      .pause-sound {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 4px 0;
+      }
+      .pause-sound .sound-slider {
+        width: 160px;
+      }
       .world-list {
         display: flex;
         flex-direction: column;
@@ -920,7 +1083,16 @@
       }
       .menu-card-banner {
         position: relative;
-        height: 86px;
+        height: 118px; /* tall enough for the preview screenshots to read as scenes */
+        overflow: hidden;
+      }
+      .menu-card-preview {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
       }
       /* A faint block grid so the banner reads voxel, not just gradient. */
       .menu-card-banner::after {
@@ -1005,6 +1177,21 @@
         flex: none;
         width: 46px;
         align-self: stretch;
+      }
+      .menu-import-card {
+        cursor: pointer;
+        border-style: dashed;
+      }
+      .menu-import-swatch {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: rgba(238, 242, 246, 0.7);
+        background: rgba(255, 255, 255, 0.05) !important;
+      }
+      .menu-import-error {
+        color: #ff8d7a !important;
       }
       .menu-worlds-link {
         position: fixed;

@@ -2,8 +2,11 @@
 export const CHUNK_SIZE_X = 16;
 /** Horizontal chunk footprint (Z). */
 export const CHUNK_SIZE_Z = 16;
-/** Bounded vertical extent of the world (tunable; bump persistence version if changed). */
-export const WORLD_HEIGHT = 192;
+/**
+ * Bounded vertical extent of the world (tunable; bump SAVE_VERSION if changed).
+ * Raised from 192 → 512 so tall authored keeps (Grand Keep multi-storey stack) fit.
+ */
+export const WORLD_HEIGHT = 512;
 
 export const CHUNK_AREA = CHUNK_SIZE_X * CHUNK_SIZE_Z;
 export const CHUNK_VOLUME = CHUNK_SIZE_X * WORLD_HEIGHT * CHUNK_SIZE_Z;
@@ -23,7 +26,7 @@ export const SEA_LEVEL = 62;
 /** Lower bound for the adaptive view-distance governor (also the initial radius). */
 export const MIN_VIEW_DISTANCE = 4;
 /** Hard upper bound for the adaptive view-distance governor. */
-export const MAX_VIEW_DISTANCE = 12;
+export const MAX_VIEW_DISTANCE = 16;
 
 /** Cold-start streaming budgets: fill the spawn area fast until the first ring drains. */
 export const BURST_GEN_BUDGET = 8;

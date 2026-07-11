@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "seed": 1337,
+    "version": 2,
+    "preset": "grand-keep",
+    "title": "The Grand Keep",
+    "description": "A colossal fully explorable castle — thirty storeys of halls, balconies, chambers and stairs from the Great Hall to the battlements and Crown Tower, plus a Deep Dungeon below.",
+    "spawn": { "x": 8, "y": 74.5, "z": -155 },
+    "look": { "yaw": 3.1416, "pitch": 0.15 },
+    "landmarks": [
+      { "name": "Arrival Overlook", "x": 8, "y": 74, "z": -155 },
+      { "name": "The Grand Gate", "x": 8, "y": 74, "z": -80 },
+      { "name": "Market Plaza", "x": 35, "y": 74, "z": -5 },
+      { "name": "The Inner Court", "x": 8, "y": 73, "z": 8 },
+      { "name": "The Great Hall", "x": 8, "y": 74, "z": 42 },
+      { "name": "South Sky Tower", "x": 8, "y": 100, "z": -125 },
+      { "name": "The Grand Stair", "x": 48, "y": 100, "z": 40 },
+      { "name": "The Throne Chamber", "x": 8, "y": 104, "z": 60 },
+      { "name": "The King's Solar", "x": 8, "y": 175, "z": 52 },
+      { "name": "The Deep Dungeon", "x": -12, "y": 61, "z": 52 },
+      { "name": "The Observatory", "x": 8, "y": 364, "z": 52 },
+      { "name": "The High Battlements", "x": 8, "y": 374, "z": 40 },
+      { "name": "The Crown Tower", "x": 48, "y": 396, "z": 72 }
+    ],
+    "tour": [
+      { "name": "Arrival Overlook", "x": 8, "y": 75, "z": -150 },
+      { "name": "Outer Town", "x": 8, "y": 75, "z": -110 },
+      { "name": "The Grand Gate", "x": 8, "y": 75, "z": -78 },
+      { "name": "Bailey Market", "x": 30, "y": 75, "z": 0 },
+      { "name": "The Great Hall", "x": 8, "y": 75, "z": 40 },
+      { "name": "Sky Bridge", "x": 8, "y": 105, "z": -50 },
+      { "name": "The Throne Chamber", "x": 8, "y": 105, "z": 58 },
+      { "name": "The King's Solar", "x": 8, "y": 175, "z": 50 },
+      { "name": "Solar Gallery", "x": 8, "y": 195, "z": 30 },
+      { "name": "Observatory", "x": 8, "y": 365, "z": 52 },
+      { "name": "The High Battlements", "x": 8, "y": 375, "z": 45 },
+      { "name": "The Crown Tower", "x": 48, "y": 396, "z": 72 },
+      { "name": "The Deep Dungeon", "x": -12, "y": 62, "z": 52 }
+    ]
+  },
+  "chunks": {}
+}

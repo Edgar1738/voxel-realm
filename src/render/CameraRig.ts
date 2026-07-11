@@ -4,6 +4,8 @@ import type { Vec3 } from '../core/types';
 
 const SENSITIVITY = 0.0025;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
+/** Two W presses within this window arm sprint (Minecraft's classic double-tap). */
+const DOUBLE_TAP_MS = 300;
 
 /** How far the third-person camera trails behind the eye, before obstruction clipping. */
 export const THIRD_PERSON_DISTANCE = 4;
@@ -35,6 +37,9 @@ export class CameraRig {
 
   private readonly pressed = new Set<string>();
   private toggleFlyQueued = false;
+  /** Sprint arms on a double-tap of W (Ctrl+W closes browser tabs) and drops on W release. */
+  private sprinting = false;
+  private lastForwardTapMs = -Infinity;
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
   private readonly inputController = new AbortController();
 
@@ -78,6 +83,7 @@ export class CameraRig {
         if (!this.locked) {
           this.pressed.clear();
           this.toggleFlyQueued = false;
+          this.sprinting = false;
         }
         if (this.overlay) this.overlay.style.display = this.locked ? 'none' : 'flex';
       },
@@ -98,12 +104,26 @@ export class CameraRig {
     window.addEventListener(
       'keydown',
       (e) => {
+        // Double-tap detection needs the fresh-press edge, so check before pressed.add
+        // (held-key auto-repeat also arrives as keydown and must not count as a tap).
+        if (e.code === 'KeyW' && !this.pressed.has('KeyW')) {
+          const now = performance.now();
+          if (now - this.lastForwardTapMs < DOUBLE_TAP_MS) this.sprinting = true;
+          this.lastForwardTapMs = now;
+        }
         this.pressed.add(e.code);
         if (e.code === 'KeyF') this.toggleFlyQueued = true;
       },
       { signal },
     );
-    window.addEventListener('keyup', (e) => this.pressed.delete(e.code), { signal });
+    window.addEventListener(
+      'keyup',
+      (e) => {
+        this.pressed.delete(e.code);
+        if (e.code === 'KeyW') this.sprinting = false;
+      },
+      { signal },
+    );
   }
 
   /** Removes all event listeners registered by this rig. */
@@ -115,6 +135,7 @@ export class CameraRig {
   getInput(): InputState {
     if (!this.locked || this.isInputBlocked()) {
       this.toggleFlyQueued = false;
+      this.sprinting = false;
       return {
         forward: false,
         back: false,
@@ -122,17 +143,20 @@ export class CameraRig {
         right: false,
         up: false,
         down: false,
+        sprint: false,
         toggleFly: false,
       };
     }
 
+    const forward = this.pressed.has('KeyW');
     const state: InputState = {
-      forward: this.pressed.has('KeyW'),
+      forward,
       back: this.pressed.has('KeyS'),
       left: this.pressed.has('KeyA'),
       right: this.pressed.has('KeyD'),
       up: this.pressed.has('Space'),
       down: this.pressed.has('ShiftLeft'),
+      sprint: this.sprinting && forward,
       toggleFly: this.toggleFlyQueued,
     };
     this.toggleFlyQueued = false;

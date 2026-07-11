@@ -19,6 +19,7 @@ import { CelestialSky } from '../render/CelestialSky';
 import { ChunkMeshRegistry } from '../render/ChunkMeshRegistry';
 import { CameraRig, lookDirectionFromYawPitch, THIRD_PERSON_DISTANCE } from '../render/CameraRig';
 import { PlayerAvatar } from '../render/PlayerAvatar';
+import { HeldBlock } from '../render/HeldBlock';
 import {
   loadPlayerSkinId,
   nextPlayerSkinId,
@@ -37,6 +38,10 @@ import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
 import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
+import { createWorldMapUi } from './WorldMapUi';
+import { buildMapPalette } from './worldMapRender';
+import { LandmarkDiscovery } from './landmarkDiscovery';
+import { exportWorldJson, exportFileName } from '../persistence/worldShare';
 import { createBootStore } from './bootStore';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -57,7 +62,7 @@ import {
   CHUNK_SIZE_X,
 } from '../core/constants';
 import { ViewDistanceGovernor } from './ViewDistanceGovernor';
-import { applyFogRange } from '../render/fog';
+import { applyFogRange, fogRangeFor } from '../render/fog';
 import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
@@ -91,12 +96,14 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
+import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
 import { BuilderState } from './BuilderState';
 import type { BuilderIntent } from './builderInput';
 import { dominantHorizontalAxis, nudgeDelta } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
+import { TourMarker } from '../render/TourMarker';
 import { BlockParticles, particleColorOf } from '../render/BlockParticles';
 import { AudioEngine } from '../audio/AudioEngine';
 import { MovementSoundTracker } from '../audio/MovementSounds';
@@ -121,6 +128,8 @@ import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
+const BASE_FOV = 70; // must match the Renderer's PerspectiveCamera construction
+const SPRINT_FOV_KICK = 8; // Minecraft-style widening while sprinting
 // Camera eye eases up this many blocks/sec when the player steps up (stairs/ledges), so a
 // 1-block step-up smooths over ~110ms instead of snapping the view a full block.
 const STEP_EYE_SPEED = 9;
@@ -162,9 +171,20 @@ export class Game {
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
     const requested = new URLSearchParams(window.location.search).get('world');
     const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
+    const generatedMeta = curatedPresetMeta(preset, SEED, SAVE_VERSION);
+    const activeMeta = bootMeta.meta ?? generatedMeta;
+    const curatedTitle = activeMeta?.title?.trim();
+    if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
     const { generator, overlays } = createGenerator(preset);
 
-    const bootSave = await initializeBootSave(bootMeta, SEED, SAVE_VERSION, preset);
+    const bootSave = await initializeBootSave(
+      bootMeta,
+      SEED,
+      SAVE_VERSION,
+      preset,
+      undefined,
+      generatedMeta,
+    );
     store = bootSave.store;
     const savedDeltas: WorldDeltas = bootSave.savedDeltas;
 
@@ -217,7 +237,7 @@ export class Game {
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
     const spawnOverrides = parseSpawnOverrides(window.location.search);
     const spawnState = clampSpawnY(
-      resolveSpawn(bootMeta.meta, spawnOverrides, {
+      resolveSpawn(activeMeta, spawnOverrides, {
         spawn: SPAWN,
         look: { yaw: 0, pitch: 0 },
       }),
@@ -225,12 +245,18 @@ export class Game {
     );
     // Only the fixed default spawn hovers waiting for terrain; curated/overridden spawns are
     // intentional vantage points and must not be settled onto the ground.
-    const usingDefaultSpawn =
-      spawnOverrides.spawn === undefined && bootMeta.meta?.spawn === undefined;
+    const usingDefaultSpawn = spawnOverrides.spawn === undefined && activeMeta?.spawn === undefined;
     const player = new PlayerController(spawnState.spawn, true);
-    const sampler: SoliditySampler & { isWater(x: number, y: number, z: number): boolean } = {
+    const sampler: SoliditySampler & {
+      isWater(x: number, y: number, z: number): boolean;
+      isClimbable(x: number, y: number, z: number): boolean;
+      isBarrier(x: number, y: number, z: number): boolean;
+    } = {
       collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
+      isClimbable: (x: number, y: number, z: number) =>
+        registry.isClimbable(manager.getBlock(x, y, z)),
+      isBarrier: (x: number, y: number, z: number) => registry.isBarrier(manager.getBlock(x, y, z)),
     };
 
     const edit = new EditService(manager);
@@ -239,6 +265,10 @@ export class Game {
     const movementSounds = new MovementSoundTracker();
     const particles = new BlockParticles();
     particles.attach((o) => renderer.add(o));
+
+    // First-person held block (the selected hotbar block in the lower right, build mode only).
+    const heldBlock = new HeldBlock(registry);
+    heldBlock.attach(renderer.scene, renderer.camera);
 
     // Ambience: weather cycles on its own clock; __vr.weather() pins a kind for testing.
     const weather = new Weather((intensity) => audio.playThunder(intensity));
@@ -330,8 +360,8 @@ export class Game {
 
     // Experience mode: curated worlds (title/description/spawn/look) open explore-first in
     // `play` (creative UI hidden, edit inputs gated in input.ts); `build` is full creative.
-    const curated = isCuratedWorld(bootMeta.meta);
-    let experience: ExperienceMode = initialExperienceMode(bootMeta.meta);
+    const curated = isCuratedWorld(activeMeta);
+    let experience: ExperienceMode = initialExperienceMode(activeMeta);
     const rig = new CameraRig(renderer.camera, canvas, overlay as HTMLElement | undefined, () =>
       ui.isInventoryOpen(),
     );
@@ -526,7 +556,10 @@ export class Game {
         return;
       }
       const batch = edit.apply(voxels);
-      if (batch) playEditEffects(batch.changes);
+      if (batch) {
+        playEditEffects(batch.changes);
+        heldBlock.punch(); // every successful edit funnels through here — one swing hook
+      }
       setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
@@ -650,17 +683,22 @@ export class Game {
     });
 
     // Guided tour (meta.tour): active waypoint + distance in the HUD, advancing on arrival.
-    const route = tourRoute(bootMeta.meta);
+    // World-space gold beacon tracks the active waypoint so players can navigate by sight,
+    // not only by the distance readout.
+    const tourMarker = new TourMarker();
+    tourMarker.attach((o) => renderer.add(o));
+    const route = tourRoute(activeMeta);
     let tourIndex: number | undefined;
     const endTour = (message: string): void => {
       tourIndex = undefined;
       ui.setTourHud(undefined);
+      tourMarker.update(undefined, false);
       setStatus(message);
     };
     const startTour = (): void => {
       if (!route) return void setStatus('This world has no tour');
       tourIndex = 0;
-      setStatus('Tour started — follow the marker distance');
+      setStatus('Tour started — follow the gold beacon');
     };
     ui.tourPrev.addEventListener('click', () => {
       if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, -1);
@@ -669,13 +707,41 @@ export class Game {
       if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, 1);
     });
     ui.tourEnd.addEventListener('click', () => endTour('Tour ended'));
-    /** One tour tick: advance from the player position and refresh the HUD (loop + dev hook). */
+    /** One tour tick: advance from the player position and refresh the HUD + beacon. */
     const updateTour = (): void => {
-      if (!route || tourIndex === undefined) return;
+      if (!route || tourIndex === undefined) {
+        tourMarker.update(undefined, false);
+        return;
+      }
       const s = tourTick(route, tourIndex, player.position.x, player.position.z);
       tourIndex = s.index;
       if (s.done) endTour(`Tour complete — ${s.name}`);
-      else ui.setTourHud(s);
+      else {
+        ui.setTourHud(s);
+        tourMarker.update(route[s.index], true);
+      }
+    };
+
+    // Landmark discovery medals: walking near a landmark marks it found, persisted per save.
+    // The map and info dialog hide undiscovered names behind "???" so exploring reveals them.
+    const discovery = new LandmarkDiscovery(
+      bootMeta.meta?.landmarks ?? [],
+      `vr.landmarksFound.${worldName}`,
+    );
+    let discoveryTimer = 0;
+    const tickDiscovery = (cdt: number): void => {
+      if (discovery.total === 0) return;
+      discoveryTimer -= cdt;
+      if (discoveryTimer > 0) return;
+      discoveryTimer = 0.5; // a stroll covers ~3 blocks between checks — plenty inside radius 12
+      const found = discovery.tick(player.position.x, player.position.z);
+      if (found.length === 0) return;
+      audio.playTick();
+      setStatus(
+        discovery.complete
+          ? `All ${discovery.total} landmarks discovered — world explored!`
+          : `Discovered: ${found.map((l) => l.name).join(', ')} (${discovery.foundCount}/${discovery.total})`,
+      );
     };
 
     // World intro/info panel: shown once per save on a curated first visit, reopenable via Info.
@@ -688,12 +754,15 @@ export class Game {
       }
     };
     const openWorldInfo = async (): Promise<void> => {
-      const meta = bootMeta.meta;
+      const meta = activeMeta;
       const action = await ui.showWorldInfoDialog(
         {
           title: meta?.title?.trim() || `World: ${worldName}`,
           description: meta?.description ?? '',
-          landmarks: (meta?.landmarks ?? []).map((l) => l.name),
+          landmarks: (meta?.landmarks ?? []).map((l) => ({
+            name: l.name,
+            found: discovery.isFound(l.name),
+          })),
           tourCount: meta?.tour?.length ?? 0,
         },
         worldName,
@@ -717,9 +786,96 @@ export class Game {
     applyExperience(experience);
     if (curated && !introSeen()) void openWorldInfo();
 
+    // World map (M): a player-centered top-down snapshot of the loaded world with landmark
+    // labels and the tour route. Rendered once per open.
+    const worldMap = createWorldMapUi();
+    const mapPalette = buildMapPalette();
+    const toggleWorldMap = (): void => {
+      worldMap.toggle({
+        center: { x: Math.floor(player.position.x), z: Math.floor(player.position.z) },
+        yaw: rig.yaw,
+        radius: manager.viewDistance * CHUNK_SIZE_X,
+        sample: (x, z) => manager.surfaceAt(x, z),
+        palette: mapPalette,
+        title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
+        landmarks: (bootMeta.meta?.landmarks ?? []).map((l) => ({
+          ...l,
+          found: discovery.isFound(l.name),
+        })),
+        tour: route ?? [],
+      });
+    };
+
+    // Escape pause menu: losing pointer lock in-game (Esc, alt-tab) opens it. The lock-loss
+    // event is the only Escape signal the page gets — the browser reserves the key while
+    // locked. Programmatic unlocks (inventory `I`) and already-open dialogs skip it.
+    let pauseBusy = false;
+    const openPauseMenu = async (): Promise<void> => {
+      pauseBusy = true;
+      worldMap.close(); // the pause dialog owns the screen
+      // The dialog scrim dims the scene itself; hide the click-to-play overlay text behind it.
+      overlay?.style.setProperty('visibility', 'hidden');
+      try {
+        const action = await ui.showPauseDialog({
+          title: activeMeta?.title?.trim() || `World: ${worldName}`,
+          volume: audio.volume,
+          muted: audio.muted,
+          onVolume: (v) => {
+            audio.setVolume(v);
+            audio.playTick(); // audible feedback while dragging
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+          onMute: (m) => {
+            audio.setMuted(m);
+            ui.setSoundUi(audio.volume, audio.muted);
+          },
+          viewBob: viewBobOn,
+          onViewBob: (on) => setViewBob(on),
+          onShare: () => {
+            void (async () => {
+              // Fresh meta (dev setMeta can change it after boot) + the live delta map, so
+              // the export never waits on (or races) the debounced persistence flush.
+              const meta = (await store.loadMeta().catch(() => undefined)) ?? bootMeta.meta;
+              const json = exportWorldJson(meta, manager.allDeltas());
+              const blob = new Blob([json], { type: 'application/json' });
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = exportFileName(meta?.title, worldName);
+              link.click();
+              window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
+              setStatus('World copy downloaded — import it from the menu on any device');
+            })();
+          },
+        });
+        if (action === 'resume') {
+          // Chrome enforces a ~1.25s cooldown after an Escape-exit; when the request is
+          // rejected the click-to-play overlay is already back up, so a click resumes.
+          const request = canvas.requestPointerLock() as Promise<void> | undefined;
+          void request?.catch(() => {});
+        } else if (action === 'guide') {
+          await openWorldInfo();
+        } else if (action === 'worlds') {
+          window.location.href = './';
+        }
+      } finally {
+        overlay?.style.removeProperty('visibility');
+        pauseBusy = false;
+      }
+    };
+    const pauseListener = new AbortController();
+    document.addEventListener(
+      'pointerlockchange',
+      () => {
+        if (document.pointerLockElement === canvas) return;
+        if (pauseBusy || ui.isInventoryOpen() || ui.isDialogOpen()) return;
+        void openPauseMenu();
+      },
+      { signal: pauseListener.signal },
+    );
+
     const selectionBox = new SelectionBox();
     selectionBox.attach((o) => renderer.add(o));
-    const pasteGhost = new PasteGhost();
+    const pasteGhost = new PasteGhost(mapPalette); // same block colors as the world map
     pasteGhost.attach((o) => renderer.add(o));
 
     // Visible player character, shown only in third-person view.
@@ -966,6 +1122,7 @@ export class Game {
           setHeadlamp(!headlampOn, true);
           setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
         },
+        onToggleMap: toggleWorldMap,
         onToggleView: () => {
           const next = rig.toggleMode();
           setStatus(next === 'third' ? 'Third-person view (F1)' : 'First-person view (F1)');
@@ -991,9 +1148,27 @@ export class Game {
       VIEW_DISTANCE,
     );
     let burstActive = true;
+    let loadingElapsed = 0;
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
+    // View bob: on by default, toggleable from the pause menu (motion-sickness opt-out).
+    let viewBobOn = true;
+    try {
+      viewBobOn = localStorage.getItem('vr.viewBob') !== 'off';
+    } catch {
+      /* localStorage unavailable — keep the default */
+    }
+    const setViewBob = (on: boolean): void => {
+      viewBobOn = on;
+      try {
+        localStorage.setItem('vr.viewBob', on ? 'on' : 'off');
+      } catch {
+        /* ignore persistence failure */
+      }
+    };
+    let bobPhase = 0;
+    let bobAmp = 0;
     // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
     let avatarPrevX = player.position.x;
     let avatarPrevZ = player.position.z;
@@ -1011,6 +1186,13 @@ export class Game {
       if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
+
+      // Sprint feedback: ease the FOV out while sprinting and back on release.
+      const targetFov = BASE_FOV + (player.sprinting ? SPRINT_FOV_KICK : 0);
+      if (Math.abs(renderer.camera.fov - targetFov) > 0.05) {
+        renderer.camera.fov += (targetFov - renderer.camera.fov) * Math.min(1, cdt * 8);
+        renderer.camera.updateProjectionMatrix();
+      }
       const eye = player.eye();
       // Ease the camera up small step-ups (stairs/ledges) instead of snapping a full block; snap
       // for jumps, falls, flying, and teleports so those stay responsive.
@@ -1021,6 +1203,24 @@ export class Game {
         smoothEyeY = eye.y;
       }
       const viewEye = { x: eye.x, y: smoothEyeY, z: eye.z };
+      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
+      avatarPrevX = player.position.x;
+      avatarPrevZ = player.position.z;
+      // View bob: stride-driven sway while walking on the ground, first-person only. The
+      // amplitude eases in/out so starts and stops never snap the camera; phase advances by
+      // ground covered, so bob speed tracks walk vs sprint automatically.
+      const bobTarget =
+        viewBobOn && player.grounded && rig.mode === 'first' && avatarDh > 0.0005 ? 1 : 0;
+      bobAmp += (bobTarget - bobAmp) * Math.min(1, cdt * 8);
+      let bobY = 0;
+      if (bobAmp > 0.002) {
+        bobPhase += avatarDh * 1.7;
+        const lateral = Math.cos(bobPhase) * 0.022 * bobAmp;
+        bobY = Math.sin(bobPhase * 2) * 0.042 * bobAmp;
+        viewEye.y += bobY;
+        viewEye.x += Math.cos(rig.yaw) * lateral;
+        viewEye.z += -Math.sin(rig.yaw) * lateral;
+      }
       // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
       let thirdDistance = THIRD_PERSON_DISTANCE;
       if (rig.mode === 'third') {
@@ -1033,9 +1233,15 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      const avatarDh = Math.hypot(player.position.x - avatarPrevX, player.position.z - avatarPrevZ);
-      avatarPrevX = player.position.x;
-      avatarPrevZ = player.position.z;
+      // Held block: first-person build mode only; play mode reads as scenery, not a toolbar.
+      heldBlock.setBlock(inventory.selectedBlock);
+      heldBlock.update(cdt, {
+        visible:
+          rig.mode === 'first' && experience === 'build' && rig.locked && !ui.isInventoryOpen(),
+        yaw: rig.yaw,
+        pitch: rig.pitch,
+        bobY,
+      });
       avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
       const move = movementSounds.update(
         cdt,
@@ -1076,14 +1282,14 @@ export class Game {
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
       const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
-      const fogFar = Math.max(1, manager.viewDistance * CHUNK_SIZE_X);
+      const fogRange = fogRangeFor(manager.viewDistance * CHUNK_SIZE_X);
       const surfaceFog: FogParams = {
         // Source the surface fog from the sky model, not scene.background: the background stores
         // color-managed (linear) components, and reading it back would feed linear values into
         // the raw fog uniforms and re-ingest the previous frame's flash/underwater writes.
         color: [skyNow.sky[0] / 255, skyNow.sky[1] / 255, skyNow.sky[2] / 255],
-        near: fogFar * 0.55,
-        far: fogFar,
+        near: fogRange.near,
+        far: fogRange.far,
       };
       applyUnderwater(chunkMaterials, renderer.scene, surfaceFog, underwaterFactor);
       weather.applyFlash(chunkMaterials, renderer.scene);
@@ -1097,6 +1303,20 @@ export class Game {
       if (burstActive && !manager.streaming) {
         burstActive = false;
         manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
+        ui.setLoadingHud(undefined);
+      }
+      // Streaming status: honest progress while the first ring fills (delayed slightly so
+      // fast loads never flash a banner). Percent is capped — the last chunks are the sort
+      // tail, and 100% would linger.
+      if (burstActive) {
+        loadingElapsed += cdt;
+        if (loadingElapsed > 0.35) {
+          const pct = Math.min(
+            99,
+            Math.round((100 * manager.loadedChunkCount()) / manager.desiredChunkCount()),
+          );
+          ui.setLoadingHud(`Building ${worldTitle ?? 'the world'} — ${pct}%`);
+        }
       }
 
       // Enter the world on the ground: the default spawn hovers while chunks stream in. As
@@ -1146,7 +1366,12 @@ export class Game {
         targetOverlay.update(undefined, false);
         selectionBox.update(builder.selectionBox(), true);
         if (builder.mode === 'pasting') {
-          pasteGhost.update(builder.transformedClipboard()?.dims, pasteOrigin(), true);
+          pasteGhost.update(
+            builder.transformedClipboard(),
+            pasteOrigin(),
+            true,
+            builder.clipboardRevision,
+          );
         } else {
           pasteGhost.update(undefined, undefined, false);
         }
@@ -1171,6 +1396,7 @@ export class Game {
       }
       // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
       updateTour();
+      tickDiscovery(cdt);
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 
@@ -1276,6 +1502,8 @@ export class Game {
     /** Releases all resources acquired during boot. */
     function cleanup(): void {
       abortInput();
+      pauseListener.abort();
+      worldMap.dispose();
       meshPool?.dispose();
       audio.dispose();
       persistence.dispose();
@@ -1288,6 +1516,8 @@ export class Game {
       particles.dispose();
       selectionBox.dispose();
       pasteGhost.dispose();
+      heldBlock.dispose();
+      tourMarker.dispose();
       targetOverlay.dispose();
       sink.disposeAll();
       mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too

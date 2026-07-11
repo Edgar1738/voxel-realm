@@ -1,4 +1,5 @@
 import {
+  AdditiveBlending,
   BoxGeometry,
   Color,
   DynamicDrawUsage,
@@ -6,6 +7,7 @@ import {
   Matrix4,
   MeshBasicMaterial,
   Quaternion,
+  SphereGeometry,
   Vector3,
   type Object3D,
 } from 'three';
@@ -33,9 +35,9 @@ const KINDS: Record<LifeKindName, KindDef> = {
   butterfly: {
     count: 10,
     palette: [0xfff4f4, 0xffa54f, 0xc9a0ff, 0xffe06e],
-    scale: [0.14, 0.05, 0.1],
+    scale: [0.18, 0.04, 0.12],
   },
-  firefly: { count: 26, palette: [0xd8ff6e], scale: [0.07, 0.07, 0.07] },
+  firefly: { count: 26, palette: [0xd8ff6e], scale: [0.09, 0.09, 0.09] },
   leaf: { count: 14, palette: [0x4d8f3a, 0x6aa84f, 0x8fbc5a], scale: [0.11, 0.02, 0.11] },
 };
 
@@ -85,8 +87,24 @@ interface Agent {
  * around the camera every couple of seconds, so life shows up wherever the world
  * happens to provide habitat — nothing is scripted per world.
  */
+/** Firefly halo radius in world units at full glow. */
+const GLOW_RADIUS = 0.34;
+/** Warm green halo tint; additive blending turns intensity into brightness. */
+const GLOW_COLOR = new Color(0x9fd542).multiplyScalar(0.55);
+
+/**
+ * Smooth firefly blink in [0,1]: slow fade-in/out with real off periods, instead of the old
+ * hard on/off cut. Exported for tests.
+ */
+export function fireflyGlow(age: number, phase: number): number {
+  return Math.min(1, Math.max(0, Math.sin(age * 2.4 + phase) * 1.8 + 0.55));
+}
+
 export class AmbientLife {
   private readonly mesh: InstancedMesh;
+  /** Additive halo spheres, fireflies only — the actual "glow" the tiny core box lacks. */
+  private readonly glowMesh: InstancedMesh;
+  private readonly scratchColor = new Color();
   private readonly agents: Agent[] = [];
   private readonly anchors: Record<LifeKindName, Vector3[]> = {
     butterfly: [],
@@ -108,10 +126,25 @@ export class AmbientLife {
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 996;
+    // depthWrite off: halos overlap each other and the core box; additive light just sums.
+    this.glowMesh = new InstancedMesh(
+      new SphereGeometry(1, 10, 8),
+      new MeshBasicMaterial({
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+      MAX_AGENTS,
+    );
+    this.glowMesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.glowMesh.count = 0;
+    this.glowMesh.frustumCulled = false;
+    this.glowMesh.renderOrder = 997;
   }
 
   attach(add: (o: Object3D) => void): void {
     add(this.mesh);
+    add(this.glowMesh);
   }
 
   /** Agents currently alive per kind (for dev inspection and tests). */
@@ -135,6 +168,7 @@ export class AmbientLife {
     }
 
     let write = 0;
+    let glowWrite = 0;
     for (const agent of this.agents) {
       agent.age += dt;
       const dx = agent.pos.x - cam.x;
@@ -144,13 +178,32 @@ export class AmbientLife {
       }
       this.move(agent, dt);
       const def = KINDS[agent.kind];
-      const blink =
-        agent.kind === 'firefly'
-          ? Math.sin(agent.age * 2.4 + agent.phase) > -0.35
-            ? 1
-            : 0.001
-          : 1;
-      this.scratchScale.set(def.scale[0] * blink, def.scale[1] * blink, def.scale[2] * blink);
+      let sx = def.scale[0];
+      let sy = def.scale[1];
+      let sz = def.scale[2];
+      if (agent.kind === 'firefly') {
+        // Fade the core with the glow so blinks read as light, not a popping box.
+        const glow = fireflyGlow(agent.age, agent.phase);
+        const core = Math.max(0.001, 0.4 + 0.6 * glow);
+        sx *= core;
+        sy *= core;
+        sz *= core;
+        if (glow > 0.01) {
+          const r = GLOW_RADIUS * glow;
+          this.scratchScale.set(r, r, r);
+          this.scratchMatrix.compose(agent.pos, this.scratchQuat, this.scratchScale);
+          this.glowMesh.setMatrixAt(glowWrite, this.scratchMatrix);
+          this.scratchColor.copy(GLOW_COLOR).multiplyScalar(glow);
+          this.glowMesh.setColorAt(glowWrite, this.scratchColor);
+          glowWrite++;
+        }
+      } else if (agent.kind === 'butterfly') {
+        // Wing flap: pinch the span, widen slightly along the body, at a fast beat.
+        const flap = 0.25 + 0.75 * Math.abs(Math.sin(agent.age * 9 + agent.phase));
+        sx *= flap;
+        sz *= 1.1 - 0.25 * flap;
+      }
+      this.scratchScale.set(sx, sy, sz);
       this.scratchMatrix.compose(agent.pos, this.scratchQuat, this.scratchScale);
       this.mesh.setMatrixAt(write, this.scratchMatrix);
       this.mesh.setColorAt(write, agent.color);
@@ -161,12 +214,17 @@ export class AmbientLife {
     this.mesh.count = write;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.glowMesh.count = glowWrite;
+    this.glowMesh.instanceMatrix.needsUpdate = true;
+    if (this.glowMesh.instanceColor) this.glowMesh.instanceColor.needsUpdate = true;
   }
 
   /** Frees the shared instanced-mesh GPU resources. */
   dispose(): void {
     this.mesh.geometry.dispose();
     (this.mesh.material as MeshBasicMaterial).dispose();
+    this.glowMesh.geometry.dispose();
+    (this.glowMesh.material as MeshBasicMaterial).dispose();
   }
 
   private move(agent: Agent, dt: number): void {

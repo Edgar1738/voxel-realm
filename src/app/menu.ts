@@ -38,8 +38,10 @@ export interface WorldCard {
   tourCount: number;
   chunkCount?: number;
   url: string;
-  /** Stable per-slug hue for the card art (no preview images are shipped yet). */
+  /** Stable per-slug hue for the card art — the fallback when no preview image ships. */
   hue: number;
+  /** Relative path to the card's preview screenshot, when the manifest ships one. */
+  preview?: string;
 }
 
 /** Deterministic hue in [0, 360) so a card's gradient is stable across visits. */
@@ -59,6 +61,7 @@ export function worldCards(manifest: WorldManifest): WorldCard[] {
     landmarkCount: w.landmarks.length,
     tourCount: w.tour.length,
     ...(w.chunkCount !== undefined ? { chunkCount: w.chunkCount } : {}),
+    ...(w.preview !== undefined ? { preview: w.preview } : {}),
     url: shippedWorldUrl(w.slug),
     hue: cardHue(w.slug),
   }));
@@ -87,6 +90,7 @@ export const CREATE_CARDS: readonly CreateCard[] = [
       ['islands', 'Archipelago', 'Island peaks rising from open water.'],
       ['canyon', 'Canyonlands', 'A high plateau cut by deep ravines, ruins on the mesas.'],
       ['villages', 'Villages', 'Gentle plains dotted with generated villages.'],
+      ['ashen-reach', 'Ashen Reach', 'A volcanic frontier: cross the ember bridge to Cinderkeep.'],
       ['citadel', 'The Citadel', 'A ruined fortress-kingdom with a dungeon below.'],
       ['harbor', 'Harbor', 'A coastal harbor town on the waterline.'],
     ] as Array<[WorldPreset, string, string]>

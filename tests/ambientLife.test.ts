@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AmbientLife, isAnchor, kindActive } from '../src/render/AmbientLife';
+import { AmbientLife, fireflyGlow, isAnchor, kindActive } from '../src/render/AmbientLife';
 import { AIR, FLOWER, GRASS, LEAVES, TALL_GRASS, WATER, STONE } from '../src/blocks/blocks';
 
 const CAM = { x: 0, y: 64, z: 0 };
@@ -26,6 +26,25 @@ describe('kindActive', () => {
     for (let d = 0; d <= 1; d += 0.05) {
       expect(kindActive('butterfly', d) && kindActive('firefly', d)).toBe(false);
     }
+  });
+});
+
+describe('fireflyGlow', () => {
+  it('pulses smoothly between fully off and fully on', () => {
+    let min = 1;
+    let max = 0;
+    const seen = new Set<number>();
+    for (let age = 0; age < 10; age += 0.02) {
+      const g = fireflyGlow(age, 0);
+      expect(g).toBeGreaterThanOrEqual(0);
+      expect(g).toBeLessThanOrEqual(1);
+      min = Math.min(min, g);
+      max = Math.max(max, g);
+      if (g > 0 && g < 1) seen.add(Math.round(g * 10));
+    }
+    expect(min).toBe(0); // real off periods (dark gaps between blinks)
+    expect(max).toBe(1); // reaches full brightness
+    expect(seen.size).toBeGreaterThan(3); // and fades through the middle, not a hard cut
   });
 });
 

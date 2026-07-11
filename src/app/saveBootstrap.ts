@@ -43,6 +43,7 @@ export async function initializeBootSave(
   version: number,
   preset: string,
   onError: ErrorLogger = defaultLogger,
+  initialMeta?: WorldMeta,
 ): Promise<BootSaveState> {
   if (!boot.persistent) {
     return {
@@ -80,7 +81,7 @@ export async function initializeBootSave(
 
   try {
     await boot.store.clearDeltas();
-    await boot.store.saveMeta({ seed, version, preset });
+    await boot.store.saveMeta(initialMeta ?? { seed, version, preset });
     return {
       store: boot.store,
       savedDeltas: new Map(),

@@ -1,4 +1,4 @@
-import { FACING } from '../world/VoxelState';
+import { FACING, FACING_DIR } from '../world/VoxelState';
 
 /** A local axis-aligned box within a voxel: [minX,minY,minZ, maxX,maxY,maxZ] (0..1, Y up to 1.5). */
 export type AABB = readonly [number, number, number, number, number, number];
@@ -34,6 +34,37 @@ export function connectedBoxes(post: { lo: number; hi: number }, conns: ConnFlag
   if (conns.pz) boxes.push([lo, 0, hi, hi, 1.5, 1]);
   if (conns.nz) boxes.push([lo, 0, 0, hi, 1.5, lo]);
   return boxes;
+}
+
+/** Door panel thickness (≈ Minecraft's 3/16). */
+export const DOOR_THICKNESS = 0.19;
+/** Ladder plate thickness — thin enough to hug the wall, thick enough to read side-on. */
+export const LADDER_THICKNESS = 0.08;
+/** Doors collide 1.5 tall (unjumpable, same convention as fences/gates)… */
+export const DOOR_COLLISION_HEIGHT = 1.5;
+/** …but render 2 tall, filling a standard 2-high doorway. */
+export const DOOR_RENDER_HEIGHT = 2;
+
+/**
+ * A thin slab flush against the cell edge BEHIND `facing` (the −FACING_DIR side): a ladder
+ * plate hugs the wall it was clicked onto, a closed door panel sits at the edge nearest the
+ * placer. Shared by rendering and collision so the two can't disagree.
+ */
+export function edgeSlabBox(facing: number, thickness: number, height: number): AABB {
+  const [dx, dz] = FACING_DIR[facing & 0b11];
+  if (dz === -1) return [0, 0, 1 - thickness, 1, height, 1]; // behind = +Z edge
+  if (dz === 1) return [0, 0, 0, 1, height, thickness]; // behind = -Z edge
+  if (dx === -1) return [1 - thickness, 0, 0, 1, height, 1]; // behind = +X edge
+  return [0, 0, 0, thickness, height, 1]; // behind = -X edge
+}
+
+/**
+ * The door panel box. Closed: flush at the edge behind the facing, spanning the passage.
+ * Open: swung 90° clockwise onto the adjacent side edge (hinge at the shared corner), so
+ * the doorway clears.
+ */
+export function doorBox(facing: number, open: boolean, height: number): AABB {
+  return edgeSlabBox(open ? (facing + 1) % 4 : facing, DOOR_THICKNESS, height);
 }
 
 /**

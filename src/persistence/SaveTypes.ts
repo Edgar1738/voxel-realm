@@ -1,5 +1,5 @@
 /** Bump when WORLD_HEIGHT, the voxel-index convention, block ids, or base worldgen change. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** A world-space point used by spawn, landmarks, and tour waypoints. */
 export interface MetaPoint {

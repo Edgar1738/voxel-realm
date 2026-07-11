@@ -1,0 +1,175 @@
+// src/render/HeldBlock.ts
+//
+// First-person held block: the selected hotbar block rendered as a small camera-anchored
+// cube in the lower right (Minecraft's held item). Textures are painted from the same
+// procedural specs as the world's texture array, one tiny DataTexture per unique layer
+// (cached — most blocks share layers). Materials draw with depthTest off: the cube is
+// convex and backface-culled, so it composites correctly over the world without ever
+// clipping into a wall the player stands against.
+import {
+  BoxGeometry,
+  DataTexture,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  NearestFilter,
+  PlaneGeometry,
+  RGBAFormat,
+  SRGBColorSpace,
+  type PerspectiveCamera,
+  type Scene,
+} from 'three';
+import { Face, BLOCK_TEXTURES } from '../blocks/blocks';
+import { TILE, paintLayer } from '../blocks/textures';
+import type { BlockRegistry } from '../blocks/BlockRegistry';
+
+/** Rest pose, tuned like Minecraft's right-hand item (camera space, −Z forward). */
+const REST = { x: 0.46, y: -0.44, z: -0.86 };
+const SCALE = 0.4;
+/** Per-face brightness so the unlit cube still reads 3D (same idea as the block icons). */
+const FACE_SHADE: Record<Face, number> = {
+  [Face.PosX]: 0.8,
+  [Face.NegX]: 0.8,
+  [Face.PosY]: 1,
+  [Face.NegY]: 0.55,
+  [Face.PosZ]: 0.9,
+  [Face.NegZ]: 0.7,
+};
+const PUNCH_SECONDS = 0.22;
+
+export class HeldBlock {
+  private readonly group = new Group();
+  private currentId = -1;
+  private mesh?: Mesh;
+  /** One tiny texture per unique layer index, shared across blocks and faces. */
+  private readonly layerTextures = new Map<number, DataTexture>();
+  private punchT = 0;
+  private swayYaw = 0;
+  private swayPitch = 0;
+  private prevYaw?: number;
+  private prevPitch?: number;
+
+  constructor(private readonly registry: BlockRegistry) {
+    this.group.visible = false;
+    this.group.renderOrder = 1000;
+  }
+
+  /** Parents the group to the camera (adding the camera to the scene so children render). */
+  attach(scene: Scene, camera: PerspectiveCamera): void {
+    scene.add(camera);
+    camera.add(this.group);
+    this.group.position.set(REST.x, REST.y, REST.z);
+    this.group.rotation.set(0.12, -0.6, 0.02);
+    this.group.scale.setScalar(SCALE);
+  }
+
+  /** Kicks the place/break swing animation. */
+  punch(): void {
+    this.punchT = 1;
+  }
+
+  /** Swaps the displayed block (no-op when unchanged; AIR hides the hand). */
+  setBlock(id: number): void {
+    if (id === this.currentId) return;
+    this.currentId = id;
+    if (this.mesh) {
+      this.group.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      const mats = Array.isArray(this.mesh.material) ? this.mesh.material : [this.mesh.material];
+      for (const m of mats) m.dispose();
+      delete this.mesh;
+    }
+    if (id === 0 || !this.registry.has(id)) return;
+    this.mesh = this.registry.shape(id) === 'cross' ? this.buildCross(id) : this.buildCube(id);
+    this.mesh.renderOrder = 1000;
+    this.group.add(this.mesh);
+  }
+
+  /**
+   * Per-frame animation: look-lag sway (the hand trails the camera), walk bob, and the
+   * punch dip. `bobY` is the view-bob vertical offset so hand and eye move together.
+   */
+  update(dt: number, opts: { visible: boolean; yaw: number; pitch: number; bobY: number }): void {
+    this.group.visible = opts.visible && this.mesh !== undefined;
+    if (!this.group.visible) {
+      this.prevYaw = opts.yaw;
+      this.prevPitch = opts.pitch;
+      return;
+    }
+    const dYaw = opts.yaw - (this.prevYaw ?? opts.yaw);
+    const dPitch = opts.pitch - (this.prevPitch ?? opts.pitch);
+    this.prevYaw = opts.yaw;
+    this.prevPitch = opts.pitch;
+    // Look-lag accumulates the camera's turn and eases back to center.
+    const clamp = (v: number): number => Math.max(-0.1, Math.min(0.1, v));
+    this.swayYaw = clamp(this.swayYaw + dYaw * 0.4) * Math.max(0, 1 - dt * 8);
+    this.swayPitch = clamp(this.swayPitch + dPitch * 0.4) * Math.max(0, 1 - dt * 8);
+
+    this.punchT = Math.max(0, this.punchT - dt / PUNCH_SECONDS);
+    // The punch dips the hand down-forward and back in one half-sine.
+    const punch = Math.sin(this.punchT * Math.PI);
+
+    this.group.position.set(
+      REST.x + this.swayYaw,
+      REST.y - this.swayPitch + opts.bobY - punch * 0.16,
+      REST.z - punch * 0.18,
+    );
+    this.group.rotation.set(0.12 - punch * 0.5, -0.6 + this.swayYaw * 1.4, 0.02);
+  }
+
+  dispose(): void {
+    this.setBlock(-2); // drops the current mesh (an id that can never be selected)
+    for (const tex of this.layerTextures.values()) tex.dispose();
+    this.layerTextures.clear();
+  }
+
+  private layerTexture(layer: number): DataTexture {
+    let tex = this.layerTextures.get(layer);
+    if (!tex) {
+      const data = new Uint8Array(TILE * TILE * 4);
+      paintLayer(data, 0, BLOCK_TEXTURES.uniqueSpecs[layer]);
+      tex = new DataTexture(data, TILE, TILE, RGBAFormat);
+      tex.magFilter = NearestFilter;
+      tex.minFilter = NearestFilter;
+      tex.colorSpace = SRGBColorSpace;
+      tex.needsUpdate = true;
+      this.layerTextures.set(layer, tex);
+    }
+    return tex;
+  }
+
+  private faceMaterial(id: number, face: Face, cutout: boolean): MeshBasicMaterial {
+    const shade = FACE_SHADE[face];
+    const mat = new MeshBasicMaterial({
+      map: this.layerTexture(this.registry.faceLayer(id, face)),
+      depthTest: false,
+    });
+    if (cutout) {
+      mat.transparent = true;
+      mat.alphaTest = 0.5;
+      mat.side = 2; // DoubleSide
+    }
+    mat.color.setScalar(shade);
+    return mat;
+  }
+
+  /** BoxGeometry group order (px,nx,py,ny,pz,nz) matches the Face enum indices exactly. */
+  private buildCube(id: number): Mesh {
+    const half = this.registry.shape(id) === 'slab';
+    const geo = new BoxGeometry(1, half ? 0.5 : 1, 1);
+    const mats = [Face.PosX, Face.NegX, Face.PosY, Face.NegY, Face.PosZ, Face.NegZ].map((f) =>
+      this.faceMaterial(id, f, false),
+    );
+    const mesh = new Mesh(geo, mats);
+    if (half) mesh.position.y = -0.25;
+    return mesh;
+  }
+
+  /** Cross plants render as one double-sided cutout quad — reads as "holding a flower". */
+  private buildCross(id: number): Mesh {
+    const geo = new PlaneGeometry(1, 1);
+    const mat = this.faceMaterial(id, Face.PosX, true);
+    mat.color.setScalar(1);
+    return new Mesh(geo, mat);
+  }
+}

@@ -60,7 +60,8 @@ export interface BlueprintEntry {
 export interface WorldInfo {
   title: string;
   description?: string;
-  landmarks: string[];
+  /** Undiscovered landmarks list as "???" — exploring (within the discovery radius) reveals them. */
+  landmarks: Array<{ name: string; found: boolean }>;
   /** Number of tour waypoints; the Start Tour action shows only when this is >= 2. */
   tourCount: number;
 }
@@ -75,7 +76,15 @@ export interface HotkeyGroup {
 export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   {
     heading: 'Roam',
-    lines: ['WASD move', 'Mouse look', 'Space up / jump', 'Shift down', 'F fly', 'L headlamp'],
+    lines: [
+      'WASD move',
+      'Mouse look',
+      'Space up / jump',
+      'Shift down',
+      'F fly',
+      'L headlamp',
+      'M map',
+    ],
   },
   { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
   { heading: 'Blocks', lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory'] },
@@ -86,6 +95,24 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   },
   { heading: 'Reach', lines: ['Shift + wheel adjusts reach'] },
 ];
+
+/** Escape pause-menu actions; 'resume' is also the Escape/backdrop fallback. */
+export type PauseAction = 'resume' | 'guide' | 'worlds';
+
+export interface PauseDialogOpts {
+  /** World title shown under the "Paused" heading. */
+  title: string;
+  /** Current engine volume in [0,1] and mute state; changes apply live via the callbacks. */
+  volume: number;
+  muted: boolean;
+  onVolume(volume: number): void;
+  onMute(muted: boolean): void;
+  /** View-bob setting (motion-sickness opt-out); toggles apply live via the callback. */
+  viewBob: boolean;
+  onViewBob(on: boolean): void;
+  /** Downloads a shareable copy of the world (the dialog stays open; a toast confirms). */
+  onShare(): void;
+}
 
 /** What the tour HUD displays for the active waypoint. */
 export interface TourHudStatus {
@@ -178,6 +205,8 @@ export interface CreativeUi {
   setExperienceMode(mode: 'play' | 'build'): void;
   /** Shows/updates the tour HUD, or hides it when passed undefined. */
   setTourHud(status: TourHudStatus | undefined): void;
+  /** Cold-start streaming banner ("Building the world — 42%"), hidden when passed undefined. */
+  setLoadingHud(text: string | undefined): void;
   /**
    * Menu dialog: world title/description/landmarks + "Current world" + the grouped hotkey
    * reference. Resolves the chosen action or undefined on dismiss.
@@ -186,6 +215,13 @@ export interface CreativeUi {
     info: WorldInfo,
     worldName: string,
   ): Promise<'explore' | 'tour' | 'build' | undefined>;
+  /** Whether any modal dialog (pause, menu, worlds, blueprints, confirm) is currently open. */
+  isDialogOpen(): boolean;
+  /**
+   * Escape pause menu: resume / world guide / sound / back to worlds. Sound changes apply
+   * live through the callbacks; Escape and the backdrop resolve 'resume'.
+   */
+  showPauseDialog(opts: PauseDialogOpts): Promise<PauseAction>;
 }
 
 const STATUS_VISIBLE_MS = 1600;
@@ -555,6 +591,21 @@ export function createCreativeUi(
   tourEnd.setAttribute('aria-label', 'End tour');
   tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
 
+  // Cold-start streaming banner: honest feedback while the first chunk ring generates and
+  // meshes, so a slow machine sees progress instead of empty sky ("is it broken?").
+  const loadingHud = document.createElement('div');
+  loadingHud.className = 'loading-hud';
+  loadingHud.style.display = 'none';
+  loadingHud.setAttribute('role', 'status');
+  const setLoadingHud = (text: string | undefined): void => {
+    if (text === undefined) {
+      loadingHud.style.display = 'none';
+      return;
+    }
+    loadingHud.style.display = 'block';
+    loadingHud.textContent = text;
+  };
+
   const setTourHud = (s: TourHudStatus | undefined): void => {
     if (!s) {
       tourHud.style.display = 'none';
@@ -566,7 +617,7 @@ export function createCreativeUi(
       : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
   };
 
-  root.append(dock, scrim, status, notice, hotbar, tourHud, dialogScrim);
+  root.append(dock, scrim, status, notice, hotbar, tourHud, loadingHud, dialogScrim);
   document.body.append(root);
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
@@ -884,14 +935,16 @@ export function createCreativeUi(
       panel.append(title, worldLine, message);
 
       if (info.landmarks.length > 0) {
+        const foundCount = info.landmarks.filter((l) => l.found).length;
         const heading = document.createElement('div');
         heading.className = 'info-heading';
-        heading.textContent = 'Landmarks';
+        heading.textContent = `Landmarks (${foundCount}/${info.landmarks.length} discovered)`;
         const list = document.createElement('ul');
         list.className = 'info-landmarks';
-        for (const name of info.landmarks) {
+        for (const landmark of info.landmarks) {
           const li = document.createElement('li');
-          li.textContent = name;
+          li.textContent = landmark.found ? landmark.name : '???';
+          if (!landmark.found) li.classList.add('is-undiscovered');
           list.append(li);
         }
         panel.append(heading, list);
@@ -954,6 +1007,95 @@ export function createCreativeUi(
       panel.append(actions);
 
       const close = openDialogPanel(panel, () => finish(undefined));
+    });
+
+  const isDialogOpen = (): boolean => dialogScrim.classList.contains('is-open');
+
+  const showPauseDialog = (opts: PauseDialogOpts): Promise<PauseAction> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('Paused');
+      panel.classList.add('pause-panel');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'Paused';
+      const worldLine = document.createElement('p');
+      worldLine.className = 'dialog-message';
+      worldLine.textContent = opts.title;
+
+      const finish = (action: PauseAction): void => {
+        close();
+        resolve(action);
+      };
+
+      const actions = document.createElement('div');
+      actions.className = 'pause-actions';
+      const resume = button('Resume');
+      resume.className = 'dialog-btn pause-btn';
+      resume.addEventListener('click', () => finish('resume'));
+      const guide = button('World guide & controls');
+      guide.className = 'dialog-btn pause-btn';
+      guide.addEventListener('click', () => finish('guide'));
+      const worlds = button('Back to worlds');
+      worlds.className = 'dialog-btn pause-btn';
+      worlds.addEventListener('click', () => finish('worlds'));
+
+      // Sound row mirrors the HUD controls — play mode hides the HUD chrome, so the pause
+      // menu is the roamer's only volume surface.
+      let muted = opts.muted;
+      const soundRow = document.createElement('div');
+      soundRow.className = 'sound-group pause-sound';
+      const mute = document.createElement('button');
+      mute.type = 'button';
+      mute.className = 'sound-btn';
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.className = 'sound-slider';
+      slider.min = '0';
+      slider.max = '100';
+      slider.step = '1';
+      slider.value = String(Math.round(opts.volume * 100));
+      slider.setAttribute('aria-label', 'Sound volume');
+      const syncSound = (): void => {
+        mute.replaceChildren(buildIcon(SPEAKER_SHAPES[muted ? 'off' : 'on']));
+        const label = muted ? 'Unmute sound' : 'Mute sound';
+        mute.title = label;
+        mute.setAttribute('aria-label', label);
+        mute.setAttribute('aria-pressed', String(muted));
+        slider.disabled = muted;
+        soundRow.classList.toggle('is-muted', muted);
+      };
+      mute.addEventListener('click', () => {
+        muted = !muted;
+        opts.onMute(muted);
+        syncSound();
+      });
+      slider.addEventListener('input', () => opts.onVolume(Number(slider.value) / 100));
+      syncSound();
+      soundRow.append(mute, slider);
+
+      // View-bob toggle (motion-sickness opt-out) — label reflects the live state.
+      let viewBob = opts.viewBob;
+      const bobBtn = button('');
+      bobBtn.className = 'dialog-btn pause-btn';
+      const syncBob = (): void => {
+        bobBtn.textContent = `View bob: ${viewBob ? 'on' : 'off'}`;
+        bobBtn.setAttribute('aria-pressed', String(viewBob));
+      };
+      bobBtn.addEventListener('click', () => {
+        viewBob = !viewBob;
+        opts.onViewBob(viewBob);
+        syncBob();
+      });
+      syncBob();
+
+      const share = button('Download world copy');
+      share.className = 'dialog-btn pause-btn';
+      share.title = 'Save this world as a file you can share; others import it from the menu';
+      share.addEventListener('click', () => opts.onShare());
+
+      actions.append(resume, guide, soundRow, bobBtn, share, worlds);
+      panel.append(title, worldLine, actions);
+      const close = openDialogPanel(panel, () => finish('resume'));
     });
 
   let inventoryOpen = false;
@@ -1053,6 +1195,9 @@ export function createCreativeUi(
     showBlueprintDialog,
     setExperienceMode,
     setTourHud,
+    setLoadingHud,
     showWorldInfoDialog,
+    isDialogOpen,
+    showPauseDialog,
   };
 }
