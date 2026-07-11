@@ -83,6 +83,46 @@ describe('HeldBlock', () => {
     expect(meshOf(group)).toBe(first);
   });
 
+  it('tool modes swap in a viewmodel and hide the block cube', () => {
+    const { held, group } = makeHeld();
+    held.setBlock(STONE);
+    held.setMode('axe');
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(group.visible).toBe(true);
+    const blockMesh = meshOf(group)!;
+    expect(blockMesh.visible).toBe(false); // cube stays built but hidden
+    const tool = group.children[1] as { children: unknown[] };
+    expect(tool.children.length).toBeGreaterThanOrEqual(3); // handle + head parts
+    held.setMode('block');
+    expect(blockMesh.visible).toBe(true);
+    expect(group.children).toHaveLength(1); // tool torn down
+  });
+
+  it('tool modes show even with an empty block hand; empty mode hides everything', () => {
+    const { held, group } = makeHeld();
+    held.setBlock(AIR);
+    held.setMode('sword');
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(group.visible).toBe(true); // a sword needs no hotbar block
+    held.setMode('empty');
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(group.visible).toBe(false);
+    held.setBlock(STONE);
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(group.visible).toBe(false); // empty means empty, block selection or not
+  });
+
+  it('tool parts share cached spec textures (wood handle reused across tools)', () => {
+    const { held, group } = makeHeld();
+    held.setMode('pickaxe');
+    const pickHandle = ((group.children[0] as { children: Mesh[] }).children[0]
+      .material as MeshBasicMaterial).map;
+    held.setMode('axe');
+    const axeHandle = ((group.children[0] as { children: Mesh[] }).children[0]
+      .material as MeshBasicMaterial).map;
+    expect(axeHandle).toBe(pickHandle);
+  });
+
   it('punch dips the hand and decays back to the rest pose', () => {
     const { held, group } = makeHeld();
     held.setBlock(STONE);
