@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGenerator, isWorldPreset, WORLD_PRESETS } from '../src/worldgen/Presets';
-import { ASHEN, ashenSurfaceAt } from '../src/worldgen/AshenReachGenerator';
+import { ASHEN, ashenSurfaceAt } from '../src/worldgen/EmberSpireGenerator';
 import { applyOverlays } from '../src/worldgen/Generator';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
@@ -26,7 +26,7 @@ function makeSampler(seed = SEED): {
   at: (wx: number, wy: number, wz: number) => number;
   chunkOf: (cx: number, cz: number) => ChunkData;
 } {
-  const { generator, overlays } = createGenerator('ashen-reach');
+  const { generator, overlays } = createGenerator('ember-spire');
   const cache = new Map<string, ChunkData>();
   const chunkOf = (cx: number, cz: number): ChunkData => {
     const key = `${cx},${cz}`;
@@ -46,23 +46,23 @@ function makeSampler(seed = SEED): {
   return { at, chunkOf };
 }
 
-describe('ashen-reach preset registration', () => {
+describe('ember-spire preset registration', () => {
   it('is a recognized preset', () => {
-    expect(isWorldPreset('ashen-reach')).toBe(true);
-    expect(WORLD_PRESETS).toContain('ashen-reach');
+    expect(isWorldPreset('ember-spire')).toBe(true);
+    expect(WORLD_PRESETS).toContain('ember-spire');
   });
 
   it('resolves to a generator with tree + site + decoration overlays', () => {
-    const { generator, overlays } = createGenerator('ashen-reach');
+    const { generator, overlays } = createGenerator('ember-spire');
     expect(typeof generator.generateBaseChunk).toBe('function');
     expect(overlays.length).toBe(3);
   });
 });
 
-describe('ashen-reach terrain composition', () => {
+describe('ember-spire terrain composition', () => {
   it('is deterministic: two generators produce identical chunks', () => {
-    const a = createGenerator('ashen-reach');
-    const b = createGenerator('ashen-reach');
+    const a = createGenerator('ember-spire');
+    const b = createGenerator('ember-spire');
     for (const [cx, cz] of [
       [0, 0],
       [0, 6],
@@ -129,7 +129,7 @@ describe('ashen-reach terrain composition', () => {
   });
 });
 
-describe('ashen-reach site architecture', () => {
+describe('ember-spire site architecture', () => {
   it('paves the Emberhold plaza with warm flagstones', () => {
     const { at } = makeSampler();
     const samples = [at(8, ASHEN.village.benchY, 4), at(0, ASHEN.village.benchY, 0)];

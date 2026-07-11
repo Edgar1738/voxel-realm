@@ -28,7 +28,7 @@ import {
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2 } from './CitadelStamp';
-import { ASHEN, ashenSurfaceAt } from './AshenReachGenerator';
+import { ASHEN, ashenSurfaceAt } from './EmberSpireGenerator';
 import { well, marketStall, lampPost } from './prefabs';
 import type { Prefab } from '../core/Prefab';
 import type { BlockId, WorldSeed } from '../core/types';

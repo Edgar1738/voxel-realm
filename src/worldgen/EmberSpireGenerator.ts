@@ -20,7 +20,7 @@ import type { ChunkData } from '../world/ChunkData';
 import type { BlockId, WorldSeed } from '../core/types';
 
 /**
- * Ashen Reach: a volcanic caldera kingdom around a dark crater lake.
+ * Ember Spire: a volcanic caldera kingdom around a dark crater lake.
  *
  * Composition (looking down, +z south):
  *   - Crater lake south of spawn, flooded to sea level with a deep slate floor
@@ -32,7 +32,7 @@ import type { BlockId, WorldSeed } from '../core/types';
  */
 /**
  * Official identity (Milestone 2+): permanent Voxel Realm world — not an experiment name.
- * Preset / save ID: `ashen-reach`. Display title: Ashen Reach.
+ * Preset / save ID: `ember-spire`. Display title: Ember Spire.
  */
 export const ASHEN = {
   /** Heart of the crater lake. */
@@ -423,7 +423,7 @@ class AshenField implements TerrainStage {
 }
 
 /** Crater lake + ash terraces + basalt rim. Solid ground, flooded basin, light ore. */
-export function createAshenReachGenerator(): LayeredGenerator {
+export function createEmberSpireGenerator(): LayeredGenerator {
   return new LayeredGenerator(
     [new AshenField(), new WaterFiller(), new OreScatterer({ densityScale: 0.85 })],
     SEA_LEVEL,

@@ -14,8 +14,8 @@ import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGene
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
-import { createAshenReachGenerator, ashenSurfaceAt } from './AshenReachGenerator';
-import { ashenReachSite } from './ashenReachSite';
+import { createEmberSpireGenerator, ashenSurfaceAt } from './EmberSpireGenerator';
+import { emberSpireSite } from './emberSpireSite';
 import {
   cottage,
   well,
@@ -56,7 +56,7 @@ export type WorldPreset =
   | 'frontier'
   | 'citadel'
   | 'harbor'
-  | 'ashen-reach';
+  | 'ember-spire';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -71,7 +71,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'frontier',
   'citadel',
   'harbor',
-  'ashen-reach',
+  'ember-spire',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -324,15 +324,15 @@ export function createGenerator(preset: WorldPreset): {
           harborSite(),
         ],
       };
-    case 'ashen-reach':
+    case 'ember-spire':
       return {
         // Experimental candidate world (Grok). Volcanic caldera + Emberhold village.
         // Not part of the official curated collection unless Edgar promotes it.
-        generator: createAshenReachGenerator(),
+        generator: createEmberSpireGenerator(),
         overlays: [
           // Sparse oaks only on grassy outer/terrace patches; site stamps architecture after.
           scatterOaks(ashenSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 8 }),
-          ashenReachSite(),
+          emberSpireSite(),
           scatterDecorations(),
         ],
       };

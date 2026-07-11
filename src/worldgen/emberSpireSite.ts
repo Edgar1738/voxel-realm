@@ -22,20 +22,20 @@ import {
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
-import { ASHEN, ASHEN_ROAD, ashenSurfaceAt } from './AshenReachGenerator';
+import { ASHEN, ASHEN_ROAD, ashenSurfaceAt } from './EmberSpireGenerator';
 import { deadTree, obelisk } from './wildsPrefabs';
 import {
   buildArrivalTunnel,
   buildCraterGate,
   buildGateDistrict,
-} from './ashenReachDistrict';
-import { buildEmberSpireM2, buildCeremonialApproach } from './ashenReachTower';
+} from './emberSpireDistrict';
+import { buildEmberSpireM2, buildCeremonialApproach } from './emberSpireTower';
 import {
   buildCliffMonastery,
   buildDrownedRuins,
   buildAshMinesM2,
   buildCliffEmbeddedRuin,
-} from './ashenReachSecondaries';
+} from './emberSpireSecondaries';
 import type { Overlay } from './Generator';
 import type { Prefab } from '../core/Prefab';
 import type { WorldSeed } from '../core/types';
@@ -473,11 +473,11 @@ function polishShore(s: CitadelStamp): void {
 }
 
 /**
- * Ashen Reach site overlay (Milestone 2):
+ * Ember Spire site overlay (Milestone 2):
  * Arrival tunnel → Crater Gate → Gate District → lakefront → ceremonial causeway →
  * Ember Spire (full climb) + secondaries (monastery, drowned ruins, ash mines, cliff ruin).
  */
-export function ashenReachSite(): Overlay {
+export function emberSpireSite(): Overlay {
   return (chunk, cx, cz, seed) => {
     const s = new CitadelStamp(chunk, cx, cz);
     buildArrivalTunnel(s);

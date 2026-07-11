@@ -2,8 +2,8 @@
   "meta": {
     "seed": 1337,
     "version": 1,
-    "preset": "ashen-reach",
-    "title": "Ashen Reach",
+    "preset": "ember-spire",
+    "title": "Ember Spire",
     "description": "An ancient civilization inside a volcanic caldera. Emerge from the Crater Gate into the Gate District, walk the ceremonial avenue to the lakefront, cross the causeway to The Ember Spire, and climb to the summit beacon.",
     "spawn": { "x": 8, "y": 71.5, "z": -48 },
     "look": { "yaw": 3.1416, "pitch": 0.05 },

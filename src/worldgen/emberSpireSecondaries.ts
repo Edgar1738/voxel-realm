@@ -1,5 +1,5 @@
 /**
- * Secondary destinations for Ashen Reach Milestone 2:
+ * Secondary destinations for Ember Spire Milestone 2:
  * - Cliff Monastery (NW shelf)
  * - Drowned Ruins (west lake shallows)
  * - Ash Mines (expanded east-rim network)
@@ -27,7 +27,7 @@ import {
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
-import { ASHEN, ashenSurfaceAt } from './AshenReachGenerator';
+import { ASHEN, ashenSurfaceAt } from './EmberSpireGenerator';
 import { SEA_LEVEL } from '../core/constants';
 import type { WorldSeed } from '../core/types';
 

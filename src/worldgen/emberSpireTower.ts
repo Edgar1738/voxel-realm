@@ -26,7 +26,7 @@ import {
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, spiralStair } from './CitadelStamp';
-import { ASHEN, ashenSurfaceAt } from './AshenReachGenerator';
+import { ASHEN, ashenSurfaceAt } from './EmberSpireGenerator';
 import { SEA_LEVEL } from '../core/constants';
 import type { WorldSeed } from '../core/types';
 
