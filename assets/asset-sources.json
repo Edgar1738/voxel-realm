@@ -9,12 +9,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/stone.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_stone.png"],
       "outputFiles": ["public/assets/textures/fantasy/stone.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "ab8978fe8e8b0e7bc75f0b9e7f95c12d25c916dd4a80e5293023d619ad2b5823"
     },
     {
       "id": "cobblestone",
@@ -23,12 +23,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/cobblestone.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/wall_rock.png"],
       "outputFiles": ["public/assets/textures/fantasy/cobblestone.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "e1ca8fd18969f3d053b545186195099c6249b7764a3e8bc4a67646282c84408d"
     },
     {
       "id": "brick",
@@ -37,12 +37,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/brick.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/wall_brick_small_stone.png"],
       "outputFiles": ["public/assets/textures/fantasy/brick.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "302a2c11d7d2c35e571a6bd7888fbf76d21591704ee215925ec1d2334e5375b6"
     },
     {
       "id": "deepslate",
@@ -51,12 +51,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/deepslate.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_stone_pattern_depth.png"],
       "outputFiles": ["public/assets/textures/fantasy/deepslate.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "5517ca174aa42f25369f176218966dd87b409e4da7ed6e425d7cadcaf60443d4"
     },
     {
       "id": "planks",
@@ -65,12 +65,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/planks.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_wood_planks.png"],
       "outputFiles": ["public/assets/textures/fantasy/planks.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "52362e7ac99334499450fda63c15b77536503659efe3cd0a2ef3534ac64eaff5"
     },
     {
       "id": "log_bark",
@@ -79,12 +79,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/log_bark.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/wall_timber_structure_vertical.png"],
       "outputFiles": ["public/assets/textures/fantasy/log_bark.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "ce33864c08e1905614725f076d6d7cc78149c8b4d91b23629eaee4cb5ba16228"
     },
     {
       "id": "log_rings",
@@ -93,12 +93,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/log_rings.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/timber_square_planks.png"],
       "outputFiles": ["public/assets/textures/fantasy/log_rings.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "7f7c9f77f74d65128f59853e2e58f7f17db7a0b7683d62ab64fea224a79b3d18"
     },
     {
       "id": "bookshelf",
@@ -107,12 +107,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/bookshelf.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/window_square_divided_boarded.png"],
       "outputFiles": ["public/assets/textures/fantasy/bookshelf.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "73ba1b796193e602ae79f23ef53c02d210c85ea3806864344be77c0afb2dc428"
     },
     {
       "id": "terracotta",
@@ -121,12 +121,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/terracotta.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/roof_clay_red_center.png"],
       "outputFiles": ["public/assets/textures/fantasy/terracotta.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "b90294daa34bb0d0536650b086fb019ff913e4ee04bd4dec07e4238912238a05"
     },
     {
       "id": "gravel",
@@ -135,12 +135,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/gravel.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_stone_sand_random.png"],
       "outputFiles": ["public/assets/textures/fantasy/gravel.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "a10a573c6441cb7b5d8167e52af7223b04caee5b90dd2261bef268fa72c66be8"
     },
     {
       "id": "furnace_front",
@@ -149,12 +149,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/furnace_front.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_stone_grate.png"],
       "outputFiles": ["public/assets/textures/fantasy/furnace_front.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "c05c736afaa77382269d27f09aa1ee3a552d8ef9c174ebc82dab12636c1b1cbc"
     },
     {
       "id": "sand",
@@ -163,12 +163,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/sand.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_ground_sand.png"],
       "outputFiles": ["public/assets/textures/fantasy/sand.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "59f56bd2100501f1ae38771efc3cee8046d102676d1b59be1aa3137cb41fa4fe"
     },
     {
       "id": "dirt",
@@ -177,12 +177,12 @@
       "creator": "Kenney (kenney.nl)",
       "sourcePage": "https://kenney.nl/assets/retro-textures-fantasy",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/textures/dirt.png",
-      "originalFiles": [],
+      "originalFiles": ["PNG/floor_ground_dirt.png"],
       "outputFiles": ["public/assets/textures/fantasy/dirt.png"],
       "modifications": ["center-crop to square", "resize to 16x16 (nearest)", "strip metadata"],
-      "sha256": ""
+      "sha256": "6358324aa5dcffc290709c5f292cf15d160b1b7156fcfcbaebaea65c75add986"
     }
   ],
   "models": [
@@ -192,13 +192,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/cubeworldkit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/dead_tree.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/dead_tree/DeadTree_2.gltf",
+      "originalFiles": ["Environment/glTF/DeadTree_2.gltf"],
       "outputFiles": ["public/assets/models/fantasy/dead_tree.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "a73faf404312409beac9d41db83d9af2b0f0ea0b63672a7df4c3318da0f6f28b"
     },
     {
       "id": "crystal",
@@ -206,13 +211,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/cubeworldkit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/crystal.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/crystal/Crystal_Big.gltf",
+      "originalFiles": ["Environment/glTF/Crystal_Big.gltf"],
       "outputFiles": ["public/assets/models/fantasy/crystal.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "449fe7a831af043825cf969abd95e69ac89df9722076a8ef18a8044f32a5e843"
     },
     {
       "id": "chest",
@@ -220,13 +230,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/chest.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/chest/Chest_Wood.gltf",
+      "originalFiles": ["Exports/glTF/Chest_Wood.gltf"],
       "outputFiles": ["public/assets/models/fantasy/chest.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "df498a1936908d58f2136d0521c985260026892cfb9ea1888ecd8947d1a072ff"
     },
     {
       "id": "barrel",
@@ -234,13 +249,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/barrel.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/barrel/Barrel.gltf",
+      "originalFiles": ["Exports/glTF/Barrel.gltf"],
       "outputFiles": ["public/assets/models/fantasy/barrel.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "8a9fa062cc03037b4c4731d4959d1d6cdad38d47ddac5239da46c82b124c69e0"
     },
     {
       "id": "crate",
@@ -248,13 +268,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/crate.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/crate/Crate_Wooden.gltf",
+      "originalFiles": ["Exports/glTF/Crate_Wooden.gltf"],
       "outputFiles": ["public/assets/models/fantasy/crate.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "73c9c1879b0d3d62efca5841d9bf5dedc44d5409104bf36bf48188d79170f424"
     },
     {
       "id": "table",
@@ -262,13 +287,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/table.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/table/Table_Large.gltf",
+      "originalFiles": ["Exports/glTF/Table_Large.gltf"],
       "outputFiles": ["public/assets/models/fantasy/table.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "0d7b9f04ca60ac3069bc925fe42de7ee1660ba5c3e12dfd8172f9db7c242f503"
     },
     {
       "id": "bench",
@@ -276,13 +306,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/bench.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/bench/Bench.gltf",
+      "originalFiles": ["Exports/glTF/Bench.gltf"],
       "outputFiles": ["public/assets/models/fantasy/bench.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "2d39ecc0e4b715283132980e28b2ae2a6a4d8674203bad059feef43d57a9df15"
     },
     {
       "id": "candle",
@@ -290,13 +325,18 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/candle.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/candle/Candle_1.gltf",
+      "originalFiles": ["Exports/glTF/Candle_1.gltf"],
       "outputFiles": ["public/assets/models/fantasy/candle.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "67e558a815defab7bd01ab1114bb918286f990574f237fc1a8dfc8154ecd1d47"
     },
     {
       "id": "books",
@@ -304,55 +344,78 @@
       "creator": "Quaternius (quaternius.com)",
       "sourcePage": "https://quaternius.com/packs/fantasypropsmegakit.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
-      "stagedFile": ".asset-staging/models/books.glb",
-      "originalFiles": [],
+      "retrievedAt": "2026-07-11",
+      "stagedFile": ".asset-staging/models/books/Book_Stack_1.gltf",
+      "originalFiles": ["Exports/glTF/Book_Stack_1.gltf"],
       "outputFiles": ["public/assets/models/fantasy/books.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "28c282a1719e865e7b182b8484fa5a3795ead600aad510c039f1a1aef02c58b3"
     },
     {
       "id": "broken_column",
       "package": "Quaternius — Ultimate Modular Ruins Pack",
       "creator": "Quaternius (quaternius.com)",
-      "sourcePage": "https://quaternius.com/",
+      "sourcePage": "https://quaternius.com/packs/ultimatemodularruins.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/models/broken_column.glb",
-      "originalFiles": [],
+      "originalFiles": ["OBJ/Column_Round_Short.obj", "OBJ/Column_Round_Short.mtl"],
       "outputFiles": ["public/assets/models/fantasy/broken_column.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "convert OBJ and MTL to GLB via obj2gltf",
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "bcc2472f0db518b4330c233a17e89ff1d360d9a561e6cf9aff4349ccd483a905"
     },
     {
       "id": "rubble",
       "package": "Quaternius — Ultimate Modular Ruins Pack",
       "creator": "Quaternius (quaternius.com)",
-      "sourcePage": "https://quaternius.com/",
+      "sourcePage": "https://quaternius.com/packs/ultimatemodularruins.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/models/rubble.glb",
-      "originalFiles": [],
+      "originalFiles": ["OBJ/Bricks.obj", "OBJ/Bricks.mtl"],
       "outputFiles": ["public/assets/models/fantasy/rubble.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "convert OBJ and MTL to GLB via obj2gltf",
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "a117a7ece42a3c91f1791f307d9a7972ef31b48fc729248e5e775441614ce9ee"
     },
     {
       "id": "statue",
       "package": "Quaternius — Ultimate Modular Ruins Pack",
       "creator": "Quaternius (quaternius.com)",
-      "sourcePage": "https://quaternius.com/",
+      "sourcePage": "https://quaternius.com/packs/ultimatemodularruins.html",
       "license": "CC0-1.0",
-      "retrievedAt": "",
+      "retrievedAt": "2026-07-11",
       "stagedFile": ".asset-staging/models/statue.glb",
-      "originalFiles": [],
+      "originalFiles": ["OBJ/Statue_Fox.obj", "OBJ/Statue_Fox.mtl"],
       "outputFiles": ["public/assets/models/fantasy/statue.glb"],
-      "modifications": ["prune unused", "drop animations", "weld + dedup", "unlit basic material (runtime)"],
+      "modifications": [
+        "convert OBJ and MTL to GLB via obj2gltf",
+        "prune unused",
+        "drop animations",
+        "weld + dedup",
+        "unlit basic material (runtime)"
+      ],
       "defaultScale": 1,
-      "sha256": ""
+      "sha256": "1eaa6113caa63c9d6aadd607a1d048167a6a97dfd9a89764f824688321211da2"
     }
   ]
 }

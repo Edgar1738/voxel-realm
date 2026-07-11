@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { dedup, prune, weld } from '@gltf-transform/functions';
 import { PNG } from 'pngjs';
 
 const TILE_SIZE = 16;
+const MODEL_TEXTURE_SIZE = 256;
 const MAX_TEXTURES = 15;
 const MAX_MODELS = 12;
 const MAX_PNG_INPUT_BYTES = 16 * 1024 * 1024;
@@ -187,7 +188,7 @@ function sha256(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
-function prepareTexture(source: Buffer): Buffer {
+function resizeSquarePng(source: Buffer, targetSize: number): Buffer {
   let decoded: PNG;
   try {
     decoded = PNG.sync.read(source);
@@ -198,23 +199,86 @@ function prepareTexture(source: Buffer): Buffer {
   const cropSize = Math.min(decoded.width, decoded.height);
   const cropX = Math.floor((decoded.width - cropSize) / 2);
   const cropY = Math.floor((decoded.height - cropSize) / 2);
-  const output = new PNG({ width: TILE_SIZE, height: TILE_SIZE });
-  for (let y = 0; y < TILE_SIZE; y += 1) {
-    const sourceY = cropY + Math.floor((y * cropSize) / TILE_SIZE);
-    for (let x = 0; x < TILE_SIZE; x += 1) {
-      const sourceX = cropX + Math.floor((x * cropSize) / TILE_SIZE);
+  const output = new PNG({ width: targetSize, height: targetSize });
+  for (let y = 0; y < targetSize; y += 1) {
+    const sourceY = cropY + Math.floor((y * cropSize) / targetSize);
+    for (let x = 0; x < targetSize; x += 1) {
+      const sourceX = cropX + Math.floor((x * cropSize) / targetSize);
       const sourceOffset = (sourceY * decoded.width + sourceX) * 4;
-      const outputOffset = (y * TILE_SIZE + x) * 4;
+      const outputOffset = (y * targetSize + x) * 4;
       output.data.set(decoded.data.subarray(sourceOffset, sourceOffset + 4), outputOffset);
     }
   }
   return PNG.sync.write(output, { colorType: 6, inputColorType: 6, bitDepth: 8 });
 }
 
-async function prepareModel(sourcePath: string): Promise<Uint8Array> {
+function prepareTexture(source: Buffer): Buffer {
+  return resizeSquarePng(source, TILE_SIZE);
+}
+
+function assertPathWithin(root: string, target: string, label: string): void {
+  const fromRoot = relative(resolve(root), resolve(target));
+  if (fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) {
+    throw new Error(`${label} must stay inside the model staging directory`);
+  }
+}
+
+async function validateGltfResources(sourcePath: string, modelsRoot: string): Promise<void> {
+  if (extname(sourcePath).toLowerCase() !== '.gltf') return;
+  let gltf: unknown;
+  try {
+    gltf = JSON.parse(await readFile(sourcePath, 'utf8'));
+  } catch (error) {
+    throw new Error(`Invalid glTF JSON: ${(error as Error).message}`);
+  }
+  if (!isRecord(gltf)) throw new Error('Invalid glTF JSON root');
+  const resources = [
+    ...(Array.isArray(gltf.buffers) ? gltf.buffers : []),
+    ...(Array.isArray(gltf.images) ? gltf.images : []),
+  ];
+  for (const resource of resources) {
+    if (!isRecord(resource) || typeof resource.uri !== 'string') continue;
+    if (resource.uri.startsWith('data:')) continue;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(resource.uri);
+    } catch {
+      throw new Error('glTF resource URI must stay inside the model staging directory');
+    }
+    if (/^[a-z][a-z0-9+.-]*:/i.test(decoded) || decoded.startsWith('//')) {
+      throw new Error('glTF resource URI must stay inside the model staging directory');
+    }
+    assertPathWithin(modelsRoot, resolve(dirname(sourcePath), decoded), 'glTF resource URI');
+  }
+}
+
+async function prepareModel(sourcePath: string, modelsRoot: string): Promise<Uint8Array> {
+  await validateGltfResources(sourcePath, modelsRoot);
   const io = new NodeIO();
   const document = await io.read(sourcePath);
   for (const animation of document.getRoot().listAnimations()) animation.dispose();
+  const baseColorTextures = new Set(
+    document
+      .getRoot()
+      .listMaterials()
+      .map((material) => material.getBaseColorTexture())
+      .filter((texture) => texture !== null),
+  );
+  for (const material of document.getRoot().listMaterials()) {
+    material
+      .setNormalTexture(null)
+      .setOcclusionTexture(null)
+      .setMetallicRoughnessTexture(null)
+      .setEmissiveTexture(null)
+      .setMetallicFactor(0)
+      .setRoughnessFactor(1);
+  }
+  for (const texture of baseColorTextures) {
+    const image = texture.getImage();
+    if (image && texture.getMimeType() === 'image/png') {
+      texture.setImage(resizeSquarePng(Buffer.from(image), MODEL_TEXTURE_SIZE));
+    }
+  }
   await document.transform(prune({ keepLeaves: true }), dedup(), weld());
   return io.writeBinary(document);
 }
@@ -268,9 +332,9 @@ export async function buildAssets(options: BuildOptions = {}): Promise<AssetBuil
     }
     let prepared: Uint8Array;
     try {
-      prepared = await prepareModel(sourcePath);
+      prepared = await prepareModel(sourcePath, resolve(rootDir, '.asset-staging/models'));
     } catch (error) {
-      throw new Error(`Corrupt GLB ${asset.stagedFile}: ${(error as Error).message}`);
+      throw new Error(`Corrupt model ${asset.stagedFile}: ${(error as Error).message}`);
     }
     const outputPath = resolvedWithin(rootDir, asset.outputFiles[0]);
     await writeOutput(outputPath, prepared);

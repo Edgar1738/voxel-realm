@@ -29,6 +29,30 @@ function catalog(stagedFile = '.asset-staging/textures/stone.png') {
   };
 }
 
+function modelCatalog(stagedFile = '.asset-staging/models/crate/source.gltf') {
+  return {
+    version: 1,
+    note: 'test',
+    textures: [],
+    models: [
+      {
+        id: 'crate',
+        package: 'Test pack',
+        creator: 'Test creator',
+        sourcePage: 'https://example.com',
+        license: 'CC0-1.0',
+        retrievedAt: '',
+        stagedFile,
+        originalFiles: ['source.gltf'],
+        outputFiles: ['public/assets/models/fantasy/crate.glb'],
+        modifications: [],
+        defaultScale: 1,
+        sha256: '',
+      },
+    ],
+  };
+}
+
 async function fixture() {
   const rootDir = await mkdtemp(join(tmpdir(), 'voxel-assets-'));
   await mkdir(join(rootDir, 'assets'), { recursive: true });
@@ -114,5 +138,45 @@ describe('asset preparation pipeline', () => {
     expect(validateAssetCatalog(overBudget).warnings).toContain(
       'Texture budget exceeded: 16 catalog entries (maximum 15)',
     );
+  });
+
+  it('accepts an official glTF source and emits a binary GLB derivative', async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'voxel-models-'));
+    await mkdir(join(rootDir, 'assets'), { recursive: true });
+    await mkdir(join(rootDir, '.asset-staging/models/crate'), { recursive: true });
+    await writeFile(
+      join(rootDir, 'assets/asset-sources.json'),
+      `${JSON.stringify(modelCatalog(), null, 2)}\n`,
+    );
+    await writeFile(
+      join(rootDir, '.asset-staging/models/crate/source.gltf'),
+      JSON.stringify({ asset: { version: '2.0' }, scenes: [{}], scene: 0 }),
+    );
+
+    const result = await buildAssets({ rootDir, log: () => undefined });
+    const output = await readFile(join(rootDir, 'public/assets/models/fantasy/crate.glb'));
+
+    expect(result.processedModels).toBe(1);
+    expect(output.subarray(0, 4).toString('ascii')).toBe('glTF');
+  });
+
+  it('rejects remote and traversal resource URIs in staged glTF input', async () => {
+    for (const uri of ['https://example.com/model.bin', '../../outside.bin']) {
+      const rootDir = await mkdtemp(join(tmpdir(), 'voxel-models-'));
+      await mkdir(join(rootDir, 'assets'), { recursive: true });
+      await mkdir(join(rootDir, '.asset-staging/models/crate'), { recursive: true });
+      await writeFile(
+        join(rootDir, 'assets/asset-sources.json'),
+        `${JSON.stringify(modelCatalog(), null, 2)}\n`,
+      );
+      await writeFile(
+        join(rootDir, '.asset-staging/models/crate/source.gltf'),
+        JSON.stringify({ asset: { version: '2.0' }, buffers: [{ uri, byteLength: 4 }] }),
+      );
+
+      await expect(buildAssets({ rootDir, log: () => undefined })).rejects.toThrow(
+        /glTF resource.*staging directory/i,
+      );
+    }
   });
 });

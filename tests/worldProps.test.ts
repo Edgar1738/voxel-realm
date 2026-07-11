@@ -9,6 +9,23 @@ const catalog: readonly PropAssetDef[] = [
 ];
 
 describe('world prop data', () => {
+  it('publishes the complete reviewed fantasy prop catalog', () => {
+    expect(PROP_CATALOG.map(({ id, url }) => [id, url])).toEqual([
+      ['dead_tree', 'models/fantasy/dead_tree.glb'],
+      ['crystal', 'models/fantasy/crystal.glb'],
+      ['chest', 'models/fantasy/chest.glb'],
+      ['barrel', 'models/fantasy/barrel.glb'],
+      ['crate', 'models/fantasy/crate.glb'],
+      ['table', 'models/fantasy/table.glb'],
+      ['bench', 'models/fantasy/bench.glb'],
+      ['candle', 'models/fantasy/candle.glb'],
+      ['books', 'models/fantasy/books.glb'],
+      ['broken_column', 'models/fantasy/broken_column.glb'],
+      ['rubble', 'models/fantasy/rubble.glb'],
+      ['statue', 'models/fantasy/statue.glb'],
+    ]);
+  });
+
   it('parses defensive instances with default transforms', () => {
     const parsed = parseWorldPropInstances(
       [{ id: 'crate-1', asset: 'crate', x: 1, y: 2, z: 3 }],
@@ -49,9 +66,7 @@ describe('world prop data', () => {
       '/voxel-realm/assets/models/fantasy/crate.glb',
     );
     const fetcher = vi.fn();
-    expect(
-      await loadWorldPropInstances('ashen-reach', PROP_CATALOG, '/voxel-realm/', fetcher),
-    ).toEqual([]);
+    expect(await loadWorldPropInstances('ashen-reach', [], '/voxel-realm/', fetcher)).toEqual([]);
     expect(fetcher).not.toHaveBeenCalled();
   });
 
