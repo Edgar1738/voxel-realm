@@ -11,6 +11,18 @@ import type { WorldDeltas } from '../src/persistence/SaveTypes';
 const isValidBlockId = (id: number): boolean => id >= 0 && id <= 13;
 
 describe('WorldSnapshot', () => {
+  it('preserves a valid optional texture theme and drops an invalid one', () => {
+    const valid = parseWorldSnapshot(
+      { meta: { seed: 1, version: 2, textureTheme: 'fantasy' }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(valid.snapshot?.meta?.textureTheme).toBe('fantasy');
+    const invalid = parseWorldSnapshot(
+      { meta: { seed: 1, version: 2, textureTheme: 'neon' }, chunks: {} },
+      { isValidBlockId },
+    );
+    expect(invalid.snapshot?.meta?.textureTheme).toBeUndefined();
+  });
   it('round-trips meta + deltas through serialize/parse/snapshotToDeltas', () => {
     const deltas: WorldDeltas = new Map([
       [

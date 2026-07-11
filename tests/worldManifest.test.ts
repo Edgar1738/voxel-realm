@@ -17,6 +17,7 @@ const fullMeta: WorldMeta = {
   seed: 42,
   version: 1,
   preset: 'citadel',
+  textureTheme: 'fantasy',
   title: 'Moonspire Realm',
   description: 'A ruined citadel above a lake.',
   spawn: { x: 8, y: 72, z: 94 },
@@ -52,6 +53,7 @@ describe('buildManifestEntry', () => {
       preset: 'citadel',
       seed: 42,
       version: 1,
+      textureTheme: 'fantasy',
       spawn: { x: 8, y: 72, z: 94 },
       look: { yaw: 0.5, pitch: -0.2 },
       tags: ['citadel', 'ruin'],
@@ -61,6 +63,14 @@ describe('buildManifestEntry', () => {
     });
     expect(entry.landmarks).toEqual(fullMeta.landmarks);
     expect(entry.tour).toEqual(fullMeta.tour);
+  });
+
+  it('keeps textureTheme optional for legacy manifests', () => {
+    const legacyMeta = { ...fullMeta };
+    delete legacyMeta.textureTheme;
+    const legacy = buildManifestEntry('Legacy', legacyMeta);
+    expect(legacy.textureTheme).toBeUndefined();
+    expect(manifestEntryProblems(legacy)).toEqual([]);
   });
 
   it('falls back to the slug for a missing title and copies points defensively', () => {

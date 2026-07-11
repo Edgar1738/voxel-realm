@@ -11,6 +11,8 @@ describe('DEV_HELP', () => {
       'stairs',
       'blockAt',
       'world',
+      'props',
+      'propCatalog',
       'ambient',
       'help',
     ]) {

@@ -6,6 +6,7 @@ describe('Ashen Reach curated metadata', () => {
     expect(curatedPresetMeta('ashen-reach', 1337, 1)).toMatchObject({
       title: 'Ashen Reach',
       preset: 'ashen-reach',
+      textureTheme: 'fantasy',
       spawn: { x: 0, y: 108, z: 95 },
       look: { yaw: 0, pitch: -0.12 },
     });

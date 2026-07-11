@@ -10,7 +10,13 @@ import {
 import { MemorySaveStore } from '../src/persistence/SaveStore';
 import { packVoxel, type WorldDeltas, type WorldMeta } from '../src/persistence/SaveTypes';
 
-const META: WorldMeta = { seed: 1337, version: 1, preset: 'flat', title: 'My Castle' };
+const META: WorldMeta = {
+  seed: 1337,
+  version: 1,
+  preset: 'flat',
+  textureTheme: 'fantasy',
+  title: 'My Castle',
+};
 
 function sampleDeltas(): WorldDeltas {
   return new Map([
@@ -29,6 +35,7 @@ describe('export → import round-trip', () => {
     expect(chunkCount).toBe(2);
     expect(snapshot.meta?.title).toBe('My Castle');
     expect(snapshot.meta?.preset).toBe('flat');
+    expect(snapshot.meta?.textureTheme).toBe('fantasy');
     expect(snapshot.chunks['0,0']).toEqual([[5, 3]]);
     expect(snapshot.chunks['-1,2']).toEqual([[9, 31, 6]]); // state survives
 
@@ -36,6 +43,7 @@ describe('export → import round-trip', () => {
     const written = await writeImportedWorld(store, snapshot);
     expect(written).toBe(2);
     expect((await store.loadMeta())?.seed).toBe(1337);
+    expect((await store.loadMeta())?.textureTheme).toBe('fantasy');
     const deltas = await store.loadDeltas();
     expect(deltas.get('-1,2')?.get(9)).toBe(packVoxel(31, 6));
   });
