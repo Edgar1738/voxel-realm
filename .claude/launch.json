@@ -152,22 +152,6 @@
       "autoPort": false
     },
     {
-      "name": "handmodes",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--prefix",
-        "C:\\Users\\Edgar\\Desktop\\voxel-realm\\.claude\\worktrees\\hand-modes",
-        "--",
-        "--port",
-        "5260",
-        "--strictPort"
-      ],
-      "port": 5260,
-      "autoPort": false
-    },
-    {
       "name": "stonehaven",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
