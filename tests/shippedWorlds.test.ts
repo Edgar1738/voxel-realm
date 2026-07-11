@@ -9,7 +9,7 @@ import {
   entryMetaProblems,
   type WorldManifest,
 } from '../src/persistence/worldManifest';
-import { parseWorldSnapshot } from '../src/persistence/WorldSnapshot';
+import { decodeWorldBinary } from '../src/persistence/WorldBinary';
 import { SAVE_VERSION } from '../src/persistence/SaveTypes';
 import { isWorldPreset } from '../src/worldgen/Presets';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
@@ -35,16 +35,17 @@ describe('shipped world collection', () => {
 
   for (const entry of manifest.worlds) {
     it(`"${entry.slug}" is bundled in public/worlds/ and matches its manifest entry`, () => {
-      const file = resolve(root, 'public', 'worlds', `${entry.slug}.json`);
+      const file = resolve(root, 'public', 'worlds', `${entry.slug}.vrw`);
       expect(existsSync(file), `${file} missing — run: npm run world:bundle`).toBe(true);
 
-      const raw: unknown = JSON.parse(readFileSync(file, 'utf8'));
-      const { snapshot, dropped } = parseWorldSnapshot(raw, {
-        isValidBlockId: (id) => registry.has(id),
-      });
+      const buffer = readFileSync(file);
+      const { meta, deltas, dropped } = decodeWorldBinary(
+        buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+        { isValidBlockId: (id) => registry.has(id) },
+      );
       expect(dropped, `"${entry.slug}" has entries the current registry rejects`).toBe(0);
-      expect(entryMetaProblems(entry, snapshot.meta)).toEqual([]);
-      expect(Object.keys(snapshot.chunks).length).toBeGreaterThan(0);
+      expect(entryMetaProblems(entry, meta)).toEqual([]);
+      expect(deltas.size).toBeGreaterThan(0);
     });
   }
 });

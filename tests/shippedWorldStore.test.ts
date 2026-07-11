@@ -5,6 +5,7 @@ import {
   type ShippedWorldBase,
 } from '../src/persistence/ShippedWorldStore';
 import { MemorySaveStore } from '../src/persistence/SaveStore';
+import { encodeWorldBinary } from '../src/persistence/WorldBinary';
 import { packVoxel } from '../src/persistence/SaveTypes';
 import type { WorldDeltas, WorldMeta } from '../src/persistence/SaveTypes';
 
@@ -102,12 +103,40 @@ describe('fetchShippedWorld', () => {
     chunks: { '0,0': [[1, 2]], '1,0': [[5, 3, 7]] },
   };
 
-  function fetchOk(body: unknown): typeof fetch {
-    return vi.fn(async () => ({ ok: true, status: 200, json: async () => body })) as never;
+  /** Routes by extension: `.vrw` → the given binary (or 404), `.json` → the given snapshot. */
+  function fetchByUrl(opts: { vrw?: ArrayBuffer; json?: unknown }): typeof fetch {
+    return vi.fn(async (url: string) => {
+      if (url.endsWith('.vrw')) {
+        return opts.vrw
+          ? { ok: true, status: 200, arrayBuffer: async () => opts.vrw }
+          : { ok: false, status: 404 };
+      }
+      return opts.json !== undefined
+        ? { ok: true, status: 200, json: async () => opts.json }
+        : { ok: false, status: 404 };
+    }) as never;
   }
 
-  it('fetches worlds/<slug>.json under the base URL and parses it', async () => {
-    const fetchImpl = fetchOk(SNAPSHOT);
+  const BINARY = encodeWorldBinary(
+    META,
+    new Map([
+      ['0,0', chunk([[1, 2]])],
+      ['1,0', new Map([[5, packVoxel(3, 7)]])],
+    ]),
+  );
+
+  it('prefers worlds/<slug>.vrw and decodes it', async () => {
+    const fetchImpl = fetchByUrl({ vrw: BINARY });
+    const world = await fetchShippedWorld('/voxel-realm/', 'test-cove', () => true, fetchImpl);
+    expect(fetchImpl).toHaveBeenCalledWith('/voxel-realm/worlds/test-cove.vrw');
+    expect(fetchImpl).toHaveBeenCalledTimes(1); // no JSON fallback attempt
+    expect(world.meta.title).toBe('Test Cove');
+    expect(world.deltas.get('0,0')).toEqual(chunk([[1, 2]]));
+    expect(world.deltas.get('1,0')!.get(5)).toBe(packVoxel(3, 7));
+  });
+
+  it('falls back to worlds/<slug>.json when the binary is missing', async () => {
+    const fetchImpl = fetchByUrl({ json: SNAPSHOT });
     const world = await fetchShippedWorld('/voxel-realm/', 'test-cove', () => true, fetchImpl);
     expect(fetchImpl).toHaveBeenCalledWith('/voxel-realm/worlds/test-cove.json');
     expect(world.meta.title).toBe('Test Cove');
@@ -115,20 +144,41 @@ describe('fetchShippedWorld', () => {
     expect(world.deltas.get('1,0')!.get(5)).toBe(packVoxel(3, 7));
   });
 
-  it('drops entries with block ids the registry does not know', async () => {
-    const world = await fetchShippedWorld('/', 's', (id) => id === 2, fetchOk(SNAPSHOT));
-    expect(world.deltas.get('0,0')).toEqual(chunk([[1, 2]]));
-    expect(world.deltas.has('1,0')).toBe(false);
+  it('a binary that fetches but fails to decode rejects (no silent JSON fallback)', async () => {
+    const fetchImpl = fetchByUrl({ vrw: new TextEncoder().encode('junk').buffer, json: SNAPSHOT });
+    await expect(fetchShippedWorld('/', 's', () => true, fetchImpl)).rejects.toThrow('bad magic');
   });
 
-  it('throws on an HTTP error', async () => {
-    const fetchImpl = vi.fn(async () => ({ ok: false, status: 404 })) as never;
-    await expect(fetchShippedWorld('/', 'missing', () => true, fetchImpl)).rejects.toThrow('404');
-  });
-
-  it('throws when the snapshot has no meta', async () => {
-    await expect(fetchShippedWorld('/', 's', () => true, fetchOk({ chunks: {} }))).rejects.toThrow(
-      'no meta',
+  it('drops entries with block ids the registry does not know (both formats)', async () => {
+    const viaBin = await fetchShippedWorld('/', 's', (id) => id === 2, fetchByUrl({ vrw: BINARY }));
+    expect(viaBin.deltas.get('0,0')).toEqual(chunk([[1, 2]]));
+    expect(viaBin.deltas.has('1,0')).toBe(false);
+    const viaJson = await fetchShippedWorld(
+      '/',
+      's',
+      (id) => id === 2,
+      fetchByUrl({ json: SNAPSHOT }),
     );
+    expect(viaJson.deltas.get('0,0')).toEqual(chunk([[1, 2]]));
+    expect(viaJson.deltas.has('1,0')).toBe(false);
+  });
+
+  it('throws when both formats are missing', async () => {
+    await expect(fetchShippedWorld('/', 'missing', () => true, fetchByUrl({}))).rejects.toThrow(
+      '404',
+    );
+  });
+
+  it('throws when the binary has no meta', async () => {
+    const bare = encodeWorldBinary(undefined, new Map([['0,0', chunk([[1, 2]])]]));
+    await expect(
+      fetchShippedWorld('/', 's', () => true, fetchByUrl({ vrw: bare })),
+    ).rejects.toThrow('no meta');
+  });
+
+  it('throws when the fallback snapshot has no meta', async () => {
+    await expect(
+      fetchShippedWorld('/', 's', () => true, fetchByUrl({ json: { chunks: {} } })),
+    ).rejects.toThrow('no meta');
   });
 });
