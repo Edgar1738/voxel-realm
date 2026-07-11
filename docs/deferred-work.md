@@ -13,7 +13,8 @@ scoped **out** of those v1s — recorded here so it survives in the repo rather 
   (`src/app/curatedBlueprints.ts`) has id/name/category/tags/description + validation only; the
   `Prefab` type (`src/core/Prefab.ts`) is unchanged.
 - **Reusable kits** and **road/path planning** in `src/worldgen/Structures.ts` (only static road
-  prefabs exist today).
+  prefabs exist today). Frostvale's furniture kit ships as blueprint JSONs
+  (`docs/worlds/wip/blueprints/`) — engine-side kit support is still missing.
 - **Binary/streamed world format.** The shipped collection (PR #55) bundles plain compact JSON in
   `public/worlds/` and leans on the CDN's gzip (~12:1 on voxel entries, e.g. giza 7.5 MB → ~600 KB
   transfer). Fine at this scale; a packed binary or per-chunk streamed format only matters if
@@ -41,6 +42,10 @@ roadmap deferred:
   cards fall back to gradients today. Capture + commit thumbnails.
 
 ## Dev / infra
+- **`reportBench` hangs in headless Chromium** (`src/app/DevControls.ts`): it ends with
+  `await navigator.clipboard.writeText(...)`, which never settles without clipboard permission —
+  the `try/catch` only covers rejection. Racing it against a short timeout would fix headless
+  `__vr.bench*` runs; until then, stub `navigator.clipboard.writeText` from Playwright.
 - **`server/worldDiskStore.ts`** still re-serializes the whole world JSON per chunk flush by design
   (the cache only removed the redundant per-edit read+parse). A per-chunk-file format would make
   saves O(chunk) instead of O(world).

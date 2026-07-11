@@ -28,14 +28,14 @@ re-merge something that's already in `main` or drag a stale branch across it.
 - **Recommended action:** Do NOT re-merge from Stonehaven. Treat the worktree's render/fog edits as duplicate of what already landed in main; drop them when reconciling that branch.
 - **Merge risk:** high if merged wholesale (would duplicate/conflict with main).
 
-## 3. Frostvale Valley — stale branch vs main
+## 3. Frostvale Valley — stale branch vs main (RESOLVED)
 
-- **Originating world:** `frostvale-valley` (`origin/claude/frostvale-valley-world-qznjnv`, commit `9b8d493`)
-- **Files / areas touched:** Potentially TourMarker, fog, and the tour/landmark label-alias (`label`→`name`) logic — the branch predates recent main changes in these areas (PRs #56 label-alias, #57 fog, #58 tour beacon).
-- **Reusable vs world-specific:** The world content is world-specific; the concern is that the branch is **stale** relative to main's engine changes, not that it adds new reusable engine work.
-- **Main status:** Not merged. Branch is stale relative to main.
-- **Recommended action:** Do NOT merge wholesale. Rebase/reconcile against current main before any integration; re-verify tour labels/fog against main's newer implementations. Phase 7 (curation/ship) is also incomplete.
-- **Merge risk:** high (stale-branch conflict risk against TourMarker/fog/label-alias).
+- **Originating world:** `frostvale-valley` (`claude/frostvale-valley-world-qznjnv`, PR #60)
+- **Files / areas touched:** None — the branch carried world content, docs, and one worldgen-pinning test; no engine code.
+- **Reusable vs world-specific:** World-specific throughout. The stale-branch concern (TourMarker/fog/label-alias) did not materialize: the tour was authored with `name` keys and the branch touched none of those systems.
+- **Main status:** **Resolved 2026-07-11.** `main` was merged into the branch before ship (only conflict: `world-manifest.json`, both sides appending entries); save meta bumped v1→v2 for the `WORLD_HEIGHT` 512 change (voxel indices are y-major, so chunk entries were untouched). Full suite green post-merge, including `frostvaleSiteProbe` (terrain identity) and `shippedWorlds`.
+- **Recommended action:** None. Shipped via PR #60.
+- **Merge risk:** none (merged).
 
 ## 4. Hogwarts — camera step-up smoothing
 

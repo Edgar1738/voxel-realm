@@ -98,6 +98,27 @@ Commit `world-manifest.json` and `public/worlds/<slug>.json`; the world-select m
 production loader are both driven by the manifest, and CI (`tests/shippedWorlds.test.ts`) fails if
 they drift apart.
 
+## Field notes (learned shipping Frostvale Valley)
+
+- **`VR_VAULT` on non-Windows:** `world:package` archives to a Windows-default vault path. Point
+  `VR_VAULT` at any writable scratch directory — the archive is a side effect; the manifest entry
+  and captures are what matter.
+- **`world:bundle` on a fresh clone:** it re-bundles *every* manifest entry and `.saves/` is
+  gitignored, so first restore the other shipped saves by copying `public/worlds/<slug>.json` to
+  `.saves/<slug>.json` (the bundles are byte-complete snapshots). Don't add an `--only` flag
+  naively — `worldBundle.ts` prunes any `public/worlds/*.json` it didn't just write.
+- **`setSpawn(name)` also registers a landmark** at the spawn pose, so an 8-landmark plan ships
+  as 9 — plan for it.
+- **Tour waypoints use `name` keys** (`setTour([{ name, x, y, z }, …])`); a `label` key silently
+  ships an unnamed stop.
+- **Benching from headless Playwright:** `reportBench` ends with
+  `await navigator.clipboard.writeText(...)`, which never settles in headless Chromium without
+  clipboard permission — stub `navigator.clipboard.writeText = async () => {}` before calling
+  `__vr.bench*` or the call hangs after the summary prints. Conversely don't stub
+  `requestAnimationFrame` on a page that will bench: the roam advances per render frame.
+- The full build methodology (site survey, water settling, `reachable()` verification, per-phase
+  gates) is worked through in `docs/worlds/frostvale-valley-brief.md`.
+
 ---
 
 **Note on `.saves/`:** the directory is gitignored — treat local saves as *source material*, not

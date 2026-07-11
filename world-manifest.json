@@ -685,21 +685,214 @@
         "pitch": -0.12
       },
       "landmarks": [
-        { "name": "Basalt Overlook", "x": 0, "y": 107, "z": 95 },
-        { "name": "Ember Bridge", "x": 0, "y": 80, "z": 12 },
-        { "name": "Cinderkeep Gatehouse", "x": 0, "y": 80, "z": -42 },
-        { "name": "Cinderkeep Rooftop", "x": 0, "y": 108, "z": -78 },
-        { "name": "Ash Watchtower", "x": 28, "y": 72, "z": 38 }
+        {
+          "name": "Basalt Overlook",
+          "x": 0,
+          "y": 107,
+          "z": 95
+        },
+        {
+          "name": "Ember Bridge",
+          "x": 0,
+          "y": 80,
+          "z": 12
+        },
+        {
+          "name": "Cinderkeep Gatehouse",
+          "x": 0,
+          "y": 80,
+          "z": -42
+        },
+        {
+          "name": "Cinderkeep Rooftop",
+          "x": 0,
+          "y": 108,
+          "z": -78
+        },
+        {
+          "name": "Ash Watchtower",
+          "x": 28,
+          "y": 72,
+          "z": 38
+        }
       ],
       "tour": [
-        { "name": "Basalt Overlook", "x": 0, "y": 107, "z": 95 },
-        { "name": "Ember Bridge", "x": 0, "y": 80, "z": 12 },
-        { "name": "Cinderkeep Gatehouse", "x": 0, "y": 80, "z": -42 },
-        { "name": "Cinderkeep Rooftop", "x": 0, "y": 108, "z": -78 }
+        {
+          "name": "Basalt Overlook",
+          "x": 0,
+          "y": 107,
+          "z": 95
+        },
+        {
+          "name": "Ember Bridge",
+          "x": 0,
+          "y": 80,
+          "z": 12
+        },
+        {
+          "name": "Cinderkeep Gatehouse",
+          "x": 0,
+          "y": 80,
+          "z": -42
+        },
+        {
+          "name": "Cinderkeep Rooftop",
+          "x": 0,
+          "y": 108,
+          "z": -78
+        }
       ],
-      "tags": ["fantasy", "volcanic", "ruins", "fortress"],
+      "tags": [
+        "fantasy",
+        "volcanic",
+        "ruins",
+        "fortress"
+      ],
       "packageVersion": 1,
       "chunkCount": 1
+    },
+    {
+      "slug": "frostvale-valley",
+      "title": "Frostvale Valley",
+      "description": "An alpine valley beneath a great waterfall: a timbered lodge and snowbound village on the meadows, a frozen mere, a watermill on the river — and up the switchback, a summit shrine, a watchtower over the pass, and more than one secret behind the water.",
+      "preset": "default",
+      "seed": 1337,
+      "version": 2,
+      "spawn": {
+        "x": 560.5,
+        "y": 66.4,
+        "z": 3330.5
+      },
+      "look": {
+        "yaw": 0.052,
+        "pitch": 0.218
+      },
+      "landmarks": [
+        {
+          "name": "Arrival",
+          "x": 560.5,
+          "y": 66.4,
+          "z": 3330.5
+        },
+        {
+          "name": "The Great Falls",
+          "x": 554,
+          "y": 64,
+          "z": 3212
+        },
+        {
+          "name": "Frostvale Lodge",
+          "x": 571,
+          "y": 67,
+          "z": 3360
+        },
+        {
+          "name": "Village Square",
+          "x": 545,
+          "y": 65,
+          "z": 3346
+        },
+        {
+          "name": "River Bridge",
+          "x": 460,
+          "y": 65,
+          "z": 3274
+        },
+        {
+          "name": "The Water Mill",
+          "x": 444,
+          "y": 64,
+          "z": 3282
+        },
+        {
+          "name": "The Watchtower",
+          "x": 590,
+          "y": 86,
+          "z": 3134
+        },
+        {
+          "name": "Summit Shrine",
+          "x": 559,
+          "y": 99,
+          "z": 3150
+        },
+        {
+          "name": "The Frozen Mere",
+          "x": 420,
+          "y": 63,
+          "z": 3330
+        }
+      ],
+      "tour": [
+        {
+          "name": "Village Square",
+          "x": 545,
+          "y": 65,
+          "z": 3346
+        },
+        {
+          "name": "Frostvale Lodge",
+          "x": 570,
+          "y": 67,
+          "z": 3358
+        },
+        {
+          "name": "The Frozen Mere",
+          "x": 440,
+          "y": 63,
+          "z": 3330
+        },
+        {
+          "name": "River Bridge",
+          "x": 460,
+          "y": 65,
+          "z": 3274
+        },
+        {
+          "name": "The Water Mill",
+          "x": 446,
+          "y": 64,
+          "z": 3283
+        },
+        {
+          "name": "The Great Falls",
+          "x": 558,
+          "y": 64,
+          "z": 3240
+        },
+        {
+          "name": "The Switchback",
+          "x": 490,
+          "y": 70,
+          "z": 3222
+        },
+        {
+          "name": "Summit Shrine",
+          "x": 559,
+          "y": 99,
+          "z": 3151
+        },
+        {
+          "name": "The Watchtower",
+          "x": 590,
+          "y": 86,
+          "z": 3135
+        },
+        {
+          "name": "The Narrows",
+          "x": 615,
+          "y": 64,
+          "z": 3120
+        }
+      ],
+      "tags": [
+        "alpine",
+        "village",
+        "fantasy"
+      ],
+      "packageVersion": 1,
+      "chunkCount": 961,
+      "preview": "worlds/previews/frostvale-valley.jpg"
     }
   ]
 }
