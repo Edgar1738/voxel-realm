@@ -43,6 +43,7 @@ import { buildMapPalette } from './worldMapRender';
 import { LandmarkDiscovery } from './landmarkDiscovery';
 import { exportWorldJson, exportFileName } from '../persistence/worldShare';
 import { createBootStore } from './bootStore';
+import { BootStats, type BootReport } from './bootStats';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
@@ -141,6 +142,9 @@ export class Game {
    * The returned cleanup disposes all resources: render loop, listeners, persistence, HUD.
    */
   static async boot(canvas: HTMLCanvasElement): Promise<() => void> {
+    // Boot telemetry: every startup phase is timed; window.__vrBootStats() reads the report.
+    const bootStats = new BootStats();
+    bootStats.begin('renderer+materials');
     const registry = new BlockRegistry();
     const renderer = new Renderer(canvas);
     const texture = createTextureArray();
@@ -153,6 +157,7 @@ export class Game {
     const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
     const daynight = new DayNight(renderer.scene, chunkMaterials);
     const celestial = new CelestialSky(renderer.scene);
+    bootStats.end('renderer+materials');
 
     // Load the durable save (or start fresh / discard an incompatible one). Dev uses the
     // server-owned disk store; production serves shipped worlds from static hosting with a
@@ -162,7 +167,7 @@ export class Game {
       dev: import.meta.env.DEV,
       baseUrl: import.meta.env.BASE_URL,
     });
-    const bootMeta = await loadBootMeta(store);
+    const bootMeta = await bootStats.span('load-meta', () => loadBootMeta(store));
     store = bootMeta.store;
     const worldTitle = bootMeta.meta?.title?.trim();
     if (worldTitle) document.title = `${worldTitle} — Voxel Realm`;
@@ -177,17 +182,13 @@ export class Game {
     if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
     const { generator, overlays } = createGenerator(preset);
 
-    const bootSave = await initializeBootSave(
-      bootMeta,
-      SEED,
-      SAVE_VERSION,
-      preset,
-      undefined,
-      generatedMeta,
+    const bootSave = await bootStats.span('load-deltas', () =>
+      initializeBootSave(bootMeta, SEED, SAVE_VERSION, preset, undefined, generatedMeta),
     );
     store = bootSave.store;
     const savedDeltas: WorldDeltas = bootSave.savedDeltas;
 
+    bootStats.begin('chunk-manager');
     const sink = new ChunkMeshRegistry(
       renderer.scene,
       material,
@@ -216,6 +217,8 @@ export class Game {
       },
       savedDeltas,
     );
+    bootStats.end('chunk-manager');
+    bootStats.begin('systems+ui');
 
     // Debounced per-chunk persistence.
     const persistence = createPersistence(store, manager);
@@ -1179,7 +1182,13 @@ export class Game {
     const getBlockAt = (x: number, y: number, z: number): number => manager.getBlock(x, y, z);
     const critterEnv = { getBlock: getBlockAt, player: player.position };
 
+    bootStats.end('systems+ui');
+    // Report hook for scripts/benchmarks (all builds; overwritten by the next boot).
+    (window as typeof window & { __vrBootStats?: () => BootReport }).__vrBootStats = () =>
+      bootStats.report();
+
     renderer.start((dt) => {
+      bootStats.event('first-frame');
       const cdt = Math.min(dt, MAX_DT);
       if (import.meta.env.DEV) devRoam?.step(cdt);
       daynight.advance(cdt);
@@ -1304,6 +1313,8 @@ export class Game {
         burstActive = false;
         manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
         ui.setLoadingHud(undefined);
+        bootStats.event('streamed');
+        if (import.meta.env.DEV) console.info('[vr] boot', bootStats.report());
       }
       // Streaming status: honest progress while the first ring fills (delayed slightly so
       // fast loads never flash a banner). Percent is capped — the last chunks are the sort
@@ -1343,6 +1354,7 @@ export class Game {
             player.position.y = groundY + 0.001;
             player.flying = false;
             settlePending = false;
+            bootStats.event('spawn-settled');
           }
         }
       }

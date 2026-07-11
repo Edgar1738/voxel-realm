@@ -64,11 +64,21 @@ describe('ShippedWorldStore', () => {
     expect(merged.get('1,0')).toEqual(chunk([[7, 4]])); // overlay replaces, not merges
   });
 
-  it('returns copies so callers cannot mutate the cached base', async () => {
-    const baseDeltas: WorldDeltas = new Map([['0,0', chunk([[1, 2]])]]);
-    const store = new ShippedWorldStore(async () => base(baseDeltas), new MemorySaveStore());
+  it('hands ownership of the base maps: a second loadDeltas re-fetches instead of seeing caller mutations', async () => {
+    // Fresh deltas per fetch, like the real loader (parses the packaged JSON each time).
+    const load = vi.fn(async () => base(new Map([['0,0', chunk([[1, 2]])]])));
+    const store = new ShippedWorldStore(load, new MemorySaveStore());
     (await store.loadDeltas()).get('0,0')!.set(9, packVoxel(9, 0));
     expect((await store.loadDeltas()).get('0,0')).toEqual(chunk([[1, 2]]));
+    expect(load).toHaveBeenCalledTimes(2); // the consumed base was dropped, not reused
+  });
+
+  it('still serves meta after loadDeltas consumed the base (no re-fetch)', async () => {
+    const load = vi.fn(async () => base(new Map()));
+    const store = new ShippedWorldStore(load, new MemorySaveStore());
+    await store.loadDeltas();
+    expect(await store.loadMeta()).toEqual(META);
+    expect(load).toHaveBeenCalledTimes(1); // meta is cached across the handoff
   });
 
   it('routes writes and clearDeltas to the overlay only', async () => {

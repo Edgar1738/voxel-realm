@@ -6,7 +6,11 @@ export interface SaveStore {
   /** Resolves undefined only for a successfully-read store with no meta; rejects on load failure. */
   loadMeta(): Promise<WorldMeta | undefined>;
   saveMeta(meta: WorldMeta): Promise<void>;
-  /** Rejects on load failure so boot can avoid clearing or overwriting persisted data. */
+  /**
+   * Rejects on load failure so boot can avoid clearing or overwriting persisted data.
+   * The returned maps are OWNED by the caller (built fresh per call, never shared with the
+   * store's internal state) — ChunkManager adopts them without copying and mutates them.
+   */
   loadDeltas(): Promise<WorldDeltas>;
   saveChunkDelta(chunkKey: string, entries: ChunkDeltaEntries): Promise<void>;
   clearDeltas(): Promise<void>;

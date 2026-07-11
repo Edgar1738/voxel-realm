@@ -2,6 +2,7 @@
 import type { SaveStore } from './SaveStore';
 import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 import { parseWorldSnapshot, snapshotToDeltas } from './WorldSnapshot';
+import { recordMeasure } from '../app/bootStats';
 
 /** A shipped world's read-only content: the packaged meta + chunk deltas. */
 export interface ShippedWorldBase {
@@ -22,13 +23,23 @@ export async function fetchShippedWorld(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ShippedWorldBase> {
   const url = `${baseUrl}worlds/${encodeURIComponent(slug)}.json`;
+  const t0 = performance.now();
   const res = await fetchImpl(url);
   if (!res.ok) throw new Error(`shipped world "${slug}": fetch failed (${res.status})`);
-  const { snapshot, dropped } = parseWorldSnapshot(await res.json(), { isValidBlockId });
+  const json: unknown = await res.json();
+  const tJson = performance.now();
+  const { snapshot, dropped } = parseWorldSnapshot(json, { isValidBlockId });
+  const tValidate = performance.now();
   if (dropped > 0)
     console.warn(`Voxel Realm: shipped world "${slug}" had ${dropped} malformed entries dropped.`);
   if (!snapshot.meta) throw new Error(`shipped world "${slug}": snapshot has no meta`);
-  return { meta: snapshot.meta, deltas: snapshotToDeltas(snapshot) };
+  const deltas = snapshotToDeltas(snapshot);
+  // Boot telemetry: how the shipped-world load splits into network+JSON.parse, defensive
+  // validation, and delta materialization. Surfaced by window.__vrBootStats().
+  recordMeasure('vr:shipped-fetch+json', t0, tJson);
+  recordMeasure('vr:shipped-validate', tJson, tValidate);
+  recordMeasure('vr:shipped-to-deltas', tValidate, performance.now());
+  return { meta: snapshot.meta, deltas };
 }
 
 /**
@@ -44,6 +55,7 @@ export async function fetchShippedWorld(
  */
 export class ShippedWorldStore implements SaveStore {
   private basePromise: Promise<ShippedWorldBase> | undefined;
+  private meta: WorldMeta | undefined;
 
   constructor(
     private readonly loadBase: () => Promise<ShippedWorldBase>,
@@ -55,7 +67,7 @@ export class ShippedWorldStore implements SaveStore {
   }
 
   async loadMeta(): Promise<WorldMeta | undefined> {
-    return (await this.base()).meta;
+    return (this.meta ??= (await this.base()).meta);
   }
 
   async saveMeta(meta: WorldMeta): Promise<void> {
@@ -64,9 +76,14 @@ export class ShippedWorldStore implements SaveStore {
 
   async loadDeltas(): Promise<WorldDeltas> {
     const [base, overlayDeltas] = await Promise.all([this.base(), this.overlay.loadDeltas()]);
-    const out: WorldDeltas = new Map();
-    for (const [key, map] of base.deltas) out.set(key, new Map(map));
-    for (const [key, map] of overlayDeltas) out.set(key, new Map(map));
+    // Hand the packaged base maps to the caller instead of deep-copying them — the base of a
+    // large shipped world is hundreds of thousands of entries, and the chunk manager takes
+    // ownership of what loadDeltas returns. Dropping the cached base (meta is kept separately)
+    // means a hypothetical second loadDeltas re-fetches instead of observing caller mutations.
+    this.meta ??= base.meta;
+    this.basePromise = undefined;
+    const out: WorldDeltas = base.deltas;
+    for (const [key, map] of overlayDeltas) out.set(key, map);
     return out;
   }
 
