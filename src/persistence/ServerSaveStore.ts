@@ -7,6 +7,14 @@ const ENDPOINT = '/__world';
 
 /** SaveStore backed by the `/__world` dev endpoint, so worlds are shared across browser profiles. */
 export class ServerSaveStore implements SaveStore {
+  /**
+   * In-flight/unconsumed snapshot shared between loadMeta and loadDeltas, so boot's
+   * meta-then-deltas sequence fetches + parses the (potentially multi-MB) world once instead
+   * of twice. loadDeltas consumes it: later reads re-fetch, so post-boot callers still see
+   * fresh disk state (dev worlds are edited by other sessions).
+   */
+  private snapshotPromise: Promise<WorldSnapshot | undefined> | undefined;
+
   constructor(
     private readonly name: string,
     private readonly isValidBlockId: (id: number) => boolean,
@@ -17,8 +25,17 @@ export class ServerSaveStore implements SaveStore {
     return `${ENDPOINT}?${q.toString()}`;
   }
 
+  private snapshotOnce(): Promise<WorldSnapshot | undefined> {
+    const promise = (this.snapshotPromise ??= this.fetchSnapshot());
+    // Never cache a failure: a rejected fetch must not poison a later retry.
+    promise.catch(() => {
+      if (this.snapshotPromise === promise) this.snapshotPromise = undefined;
+    });
+    return promise;
+  }
+
   async loadMeta(): Promise<WorldMeta | undefined> {
-    return (await this.fetchSnapshot())?.meta;
+    return (await this.snapshotOnce())?.meta;
   }
 
   async saveMeta(meta: WorldMeta): Promise<void> {
@@ -26,7 +43,8 @@ export class ServerSaveStore implements SaveStore {
   }
 
   async loadDeltas(): Promise<WorldDeltas> {
-    const snap = await this.fetchSnapshot();
+    const snap = await this.snapshotOnce();
+    this.snapshotPromise = undefined;
     return snap ? snapshotToDeltas(snap) : new Map();
   }
 

@@ -60,6 +60,44 @@ describe('ServerSaveStore', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
+  it('boot sequence (loadMeta then loadDeltas) fetches the snapshot once', async () => {
+    const fetchMock = vi.fn(async () =>
+      ok({ meta: { seed: 1, version: 1 }, chunks: { '0,0': [[5, 13]] } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = new ServerSaveStore('big-world', isValidBlockId);
+    const meta = await store.loadMeta();
+    const deltas = await store.loadDeltas();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(meta).toEqual({ seed: 1, version: 1 });
+    expect(deltas.get('0,0')).toEqual(new Map([[5, 13]]));
+  });
+
+  it('a second loadDeltas re-fetches (the consumed snapshot is not reused)', async () => {
+    const fetchMock = vi.fn(async () => ok({ meta: { seed: 1, version: 1 }, chunks: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = new ServerSaveStore('w', isValidBlockId);
+    await store.loadDeltas();
+    await store.loadDeltas();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed snapshot fetch is not cached: the next load retries', async () => {
+    const fetchMock = vi
+      .fn(async () => ok({ meta: { seed: 1, version: 1 }, chunks: {} }))
+      .mockRejectedValueOnce(new Error('network blip'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = new ServerSaveStore('w', isValidBlockId);
+    await expect(store.loadMeta()).rejects.toThrow('network blip');
+    expect(await store.loadMeta()).toEqual({ seed: 1, version: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('saveChunkDelta POSTs entries to the chunk URL', async () => {
     const fetchMock = vi.fn(async () => ok({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
