@@ -1,4 +1,16 @@
-import { BoxGeometry, Group, Mesh, MeshLambertMaterial, type Material, type Object3D } from 'three';
+import {
+  BoxGeometry,
+  DataTexture,
+  Group,
+  Mesh,
+  MeshLambertMaterial,
+  NearestFilter,
+  RGBAFormat,
+  SRGBColorSpace,
+  type Material,
+  type Object3D,
+} from 'three';
+import { AVATAR_TILE, paintAvatarTile, styleForSlot, type AvatarStyle } from '../character/AvatarTextures';
 import type { Vec3 } from '../core/types';
 import {
   resolvePlayerSkin,
@@ -179,6 +191,7 @@ export class PlayerAvatar {
   readonly group = new Group();
   private readonly disposables: (BoxGeometry | Material)[] = [];
   private readonly partMeshes = new Map<string, Mesh<BoxGeometry, MeshLambertMaterial>>();
+  private readonly styleTextures = new Map<string, DataTexture>();
   private readonly limbs: Limb[] = [];
   private phase = 0;
   private swingAmp = 0;
@@ -253,20 +266,53 @@ export class PlayerAvatar {
     }
   }
 
-  /** Applies one of the built-in skins; unknown ids fall back to the default Realm Scout. */
+  /**
+   * Applies one of the built-in skins; unknown ids fall back to the default Realm Scout.
+   * Cloth/leather/metal slots get a tiny procedural texture baked from the palette color
+   * (material color stays white so the texel colors aren't double-tinted); plain slots
+   * (skin, hair, eyes) keep the flat Lambert color.
+   */
   setSkin(skinId?: string): PlayerSkin {
     const skin = resolvePlayerSkin(skinId);
     const accessories = new Set<PlayerAccessoryId>(skin.accessories);
     for (const part of PARTS) {
       const mesh = this.partMeshes.get(part.id);
       if (!mesh) continue;
-      mesh.material.color.setHex(skin.palette[part.slot]);
+      const color = skin.palette[part.slot];
+      const style = styleForSlot(part.slot);
+      if (style === 'plain') {
+        mesh.material.map = null;
+        mesh.material.color.setHex(color);
+      } else {
+        mesh.material.map = this.styleTexture(color, style);
+        mesh.material.color.setHex(0xffffff);
+      }
+      mesh.material.needsUpdate = true;
       mesh.visible = part.accessory === undefined || accessories.has(part.accessory);
     }
     return skin;
   }
 
+  /** One texture per color+style pair, shared across parts and reused on skin changes. */
+  private styleTexture(color: number, style: AvatarStyle): DataTexture {
+    const key = `${style}:${color}`;
+    let tex = this.styleTextures.get(key);
+    if (!tex) {
+      const data = new Uint8Array(AVATAR_TILE * AVATAR_TILE * 4);
+      paintAvatarTile(data, color, style);
+      tex = new DataTexture(data, AVATAR_TILE, AVATAR_TILE, RGBAFormat);
+      tex.magFilter = NearestFilter;
+      tex.minFilter = NearestFilter;
+      tex.colorSpace = SRGBColorSpace;
+      tex.needsUpdate = true;
+      this.styleTextures.set(key, tex);
+    }
+    return tex;
+  }
+
   dispose(): void {
     for (const d of this.disposables) d.dispose();
+    for (const tex of this.styleTextures.values()) tex.dispose();
+    this.styleTextures.clear();
   }
 }
