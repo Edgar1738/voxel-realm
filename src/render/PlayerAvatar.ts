@@ -28,7 +28,8 @@ const PARTS: readonly Part[] = [
   { id: 'left-pupil', size: [0.05, 0.05, 0.03], pos: [-0.09, 0.685, -0.235], slot: 'pupil' },
   { id: 'brow', size: [0.3, 0.05, 0.03], pos: [0, 0.765, -0.225], slot: 'hair', accessory: 'brow' },
   { id: 'hair', size: [0.5, 0.14, 0.5], pos: [0, 0.88, 0], slot: 'hair', accessory: 'hair' },
-  { id: 'hood', size: [0.58, 0.58, 0.58], pos: [0, 0.65, 0], slot: 'hood', accessory: 'hood' },
+  // Open-front hood: shorter in Z and shifted back so the face (and its eyes) stays exposed.
+  { id: 'hood', size: [0.58, 0.58, 0.46], pos: [0, 0.65, 0.06], slot: 'hood', accessory: 'hood' },
   {
     id: 'helmet',
     size: [0.56, 0.22, 0.56],
