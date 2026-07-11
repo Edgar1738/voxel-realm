@@ -1,4 +1,4 @@
-import { BufferGeometry, Group, Mesh, MeshStandardMaterial, Texture } from 'three';
+import { BufferGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Texture } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { PROP_CATALOG, propAssetUrl, type PropAssetDef } from '../src/assets/PropCatalog';
 import { loadWorldPropInstances, parseWorldPropInstances } from '../src/persistence/WorldProps';
@@ -119,5 +119,43 @@ describe('world prop rendering', () => {
     await Promise.all([cache.load('/missing.glb'), cache.load('/missing.glb')]);
     expect(loader.loadAsync).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('preserves vertex colors when normalizing imported materials', async () => {
+    const scene = new Group();
+    scene.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial({ vertexColors: true })));
+    const cache = new PropModelCache({ loadAsync: vi.fn(async () => ({ scene })) });
+    await cache.load('/assets/painted.glb');
+    const normalized = (scene.children[0] as Mesh).material as MeshStandardMaterial;
+    expect(normalized.vertexColors).toBe(true);
+    cache.dispose();
+  });
+
+  it('disposes InstancedMesh GPU buffers on re-render and teardown', async () => {
+    const scene = new Group();
+    scene.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    const root = new Group();
+    const layer = new WorldPropLayer(root, catalog, '/', {
+      loadAsync: vi.fn(async () => ({ scene })),
+    });
+    const instances = [
+      { id: 'crate-1', asset: 'crate', x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, scale: 1 },
+      { id: 'crate-2', asset: 'crate', x: 2, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, scale: 1 },
+    ];
+
+    await layer.render(instances);
+    const firstBatch = root.children.filter((child) => child instanceof InstancedMesh);
+    expect(firstBatch).toHaveLength(1);
+    const firstDispose = vi.spyOn(firstBatch[0], 'dispose');
+
+    await layer.render(instances); // re-render replaces the batch and must free the old one
+    expect(firstDispose).toHaveBeenCalledOnce();
+    const secondBatch = root.children.filter((child) => child instanceof InstancedMesh);
+    expect(secondBatch).toHaveLength(1);
+    const secondDispose = vi.spyOn(secondBatch[0], 'dispose');
+
+    layer.dispose();
+    expect(secondDispose).toHaveBeenCalledOnce();
+    expect(root.children).toHaveLength(0);
   });
 });

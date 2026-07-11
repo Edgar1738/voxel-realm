@@ -50,7 +50,13 @@ function normalizeMaterial(material: Material): MeshBasicMaterial {
   }
   const sourceColor =
     'color' in material && material.color instanceof Color ? material.color : null;
-  return new MeshBasicMaterial({ map, color: sourceColor?.clone() ?? new Color(0xffffff) });
+  return new MeshBasicMaterial({
+    map,
+    color: sourceColor?.clone() ?? new Color(0xffffff),
+    // Low-poly packs (e.g. Quaternius) often paint via vertex colors instead of a texture;
+    // dropping the flag would flatten those props to plain white.
+    vertexColors: material.vertexColors,
+  });
 }
 
 export class PropModelCache {
@@ -140,9 +146,20 @@ export class WorldPropLayer {
     this.cache = new PropModelCache(loader, warn);
   }
 
+  /**
+   * Detach and free every object this layer added. Geometry/materials/maps belong to the model
+   * cache; the only GPU resource owned per batch is an InstancedMesh's instance-matrix buffer.
+   */
+  private clearOwned(): void {
+    for (const object of this.owned.splice(0)) {
+      this.parent.remove(object);
+      if (object instanceof InstancedMesh) object.dispose();
+    }
+  }
+
   async render(instances: readonly WorldPropInstance[]): Promise<void> {
     if (this.disposed) return;
-    for (const object of this.owned.splice(0)) this.parent.remove(object);
+    this.clearOwned();
     if (instances.length === 0) return;
     const assets = new Map(this.catalog.map((asset) => [asset.id, asset]));
     const grouped = new Map<string, WorldPropInstance[]>();
@@ -186,7 +203,7 @@ export class WorldPropLayer {
 
   dispose(): void {
     this.disposed = true;
-    for (const object of this.owned.splice(0)) this.parent.remove(object);
+    this.clearOwned();
     this.cache.dispose();
   }
 }
