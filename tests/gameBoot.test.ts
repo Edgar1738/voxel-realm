@@ -36,9 +36,11 @@ type FakeUi = {
   weatherButton: { addEventListener: (...args: unknown[]) => void };
   timeSlider: { addEventListener: (...args: unknown[]) => void; value: string };
   skinButton: { addEventListener: (...args: unknown[]) => void };
+  handButton: { addEventListener: (...args: unknown[]) => void };
   setWeatherUi: (mode: string) => void;
   setTimeUi: (t: number) => void;
   setSkinUi: ReturnType<typeof vi.fn>;
+  setHandUi: ReturnType<typeof vi.fn>;
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
   setReachValue: (reach: number) => void;
@@ -71,9 +73,11 @@ function makeUi(): FakeUi {
     weatherButton: { addEventListener: vi.fn() },
     timeSlider: { addEventListener: vi.fn(), value: '500' },
     skinButton: { addEventListener: vi.fn() },
+    handButton: { addEventListener: vi.fn() },
     setWeatherUi: vi.fn(),
     setTimeUi: vi.fn(),
     setSkinUi: vi.fn(),
+    setHandUi: vi.fn(),
     inventoryOpen: false,
     setActiveTool: vi.fn(),
     setReachValue: vi.fn(),
@@ -238,6 +242,7 @@ vi.mock('../src/render/HeldBlock', () => ({
       attach: vi.fn(),
       punch: vi.fn(),
       setBlock: vi.fn(),
+      setMode: vi.fn(),
       update: vi.fn(),
       dispose: vi.fn(),
     };

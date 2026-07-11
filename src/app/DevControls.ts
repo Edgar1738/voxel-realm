@@ -89,6 +89,8 @@ export interface DevControlsContext {
   roam: RoamDriver;
   /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
   headlamp: (on: boolean) => void;
+  /** Gets (no arg) or sets the first-person hand mode; session-only, never persisted. */
+  hand: (mode?: string) => string;
   /** Play-mode tour HUD controls; `tick` steps the loop path once (hidden tabs suspend rAF). */
   tour?: { start(): void; end(): void; tick(): void };
   /** Pins the weather ('auto' resumes the natural cycle); returns the active kind. */
@@ -559,6 +561,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     },
     /** Camera-centered glow for dark caves — lights captures without placing blocks. */
     headlamp: (on = true): void => ctx.headlamp(on),
+    /** Get or set the first-person hand mode (block/pickaxe/axe/sword/empty; not persisted). */
+    hand: (mode?: string): string => ctx.hand(mode),
     /** Play-mode tour HUD: start()/end()/tick() — tick after moving (hidden tabs suspend rAF). */
     tourHud: ctx.tour,
     weather: ctx.weather,

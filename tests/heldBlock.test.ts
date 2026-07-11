@@ -115,11 +115,11 @@ describe('HeldBlock', () => {
   it('tool parts share cached spec textures (wood handle reused across tools)', () => {
     const { held, group } = makeHeld();
     held.setMode('pickaxe');
-    const pickHandle = ((group.children[0] as { children: Mesh[] }).children[0]
-      .material as MeshBasicMaterial).map;
+    const handleMap = (g: { children: unknown[] }): unknown =>
+      ((g.children[0] as { children: Mesh[] }).children[0].material as MeshBasicMaterial).map;
+    const pickHandle = handleMap(group);
     held.setMode('axe');
-    const axeHandle = ((group.children[0] as { children: Mesh[] }).children[0]
-      .material as MeshBasicMaterial).map;
+    const axeHandle = handleMap(group);
     expect(axeHandle).toBe(pickHandle);
   });
 
