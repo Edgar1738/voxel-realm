@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Mesh, MeshLambertMaterial, type Object3D } from 'three';
+import { Mesh, MeshLambertMaterial, type DataTexture, type Object3D } from 'three';
 import { PlayerAvatar, PLAYER_AVATAR_PART_IDS } from '../src/render/PlayerAvatar';
 import { resolvePlayerSkin } from '../src/character/PlayerSkins';
 
@@ -41,7 +41,25 @@ describe('PlayerAvatar', () => {
     const avatar = new PlayerAvatar();
     const torso = avatar.group.getObjectByName('torso') as Mesh;
     const mat = torso.material as MeshLambertMaterial;
-    expect(mat.color.getHex()).toBe(resolvePlayerSkin('realm-scout').palette.tunic);
+    // Textured slot: the palette color is baked into the map, material color stays white.
+    expect(mat.map).not.toBeNull();
+    expect(mat.color.getHex()).toBe(0xffffff);
+    const head = avatar.group.getObjectByName('head') as Mesh;
+    const headMat = head.material as MeshLambertMaterial;
+    expect(headMat.map).toBeNull();
+    expect(headMat.color.getHex()).toBe(resolvePlayerSkin('realm-scout').palette.skin);
+  });
+
+  it('shares one texture per color+style across parts and skin swaps', () => {
+    const avatar = new PlayerAvatar('realm-scout');
+    const mapOf = (id: string): unknown =>
+      (avatar.group.getObjectByName(id) as Mesh<never, MeshLambertMaterial>).material.map;
+    const tunicMap = mapOf('torso');
+    // Hood shares the tunic color on realm-scout → same cached texture instance.
+    expect(mapOf('hood')).toBe(tunicMap);
+    avatar.setSkin('dawn-guard');
+    avatar.setSkin('realm-scout');
+    expect(mapOf('torso')).toBe(tunicMap);
   });
 
   it('can apply the Mage of the Keep skin by id', () => {
@@ -51,7 +69,10 @@ describe('PlayerAvatar', () => {
     const hood = avatar.group.getObjectByName('hood') as Mesh;
     const helmet = avatar.group.getObjectByName('helmet') as Mesh;
     const mat = torso.material as MeshLambertMaterial;
-    expect(mat.color.getHex()).toBe(resolvePlayerSkin('keep-mage').palette.tunic);
+    // Textured tunic: the mage's robe color lives in the baked texel data.
+    const texel = (mat.map as DataTexture).image.data as Uint8Array;
+    const tunic = resolvePlayerSkin('keep-mage').palette.tunic;
+    expect(Math.abs(texel[0] - ((tunic >> 16) & 0xff))).toBeLessThan(40);
     // The mage trades the old full hood for a proper pointed hat.
     expect(hatBrim.visible).toBe(true);
     expect(hood.visible).toBe(false);
@@ -88,11 +109,13 @@ describe('PlayerAvatar', () => {
     expect((mage.group.getObjectByName('hat-tip') as Mesh).visible).toBe(true);
   });
 
-  it('can apply the Shadow Wanderer (all-black) skin by id', () => {
+  it('can apply the Shadow Wanderer (all-black) skin by id (silhouette survives texturing)', () => {
     const avatar = new PlayerAvatar('shadow-wanderer');
     const torso = avatar.group.getObjectByName('torso') as Mesh;
     const mat = torso.material as MeshLambertMaterial;
-    expect(mat.color.getHex()).toBe(resolvePlayerSkin('shadow-wanderer').palette.tunic);
+    // Every baked texel stays near-black so the silhouette reads solid.
+    const texel = (mat.map as DataTexture).image.data as Uint8Array;
+    for (let i = 0; i < texel.length; i += 4) expect(texel[i]).toBeLessThan(0x14);
   });
 
   it('starts hidden (first-person default)', () => {
