@@ -2,6 +2,7 @@
 import type { SaveStore } from './SaveStore';
 import type { ChunkDeltaEntries, WorldDeltas, WorldMeta } from './SaveTypes';
 import { parseWorldSnapshot, snapshotToDeltas } from './WorldSnapshot';
+import { decodeWorldBinary } from './WorldBinary';
 import { recordMeasure } from '../app/bootStats';
 
 /** A shipped world's read-only content: the packaged meta + chunk deltas. */
@@ -11,16 +12,41 @@ export interface ShippedWorldBase {
 }
 
 /**
- * Fetch and defensively parse a packaged world from static hosting
- * (`<baseUrl>worlds/<slug>.json`, the output of `npm run world:bundle`).
- * Rejects on network/HTTP failure or a snapshot without meta, so boot's
- * fail-closed volatile fallback engages instead of silently showing an empty world.
+ * Fetch a packaged world from static hosting: the VRW1 binary (`<baseUrl>worlds/<slug>.vrw`,
+ * the output of `npm run world:bundle`) first, falling back to the legacy JSON snapshot
+ * (`<slug>.json`) only when the binary is missing (e.g. a stale deploy). A binary that fetches
+ * but fails to DECODE is corruption and rejects rather than falling back, and any rejection
+ * engages boot's fail-closed volatile fallback instead of silently showing an empty world.
  */
 export async function fetchShippedWorld(
   baseUrl: string,
   slug: string,
   isValidBlockId: (id: number) => boolean,
   fetchImpl: typeof fetch = fetch,
+): Promise<ShippedWorldBase> {
+  const t0 = performance.now();
+  const res = await fetchImpl(`${baseUrl}worlds/${encodeURIComponent(slug)}.vrw`);
+  if (res.ok) {
+    const buffer = await res.arrayBuffer();
+    const tFetch = performance.now();
+    const { meta, deltas, dropped } = decodeWorldBinary(buffer, { isValidBlockId });
+    if (dropped > 0)
+      console.warn(`Voxel Realm: shipped world "${slug}" had ${dropped} invalid entries dropped.`);
+    if (!meta) throw new Error(`shipped world "${slug}": binary has no meta`);
+    // Boot telemetry: network vs decode split. Surfaced by window.__vrBootStats().
+    recordMeasure('vr:shipped-fetch+bin', t0, tFetch);
+    recordMeasure('vr:shipped-decode', tFetch, performance.now());
+    return { meta, deltas };
+  }
+  return fetchShippedWorldJson(baseUrl, slug, isValidBlockId, fetchImpl);
+}
+
+/** The legacy whole-world JSON path (kept as the binary's missing-file fallback). */
+async function fetchShippedWorldJson(
+  baseUrl: string,
+  slug: string,
+  isValidBlockId: (id: number) => boolean,
+  fetchImpl: typeof fetch,
 ): Promise<ShippedWorldBase> {
   const url = `${baseUrl}worlds/${encodeURIComponent(slug)}.json`;
   const t0 = performance.now();
@@ -34,7 +60,7 @@ export async function fetchShippedWorld(
     console.warn(`Voxel Realm: shipped world "${slug}" had ${dropped} malformed entries dropped.`);
   if (!snapshot.meta) throw new Error(`shipped world "${slug}": snapshot has no meta`);
   const deltas = snapshotToDeltas(snapshot);
-  // Boot telemetry: how the shipped-world load splits into network+JSON.parse, defensive
+  // Boot telemetry: how the legacy JSON load splits into network+JSON.parse, defensive
   // validation, and delta materialization. Surfaced by window.__vrBootStats().
   recordMeasure('vr:shipped-fetch+json', t0, tJson);
   recordMeasure('vr:shipped-validate', tJson, tValidate);

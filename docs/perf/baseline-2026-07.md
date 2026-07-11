@@ -52,3 +52,21 @@ First recorded baseline from the boot telemetry added on `feat/boot-telemetry`
    `window.__vrBootStats()` in the console — dev also logs `[vr] boot …` once the burst drains.
 2. Compare like-for-like: same machine, same headless/headed mode, cold Vite cache noise
    excluded (run each world once as warm-up if the dev server just started).
+
+## Update 2026-07-11 — VRW1 binary shipped worlds (`feat/world-binary`)
+
+Shipped worlds now bundle as VRW1 binaries (`public/worlds/<slug>.vrw`, ~45–60 % smaller than
+the JSON) and decode via typed-array scan instead of JSON.parse + per-entry validation.
+Production build (`vite preview`), headless Chromium, same machine:
+
+| Phase / event | grand-keep | giza | frostvale-valley |
+| --- | ---: | ---: | ---: |
+| vr:shipped-fetch+bin | 209 | 82 | 89 |
+| vr:shipped-decode | 71 | 38 | 20 |
+| load-meta | 281 | 121 | 109 |
+| load-deltas | 1.2 | 0.4 | 0.4 |
+| **first-frame** | **361** | **194** | **208** |
+
+Grand-keep's pre-first-frame cost dropped from ~1.2 s (JSON, dev baseline above) to ~0.36 s,
+and its payload from 12 MB to 6.5 MB. First frame is no longer meaningfully proportional to
+world size; the remaining scaling term is the burst generation/meshing (`streamed`).

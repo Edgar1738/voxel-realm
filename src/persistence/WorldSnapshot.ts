@@ -1,7 +1,9 @@
 // src/persistence/WorldSnapshot.ts
-import { CHUNK_VOLUME } from '../core/constants';
-import { voxelId, voxelState, packVoxel } from './SaveTypes';
-import type { WorldDeltas, WorldMeta, MetaPoint } from './SaveTypes';
+// Explicit .ts extensions: this module is reachable from Node scripts (worldBundle) via
+// type-stripping, which cannot resolve extensionless relative value imports.
+import { CHUNK_VOLUME } from '../core/constants.ts';
+import { voxelId, voxelState, packVoxel } from './SaveTypes.ts';
+import type { WorldDeltas, WorldMeta, MetaPoint } from './SaveTypes.ts';
 
 type Entry = [number, number] | [number, number, number];
 
