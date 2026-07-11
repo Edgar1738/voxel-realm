@@ -11,18 +11,21 @@ opt-in (`?theme=fantasy` or a world's `textureTheme` preference).
 
 ## Creators & source packs
 
-| Pack | Creator | License | Official page |
-|---|---|---|---|
-| Retro Textures Fantasy | Kenney | CC0-1.0 | https://kenney.nl/assets/retro-textures-fantasy |
-| Voxel Pack (UI, deferred) | Kenney | CC0-1.0 | https://kenney.nl/assets/voxel-pack |
-| Cube World Kit | Quaternius | CC0-1.0 | https://quaternius.com/packs/cubeworldkit.html |
-| Fantasy Props MegaKit | Quaternius | CC0-1.0 | https://quaternius.com/packs/fantasypropsmegakit.html |
-| Ultimate Modular Ruins Pack | Quaternius | CC0-1.0 | https://quaternius.com/ |
-| Poly Haven textures (deferred) | Poly Haven | CC0-1.0 | https://polyhaven.com/license |
+| Pack                           | Creator    | License | Official page                                         |
+| ------------------------------ | ---------- | ------- | ----------------------------------------------------- |
+| Retro Textures Fantasy         | Kenney     | CC0-1.0 | https://kenney.nl/assets/retro-textures-fantasy       |
+| Voxel Pack (UI, deferred)      | Kenney     | CC0-1.0 | https://kenney.nl/assets/voxel-pack                   |
+| Cube World Kit                 | Quaternius | CC0-1.0 | https://quaternius.com/packs/cubeworldkit.html        |
+| Fantasy Props MegaKit          | Quaternius | CC0-1.0 | https://quaternius.com/packs/fantasypropsmegakit.html |
+| Ultimate Modular Ruins Pack    | Quaternius | CC0-1.0 | https://quaternius.com/                               |
+| Poly Haven textures (deferred) | Poly Haven | CC0-1.0 | https://polyhaven.com/license                         |
 
 Kenney asset-use info: https://kenney.nl/support · Quaternius FAQ: https://quaternius.com/faq.html
 
 ## What ships in the repo
+
+The initial scaffold ships the pipeline, empty texture atlas, and empty prop catalog. Prepared
+tiles and optimized models are added only after Edgar stages and reviews the official pack files.
 
 - **Prepared block tiles** — `public/assets/textures/fantasy/*.png`, each center-cropped and
   downscaled to a 16×16 nearest-neighbor pixel-art tile from a Kenney source texture.

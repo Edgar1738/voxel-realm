@@ -25,49 +25,58 @@ below into `.asset-staging/`. Rename to the exact `stagedFile` names from `asset
 the pipeline finds them (the packs' internal filenames vary; renaming decouples us from them).
 
 ### 1. Kenney — Retro Textures Fantasy → `.asset-staging/textures/`
+
 Page: https://kenney.nl/assets/retro-textures-fantasy
 Pick the tile that best matches each surface and copy it renamed:
 
-| Copy the tile for… | → staged file |
-|---|---|
-| plain stone / rock | `.asset-staging/textures/stone.png` |
-| cobblestone | `.asset-staging/textures/cobblestone.png` |
-| brick / masonry | `.asset-staging/textures/brick.png` |
-| dark fortress stone / deepslate | `.asset-staging/textures/deepslate.png` |
-| wooden planks | `.asset-staging/textures/planks.png` |
-| log bark (side) | `.asset-staging/textures/log_bark.png` |
-| log rings (end) | `.asset-staging/textures/log_rings.png` |
-| bookshelf | `.asset-staging/textures/bookshelf.png` |
-| terracotta / clay | `.asset-staging/textures/terracotta.png` |
-| gravel | `.asset-staging/textures/gravel.png` |
-| furnace / forge front | `.asset-staging/textures/furnace_front.png` |
-| sand | `.asset-staging/textures/sand.png` |
-| dirt / soil | `.asset-staging/textures/dirt.png` |
+| Copy the tile for…              | → staged file                               |
+| ------------------------------- | ------------------------------------------- |
+| plain stone / rock              | `.asset-staging/textures/stone.png`         |
+| cobblestone                     | `.asset-staging/textures/cobblestone.png`   |
+| brick / masonry                 | `.asset-staging/textures/brick.png`         |
+| dark fortress stone / deepslate | `.asset-staging/textures/deepslate.png`     |
+| wooden planks                   | `.asset-staging/textures/planks.png`        |
+| log bark (side)                 | `.asset-staging/textures/log_bark.png`      |
+| log rings (end)                 | `.asset-staging/textures/log_rings.png`     |
+| bookshelf                       | `.asset-staging/textures/bookshelf.png`     |
+| terracotta / clay               | `.asset-staging/textures/terracotta.png`    |
+| gravel                          | `.asset-staging/textures/gravel.png`        |
+| furnace / forge front           | `.asset-staging/textures/furnace_front.png` |
+| sand                            | `.asset-staging/textures/sand.png`          |
+| dirt / soil                     | `.asset-staging/textures/dirt.png`          |
 
 You do **not** need all 13 — any subset works; missing ones fall back to the procedural texture.
 Prefer square source tiles; the pipeline center-crops and downscales to 16×16 with nearest.
 
 ### 2. Quaternius — Cube World Kit → `.asset-staging/models/` (`.glb`)
+
 Page: https://quaternius.com/packs/cubeworldkit.html
+
 - a dead / stylized tree → `.asset-staging/models/dead_tree.glb`
 - a crystal → `.asset-staging/models/crystal.glb`
 
 ### 3. Quaternius — Fantasy Props MegaKit → `.asset-staging/models/` (`.glb`)
+
 Page: https://quaternius.com/packs/fantasypropsmegakit.html
+
 - chest → `chest.glb` · barrel → `barrel.glb` · crate → `crate.glb` · table → `table.glb`
 - bench → `bench.glb` · candle/lantern → `candle.glb` · books → `books.glb`
 
 ### 4. Quaternius — Ultimate Modular Ruins Pack → `.asset-staging/models/` (`.glb`)
+
 Catalog: https://quaternius.com/ (Ultimate Modular Ruins Pack)
+
 - broken column → `broken_column.glb` · rubble pile → `rubble.glb` · statue → `statue.glb`
 
 Prefer `.glb`. If a pack only ships `.gltf`/`.fbx`/`.obj`, stage the `.glb` if present; otherwise
 tell me and I'll add a convert step. Do **not** stage `.blend`, engine projects, or promo renders.
 
 ### 5. Kenney — Voxel Pack (UI art) — **deferred (M3)**
+
 Page: https://kenney.nl/assets/voxel-pack — not needed for this branch.
 
 ### 6. Poly Haven (basalt/ash source) — **deferred**
+
 License: https://polyhaven.com/license — only used later if a heavily-downscaled derivative beats
 the procedural tile. Do not scrape; manual download only.
 
@@ -75,7 +84,9 @@ the procedural tile. Do not scrape; manual download only.
 
 ```bash
 npm run assets:build      # validates staged files, writes public/assets/**, updates checksums
-npm test && npm run build # confirm green
+npm test                  # confirm runtime and pipeline fallbacks
+npm run lint
+npm run build
 ```
 
 The build **fails loudly** on a missing/oversized/corrupt staged file, and **skips** catalog

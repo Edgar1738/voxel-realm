@@ -32,24 +32,24 @@ Open the URL, click to lock the pointer, and you're in.
 
 ## Controls
 
-| Input | Action |
-|---|---|
-| `WASD` / mouse | Move / look |
-| `Space` / `Shift` | Up (jump) / down |
-| `F` | Toggle fly |
-| `B` | Toggle build / play mode |
-| Left / right click | Break / place |
-| `1–9`, mouse wheel | Hotbar slot |
-| `I` | Creative inventory |
-| `X` / `G` / `R` / `C` | Fill / clear / replace / copy region |
-| `[` `]`, `M`, `+`/`-` | Rotate / mirror / array a paste |
+| Input                      | Action                               |
+| -------------------------- | ------------------------------------ |
+| `WASD` / mouse             | Move / look                          |
+| `Space` / `Shift`          | Up (jump) / down                     |
+| `F`                        | Toggle fly                           |
+| `B`                        | Toggle build / play mode             |
+| Left / right click         | Break / place                        |
+| `1–9`, mouse wheel         | Hotbar slot                          |
+| `I`                        | Creative inventory                   |
+| `X` / `G` / `R` / `C`      | Fill / clear / replace / copy region |
+| `[` `]`, `M`, `+`/`-`      | Rotate / mirror / array a paste      |
 | Arrows, `PgUp`/`PgDn`, `N` | Nudge a paste on X/Z, up/down, reset |
-| `Z`, `Y` | Undo / redo |
-| `Shift` + wheel | Adjust reach |
-| `V` | Placement ghost |
-| `L` | Headlamp |
-| `T` | Guided tour (curated worlds) |
-| `Esc` | Close / cancel |
+| `Z`, `Y`                   | Undo / redo                          |
+| `Shift` + wheel            | Adjust reach                         |
+| `V`                        | Placement ghost                      |
+| `L`                        | Headlamp                             |
+| `T`                        | Guided tour (curated worlds)         |
+| `Esc`                      | Close / cancel                       |
 
 ## Worlds
 
@@ -58,6 +58,7 @@ The world is selected with URL query params:
 - `?world=<preset>` — terrain preset: `default`, `flat`, `void`, `arena`, `amplified`, `islands`, `canyon`, `villages`, `caverns`, `frontier`, `citadel`
 - `?save=<name>` — named save; loads from `.saves/<name>` via the dev server (an existing save remembers its own preset)
 - `?spawn=x,y,z` and `?look=yaw,pitch` — spawn overrides
+- `?theme=classic|fantasy` — optional block-texture theme; missing fantasy tiles fall back procedurally
 
 Example — a ruined fortress kingdom:
 
@@ -75,10 +76,10 @@ npm run world:package    # package a world for sharing
 
 ## Dev API
 
-The dev build exposes `window.__vr` in the console — pose the camera, roam a route, build with shape helpers (box, ring, octagon, cone), toggle AO/fog/headlamp, run headless reachability checks, and capture screenshots to disk. Start with:
+The dev build exposes `window.__vr` in the console — pose the camera, roam a route, build with shape helpers (box, ring, octagon, cone), inspect decorative props, toggle AO/fog/headlamp, run headless reachability checks, and capture screenshots to disk. Start with:
 
 ```js
-__vr.help()
+__vr.help();
 ```
 
 ## Development
@@ -87,6 +88,7 @@ __vr.help()
 npm test           # vitest — 1200+ tests, headless (fake-indexeddb, no GPU needed)
 npm run lint       # eslint + prettier
 npm run build      # tsc --noEmit && vite build
+npm run assets:build # prepare any staged curated CC0 textures/models (empty staging is valid)
 ```
 
 The engine logic (meshing, collision, lighting, worldgen, edits, persistence) is kept pure and covered by unit tests; CI runs on every push.
@@ -112,6 +114,9 @@ src/
 
 Building and publishing a curated world (build → save → add metadata → audit → package → share)
 is documented in **[docs/authoring-worlds.md](docs/authoring-worlds.md)**.
+
+Preparing the optional CC0 texture theme and decorative prop derivatives is documented in
+**[docs/fantasy-assets.md](docs/fantasy-assets.md)**.
 
 ## Shipped worlds (the front door)
 
