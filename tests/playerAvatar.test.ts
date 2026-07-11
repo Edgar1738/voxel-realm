@@ -47,12 +47,45 @@ describe('PlayerAvatar', () => {
   it('can apply the Mage of the Keep skin by id', () => {
     const avatar = new PlayerAvatar('keep-mage');
     const torso = avatar.group.getObjectByName('torso') as Mesh;
+    const hatBrim = avatar.group.getObjectByName('hat-brim') as Mesh;
     const hood = avatar.group.getObjectByName('hood') as Mesh;
     const helmet = avatar.group.getObjectByName('helmet') as Mesh;
     const mat = torso.material as MeshLambertMaterial;
     expect(mat.color.getHex()).toBe(resolvePlayerSkin('keep-mage').palette.tunic);
-    expect(hood.visible).toBe(true);
+    // The mage trades the old full hood for a proper pointed hat.
+    expect(hatBrim.visible).toBe(true);
+    expect(hood.visible).toBe(false);
     expect(helmet.visible).toBe(false);
+  });
+
+  it('every skin shows a face: eyes and pupils are always visible', () => {
+    for (const id of ['realm-scout', 'dawn-guard', 'shadow-wanderer', 'night-rogue']) {
+      const avatar = new PlayerAvatar(id);
+      for (const part of ['right-eye', 'left-eye', 'right-pupil', 'left-pupil']) {
+        const mesh = avatar.group.getObjectByName(part) as Mesh;
+        expect(mesh.visible).toBe(true);
+      }
+    }
+  });
+
+  it('eyes sit proud of the head front so hoods/helmets cannot swallow them', () => {
+    const avatar = new PlayerAvatar();
+    const head = avatar.group.getObjectByName('head')!;
+    const eye = avatar.group.getObjectByName('right-eye')!;
+    const pupil = avatar.group.getObjectByName('right-pupil')!;
+    expect(eye.position.z).toBeLessThan(head.position.z); // −Z is forward
+    expect(pupil.position.z).toBeLessThan(eye.position.z);
+  });
+
+  it('new accessories show only on skins that declare them', () => {
+    const ranger = new PlayerAvatar('forest-ranger');
+    expect((ranger.group.getObjectByName('quiver') as Mesh).visible).toBe(true);
+    expect((ranger.group.getObjectByName('right-pauldron') as Mesh).visible).toBe(false);
+    const knight = new PlayerAvatar('frost-knight');
+    expect((knight.group.getObjectByName('right-pauldron') as Mesh).visible).toBe(true);
+    expect((knight.group.getObjectByName('hat-brim') as Mesh).visible).toBe(false);
+    const mage = new PlayerAvatar('keep-mage');
+    expect((mage.group.getObjectByName('hat-tip') as Mesh).visible).toBe(true);
   });
 
   it('can apply the Shadow Wanderer (all-black) skin by id', () => {

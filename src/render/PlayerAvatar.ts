@@ -20,6 +20,13 @@ interface Part {
 // All optional skin/accessory parts are built once, then recolored and shown/hidden per skin.
 const PARTS: readonly Part[] = [
   { id: 'head', size: [0.46, 0.46, 0.46], pos: [0, 0.65, 0], slot: 'skin' },
+  // Face: eye whites + pupils sit just proud of the head's front (−Z) so hoods and helmets
+  // never swallow them. Always visible — every skin gets a face.
+  { id: 'right-eye', size: [0.1, 0.09, 0.03], pos: [0.1, 0.69, -0.225], slot: 'eye' },
+  { id: 'left-eye', size: [0.1, 0.09, 0.03], pos: [-0.1, 0.69, -0.225], slot: 'eye' },
+  { id: 'right-pupil', size: [0.05, 0.05, 0.03], pos: [0.09, 0.685, -0.235], slot: 'pupil' },
+  { id: 'left-pupil', size: [0.05, 0.05, 0.03], pos: [-0.09, 0.685, -0.235], slot: 'pupil' },
+  { id: 'brow', size: [0.3, 0.05, 0.03], pos: [0, 0.765, -0.225], slot: 'hair', accessory: 'brow' },
   { id: 'hair', size: [0.5, 0.14, 0.5], pos: [0, 0.88, 0], slot: 'hair', accessory: 'hair' },
   { id: 'hood', size: [0.58, 0.58, 0.58], pos: [0, 0.65, 0], slot: 'hood', accessory: 'hood' },
   {
@@ -74,6 +81,51 @@ const PARTS: readonly Part[] = [
     pos: [0, 0.36, 0],
     slot: 'trim',
     accessory: 'mantle',
+  },
+  // Plated shoulders, one box over each arm's shoulder joint (root-mounted; they don't swing).
+  {
+    id: 'right-pauldron',
+    size: [0.24, 0.14, 0.3],
+    pos: [0.36, 0.4, 0],
+    slot: 'metal',
+    accessory: 'pauldrons',
+  },
+  {
+    id: 'left-pauldron',
+    size: [0.24, 0.14, 0.3],
+    pos: [-0.36, 0.4, 0],
+    slot: 'metal',
+    accessory: 'pauldrons',
+  },
+  // Pointed hat as three stacked, shrinking boxes: brim, crown, tip.
+  {
+    id: 'hat-brim',
+    size: [0.62, 0.06, 0.62],
+    pos: [0, 0.9, 0],
+    slot: 'hood',
+    accessory: 'wizard-hat',
+  },
+  {
+    id: 'hat-crown',
+    size: [0.36, 0.2, 0.36],
+    pos: [0, 1.02, 0],
+    slot: 'hood',
+    accessory: 'wizard-hat',
+  },
+  {
+    id: 'hat-tip',
+    size: [0.22, 0.2, 0.22],
+    pos: [0, 1.2, 0],
+    slot: 'hood',
+    accessory: 'wizard-hat',
+  },
+  // Arrow quiver over the left shoulder blade, outside any cloak.
+  {
+    id: 'quiver',
+    size: [0.16, 0.52, 0.16],
+    pos: [-0.2, 0.18, 0.3],
+    slot: 'leather',
+    accessory: 'quiver',
   },
 ];
 
