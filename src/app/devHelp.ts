@@ -26,6 +26,7 @@ export const DEV_HELP: Record<string, string> = {
   time: 'time(t) — 0 midnight, .25 sunrise, .5 noon, .75 sunset',
   dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
   headlamp: 'headlamp(on=true) — camera-centered glow for dark caves (not persisted)',
+  hand: "hand(mode?) — get/set first-person hand: 'block'|'pickaxe'|'axe'|'sword'|'empty'",
   weather: "weather(kind) — pin 'clear'|'rain'|'storm'|'snow', or 'auto' to resume the cycle",
   sound: 'sound(on=true, volume?) — toggle audio / set volume 0..1 (persisted like the HUD)',
   view: 'view(maxWidth?, quality?) -> dataURL',

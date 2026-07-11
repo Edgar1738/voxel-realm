@@ -26,6 +26,12 @@ import {
   resolvePlayerSkin,
   savePlayerSkinId,
 } from '../character/PlayerSkins';
+import {
+  loadHandModeId,
+  nextHandModeId,
+  resolveHandMode,
+  saveHandModeId,
+} from '../character/HandModes';
 import { clipCameraDistance } from './aim';
 import { ChunkManager } from '../world/ChunkManager';
 import { MeshWorkerPool } from '../world/MeshWorkerPool';
@@ -299,6 +305,13 @@ export class Game {
     } catch {
       /* localStorage unavailable - use the default built-in skin */
     }
+    let handModeId = resolveHandMode().id;
+    try {
+      handModeId = loadHandModeId(localStorage);
+    } catch {
+      /* localStorage unavailable - use the default block hand */
+    }
+    const initialHandMode = resolveHandMode(handModeId);
     const avatarSkinTarget: { current?: PlayerAvatar } = {};
     const initialPlayerSkin = resolvePlayerSkin(playerSkinId);
 
@@ -320,6 +333,10 @@ export class Game {
         initial: { id: initialPlayerSkin.id, name: initialPlayerSkin.name },
         onCycle: () => cyclePlayerSkin(),
       },
+      {
+        initial: { id: initialHandMode.id, name: initialHandMode.name },
+        onCycle: () => cycleHandMode(),
+      },
     );
 
     const applyPlayerSkin = (id: string, persist: boolean): void => {
@@ -340,6 +357,26 @@ export class Game {
     function cyclePlayerSkin(): void {
       applyPlayerSkin(nextPlayerSkinId(playerSkinId), true);
     }
+
+    const applyHandMode = (id: string, persist: boolean): void => {
+      const mode = resolveHandMode(id);
+      handModeId = mode.id;
+      heldBlock.setMode(mode.id);
+      ui.setHandUi(mode.id, mode.name);
+      if (persist) {
+        try {
+          saveHandModeId(localStorage, mode.id);
+        } catch {
+          /* ignore persistence failure */
+        }
+        ui.setStatus(`Hand: ${mode.name}`);
+      }
+    };
+
+    function cycleHandMode(): void {
+      applyHandMode(nextHandModeId(handModeId), true);
+    }
+    applyHandMode(handModeId, false);
 
     // Dock hold-to-repeat toggle: flip, persist, and reflect in the UI + status toast.
     const toggleHoldRepeat = (): void => {
@@ -1131,6 +1168,7 @@ export class Game {
           setHeadlamp(!headlampOn, true);
           setStatus(`Headlamp ${headlampOn ? 'on' : 'off'}`);
         },
+        onCycleHand: () => cycleHandMode(),
         onToggleMap: toggleWorldMap,
         onToggleView: () => {
           const next = rig.toggleMode();
@@ -1248,11 +1286,12 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      // Held block: first-person build mode only; play mode reads as scenery, not a toolbar.
+      // First-person hand: the block cube shows in build mode only (play mode reads as
+      // scenery, not a toolbar), but cosmetic tools may roam in play mode too.
       heldBlock.setBlock(inventory.selectedBlock);
+      const handAllowed = handModeId === 'block' ? experience === 'build' : true;
       heldBlock.update(cdt, {
-        visible:
-          rig.mode === 'first' && experience === 'build' && rig.locked && !ui.isInventoryOpen(),
+        visible: rig.mode === 'first' && handAllowed && rig.locked && !ui.isInventoryOpen(),
         yaw: rig.yaw,
         pitch: rig.pitch,
         bobY,
@@ -1447,6 +1486,10 @@ export class Game {
         profiler,
         roam,
         headlamp: (on: boolean) => setHeadlamp(on, false),
+        hand: (mode?: string) => {
+          if (mode !== undefined) applyHandMode(mode, false);
+          return handModeId;
+        },
         // Headless tour driving: rAF is suspended in hidden capture tabs, so agents step the
         // same loop path (`tick`) after moving the player.
         tour: { start: startTour, end: () => endTour('Tour ended'), tick: updateTour },

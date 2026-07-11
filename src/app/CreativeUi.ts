@@ -84,6 +84,7 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
       'F fly',
       'L headlamp',
       'M map',
+      'H hand item',
     ],
   },
   { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
@@ -164,6 +165,10 @@ export interface CreativeUi {
   skinButton: HTMLButtonElement;
   /** Reflects the active built-in skin without parsing user-controlled markup. */
   setSkinUi(id: string, name: string): void;
+  /** First-person hand mode selector (block/tools/empty), wired by Game to HeldBlock. */
+  handButton: HTMLButtonElement;
+  /** Reflects the active hand mode without parsing user-controlled markup. */
+  setHandUi(id: string, name: string): void;
   /** Climate controls: weather-cycle button + time-of-day slider (wired by Game). */
   weatherButton: HTMLButtonElement;
   timeSlider: HTMLInputElement;
@@ -254,6 +259,7 @@ export function createCreativeUi(
   onReachStep?: (direction: 1 | -1) => void,
   onHoldRepeatToggle?: () => void,
   skinSelector?: PlayerSkinUiConfig,
+  handSelector?: PlayerSkinUiConfig,
 ): CreativeUi {
   const root = document.createElement('div');
   root.id = 'creative-ui';
@@ -419,6 +425,18 @@ export function createCreativeUi(
   };
   setSkinUi(skinSelector?.initial.id ?? 'realm-scout', skinSelector?.initial.name ?? 'Realm Scout');
 
+  // Hand mode selector: cosmetic first-person hand (block cube, tools, or empty). H also cycles.
+  const handButton = button('');
+  handButton.className = 'skin-btn';
+  handButton.addEventListener('click', () => handSelector?.onCycle());
+  const setHandUi = (id: string, name: string): void => {
+    handButton.textContent = `Hand: ${name}`;
+    handButton.title = `First-person hand: ${name} - click or press H to cycle`;
+    handButton.setAttribute('aria-label', handButton.title);
+    handButton.dataset.hand = id;
+  };
+  setHandUi(handSelector?.initial.id ?? 'block', handSelector?.initial.name ?? 'Block');
+
   // Sound controls: mute toggle + volume slider. State/behavior is wired by Game.
   const soundGroup = document.createElement('div');
   soundGroup.className = 'sound-group';
@@ -494,6 +512,7 @@ export function createCreativeUi(
     reachGroup,
     holdButton,
     skinButton,
+    handButton,
     soundGroup,
     climateGroup,
     infoButton,
@@ -1178,6 +1197,8 @@ export function createCreativeUi(
     setSoundUi,
     skinButton,
     setSkinUi,
+    handButton,
+    setHandUi,
     weatherButton,
     timeSlider,
     setWeatherUi,

@@ -176,6 +176,8 @@ export interface InputCallbacks {
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
   onToggleHeadlamp: () => void;
+  /** Invoked when H is pressed (both modes) — cycles the first-person hand mode. */
+  onCycleHand: () => void;
   /** Invoked when M is pressed (both modes; pasting keeps M = mirror) — toggles the world map. */
   onToggleMap: () => void;
   /** Invoked when F1 is pressed — toggles first/third-person (works in play and build modes). */
@@ -230,6 +232,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
         if (e.code === 'KeyB') callbacks.onEnterBuild();
         else if (e.code === 'KeyL') callbacks.onToggleHeadlamp();
         else if (e.code === 'KeyM') callbacks.onToggleMap();
+        else if (e.code === 'KeyH') callbacks.onCycleHand();
         return;
       }
 
@@ -265,6 +268,10 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.code === 'KeyL') {
         callbacks.onToggleHeadlamp();
+        return;
+      }
+      if (e.code === 'KeyH') {
+        callbacks.onCycleHand();
         return;
       }
 
