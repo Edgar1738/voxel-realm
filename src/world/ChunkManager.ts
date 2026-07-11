@@ -151,9 +151,10 @@ export class ChunkManager {
     options?: Partial<ChunkManagerOptions>,
     savedDeltas?: WorldDeltas,
   ) {
-    this.deltas = new Map(
-      [...(savedDeltas ?? new Map()).entries()].map(([key, value]) => [key, new Map(value)]),
-    );
+    // Takes OWNERSHIP of savedDeltas (SaveStore.loadDeltas returns freshly built maps): a large
+    // shipped world's deltas run to hundreds of thousands of entries, and re-copying them here
+    // measurably delays boot. Callers must not reuse the maps after handing them over.
+    this.deltas = savedDeltas ?? new Map();
     this.opts = {
       viewDistance: options?.viewDistance ?? VIEW_DISTANCE,
       genBudget: options?.genBudget ?? GEN_BUDGET,
