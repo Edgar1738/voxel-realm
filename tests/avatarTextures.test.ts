@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  AVATAR_TILE,
-  paintAvatarTile,
-  styleForSlot,
-} from '../src/character/AvatarTextures';
+import { AVATAR_TILE, paintAvatarTile, styleForSlot } from '../src/character/AvatarTextures';
 
 const paint = (color: number, style: 'fabric' | 'leather' | 'metal' | 'plain'): Uint8Array => {
   const out = new Uint8Array(AVATAR_TILE * AVATAR_TILE * 4);

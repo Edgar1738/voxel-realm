@@ -10,7 +10,12 @@ import {
   type Material,
   type Object3D,
 } from 'three';
-import { AVATAR_TILE, paintAvatarTile, styleForSlot, type AvatarStyle } from '../character/AvatarTextures';
+import {
+  AVATAR_TILE,
+  paintAvatarTile,
+  styleForSlot,
+  type AvatarStyle,
+} from '../character/AvatarTextures';
 import type { Vec3 } from '../core/types';
 import {
   resolvePlayerSkin,
