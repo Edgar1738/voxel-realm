@@ -21,11 +21,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const SEED = 1337;
 
-/** Inclusive world AABB regions to bake (keep + approach + south wall/town). */
+/** Inclusive world AABB regions to bake (surface-tight capital landmarks + full-height keep). */
 const REGIONS: Array<{ x0: number; x1: number; z0: number; z1: number; yMin?: number; yMax?: number }> =
   [
-    // Approach road + outer town + south wall
-    { x0: -50, x1: 60, z0: -160, z1: -70, yMin: 60, yMax: 100 },
+    // New spawn, extramural suburb, royal gate, avenue, and Crown Market
+    { x0: -130, x1: 135, z0: -340, z1: -145, yMin: 60, yMax: 100 },
+    { x0: -60, x1: 90, z0: -150, z1: -90, yMin: 60, yMax: 100 },
     // Gate + inner bailey south
     { x0: -100, x1: 110, z0: -90, z1: 25, yMin: 60, yMax: 100 },
     // Keep footprint full height (tall solar + stack)
@@ -53,8 +54,8 @@ function main(): void {
     preset: 'grand-keep',
     title: 'The Grand Keep',
     description:
-      'A colossal fully explorable castle-city: thirty storeys of halls and balconies, a multi-storey King\'s Solar with open atrium, a village bailey, and high-rise sky towers linked by multi-level bridges. Climb from the gate to the Crown Tower — or descend into the Deep Dungeon.',
-    spawn: { x: 8, y: 74.5, z: -155 },
+      'A colossal fully explorable castle-capital: pass growing roadside suburbs and a complete outer wall into prosperous medieval boroughs, then cross the old city wall and climb thirty storeys from the Great Hall to the Crown Tower — or descend into the Deep Dungeon.',
+    spawn: { x: 8, y: 74.5, z: -312 },
     look: { yaw: 3.1416, pitch: 0.15 },
   };
 

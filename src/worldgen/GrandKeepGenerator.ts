@@ -26,9 +26,9 @@ export const GRAND_KEEP = {
    * Chebyshev half-width of the flat mesa top.
    * Expanded so outer city walls, village ring, and sky-bridge towers sit on flat ground.
    */
-  plateauRadius: 140,
+  plateauRadius: 340,
   /** Chebyshev distance where the slope returns to surrounding plains. */
-  skirtRadius: 220,
+  skirtRadius: 430,
   /** Surrounding plains height. */
   plainsY: 64,
 } as const;

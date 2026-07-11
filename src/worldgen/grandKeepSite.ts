@@ -41,6 +41,7 @@ import { buildKeepBalconies } from './grandKeepBalconies';
 import { buildVillage } from './grandKeepVillage';
 import { buildSkyways } from './grandKeepSkyways';
 import { buildKingsSolar } from './grandKeepKingsSolar';
+import { buildCapitalExpansion } from './grandKeepCapital';
 import {
   G,
   CX,
@@ -70,7 +71,7 @@ function clearProcessional(s: CitadelStamp): void {
   s.fill(CX - GATE_HALF, G + 1, Z0 - 2, CX + GATE_HALF, GATE_TOP + 1, gateInner, AIR);
 
   // Approach road air column (keeps stall overhangs / banners from choking the processional)
-  s.fill(CX - 2, G + 1, Z0 - 50, CX + 2, G + 4, Z0 - 2, AIR);
+  s.fill(CX - 2, G + 1, -340, CX + 2, G + 4, Z0 - 2, AIR);
 
   // Courtyard spine in two segments so the central fountain / plaza props (≈ KZ0-14..-8) stay
   s.fill(CX - 2, G + 1, gateInner, CX + 2, G + 4, KZ0 - 16, AIR);
@@ -138,8 +139,9 @@ export function grandKeepSite(): Overlay {
     buildWallAccess(s);
     buildButtresses(s);
 
-    // Village (inner bailey + outer town) + sky towers / multi-story bridges
+    // Historical village, expanded capital, then sky towers so their structure wins at crossings.
     buildVillage(s);
+    buildCapitalExpansion(s);
     buildSkyways(s);
 
     // Main keep massing + vertical circulation

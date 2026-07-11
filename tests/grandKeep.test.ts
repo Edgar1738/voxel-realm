@@ -103,7 +103,7 @@ describe('grand-keep terrain (mesa)', () => {
   });
 
   it('slopes to plains far from the fortress', () => {
-    const far = grandKeepSurfaceAt(SEED, CX, CZ + 220);
+    const far = grandKeepSurfaceAt(SEED, CX, CZ + 430);
     expect(far).toBeLessThan(G - 6);
     expect(far).toBeGreaterThan(GRAND_KEEP.plainsY - 6);
   });
@@ -220,6 +220,13 @@ describe('grand-keep structure stamps', () => {
     expect([STONE, COBBLESTONE].includes(id as 3 | 12) || id === 26 /* gravel */).toBe(true);
   });
 
+  it('integrates the expanded capital defenses and royal avenue into the preset', () => {
+    expect(isSolid(at(CX - 80, G + 4, -220))).toBe(true);
+    expect(at(CX, G + 2, -220)).toBe(AIR);
+    expect([STONE, COBBLESTONE, GRAVEL]).toContain(at(CX, G, -250));
+    expect(at(CX, G + 2, -250)).toBe(AIR);
+  });
+
   it('has M2 courtyard wayfinding (fountain / banners area lit)', () => {
     // Well / fountain footprint near plaza or a path lantern
     const nearPlaza = at(CX, G + 2, KZ0 - 11);
@@ -271,9 +278,9 @@ describe('grand-keep structure stamps', () => {
     const hx = KX1 + 12;
     const hz = KZ0 + 8;
     // Floor paving under houses / streets nearby is solid
-    expect(isSolid(at(hx, G, hz)) || at(hx, G, hz) === PLANKS || at(hx, G, hz) === COBBLESTONE).toBe(
-      true,
-    );
+    expect(
+      isSolid(at(hx, G, hz)) || at(hx, G, hz) === PLANKS || at(hx, G, hz) === COBBLESTONE,
+    ).toBe(true);
   });
 
   it('has exterior balconies on mid floors', () => {
