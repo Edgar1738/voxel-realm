@@ -130,6 +130,9 @@ import {
   type BlueprintStore,
 } from './BlueprintStore';
 import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
+import { PROP_CATALOG } from '../assets/PropCatalog';
+import { loadWorldPropInstances, type WorldPropInstance } from '../persistence/WorldProps';
+import { WorldPropLayer } from '../render/WorldProps';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -1416,6 +1419,17 @@ export class Game {
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
 
+    // Authored decorative props stream after terrain boot and never participate in collision or
+    // persistence. With the intentionally empty pilot catalog this is a fetch-free no-op.
+    const worldProps = new WorldPropLayer(renderer.scene, PROP_CATALOG, import.meta.env.BASE_URL);
+    let propInstances: WorldPropInstance[] = [];
+    void loadWorldPropInstances(worldName, PROP_CATALOG, import.meta.env.BASE_URL).then(
+      (instances) => {
+        propInstances = instances;
+        return worldProps.render(instances);
+      },
+    );
+
     // Dev-only frame capture + roam/capture controls (window.__vr).
     // Dynamically imported so the whole module — and its html2canvas dependency —
     // is excluded from production builds.
@@ -1442,6 +1456,8 @@ export class Game {
         celestial,
         preset,
         worldName,
+        props: () => propInstances.map((instance) => ({ ...instance })),
+        propCatalog: () => PROP_CATALOG.map((asset) => ({ ...asset })),
         profiler,
         roam,
         headlamp: (on: boolean) => setHeadlamp(on, false),
@@ -1535,6 +1551,7 @@ export class Game {
       heldBlock.dispose();
       tourMarker.dispose();
       targetOverlay.dispose();
+      worldProps.dispose();
       sink.disposeAll();
       mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too
       renderer.dispose();

@@ -51,6 +51,8 @@ import {
 import type { WorldMeta } from '../persistence/SaveTypes';
 import { mergeMeta, appendLandmark, auditWorldMeta } from './worldMeta';
 import type { WorldPreset } from '../worldgen/Presets';
+import type { PropAssetDef } from '../assets/PropCatalog';
+import type { WorldPropInstance } from '../persistence/WorldProps';
 import {
   rotateY,
   mirror as mirrorPrefab,
@@ -85,6 +87,8 @@ export interface DevControlsContext {
   celestial: CelestialSky;
   preset: WorldPreset;
   worldName: string;
+  props: () => readonly WorldPropInstance[];
+  propCatalog: () => readonly PropAssetDef[];
   profiler: FrameProfiler;
   roam: RoamDriver;
   /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
@@ -135,6 +139,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     worldName,
     profiler,
     roam,
+    props,
+    propCatalog,
   } = ctx;
 
   // Physics world for headless movement simulation (mirrors Game's live sampler).
@@ -420,6 +426,10 @@ export function installDevControls(ctx: DevControlsContext): void {
   };
 
   const api = {
+    /** Authored decorative instances for this world (read-only snapshot). */
+    props,
+    /** Curated model definitions available to authored world-prop files. */
+    propCatalog,
     // --- roam ---
     pos: (): Vec3 => ({ ...player.position }),
     look: (): { yaw: number; pitch: number } => ({ yaw: rig.yaw, pitch: rig.pitch }),

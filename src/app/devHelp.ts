@@ -61,6 +61,8 @@ export const DEV_HELP: Record<string, string> = {
   slice: 'slice(y, x1,z1, x2,z2) -> {rows,legend,...} — ASCII floor plan',
   world:
     'world.list()/current()/saveAs(n)/load(n)/delete(n) · meta()/audit()/setMeta/setSpawn(name?)/addLandmark/setTour/roamUrl',
+  props: 'props() -> authored decorative instances for the current world',
+  propCatalog: 'propCatalog() -> curated decorative model definitions',
   bench: 'bench({axis,distance,speed}) — profile a straight fly-roam',
   benchRoute: 'benchRoute([{x,z}...], {speed?}) — profile a multi-waypoint route',
   benchTour: "benchTour({speed?}) — profile the world's saved meta.tour",
