@@ -7,6 +7,10 @@ dist/
 .blueprints/
 .saves/
 
+# Staged official CC0 source archives/files — inputs to scripts/buildAssets.ts.
+# Never committed; only the optimized derivatives under public/assets/** ship.
+.asset-staging/
+
 # Local agent / worktree / SDD process artifacts
 .agents/
 .claire/
