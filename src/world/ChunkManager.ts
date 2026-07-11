@@ -17,7 +17,6 @@ import {
 import { ChunkStore, ChunkState } from './ChunkStore';
 import { ChunkData } from './ChunkData';
 import { VoxelView } from './VoxelView';
-import { applyOverlays } from '../worldgen/Generator';
 import { computeChunkLight, applyBorderBlockLight, borderLightExport } from './Lighting';
 import {
   updateBlockLight,
@@ -28,6 +27,9 @@ import {
 } from './IncrementalLight';
 import { opaquePass, transparentPass, type MeshPass } from '../mesh/MeshPass';
 import { meshChunkView, buildMeshJob } from './meshJob';
+import { runGenJob } from './genJob';
+import type { GenJobResult } from './genJob';
+import type { GenScheduler } from './GenWorkerPool';
 import type { MeshScheduler } from './MeshWorkerPool';
 import { WATER, AIR } from '../blocks/blocks';
 import type { AABB } from '../blocks/shapeBoxes';
@@ -58,6 +60,13 @@ export interface ChunkManagerOptions {
    * unset (default, and always in unit tests), all meshing is synchronous — today's path.
    */
   meshPool?: MeshScheduler;
+  /**
+   * Off-thread base-chunk generation (terrain + overlays). When set, streaming generation
+   * dispatches jobs and finalizes results (saved deltas + lighting) on the main thread as
+   * they arrive; preloads and the no-pool default stay synchronous — today's path. Workers
+   * rebuild the generator deterministically from (preset, seed), so output is byte-identical.
+   */
+  genPool?: GenScheduler;
 }
 
 /** Per-frame streaming work counters for the dev profiler (P0 roam-smoothness spike). */
@@ -134,6 +143,15 @@ export class ChunkManager {
   private readonly meshGen = new Map<string, number>();
   private pendingJobs = 0;
   private readonly pool?: MeshScheduler;
+  // Async generation (P7). pendingGen doubles as the staleness tag: a key removed while a
+  // job is in flight drops its result on arrival. genQueue holds arrived base chunks until
+  // the budgeted finalize pass (deltas + light) adopts them. genFallback marks chunks whose
+  // worker job failed; those generate synchronously so a broken pool can't starve the world.
+  private readonly genPool?: GenScheduler;
+  private readonly pendingGen = new Set<string>();
+  private readonly genQueue: GenJobResult[] = [];
+  private readonly genFallback = new Set<string>();
+  private desiredKeys: ReadonlySet<string> = new Set();
 
   /** Notified once per touched chunk after a batch, with that chunk's sorted delta entries. */
   onChunkDeltaChanged?: (key: string, entries: ChunkDeltaEntries) => void;
@@ -164,6 +182,7 @@ export class ChunkManager {
       frameWorkMs: options?.frameWorkMs ?? Infinity,
     };
     if (options?.meshPool) this.pool = options.meshPool;
+    if (options?.genPool) this.genPool = options.genPool;
     this.opaquePass = opaquePass(this.registry);
     this.transparentPass = transparentPass(this.registry);
   }
@@ -236,12 +255,46 @@ export class ChunkManager {
     let gen = 0;
     const generatedThisFrame: Array<{ cx: number; cz: number }> = [];
     const generatedThisFrameKeys = new Set<string>();
-    for (const { cx, cz } of this.ordered) {
-      if (gen >= this.opts.genBudget || overTime()) break;
-      if (this.ensureGenerated(cx, cz)) {
+    if (this.genPool) {
+      // P7: finalize arrived worker chunks (saved deltas + lighting) under the gen budget —
+      // they're the oldest generation work — then top up in-flight jobs, nearest first.
+      // A chunk whose worker job failed generates synchronously (genFallback).
+      while (this.genQueue.length > 0 && gen < this.opts.genBudget && !overTime()) {
+        const result = this.genQueue.shift()!;
+        const key = chunkKey(result.cx, result.cz);
+        this.pendingGen.delete(key);
+        if (!this.desiredKeys.has(key) || this.store.has(result.cx, result.cz)) continue; // stale
+        this.finalizeGenerated(result);
         gen++;
-        generatedThisFrame.push({ cx, cz });
-        generatedThisFrameKeys.add(chunkKey(cx, cz));
+        generatedThisFrame.push({ cx: result.cx, cz: result.cz });
+        generatedThisFrameKeys.add(key);
+      }
+      let dispatched = 0;
+      for (const { cx, cz } of this.ordered) {
+        if (dispatched >= this.opts.genBudget || overTime()) break;
+        const key = chunkKey(cx, cz);
+        if (this.store.has(cx, cz) || this.pendingGen.has(key)) continue;
+        if (this.genFallback.has(key)) {
+          if (gen >= this.opts.genBudget) continue;
+          this.genFallback.delete(key);
+          if (this.ensureGenerated(cx, cz)) {
+            gen++;
+            generatedThisFrame.push({ cx, cz });
+            generatedThisFrameKeys.add(key);
+          }
+          continue;
+        }
+        this.dispatchGen(cx, cz);
+        dispatched++;
+      }
+    } else {
+      for (const { cx, cz } of this.ordered) {
+        if (gen >= this.opts.genBudget || overTime()) break;
+        if (this.ensureGenerated(cx, cz)) {
+          gen++;
+          generatedThisFrame.push({ cx, cz });
+          generatedThisFrameKeys.add(chunkKey(cx, cz));
+        }
       }
     }
     // Light-settling: chunks generated earlier in the loop above never saw a sibling
@@ -324,6 +377,14 @@ export class ChunkManager {
         this.bumpGen(key); // P6: drop any in-flight mesh result for the unloaded chunk
       }
     }
+    // P7: forget generation work for chunks that left range (in-flight results drop on arrival).
+    this.desiredKeys = new Set(desired.keys());
+    for (const key of [...this.pendingGen]) {
+      if (!desired.has(key)) this.pendingGen.delete(key);
+    }
+    for (const key of [...this.genFallback]) {
+      if (!desired.has(key)) this.genFallback.delete(key);
+    }
     this.ordered = [...desired.values()].sort(
       (a, b) =>
         (a.cx - centerCx) ** 2 +
@@ -351,6 +412,7 @@ export class ChunkManager {
   private hasWorkRemaining(): boolean {
     if (this.pendingRemesh.size > 0) return true;
     if (this.pendingJobs > 0) return true; // P6: async mesh results still in flight
+    if (this.pendingGen.size > 0 || this.genQueue.length > 0) return true; // P7: gen in flight
     for (const { cx, cz } of this.ordered) {
       const entry = this.store.get(cx, cz);
       if (!entry || entry.state === ChunkState.Generated) return true;
@@ -757,17 +819,52 @@ export class ChunkManager {
   /** Generates, stores, and applies saved deltas to a chunk if absent. Returns whether it was new. */
   private ensureGenerated(cx: number, cz: number): boolean {
     if (this.store.has(cx, cz)) return false;
-    const data = this.generator.generateBaseChunk(this.seed, cx, cz);
-    applyOverlays(data, cx, cz, this.seed, this.overlays);
+    this.adoptGenerated(runGenJob(this.generator, this.overlays, this.seed, cx, cz));
+    return true;
+  }
+
+  /** Dispatches one base-chunk job to the gen pool (P7); results land in genQueue. */
+  private dispatchGen(cx: number, cz: number): void {
     const key = chunkKey(cx, cz);
+    this.pendingGen.add(key);
+    this.genPool!.submit({ cx, cz }).then(
+      (result) => {
+        if (!this.pendingGen.has(key)) return; // left range while in flight
+        this.genQueue.push(result);
+        this.hasPendingWork = true; // wake the next update() even if the backlog looked drained
+      },
+      () => {
+        // Pool disposed or worker error: fall back to synchronous generation for this chunk.
+        if (!this.pendingGen.delete(key)) return;
+        this.genFallback.add(key);
+        this.hasPendingWork = true;
+      },
+    );
+  }
+
+  /** Adopts an arrived worker base chunk: saved deltas + light, then store it (P7). */
+  private finalizeGenerated(result: GenJobResult): void {
+    this.adoptGenerated(
+      ChunkData.overBuffer(result.cx, result.cz, result.buffer, {
+        hasShaped: false,
+        maxSolidY: -1,
+      }),
+    );
+  }
+
+  /**
+   * The shared post-generation tail (sync and worker paths): snapshot the base for delta
+   * diffs, layer saved deltas, recompute the shaped flag + height cap, light, and store.
+   */
+  private adoptGenerated(data: ChunkData): void {
+    const key = chunkKey(data.cx, data.cz);
     this.baseChunks.set(key, cloneChunk(data));
     this.applySavedDeltas(data, key);
     data.hasShaped = this.scanHasShaped(data);
     data.recomputeMaxSolidY();
     this.recomputeLight(data);
-    this.store.set(cx, cz, data, ChunkState.Generated);
+    this.store.set(data.cx, data.cz, data, ChunkState.Generated);
     this.frameGen++;
-    return true;
   }
 
   /**

@@ -29,6 +29,7 @@ import {
 import { clipCameraDistance } from './aim';
 import { ChunkManager } from '../world/ChunkManager';
 import { MeshWorkerPool } from '../world/MeshWorkerPool';
+import { GenWorkerPool } from '../world/GenWorkerPool';
 import { setSharedChunkBuffers } from '../world/chunkBuffers';
 import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldgen/Presets';
 import { GreedyMesher } from '../mesh/GreedyMesher';
@@ -201,6 +202,10 @@ export class Game {
     // synchronous on the main thread — identical output, just the pre-P6 behavior.
     const meshPool = MeshWorkerPool.supported() ? new MeshWorkerPool() : undefined;
     setSharedChunkBuffers(meshPool !== undefined);
+    // P7: off-thread base-chunk generation (terrain + overlays). Needs only Worker support —
+    // result buffers transfer (or share, when isolated) — so this stays on even on GitHub
+    // Pages. Constructed AFTER setSharedChunkBuffers so its workers allocate matching buffers.
+    const genPool = GenWorkerPool.supported() ? new GenWorkerPool(preset, SEED) : undefined;
     const manager = new ChunkManager(
       generator,
       new GreedyMesher(registry),
@@ -214,6 +219,7 @@ export class Game {
         meshBudget: BURST_MESH_BUDGET,
         frameWorkMs: BURST_FRAME_WORK_MS,
         ...(meshPool ? { meshPool } : {}),
+        ...(genPool ? { genPool } : {}),
       },
       savedDeltas,
     );
@@ -1517,6 +1523,7 @@ export class Game {
       pauseListener.abort();
       worldMap.dispose();
       meshPool?.dispose();
+      genPool?.dispose();
       audio.dispose();
       persistence.dispose();
       hudTeardown?.();

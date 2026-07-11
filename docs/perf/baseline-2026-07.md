@@ -70,3 +70,21 @@ Production build (`vite preview`), headless Chromium, same machine:
 Grand-keep's pre-first-frame cost dropped from ~1.2 s (JSON, dev baseline above) to ~0.36 s,
 and its payload from 12 MB to 6.5 MB. First frame is no longer meaningfully proportional to
 world size; the remaining scaling term is the burst generation/meshing (`streamed`).
+
+## Update 2026-07-11 — worker generation (`feat/gen-workers`)
+
+Base-chunk generation (terrain + overlay stamps) now runs in a worker pool; the main thread
+only finalizes (saved deltas + lighting). Requires only `Worker` — no COOP/COEP — so it is
+active on GitHub Pages, unlike mesh workers. Production builds, headed Chromium on the ROG GPU:
+
+| | main | gen-workers |
+| --- | ---: | ---: |
+| grand-keep first-frame | 1374 ms | **441 ms** |
+| grand-keep streamed | 6189 ms | **4782 ms** |
+| grand-keep long tasks until streamed | 4 (1348 ms) | **2 (148 ms)** |
+| frostvale streamed | 4378 ms | 3995 ms |
+| frostvale long tasks | 3 (244 ms) | 1 (108 ms) |
+
+The headline is smoothness: main-thread blocking during the initial fill drops ~90 %.
+Remaining main-thread cost per chunk is delta application + the lighting BFS (a future
+worker candidate) and synchronous meshing where COOP/COEP is absent.
