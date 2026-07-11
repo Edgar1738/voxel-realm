@@ -17,6 +17,7 @@ export interface WorldManifestEntry {
   preset: string;
   seed: number;
   version: number;
+  textureTheme?: 'classic' | 'fantasy';
   spawn: MetaPoint;
   look: WorldLook;
   landmarks: Array<{ name: string } & MetaPoint>;
@@ -86,6 +87,7 @@ export function buildManifestEntry(
   };
   if (opts.preview !== undefined) entry.preview = opts.preview;
   if (opts.chunkCount !== undefined) entry.chunkCount = opts.chunkCount;
+  if (meta.textureTheme !== undefined) entry.textureTheme = meta.textureTheme;
   return entry;
 }
 
@@ -105,6 +107,13 @@ export function manifestEntryProblems(entry: WorldManifestEntry): string[] {
   if (!entry.preset) p.push('preset is empty');
   if (!Number.isInteger(entry.seed)) p.push('seed is not an integer');
   if (!Number.isInteger(entry.version)) p.push('version is not an integer');
+  if (
+    entry.textureTheme !== undefined &&
+    entry.textureTheme !== 'classic' &&
+    entry.textureTheme !== 'fantasy'
+  ) {
+    p.push('textureTheme is invalid');
+  }
   if (!pointFinite(entry.spawn)) p.push('spawn is not finite');
   if (!Number.isFinite(entry.look.yaw) || !Number.isFinite(entry.look.pitch))
     p.push('look is not finite');

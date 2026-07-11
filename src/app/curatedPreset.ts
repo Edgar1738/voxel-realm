@@ -12,6 +12,7 @@ export function curatedPresetMeta(
     seed,
     version,
     preset,
+    textureTheme: 'fantasy',
     title: 'Ashen Reach',
     description:
       'From a basalt overlook, cross the broken ember bridge into Cinderkeep — a fallen frontier fortress above the lava-cut valley.',

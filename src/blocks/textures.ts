@@ -32,7 +32,13 @@ export type PatternName =
   | 'ladder'
   | 'door';
 
-export type TextureSpec = { pattern: PatternName; colors: RGB[]; amp?: number } | { custom: Pixel };
+export type TextureSpec =
+  | { pattern: PatternName; colors: RGB[]; amp?: number; key?: string }
+  | { custom: Pixel };
+
+export interface TextureThemePixels {
+  overrides: ReadonlyMap<string, Uint8Array>;
+}
 
 export type FaceTextures =
   | TextureSpec
@@ -933,10 +939,22 @@ export function expandFaces(
 }
 
 /** Paint one TILE*TILE RGBA layer from a spec (seeded by the spec's stable key). */
-export function paintLayer(out: Uint8Array, layer: number, spec: TextureSpec): void {
+export function paintLayer(
+  out: Uint8Array,
+  layer: number,
+  spec: TextureSpec,
+  theme?: TextureThemePixels,
+): void {
+  const offset = layer * TILE * TILE * 4;
+  if (!('custom' in spec) && spec.key) {
+    const imported = theme?.overrides.get(spec.key);
+    if (imported?.length === TILE * TILE * 4) {
+      out.set(imported, offset);
+      return;
+    }
+  }
   const fn = resolvePixel(spec);
   const rng = mulberry32(specSeed(spec));
-  const offset = layer * TILE * TILE * 4;
   for (let py = 0; py < TILE; py++) {
     for (let px = 0; px < TILE; px++) {
       const c = fn(px, py, rng);

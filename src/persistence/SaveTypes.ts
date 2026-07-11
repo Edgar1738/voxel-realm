@@ -13,6 +13,8 @@ export interface WorldMeta {
   version: number;
   /** Which world preset the saved edits belong to; a change discards them. */
   preset?: string;
+  /** Optional visual preference; absent legacy saves use the classic procedural textures. */
+  textureTheme?: 'classic' | 'fantasy';
   /** Optional curated-world fields. All are defensively parsed and may be absent on legacy saves. */
   spawn?: MetaPoint;
   look?: { yaw: number; pitch: number };

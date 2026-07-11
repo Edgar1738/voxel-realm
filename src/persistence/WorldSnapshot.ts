@@ -122,6 +122,9 @@ function parseMeta(value: unknown): WorldMeta | undefined {
   if (!Number.isInteger(m.seed) || !Number.isInteger(m.version)) return undefined;
   const meta: WorldMeta = { seed: m.seed as number, version: m.version as number };
   if (typeof m.preset === 'string') meta.preset = m.preset;
+  if (m.textureTheme === 'classic' || m.textureTheme === 'fantasy') {
+    meta.textureTheme = m.textureTheme;
+  }
 
   const spawn = parsePoint(m.spawn);
   if (spawn) meta.spawn = spawn;

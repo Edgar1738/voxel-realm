@@ -92,7 +92,11 @@ export interface BlockDef {
   faces?: FaceTextures;
 }
 
-const stone = (c: [number, number, number]): TextureSpec => ({ pattern: 'stone', colors: [c] });
+const stone = (c: [number, number, number], key?: string): TextureSpec => ({
+  pattern: 'stone',
+  colors: [c],
+  ...(key ? { key } : {}),
+});
 const speck = (c: [number, number, number], amp: number): TextureSpec => ({
   pattern: 'speckle',
   colors: [c],
@@ -102,9 +106,13 @@ const ore = (spot: [number, number, number]): TextureSpec => ({ pattern: 'ore', 
 
 // Shared dirt spec: used for both DIRT's faces and grass's underside so they dedup
 // to a single texture layer (the mesher relies on grass-bottom == dirt-top).
-const DIRT_TEX: TextureSpec = { pattern: 'dirt', colors: [[134, 96, 62]] };
-const SAND_TEX: TextureSpec = { pattern: 'sand', colors: [[206, 190, 140]] };
-const GRAVEL_TEX: TextureSpec = { pattern: 'gravel', colors: [[120, 116, 112]] };
+const DIRT_TEX: TextureSpec = { pattern: 'dirt', colors: [[134, 96, 62]], key: 'dirt' };
+const SAND_TEX: TextureSpec = { pattern: 'sand', colors: [[206, 190, 140]], key: 'sand' };
+const GRAVEL_TEX: TextureSpec = {
+  pattern: 'gravel',
+  colors: [[120, 116, 112]],
+  key: 'gravel',
+};
 
 /** The block table — the single source of truth. Order here does NOT affect ids. */
 export const BLOCK_DEFS: BlockDef[] = [
@@ -143,7 +151,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 'stone'),
   },
   {
     id: WOOD,
@@ -152,9 +160,9 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     faces: {
-      top: { pattern: 'rings', colors: [[160, 130, 85]] },
-      side: { pattern: 'bark', colors: [[105, 78, 46]] },
-      bottom: { pattern: 'rings', colors: [[160, 130, 85]] },
+      top: { pattern: 'rings', colors: [[160, 130, 85]], key: 'log_rings' },
+      side: { pattern: 'bark', colors: [[105, 78, 46]], key: 'log_bark' },
+      bottom: { pattern: 'rings', colors: [[160, 130, 85]], key: 'log_rings' },
     },
   },
   {
@@ -205,7 +213,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
+    faces: { pattern: 'planks', colors: [[165, 130, 80]], key: 'planks' },
   },
   {
     id: COBBLESTONE,
@@ -219,6 +227,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         [118, 118, 122],
         [70, 70, 74],
       ],
+      key: 'cobblestone',
     },
   },
   {
@@ -233,6 +242,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         [150, 70, 58],
         [198, 182, 162],
       ],
+      key: 'brick',
     },
   },
   {
@@ -267,7 +277,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: stone([62, 62, 70]),
+    faces: stone([62, 62, 70], 'deepslate'),
   },
   {
     id: EMERALD_ORE,
@@ -292,9 +302,9 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     faces: {
-      top: { pattern: 'planks', colors: [[165, 130, 80]] },
-      side: { pattern: 'bookshelf', colors: [[150, 116, 70]] },
-      bottom: { pattern: 'planks', colors: [[165, 130, 80]] },
+      top: { pattern: 'planks', colors: [[165, 130, 80]], key: 'planks' },
+      side: { pattern: 'bookshelf', colors: [[150, 116, 70]], key: 'bookshelf' },
+      bottom: { pattern: 'planks', colors: [[165, 130, 80]], key: 'planks' },
     },
   },
   {
@@ -311,6 +321,7 @@ export const BLOCK_DEFS: BlockDef[] = [
           [120, 120, 124],
           [60, 48, 44],
         ],
+        key: 'furnace_front',
       },
       bottom: stone([120, 120, 124]),
     },
@@ -329,7 +340,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([170, 96, 70], 16),
+    faces: { pattern: 'speckle', colors: [[170, 96, 70]], amp: 16, key: 'terracotta' },
   },
   {
     id: GRAVEL,
@@ -346,7 +357,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'slab',
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 'stone'),
   },
   {
     id: PLANK_SLAB,
@@ -355,7 +366,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'slab',
-    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
+    faces: { pattern: 'planks', colors: [[165, 130, 80]], key: 'planks' },
   },
   {
     id: FLOWER,
@@ -389,7 +400,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'stair',
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 'stone'),
   },
   {
     id: STAIRS_PLANK,
@@ -398,7 +409,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'stair',
-    faces: { pattern: 'planks', colors: [[165, 130, 80]] },
+    faces: { pattern: 'planks', colors: [[165, 130, 80]], key: 'planks' },
   },
   {
     id: STAIRS_COBBLE,
@@ -413,6 +424,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         [118, 118, 122],
         [70, 70, 74],
       ],
+      key: 'cobblestone',
     },
   },
   {
@@ -428,6 +440,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         [150, 70, 58],
         [198, 182, 162],
       ],
+      key: 'brick',
     },
   },
   {
@@ -452,6 +465,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         [118, 118, 122],
         [70, 70, 74],
       ],
+      key: 'cobblestone',
     },
   },
   {

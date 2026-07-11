@@ -8,11 +8,12 @@ import {
 } from 'three';
 import { BLOCK_TEXTURES, TEXTURE_LAYER_COUNT } from '../blocks/blocks';
 import { TILE, paintLayer } from '../blocks/textures';
+import type { TextureTheme } from '../assets/TextureTheme';
 
 /** Builds the procedural block-face texture array (one layer per derived texture spec). */
-export function createTextureArray(): DataArrayTexture {
+export function createTextureArray(theme?: TextureTheme): DataArrayTexture {
   const data = new Uint8Array(TILE * TILE * 4 * TEXTURE_LAYER_COUNT);
-  BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) => paintLayer(data, layer, spec));
+  BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) => paintLayer(data, layer, spec, theme));
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;

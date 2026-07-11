@@ -44,6 +44,12 @@ import { LandmarkDiscovery } from './landmarkDiscovery';
 import { exportWorldJson, exportFileName } from '../persistence/worldShare';
 import { createBootStore } from './bootStore';
 import { SHIPPED_MANIFEST } from './shippedManifest';
+import { findManifestEntry } from '../persistence/worldManifest';
+import {
+  loadTextureTheme,
+  readPlayerTextureTheme,
+  resolveTextureThemeId,
+} from '../assets/TextureTheme';
 import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
 import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
@@ -143,16 +149,6 @@ export class Game {
   static async boot(canvas: HTMLCanvasElement): Promise<() => void> {
     const registry = new BlockRegistry();
     const renderer = new Renderer(canvas);
-    const texture = createTextureArray();
-    // Opaque/transparent block faces use a mipmapped sibling (less distant shimmer); the cutout
-    // plant pass keeps the crisp base so mip alpha-averaging can't erode thin foliage at range.
-    const mipTexture = mipmappedArray(texture);
-    const material = createChunkMaterial(mipTexture);
-    const transparentMaterial = createTransparentMaterial(mipTexture);
-    const cutoutMaterial = createCutoutMaterial(texture);
-    const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
-    const daynight = new DayNight(renderer.scene, chunkMaterials);
-    const celestial = new CelestialSky(renderer.scene);
 
     // Load the durable save (or start fresh / discard an incompatible one). Dev uses the
     // server-owned disk store; production serves shipped worlds from static hosting with a
@@ -176,6 +172,26 @@ export class Game {
     const curatedTitle = activeMeta?.title?.trim();
     if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
     const { generator, overlays } = createGenerator(preset);
+
+    // Resolve the visual theme before the first GPU texture is created. Missing fantasy tiles
+    // remain procedural, so an empty/partial staged asset set is always safe.
+    const themeId = resolveTextureThemeId({
+      search: window.location.search,
+      playerOverride: readPlayerTextureTheme(window.localStorage),
+      savedTheme: activeMeta?.textureTheme,
+      manifestTheme: findManifestEntry(SHIPPED_MANIFEST, worldName)?.textureTheme,
+    });
+    const textureTheme = await loadTextureTheme(themeId, import.meta.env.BASE_URL);
+    const texture = createTextureArray(textureTheme);
+    // Opaque/transparent block faces use a mipmapped sibling (less distant shimmer); the cutout
+    // plant pass keeps the crisp base so mip alpha-averaging can't erode thin foliage at range.
+    const mipTexture = mipmappedArray(texture);
+    const material = createChunkMaterial(mipTexture);
+    const transparentMaterial = createTransparentMaterial(mipTexture);
+    const cutoutMaterial = createCutoutMaterial(texture);
+    const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
+    const daynight = new DayNight(renderer.scene, chunkMaterials);
+    const celestial = new CelestialSky(renderer.scene);
 
     const bootSave = await initializeBootSave(
       bootMeta,
