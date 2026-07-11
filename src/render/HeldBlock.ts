@@ -39,7 +39,7 @@ const FACE_SHADE: Record<Face, number> = {
 };
 const PUNCH_SECONDS = 0.22;
 
-/** A blocky tool part in tool-local space: handle along +Y, business end toward −Z. */
+/** A blocky tool part in tool-local space: handle along +Y, head spanning X (screen profile). */
 interface ToolPart {
   size: [number, number, number];
   pos: [number, number, number];
@@ -81,14 +81,14 @@ const DARK_WOOD_SPEC: TextureSpec = {
 const TOOL_PARTS: Record<'pickaxe' | 'axe' | 'sword', readonly ToolPart[]> = {
   pickaxe: [
     { size: [0.14, 1.15, 0.14], pos: [0, -0.05, 0], spec: WOOD_SPEC },
-    { size: [0.18, 0.18, 0.95], pos: [0, 0.55, 0], spec: STONE_HEAD_SPEC },
-    { size: [0.16, 0.3, 0.15], pos: [0, 0.42, 0.46], spec: STONE_HEAD_SPEC },
-    { size: [0.16, 0.3, 0.15], pos: [0, 0.42, -0.46], spec: STONE_HEAD_SPEC },
+    { size: [0.95, 0.18, 0.18], pos: [0, 0.55, 0], spec: STONE_HEAD_SPEC },
+    { size: [0.15, 0.3, 0.16], pos: [0.46, 0.42, 0], spec: STONE_HEAD_SPEC },
+    { size: [0.15, 0.3, 0.16], pos: [-0.46, 0.42, 0], spec: STONE_HEAD_SPEC },
   ],
   axe: [
     { size: [0.14, 1.15, 0.14], pos: [0, -0.05, 0], spec: WOOD_SPEC },
-    { size: [0.16, 0.34, 0.36], pos: [0, 0.5, -0.22], spec: STONE_HEAD_SPEC },
-    { size: [0.16, 0.5, 0.2], pos: [0, 0.42, -0.48], spec: STONE_HEAD_SPEC },
+    { size: [0.36, 0.34, 0.16], pos: [-0.22, 0.5, 0], spec: STONE_HEAD_SPEC },
+    { size: [0.2, 0.5, 0.16], pos: [-0.48, 0.42, 0], spec: STONE_HEAD_SPEC },
   ],
   sword: [
     { size: [0.12, 0.4, 0.12], pos: [0, -0.62, 0], spec: DARK_WOOD_SPEC },
@@ -98,8 +98,12 @@ const TOOL_PARTS: Record<'pickaxe' | 'axe' | 'sword', readonly ToolPart[]> = {
   ],
 };
 
-/** Tools tilt forward-right in the grip so the head leads, like Minecraft's held tools. */
-const TOOL_ROTATION = { x: 0.55, y: 0.15, z: -0.35 };
+/**
+ * Grip pose: the heads already span X (screen profile), so the tool only needs a diagonal
+ * lean — roll left plus a touch of forward pitch — to read like Minecraft's held tools.
+ * The group's own yaw (−0.6) keeps a hint of the head's front face visible for depth.
+ */
+const TOOL_ROTATION = { x: 0.25, y: 0, z: -0.5 };
 
 export class HeldBlock {
   private readonly group = new Group();
