@@ -79,20 +79,31 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
     lines: [
       'WASD move',
       'Mouse look',
+      'Double-tap W sprint',
       'Space up / jump',
       'Shift down',
       'F fly',
       'L headlamp',
       'M map',
+      'F1 first / third person',
       'H hand item',
     ],
   },
-  { heading: 'Modes', lines: ['B build / play', 'Esc close / cancel'] },
-  { heading: 'Blocks', lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory'] },
-  { heading: 'Build tools', lines: ['X fill', 'G clear', 'R replace', 'C copy'] },
+  {
+    heading: 'Modes',
+    lines: ['B build / play', 'T tour (play) / tools (build)', 'Esc close / cancel'],
+  },
+  {
+    heading: 'Blocks',
+    lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory', 'V placement ghost'],
+  },
+  {
+    heading: 'Build tools',
+    lines: ['X fill', 'G clear', 'R replace', 'C copy', 'Ctrl+Z / Ctrl+Y undo / redo'],
+  },
   {
     heading: 'Blueprint paste',
-    lines: ['Click to paste', '[ ] rotate', 'M mirror', '+/- array count'],
+    lines: ['Click to paste', '[ ] rotate', 'U mirror', '+/- array count', 'Arrows / PgUp-Dn nudge'],
   },
   { heading: 'Reach', lines: ['Shift + wheel adjusts reach'] },
 ];

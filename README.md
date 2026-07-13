@@ -35,20 +35,24 @@ Open the URL, click to lock the pointer, and you're in.
 | Input | Action |
 |---|---|
 | `WASD` / mouse | Move / look |
+| Double-tap `W` | Sprint |
 | `Space` / `Shift` | Up (jump) / down |
 | `F` | Toggle fly |
 | `B` | Toggle build / play mode |
-| Left / right click | Break / place |
+| `T` | Guided tour (play mode) / cycle tools (build mode) |
+| `M` | World map |
+| `F1` | First / third person |
+| `L` | Headlamp |
+| `H` | Hand item |
+| Left / middle / right click | Break / pick / place |
 | `1–9`, mouse wheel | Hotbar slot |
 | `I` | Creative inventory |
-| `X` / `G` / `R` / `C` | Fill / clear / replace / copy region |
-| `[` `]`, `M`, `+`/`-` | Rotate / mirror / array a paste |
-| Arrows, `PgUp`/`PgDn`, `N` | Nudge a paste on X/Z, up/down, reset |
-| `Z`, `Y` | Undo / redo |
-| `Shift` + wheel | Adjust reach |
 | `V` | Placement ghost |
-| `L` | Headlamp |
-| `T` | Guided tour (curated worlds) |
+| `X` / `G` / `R` / `C` | Fill / clear / replace / copy region |
+| `[` `]`, `U`, `+`/`-` | Rotate / mirror / array a paste |
+| Arrows, `PgUp`/`PgDn`, `N` | Nudge a paste on X/Z, up/down, reset |
+| `Ctrl`+`Z` / `Ctrl`+`Y` | Undo / redo |
+| `Shift` + wheel | Adjust reach |
 | `Esc` | Close / cancel |
 
 ## Worlds
