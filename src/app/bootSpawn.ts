@@ -14,6 +14,23 @@ export interface SpawnOverrides {
   look?: { yaw: number; pitch: number };
 }
 
+/** Resumed position/look/flying from a prior session (see resumeState.ts). */
+export interface ResumeSpawn {
+  spawn?: MetaPoint;
+  look?: { yaw: number; pitch: number };
+  flying?: boolean;
+}
+
+/** Which source won a spawn/look field, so the caller can e.g. only ground-settle the default. */
+export type SpawnSource = 'url' | 'resume' | 'meta' | 'default';
+
+export interface ResolvedSpawn extends SpawnState {
+  positionSource: SpawnSource;
+  lookSource: SpawnSource;
+  /** Boot flying-state — defined only when the resumed position won, else undefined (boot flies). */
+  flying: boolean | undefined;
+}
+
 function isFiniteNumber(n: number): boolean {
   return Number.isFinite(n);
 }
@@ -40,15 +57,56 @@ export function parseSpawnOverrides(search: string): SpawnOverrides {
   return overrides;
 }
 
-/** Resolve the boot spawn/look, applying override > meta > fallback per field. */
+/**
+ * Resolve the boot spawn/look with per-field precedence: URL override > resume > saved meta >
+ * fallback. Position and look are resolved independently, so `?spawn=` can override a resumed
+ * position while the resumed look survives (and vice versa). Reports the winning source per field;
+ * `flying` is set only when the resumed position won, so a normal boot still starts flying.
+ */
 export function resolveSpawn(
   meta: Pick<WorldMeta, 'spawn' | 'look'> | undefined,
   overrides: SpawnOverrides,
+  resume: ResumeSpawn | undefined,
   fallback: SpawnState,
-): SpawnState {
+): ResolvedSpawn {
+  let spawn: MetaPoint;
+  let positionSource: SpawnSource;
+  if (overrides.spawn) {
+    spawn = overrides.spawn;
+    positionSource = 'url';
+  } else if (resume?.spawn) {
+    spawn = resume.spawn;
+    positionSource = 'resume';
+  } else if (meta?.spawn) {
+    spawn = meta.spawn;
+    positionSource = 'meta';
+  } else {
+    spawn = fallback.spawn;
+    positionSource = 'default';
+  }
+
+  let look: { yaw: number; pitch: number };
+  let lookSource: SpawnSource;
+  if (overrides.look) {
+    look = overrides.look;
+    lookSource = 'url';
+  } else if (resume?.look) {
+    look = resume.look;
+    lookSource = 'resume';
+  } else if (meta?.look) {
+    look = meta.look;
+    lookSource = 'meta';
+  } else {
+    look = fallback.look;
+    lookSource = 'default';
+  }
+
   return {
-    spawn: overrides.spawn ?? meta?.spawn ?? fallback.spawn,
-    look: overrides.look ?? meta?.look ?? fallback.look,
+    spawn,
+    look,
+    positionSource,
+    lookSource,
+    flying: positionSource === 'resume' ? resume?.flying : undefined,
   };
 }
 
@@ -74,8 +132,8 @@ export function groundSpawnY(
  * Clamp the spawn `y` into `[0, worldHeight]` so a wild curated `y` can't fling the
  * camera into the void. Boot starts the player flying, so no solidity check is needed.
  */
-export function clampSpawnY(state: SpawnState, worldHeight: number): SpawnState {
+export function clampSpawnY<T extends SpawnState>(state: T, worldHeight: number): T {
   const y = Math.max(0, Math.min(worldHeight, state.spawn.y));
   if (y === state.spawn.y) return state;
-  return { spawn: { ...state.spawn, y }, look: state.look };
+  return { ...state, spawn: { ...state.spawn, y } };
 }

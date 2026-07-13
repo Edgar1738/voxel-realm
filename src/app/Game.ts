@@ -103,6 +103,7 @@ import { TargetOverlay } from '../render/TargetOverlay';
 import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
+import { loadResume, saveResume, clearResume, resumeToSpawn } from './resumeState';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
 import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
@@ -253,19 +254,26 @@ export class Game {
     manager.onEditsApplied = (changes) => ticker.notifyChanges(changes);
 
     const overlay = document.getElementById('overlay') ?? undefined;
-    // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging.
+    // "Resume where you left off": a discarded incompatible save regenerated the world, so any
+    // saved position points at terrain that no longer exists — drop it. Otherwise load the last
+    // position/look/flying for this world (kept in localStorage, never in the world's own save).
+    if (bootSave.discardedIncompatible) clearResume(localStorage, worldName);
+    const resume = bootSave.discardedIncompatible ? undefined : loadResume(localStorage, worldName);
+    // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging;
+    // resume sits between them (see resolveSpawn precedence).
     const spawnOverrides = parseSpawnOverrides(window.location.search);
     const spawnState = clampSpawnY(
-      resolveSpawn(activeMeta, spawnOverrides, {
+      resolveSpawn(activeMeta, spawnOverrides, resumeToSpawn(resume), {
         spawn: SPAWN,
         look: { yaw: 0, pitch: 0 },
       }),
       WORLD_HEIGHT,
     );
-    // Only the fixed default spawn hovers waiting for terrain; curated/overridden spawns are
-    // intentional vantage points and must not be settled onto the ground.
-    const usingDefaultSpawn = spawnOverrides.spawn === undefined && activeMeta?.spawn === undefined;
-    const player = new PlayerController(spawnState.spawn, true);
+    // Only the fixed default spawn hovers waiting for terrain; curated/overridden/resumed spawns
+    // are intentional positions and must not be settled onto the ground.
+    const usingDefaultSpawn = spawnState.positionSource === 'default';
+    // Resume restores the player's locomotion mode; every other spawn source boots flying.
+    const player = new PlayerController(spawnState.spawn, spawnState.flying ?? true);
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
       isClimbable(x: number, y: number, z: number): boolean;
@@ -417,6 +425,33 @@ export class Game {
     );
     rig.yaw = spawnState.look.yaw;
     rig.pitch = spawnState.look.pitch;
+
+    // Resume persistence: snapshot the player's position/look/flying to localStorage on a light
+    // throttle (see the render loop) and synchronously on page hide, so a reload drops the player
+    // back where they were. `resumeSuppressed` is flipped on Reset World so the unload that follows
+    // the reload can't resurrect a resume we just cleared. A signature guard skips redundant writes.
+    let resumeSuppressed = false;
+    let lastResumeSig = '';
+    const saveResumeNow = (): void => {
+      if (resumeSuppressed) return;
+      const s = {
+        x: player.position.x,
+        y: player.position.y,
+        z: player.position.z,
+        yaw: rig.yaw,
+        pitch: rig.pitch,
+        flying: player.flying,
+      };
+      // Never persist a garbage snapshot (e.g. a NaN mid-teleport) — resume would then spawn nowhere.
+      if (![s.x, s.y, s.z, s.yaw, s.pitch].every(Number.isFinite)) return;
+      const sig = `${s.x.toFixed(2)},${s.y.toFixed(2)},${s.z.toFixed(2)},${s.yaw.toFixed(3)},${s.pitch.toFixed(3)},${s.flying}`;
+      if (sig === lastResumeSig) return;
+      lastResumeSig = sig;
+      saveResume(localStorage, worldName, s);
+    };
+    const resumeAbort = new AbortController();
+    window.addEventListener('pagehide', saveResumeNow, { signal: resumeAbort.signal });
+    let resumeAccum = 0; // seconds since the last throttled resume snapshot
 
     // Dev world catalog (named server saves). `copyWorldFn` doubles as the reset dialog's
     // "duplicate first" capability; undefined in production (single IndexedDB world).
@@ -587,9 +622,13 @@ export class Game {
         try {
           await persistence.suppressAndClear();
           await store.clearDeltas();
+          clearResume(localStorage, worldName); // don't resume into a world that no longer exists
         } catch (err) {
           console.error('Voxel Realm: reset failed', err);
         }
+        // Block the throttled/pagehide snapshot so the imminent reload can't rewrite the resume
+        // we just cleared (or, on a failed reset, re-save the unchanged position — either is fine).
+        resumeSuppressed = true;
         window.location.reload();
       })();
     });
@@ -1269,6 +1308,13 @@ export class Game {
       celestial.update(daynight.time, renderer.camera.position);
       player.update(cdt, rig.getInput(), rig.yaw, sampler);
 
+      // Resume snapshot at ~1 Hz (the signature guard inside skips writes when nothing moved).
+      resumeAccum += cdt;
+      if (resumeAccum >= 1) {
+        resumeAccum = 0;
+        saveResumeNow();
+      }
+
       // Sprint feedback: ease the FOV out while sprinting and back on release.
       const targetFov = BASE_FOV + (player.sprinting ? SPRINT_FOV_KICK : 0);
       if (Math.abs(renderer.camera.fov - targetFov) > 0.05) {
@@ -1591,6 +1637,8 @@ export class Game {
 
     /** Releases all resources acquired during boot. */
     function cleanup(): void {
+      saveResumeNow(); // capture the final position before this world tears down
+      resumeAbort.abort();
       abortInput();
       pauseListener.abort();
       worldMap.dispose();

@@ -13,22 +13,57 @@ const FALLBACK: SpawnState = {
 };
 
 describe('resolveSpawn – boot spawn/look precedence', () => {
-  it('falls back to the default when no meta and no overrides', () => {
-    expect(resolveSpawn(undefined, {}, FALLBACK)).toEqual(FALLBACK);
+  it('falls back to the default when no meta, override, or resume', () => {
+    expect(resolveSpawn(undefined, {}, undefined, FALLBACK)).toEqual({
+      ...FALLBACK,
+      positionSource: 'default',
+      lookSource: 'default',
+      flying: undefined,
+    });
   });
 
   it('prefers saved meta spawn/look over the default', () => {
     const meta = { spawn: { x: 1, y: 2, z: 3 }, look: { yaw: 1.5, pitch: -0.2 } };
-    expect(resolveSpawn(meta, {}, FALLBACK)).toEqual(meta);
+    expect(resolveSpawn(meta, {}, undefined, FALLBACK)).toEqual({
+      ...meta,
+      positionSource: 'meta',
+      lookSource: 'meta',
+      flying: undefined,
+    });
   });
 
   it('lets a query override beat meta per-field (spawn overridden, look from meta)', () => {
     const meta = { spawn: { x: 1, y: 2, z: 3 }, look: { yaw: 1.5, pitch: -0.2 } };
     const overrides = { spawn: { x: 99, y: 99, z: 99 } };
-    expect(resolveSpawn(meta, overrides, FALLBACK)).toEqual({
+    expect(resolveSpawn(meta, overrides, undefined, FALLBACK)).toEqual({
       spawn: { x: 99, y: 99, z: 99 },
       look: { yaw: 1.5, pitch: -0.2 },
+      positionSource: 'url',
+      lookSource: 'meta',
+      flying: undefined,
     });
+  });
+
+  it('resume beats meta but loses to a URL override, per field', () => {
+    const meta = { spawn: { x: 1, y: 2, z: 3 }, look: { yaw: 1.5, pitch: -0.2 } };
+    const resume = { spawn: { x: 40, y: 41, z: 42 }, look: { yaw: 0.7, pitch: 0.1 }, flying: false };
+    // No override: resume wins both fields, and flying rides along.
+    expect(resolveSpawn(meta, {}, resume, FALLBACK)).toEqual({
+      spawn: { x: 40, y: 41, z: 42 },
+      look: { yaw: 0.7, pitch: 0.1 },
+      positionSource: 'resume',
+      lookSource: 'resume',
+      flying: false,
+    });
+    // ?spawn= overrides the resumed position; the resumed look still survives.
+    const overrides = { spawn: { x: 99, y: 99, z: 99 } };
+    const r = resolveSpawn(meta, overrides, resume, FALLBACK);
+    expect(r.spawn).toEqual({ x: 99, y: 99, z: 99 });
+    expect(r.positionSource).toBe('url');
+    expect(r.look).toEqual({ yaw: 0.7, pitch: 0.1 });
+    expect(r.lookSource).toBe('resume');
+    // flying is only carried when the resumed *position* won, so the override case boots flying.
+    expect(r.flying).toBeUndefined();
   });
 });
 
