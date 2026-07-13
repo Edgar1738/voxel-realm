@@ -10,9 +10,9 @@
 - **Current commit:** `b3c8578` (merge)
 - **Main status:** Showcase package on `main` — manifest + `public/worlds/cloudspire-citadel.vrw`; Edgar-approved 2026-07-13.
 - **Source assets:** Generator preset `cloudspire-citadel` + baked neighborhood package (~242 chunks) + procedural remainder.
-- **Registry evidence:** `world-manifest.json`, `public/worlds/cloudspire-citadel.vrw`, `public/worlds/previews/cloudspire-citadel.jpg`
+- **Registry evidence:** `world-manifest.json`, `public/worlds/cloudspire-citadel.vrw`, `public/worlds/previews/cloudspire-citadel.jpg` (real arrival capture as of the P0 pass — no longer a Grand Keep stand-in)
 - **Engine changes:** Optional `WorldMeta.atmosphere` (weather/time/fog); Cloudspire material family block ids 42–48 (append-only).
-- **Next required approval:** None for ship path — showcase on main.
+- **Next required approval:** None for ship path — showcase on main. P0 polish on `worktree-cloudspire-p0` (graded gardens, spire fog reveal, real preview) pending merge — see REVIEW_HISTORY.
 - **Last verified date:** 2026-07-13
 
 ## Load
@@ -32,7 +32,7 @@
 | Cathedral | ~58×54 plan, ~78 tower |
 | Palace stack | 12 storeys + multi-stage spire |
 | Highest architecture | ~y 420–440 |
-| Bake | 242 chunks · ~9.6 MB JSON |
+| Bake | 242 chunks · ~10.2 MB JSON (graded gardens) |
 
 ## Hero route
 

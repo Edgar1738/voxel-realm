@@ -17,8 +17,8 @@
     "atmosphere": {
       "weather": "clear",
       "timeOfDay": 0.42,
-      "fogNear": 140,
-      "fogFar": 280
+      "fogNear": 150,
+      "fogFar": 500
     },
     "landmarks": [
       {

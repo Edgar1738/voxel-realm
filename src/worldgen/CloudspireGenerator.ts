@@ -101,6 +101,30 @@ export function cloudspireSurfaceAt(seed: WorldSeed, wx: number, wz: number): nu
   return clampInt(terraceHeight(noiseFor(seed), wx, wz), 1, WORLD_HEIGHT - 1);
 }
 
+/**
+ * Authored terrace grade at (wx,wz), seed-independent. Inside the citadel envelope
+ * (Chebyshev radius <= outerRadius) the terrain is pure terrace math with no noise, so site
+ * stamps can grade paths, gardens, and props onto the exact surface the generator produced —
+ * the fix for garden features authored below grade and buried under the natural cap.
+ */
+export function cloudspireTerraceY(wx: number, wz: number): number {
+  const dx = wx - CLOUDSPIRE.centerX;
+  const dz = wz - CLOUDSPIRE.centerZ;
+  const cheb = Math.max(Math.abs(dx), Math.abs(dz));
+  if (cheb <= CLOUDSPIRE.palaceRadius) return CLOUDSPIRE.palaceY;
+  if (cheb <= CLOUDSPIRE.gardenRadius) {
+    const t =
+      (cheb - CLOUDSPIRE.palaceRadius) / (CLOUDSPIRE.gardenRadius - CLOUDSPIRE.palaceRadius);
+    return Math.round(
+      CLOUDSPIRE.palaceY + (CLOUDSPIRE.gardenY - CLOUDSPIRE.palaceY) * smoothstep(t),
+    );
+  }
+  const t = (cheb - CLOUDSPIRE.gardenRadius) / (CLOUDSPIRE.outerRadius - CLOUDSPIRE.gardenRadius);
+  return Math.round(
+    CLOUDSPIRE.gardenY + (CLOUDSPIRE.groundY - CLOUDSPIRE.gardenY) * smoothstep(Math.min(1, t)),
+  );
+}
+
 const DIRT_BAND = 3;
 
 class TerraceField implements TerrainStage {

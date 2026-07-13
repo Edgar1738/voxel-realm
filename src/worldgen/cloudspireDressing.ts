@@ -11,6 +11,7 @@ import {
 } from '../blocks/blocks';
 import { CitadelStamp, hash2 } from './CitadelStamp';
 import { G, CX, Z0, X0, X1, Z1, WALK_Y, CATH, KEEP, KCX, FLOOR, SPAWN } from './cloudspireFrame';
+import { cloudspireTerraceY } from './CloudspireGenerator';
 import { pinnacle, skyBridge } from './cloudspirePrimitives';
 
 /** Extra silhouette, lighting, banners, secrets. */
@@ -83,17 +84,16 @@ export function clearHeroRoute(s: CitadelStamp): void {
   );
   // Gate passage
   s.fill(CX - 5, G + 1, Z0 - 3, CX + 5, G + 9, Z0 + 20, AIR);
-  // Path spine
+  // Path spine — clear the walking corridor above the graded processional so the avenue
+  // stays open where the terrace rises toward the cathedral.
   for (let z = Z0 + 20; z < CATH.z0; z++) {
-    s.fill(CX - 2, G + 1, z, CX + 2, G + 4, z, AIR);
-    s.fill(CX - 2, GG_safe() + 1, z, CX + 2, GG_safe() + 4, z, AIR);
+    for (let x = CX - 2; x <= CX + 2; x++) {
+      const gy = cloudspireTerraceY(x, z);
+      s.fill(x, gy + 1, z, x, gy + 4, z, AIR);
+    }
   }
   // Cathedral
   s.fill(CX - 3, CATH.floor + 1, CATH.z0 - 2, CX + 3, CATH.floor + 6, CATH.z1 + 12, AIR);
   // Court
   s.fill(CX - 3, KEEP.floor + 1, KEEP.z0 - 18, CX + 3, KEEP.floor + 5, KEEP.z0 + 3, AIR);
-}
-
-function GG_safe(): number {
-  return 104;
 }
