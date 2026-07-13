@@ -58,8 +58,11 @@ export function curatedPresetMeta(
       atmosphere: {
         weather: 'clear',
         timeOfDay: 0.42,
-        fogNear: 140,
-        fogFar: 280,
+        // Mist still builds through the mid-ground, but the far plane clears the crown
+        // (~379 blocks from spawn) so the hero spire reads as a silhouette instead of
+        // dissolving into fog at arrival.
+        fogNear: 150,
+        fogFar: 500,
       },
       landmarks: [
         { name: 'Arrival Overlook', x: SPAWN.x, y: Math.floor(SPAWN.y), z: SPAWN.z },
