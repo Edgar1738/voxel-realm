@@ -8,6 +8,17 @@ export interface MetaPoint {
   z: number;
 }
 
+/** Optional per-world atmosphere; absent on legacy saves (existing worlds keep default behavior). */
+export interface WorldAtmosphere {
+  /** Pin weather on boot, or leave cycling alone when omitted / 'auto'. */
+  weather?: 'clear' | 'rain' | 'storm' | 'snow' | 'auto';
+  /** Absolute time of day in [0, 1). */
+  timeOfDay?: number;
+  /** Optional fog near/far overrides in blocks (dev-friendly scenic captures). */
+  fogNear?: number;
+  fogFar?: number;
+}
+
 export interface WorldMeta {
   seed: number;
   version: number;
@@ -20,6 +31,8 @@ export interface WorldMeta {
   description?: string;
   landmarks?: Array<{ name: string } & MetaPoint>;
   tour?: Array<{ name?: string } & MetaPoint>;
+  /** Optional world-specific weather / time / fog (defaults when absent). */
+  atmosphere?: WorldAtmosphere;
 }
 
 /** A chunk's edits as stable [voxelIndex, blockId] or [voxelIndex, blockId, state] entries. */

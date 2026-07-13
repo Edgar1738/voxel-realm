@@ -16,3 +16,13 @@ describe('Ashen Reach curated metadata', () => {
     expect(curatedPresetMeta('default', 1337, 1)).toBeUndefined();
   });
 });
+
+describe('Cloudspire curated metadata', () => {
+  it('authors arrival, tour, and atmosphere', () => {
+    const meta = curatedPresetMeta('cloudspire-citadel', 1337, 2);
+    expect(meta?.title).toBe('Cloudspire Citadel');
+    expect(meta?.preset).toBe('cloudspire-citadel');
+    expect(meta?.tour?.length).toBeGreaterThanOrEqual(8);
+    expect(meta?.atmosphere?.weather).toBe('clear');
+  });
+});

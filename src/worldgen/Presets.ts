@@ -18,6 +18,8 @@ import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
 import { createGrandKeepGenerator, grandKeepSurfaceAt, GRAND_KEEP } from './GrandKeepGenerator';
 import { grandKeepSite } from './grandKeepSite';
+import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
+import { cloudspireSite } from './cloudspireSite';
 import {
   cottage,
   well,
@@ -59,7 +61,8 @@ export type WorldPreset =
   | 'citadel'
   | 'ashen-reach'
   | 'harbor'
-  | 'grand-keep';
+  | 'grand-keep'
+  | 'cloudspire-citadel';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -76,6 +79,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'ashen-reach',
   'harbor',
   'grand-keep',
+  'cloudspire-citadel',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -353,6 +357,34 @@ export function createGenerator(preset: WorldPreset): {
               clearFootprint: true,
               surfaceAt: grandKeepSurfaceAt,
               maxSurfaceY: GRAND_KEEP.groundY - 6,
+              rotate: true,
+              anchor: 'min',
+            },
+          ),
+        ],
+      };
+    case 'cloudspire-citadel':
+      return {
+        generator: createCloudspireGenerator(),
+        overlays: [
+          cloudspireSite(),
+          scatterStructures(
+            [
+              ruinedWatchtower(),
+              standingStones(),
+              ruinedCottage(),
+              deadTree(),
+              campShrine(),
+              statue(),
+            ],
+            {
+              cellSize: 90,
+              density: 0.35,
+              clusterCount: 2,
+              clusterRadius: 12,
+              clearFootprint: true,
+              surfaceAt: cloudspireSurfaceAt,
+              maxSurfaceY: CLOUDSPIRE.groundY - 8,
               rotate: true,
               anchor: 'min',
             },

@@ -499,6 +499,25 @@ export class Game {
       ui.setWeatherUi(mode);
     };
     ui.setWeatherUi(weatherMode); // reflect the default (auto) without re-rolling the clock
+    // Optional curated-world atmosphere (weather + time) — existing worlds omit and keep defaults.
+    const atmo = activeMeta?.atmosphere;
+    if (atmo?.weather && atmo.weather !== 'auto') {
+      applyWeatherMode(atmo.weather);
+    }
+    if (typeof atmo?.timeOfDay === 'number' && Number.isFinite(atmo.timeOfDay)) {
+      daynight.set(atmo.timeOfDay);
+      ui.setTimeUi(daynight.time);
+    }
+    if (
+      typeof atmo?.fogNear === 'number' &&
+      typeof atmo?.fogFar === 'number' &&
+      atmo.fogFar > atmo.fogNear
+    ) {
+      for (const m of [material, transparentMaterial, cutoutMaterial]) {
+        m.uniforms.uFogNear.value = atmo.fogNear;
+        m.uniforms.uFogFar.value = atmo.fogFar;
+      }
+    }
     ui.weatherButton.addEventListener('click', () => {
       const next = WEATHER_CYCLE[(WEATHER_CYCLE.indexOf(weatherMode) + 1) % WEATHER_CYCLE.length];
       applyWeatherMode(next);
