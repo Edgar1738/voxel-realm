@@ -46,6 +46,18 @@ export const LADDER: BlockId = 39;
 export const OAK_DOOR: BlockId = 40;
 /** Static glowing lava used by authored volcanic sites; it intentionally does not enter the water flow ticker. */
 export const LAVA: BlockId = 41;
+/** Pale cool limestone — Cloudspire primary masonry. */
+export const LIMESTONE: BlockId = 42;
+/** Carved limestone trim for cornices, buttress caps, and façade detail. */
+export const CARVED_LIMESTONE: BlockId = 43;
+/** Dark slate used for steep Gothic roofs. */
+export const SLATE: BlockId = 44;
+export const SLATE_SLAB: BlockId = 45;
+export const STAIRS_SLATE: BlockId = 46;
+/** Cool cyan stained glass for cathedral and spire windows. */
+export const CYAN_GLASS: BlockId = 47;
+/** Limited gold / luminous trim for spire and altar accents. */
+export const GOLD_TRIM: BlockId = 48;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -516,6 +528,74 @@ export const BLOCK_DEFS: BlockDef[] = [
         [255, 178, 48],
       ],
       amp: 28,
+    },
+  },
+  {
+    id: LIMESTONE,
+    name: 'limestone',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([198, 200, 204], 10),
+  },
+  {
+    id: CARVED_LIMESTONE,
+    name: 'carved limestone',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [190, 192, 198],
+        [220, 222, 226],
+      ],
+    },
+  },
+  {
+    id: SLATE,
+    name: 'slate',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([52, 58, 72]),
+  },
+  {
+    id: SLATE_SLAB,
+    name: 'slate slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: stone([52, 58, 72]),
+  },
+  {
+    id: STAIRS_SLATE,
+    name: 'slate stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: stone([52, 58, 72]),
+  },
+  {
+    id: CYAN_GLASS,
+    name: 'cyan glass',
+    opaque: false,
+    transparent: true,
+    creative: true,
+    faces: { pattern: 'glass', colors: [[120, 210, 230]] },
+  },
+  {
+    id: GOLD_TRIM,
+    name: 'gold trim',
+    opaque: true,
+    transparent: false,
+    light: 10,
+    creative: true,
+    faces: {
+      pattern: 'glow',
+      colors: [[235, 200, 90]],
     },
   },
 ];

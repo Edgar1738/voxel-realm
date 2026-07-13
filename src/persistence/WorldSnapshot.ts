@@ -3,7 +3,7 @@
 // type-stripping, which cannot resolve extensionless relative value imports.
 import { CHUNK_VOLUME } from '../core/constants.ts';
 import { voxelId, voxelState, packVoxel } from './SaveTypes.ts';
-import type { WorldDeltas, WorldMeta, MetaPoint } from './SaveTypes.ts';
+import type { WorldDeltas, WorldMeta, MetaPoint, WorldAtmosphere } from './SaveTypes.ts';
 
 type Entry = [number, number] | [number, number, number];
 
@@ -157,6 +157,31 @@ function parseMeta(value: unknown): WorldMeta | undefined {
       tour.push(name !== undefined ? { name, ...point } : point);
     }
     if (tour.length > 0) meta.tour = tour;
+  }
+
+  if (m.atmosphere && typeof m.atmosphere === 'object') {
+    const a = m.atmosphere as Record<string, unknown>;
+    const atmosphere: WorldAtmosphere = {};
+    if (
+      a.weather === 'clear' ||
+      a.weather === 'rain' ||
+      a.weather === 'storm' ||
+      a.weather === 'snow' ||
+      a.weather === 'auto'
+    ) {
+      atmosphere.weather = a.weather;
+    }
+    if (isFiniteNumber(a.timeOfDay)) atmosphere.timeOfDay = ((a.timeOfDay % 1) + 1) % 1;
+    if (isFiniteNumber(a.fogNear)) atmosphere.fogNear = a.fogNear;
+    if (isFiniteNumber(a.fogFar)) atmosphere.fogFar = a.fogFar;
+    if (
+      atmosphere.weather !== undefined ||
+      atmosphere.timeOfDay !== undefined ||
+      atmosphere.fogNear !== undefined ||
+      atmosphere.fogFar !== undefined
+    ) {
+      meta.atmosphere = atmosphere;
+    }
   }
 
   return meta;

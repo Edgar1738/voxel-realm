@@ -893,6 +893,51 @@
       "packageVersion": 1,
       "chunkCount": 961,
       "preview": "worlds/previews/frostvale-valley.jpg"
+    },
+    {
+      "slug": "cloudspire-citadel",
+      "title": "Cloudspire Citadel",
+      "description": "An enormous high-fantasy castle-city in the mountain mist: pale limestone walls, dark slate roofs, a Gothic cathedral, cascading waterfalls, and one impossibly tall central spire above terraced gardens and fortifications.",
+      "preset": "cloudspire-citadel",
+      "seed": 1337,
+      "version": 2,
+      "spawn": {
+        "x": 0,
+        "y": 118.5,
+        "z": -210
+      },
+      "look": {
+        "yaw": 3.141592653589793,
+        "pitch": 0.12
+      },
+      "landmarks": [
+        { "name": "Arrival Overlook", "x": 0, "y": 118, "z": -210 },
+        { "name": "Outer Gatehouse", "x": 0, "y": 98, "z": -125 },
+        { "name": "Garden Terraces", "x": 0, "y": 105, "z": -70 },
+        { "name": "Grand Cathedral", "x": 0, "y": 115, "z": -54 },
+        { "name": "Inner Palace Court", "x": 0, "y": 114, "z": -14 },
+        { "name": "Great Hall", "x": 0, "y": 114, "z": 24 },
+        { "name": "Sky Bridge", "x": 50, "y": 205, "z": 24 },
+        { "name": "Crown Balcony", "x": 0, "y": 417, "z": 24 },
+        { "name": "East Waterfall", "x": 70, "y": 100, "z": -30 },
+        { "name": "Wizard Tower", "x": -55, "y": 160, "z": 35 }
+      ],
+      "tour": [
+        { "name": "Arrival Overlook", "x": 0, "y": 119, "z": -208 },
+        { "name": "Outer Gatehouse", "x": 0, "y": 99, "z": -120 },
+        { "name": "Garden Terraces", "x": 0, "y": 106, "z": -65 },
+        { "name": "Cathedral Nave", "x": 0, "y": 115, "z": -46 },
+        { "name": "Inner Palace Court", "x": 0, "y": 115, "z": -12 },
+        { "name": "Great Hall", "x": 0, "y": 115, "z": 24 },
+        { "name": "Throne Floor", "x": 0, "y": 145, "z": 24 },
+        { "name": "High Palace", "x": 0, "y": 205, "z": 24 },
+        { "name": "Sky Bridge", "x": 52, "y": 206, "z": 28 },
+        { "name": "Crown Balcony", "x": 0, "y": 418, "z": 22 }
+      ],
+      "tags": ["castle", "fantasy", "gothic", "exploration", "cathedral"],
+      "packageVersion": 1,
+      "chunkCount": 242,
+      "preview": "worlds/previews/cloudspire-citadel.jpg"
     }
   ]
 }
