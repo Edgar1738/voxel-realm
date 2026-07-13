@@ -75,7 +75,7 @@ import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
 import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
-import { loadBootMeta, initializeBootSave } from './saveBootstrap';
+import { loadBootMeta, initializeBootSave, resolveActiveMeta } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
 import type { TunnelConfig } from '../edit/Brushes';
 import {
@@ -184,9 +184,6 @@ export class Game {
     const requested = new URLSearchParams(window.location.search).get('world');
     const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
     const generatedMeta = curatedPresetMeta(preset, SEED, SAVE_VERSION);
-    const activeMeta = bootMeta.meta ?? generatedMeta;
-    const curatedTitle = activeMeta?.title?.trim();
-    if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
     const { generator, overlays } = createGenerator(preset);
 
     const bootSave = await bootStats.span('load-deltas', () =>
@@ -194,6 +191,13 @@ export class Game {
     );
     store = bootSave.store;
     const savedDeltas: WorldDeltas = bootSave.savedDeltas;
+
+    // The meta that actually governs this boot. After an incompatible discard the durable meta
+    // was rewritten to `generatedMeta`, so the stale loaded meta must not drive spawn/landmarks/
+    // tour/title/map. Everything below reads `activeMeta`, never `bootMeta.meta`, for consistency.
+    const activeMeta = resolveActiveMeta(bootMeta.meta, generatedMeta, bootSave.discardedIncompatible);
+    const curatedTitle = activeMeta?.title?.trim();
+    if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
 
     bootStats.begin('chunk-manager');
     const sink = new ChunkMeshRegistry(
@@ -795,7 +799,7 @@ export class Game {
     // Landmark discovery medals: walking near a landmark marks it found, persisted per save.
     // The map and info dialog hide undiscovered names behind "???" so exploring reveals them.
     const discovery = new LandmarkDiscovery(
-      bootMeta.meta?.landmarks ?? [],
+      activeMeta?.landmarks ?? [],
       `vr.landmarksFound.${worldName}`,
     );
     let discoveryTimer = 0;
@@ -867,8 +871,8 @@ export class Game {
         radius: manager.viewDistance * CHUNK_SIZE_X,
         sample: (x, z) => manager.surfaceAt(x, z),
         palette: mapPalette,
-        title: bootMeta.meta?.title?.trim() || `World: ${worldName}`,
-        landmarks: (bootMeta.meta?.landmarks ?? []).map((l) => ({
+        title: activeMeta?.title?.trim() || `World: ${worldName}`,
+        landmarks: (activeMeta?.landmarks ?? []).map((l) => ({
           ...l,
           found: discovery.isFound(l.name),
         })),
@@ -905,7 +909,7 @@ export class Game {
             void (async () => {
               // Fresh meta (dev setMeta can change it after boot) + the live delta map, so
               // the export never waits on (or races) the debounced persistence flush.
-              const meta = (await store.loadMeta().catch(() => undefined)) ?? bootMeta.meta;
+              const meta = (await store.loadMeta().catch(() => undefined)) ?? activeMeta;
               const json = exportWorldJson(meta, manager.allDeltas());
               const blob = new Blob([json], { type: 'application/json' });
               const link = document.createElement('a');

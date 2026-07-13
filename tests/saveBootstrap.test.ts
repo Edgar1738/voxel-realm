@@ -1,9 +1,26 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { SaveStore } from '../src/persistence/SaveStore';
-import { loadBootMeta, initializeBootSave } from '../src/app/saveBootstrap';
+import { loadBootMeta, initializeBootSave, resolveActiveMeta } from '../src/app/saveBootstrap';
 import type { WorldMeta } from '../src/persistence/SaveTypes';
 
 const META: WorldMeta = { seed: 1337, version: 1, preset: 'default' };
+
+describe('resolveActiveMeta', () => {
+  const loaded: WorldMeta = { seed: 1, version: 1, preset: 'flat', title: 'Loaded' };
+  const generated: WorldMeta = { seed: 2, version: 2, preset: 'default', title: 'Generated' };
+
+  it('uses the generated meta when an incompatible save was discarded, not the stale loaded meta', () => {
+    expect(resolveActiveMeta(loaded, generated, true)).toBe(generated);
+  });
+
+  it('keeps the loaded meta when the save loaded normally', () => {
+    expect(resolveActiveMeta(loaded, generated, false)).toBe(loaded);
+  });
+
+  it('falls back to the generated meta when there was no loaded meta', () => {
+    expect(resolveActiveMeta(undefined, generated, false)).toBe(generated);
+  });
+});
 
 function store(overrides: Partial<SaveStore> = {}): SaveStore {
   return {

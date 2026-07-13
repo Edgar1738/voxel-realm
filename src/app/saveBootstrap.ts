@@ -16,6 +16,21 @@ export interface BootSaveState {
   discardedIncompatible: boolean;
 }
 
+/**
+ * The metadata that actually governs a boot. When an incompatible save is discarded,
+ * `initializeBootSave` rewrites the durable meta to the freshly generated meta, so the stale
+ * loaded meta must not keep driving spawn, landmarks, tour, title, or the map. Otherwise the
+ * loaded meta wins (or the generated meta when there was none). Pure.
+ */
+export function resolveActiveMeta(
+  loadedMeta: WorldMeta | undefined,
+  generatedMeta: WorldMeta | undefined,
+  discardedIncompatible: boolean,
+): WorldMeta | undefined {
+  if (discardedIncompatible) return generatedMeta;
+  return loadedMeta ?? generatedMeta;
+}
+
 type ErrorLogger = (message: string, err: unknown) => void;
 
 const defaultLogger: ErrorLogger = (message, err) => console.error(message, err);
