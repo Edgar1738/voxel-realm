@@ -178,7 +178,7 @@ export interface InputCallbacks {
   onToggleHeadlamp: () => void;
   /** Invoked when H is pressed (both modes) — cycles the first-person hand mode. */
   onCycleHand: () => void;
-  /** Invoked when M is pressed (both modes; pasting keeps M = mirror) — toggles the world map. */
+  /** Invoked when M is pressed (both modes) — toggles the world map. Mirror moved to U. */
   onToggleMap: () => void;
   /** Invoked when F1 is pressed — toggles first/third-person (works in play and build modes). */
   onToggleView: () => void;
@@ -282,7 +282,8 @@ export function registerInputListeners(ctx: InputContext): () => void {
         callbacks.onBuilderIntent(intent);
         return;
       }
-      // After builder intents so M stays "mirror" while pasting.
+      // M is always the world map now (mirror moved to U); checked after builder intents
+      // only because resolveBuilderIntent runs first for every key.
       if (e.code === 'KeyM') {
         callbacks.onToggleMap();
         return;

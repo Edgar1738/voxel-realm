@@ -66,7 +66,8 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
         return 'rotateCCW';
       case 'BracketRight':
         return 'rotateCW';
-      case 'KeyM':
+      // Mirror is U, not M: M is reserved for the world map in every mode.
+      case 'KeyU':
         return 'mirror';
       case 'Equal':
       case 'NumpadAdd':

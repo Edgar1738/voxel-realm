@@ -28,7 +28,9 @@ describe('resolveBuilderIntent', () => {
   it('pasting mode maps rotate/mirror/array and cancel; ignores selecting-only keys', () => {
     expect(resolveBuilderIntent('BracketLeft', 'pasting')).toBe('rotateCCW');
     expect(resolveBuilderIntent('BracketRight', 'pasting')).toBe('rotateCW');
-    expect(resolveBuilderIntent('KeyM', 'pasting')).toBe('mirror');
+    expect(resolveBuilderIntent('KeyU', 'pasting')).toBe('mirror');
+    // M is reserved for the world map in every mode, so it must not mirror while pasting.
+    expect(resolveBuilderIntent('KeyM', 'pasting')).toBe('none');
     expect(resolveBuilderIntent('Equal', 'pasting')).toBe('arrayInc');
     expect(resolveBuilderIntent('NumpadAdd', 'pasting')).toBe('arrayInc');
     expect(resolveBuilderIntent('Minus', 'pasting')).toBe('arrayDec');
