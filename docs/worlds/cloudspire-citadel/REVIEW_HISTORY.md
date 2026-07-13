@@ -1,5 +1,21 @@
 # Review History — Cloudspire Citadel
 
+## 2026-07-13 — Showcase approval + merge (Edgar)
+
+**Status set to:** IMPLEMENTED WORLD — **showcase world on main**
+
+### Edgar signal
+
+- “merge it, and it is approved as a showcase world in voxel-realm”
+
+### Ship
+
+- PR #70 squash-merged to `main` as `b3c8578`
+- Live identity: `world-manifest.json` + `public/worlds/cloudspire-citadel.vrw`
+- Load: `?save=cloudspire-citadel` or `?world=cloudspire-citadel`
+
+---
+
 ## 2026-07-13 — Full autonomous ship (Grok)
 
 **Status set to:** IMPLEMENTED WORLD (branch ready to merge)
