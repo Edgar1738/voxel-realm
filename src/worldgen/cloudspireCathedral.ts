@@ -143,11 +143,24 @@ export function buildCathedral(s: CitadelStamp): void {
   // Ladder/stair to gallery from SE
   spiralStair(s, x1 - 4, z0 + 4, floor + 1, galY, PLANKS, LIMESTONE);
 
-  // Interior lighting
-  for (let z = z0 + 6; z < z1; z += 8) {
-    s.set(midX, floor + wallH - 3, z, GLOWSTONE);
+  // Interior lighting — nave chandeliers, aisle floor lanterns, glowing columns so the nave
+  // reads as a lit hall rather than a dark corridor.
+  for (let z = z0 + 5; z < z1; z += 4) {
+    // Chandelier hung at mid-height so its light actually reaches the nave floor
+    s.set(midX, floor + 12, z, GLOWSTONE);
+    s.set(midX, floor + 11, z, LANTERN);
+    // A high ceiling accent
+    s.set(midX, floor + wallH - 2, z, GLOWSTONE);
+    // Aisle floor lanterns
     s.set(midX - 6, floor + 1, z, LANTERN);
     s.set(midX + 6, floor + 1, z, LANTERN);
+  }
+  // Glowing sconces set into the aisle columns
+  for (let z = z0 + 6; z < z1 - 4; z += 6) {
+    for (const x of [x0 + 8, x1 - 8]) {
+      s.set(x, floor + 6, z, GLOWSTONE);
+      s.set(x, floor + 12, z, GLOWSTONE);
+    }
   }
 
   // Side chapels (books / pews)

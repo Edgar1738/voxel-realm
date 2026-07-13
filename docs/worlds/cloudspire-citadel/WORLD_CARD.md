@@ -32,7 +32,7 @@
 | Cathedral | ~58×54 plan, ~78 tower |
 | Palace stack | 12 storeys + multi-stage spire |
 | Highest architecture | ~y 420–440 |
-| Bake | 242 chunks · ~10.2 MB JSON (graded gardens) |
+| Bake | 242 chunks · ~10.3 MB JSON (graded gardens + P1 facade/water) |
 
 ## Hero route
 

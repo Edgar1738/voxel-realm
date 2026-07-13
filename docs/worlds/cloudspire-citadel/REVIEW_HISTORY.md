@@ -1,5 +1,29 @@
 # Review History — Cloudspire Citadel
 
+## 2026-07-13 — P1 polish (Claude)
+
+**Status:** IMPLEMENTED WORLD — **showcase on main** (P1 committed straight to main)
+
+Deferred P1s from the post-ship review, all applied and verified:
+
+- **Palace facade** — `articulatePalace()` adds pilaster ribs between window bays, string courses,
+  a projecting cornice, and a battlemented slate-capped crown, so the shaft reads as masonry rather
+  than a blank box (`cloudspirePalace.ts`).
+- **Spire doorway** — an explicit framed doorway on the stage-0 south face facing the roof; the
+  roof→spire climb now walks straight through (was corner-gap-only; reachable went from stuck rem 22
+  to arrived).
+- **Cathedral nave lighting** — mid-height hanging chandeliers + denser aisle lanterns + glowing
+  columns so the nave reads as a candlelit hall, not a dark corridor (`cloudspireCathedral.ts`).
+- **Reservoir** — relocated east of the cathedral and stood on support piers to grade (was a slab
+  floating over the east garden / clipping the cathedral), with a shorter aqueduct to the east
+  cascade (`cloudspireWater.ts`).
+- **Waterfalls** — widened from a 1–2-wide stripe to a 5-wide sheet in a stone chute with a mid
+  ledge and a contained splash basin.
+
+Repackaged: re-baked 242 chunks + `public/worlds/cloudspire-citadel.vrw` (~6.03 MB); preview refreshed
+to show the articulated palace. Cloudspire tests + hero-route walkability re-verified (interior
+segments + roof→spire→crown all walk). Committed straight to main (no PR).
+
 ## 2026-07-13 — Post-ship review + P0 polish (Claude)
 
 **Status:** IMPLEMENTED WORLD — **showcase on main** (P0 fixes on `worktree-cloudspire-p0`, pending merge)

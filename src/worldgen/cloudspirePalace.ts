@@ -3,6 +3,7 @@ import {
   LIMESTONE,
   CARVED_LIMESTONE,
   SLATE,
+  SLATE_SLAB,
   CYAN_GLASS,
   GOLD_TRIM,
   LANTERN,
@@ -13,6 +14,7 @@ import {
   DEEPSLATE,
 } from '../blocks/blocks';
 import { CitadelStamp } from './CitadelStamp';
+import type { BlockId } from '../core/types';
 import {
   KEEP,
   KCX,
@@ -109,6 +111,61 @@ export function buildPalace(s: CitadelStamp): void {
   for (const fy of [FLOOR.gallery, FLOOR.throne, FLOOR.residential, FLOOR.library]) {
     balconyRing(s, KCX, z0 - 2, 6, fy, LIMESTONE, OAK_FENCE);
     s.fill(KCX - 2, fy + 1, z0, KCX + 2, fy + 3, z0, AIR);
+  }
+
+  articulatePalace(s);
+}
+
+/** Wraps a projecting band around the four palace faces at height y (cornice / string course). */
+function corniceBand(s: CitadelStamp, y: number, block: BlockId, proj: number): void {
+  const { x0, x1, z0, z1 } = KEEP;
+  s.fill(x0 - proj, y, z0 - proj, x1 + proj, y, z0 - proj, block);
+  s.fill(x0 - proj, y, z1 + proj, x1 + proj, y, z1 + proj, block);
+  s.fill(x0 - proj, y, z0 - proj, x0 - proj, y, z1 + proj, block);
+  s.fill(x1 + proj, y, z0 - proj, x1 + proj, y, z1 + proj, block);
+}
+
+/**
+ * Facade relief so the palace shaft reads as articulated masonry, not a blank box: pilaster
+ * ribs between window bays, string courses, a projecting cornice, and a battlemented crown.
+ */
+function articulatePalace(s: CitadelStamp): void {
+  const { x0, x1, z0, z1, floor } = KEEP;
+  const roof = FLOOR.roof;
+
+  // Vertical pilaster ribs between window bays on the north & south faces (skip the central
+  // bay where the entrance + balconies open).
+  for (let x = x0 + 9; x < x1 - 4; x += 6) {
+    if (Math.abs(x - KCX) <= 8) continue;
+    s.fill(x, floor + 1, z0 - 1, x, roof - 3, z0 - 1, CARVED_LIMESTONE);
+    s.fill(x, floor + 1, z1 + 1, x, roof - 3, z1 + 1, CARVED_LIMESTONE);
+  }
+
+  // Horizontal string courses wrapping the shaft
+  for (const cy of [FLOOR.throne - 1, FLOOR.library - 1]) {
+    corniceBand(s, cy, CARVED_LIMESTONE, 1);
+  }
+
+  // Projecting cornice (two courses) just under the roofline
+  corniceBand(s, roof - 2, CARVED_LIMESTONE, 1);
+  corniceBand(s, roof - 1, CARVED_LIMESTONE, 2);
+
+  // Battlemented parapet crown at the roof edge (replaces the plain fence line)
+  const parapet = (x: number, z: number): void => {
+    if (((x + z) & 1) === 0) {
+      s.set(x, roof + 1, z, LIMESTONE);
+      s.set(x, roof + 2, z, SLATE_SLAB);
+    } else {
+      s.set(x, roof + 1, z, AIR);
+    }
+  };
+  for (let x = x0; x <= x1; x++) {
+    parapet(x, z0);
+    parapet(x, z1);
+  }
+  for (let z = z0 + 1; z < z1; z++) {
+    parapet(x0, z);
+    parapet(x1, z);
   }
 }
 
@@ -240,6 +297,32 @@ export function buildMainSpire(s: CitadelStamp): void {
   // Ensure crown balcony walkable air
   const crownY = spireAccessibleY();
   s.fill(KCX - 3, crownY + 1, KCZ - 3, KCX + 3, crownY + 4, KCZ + 3, AIR);
+
+  // Obvious doorway from the palace roof into the spire base (was corner-gap-only access).
+  const spireDoorZ = KCZ - SPIRE.stages[0].half; // south face of stage 0, facing the roof
+  s.fill(KCX - 1, SPIRE.baseY + 1, spireDoorZ, KCX + 1, SPIRE.baseY + 4, spireDoorZ + 1, AIR);
+  for (const dx of [-2, 2]) {
+    s.fill(
+      KCX + dx,
+      SPIRE.baseY + 1,
+      spireDoorZ,
+      KCX + dx,
+      SPIRE.baseY + 5,
+      spireDoorZ,
+      CARVED_LIMESTONE,
+    );
+  }
+  s.fill(
+    KCX - 2,
+    SPIRE.baseY + 5,
+    spireDoorZ,
+    KCX + 2,
+    SPIRE.baseY + 5,
+    spireDoorZ,
+    CARVED_LIMESTONE,
+  );
+  s.set(KCX - 2, SPIRE.baseY + 1, spireDoorZ - 1, LANTERN);
+  s.set(KCX + 2, SPIRE.baseY + 1, spireDoorZ - 1, LANTERN);
 
   void prevHalf;
   void CX;
