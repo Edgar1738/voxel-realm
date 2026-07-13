@@ -379,6 +379,9 @@ vi.mock('../src/app/saveBootstrap', () => ({
     persistent: true,
     discardedIncompatible: false,
   })),
+  resolveActiveMeta: vi.fn((loaded: unknown, generated: unknown, discarded: boolean) =>
+    discarded ? generated : (loaded ?? generated),
+  ),
 }));
 
 vi.mock('../src/app/input', () => ({
