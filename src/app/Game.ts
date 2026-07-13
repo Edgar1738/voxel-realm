@@ -765,6 +765,11 @@ export class Game {
       tourIndex = 0;
       setStatus('Tour started — follow the gold beacon');
     };
+    /** Play-mode T: end the tour if one is running, otherwise start it. */
+    const toggleTour = (): void => {
+      if (tourIndex !== undefined) endTour('Tour ended');
+      else startTour();
+    };
     ui.tourPrev.addEventListener('click', () => {
       if (route && tourIndex !== undefined) tourIndex = tourStep(route, tourIndex, -1);
     });
@@ -1150,6 +1155,7 @@ export class Game {
           applyExperience('build');
           setStatus('Build mode — I inventory, T tools, B build tools');
         },
+        onToggleTour: toggleTour,
         onBuilderIntent: handleBuilderIntent,
         onBuilderClick: (hit) => {
           if (builder.mode === 'selecting') {

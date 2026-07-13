@@ -119,6 +119,30 @@ export function creativeInputAllowed(mode: ExperienceMode): boolean {
   return mode === 'build';
 }
 
+/** The hint shown when a build-only key is pressed while exploring in play mode. */
+export const PLAY_MODE_BUILD_HINT = 'Play mode — press B to build';
+
+/**
+ * Message to show when a key is pressed in play (explore) mode that would only do something
+ * in build mode, or `undefined` to stay silent. Deliberately narrow: it fires only for the
+ * keys a player would press *expecting to build right now* — the hotbar digits (matched on
+ * `key`, since slot selection reads the typed digit, not the physical `code`), the inventory
+ * (I), and the placement-ghost toggle (V). It skips modifier combos (Ctrl+Z/Y undo/redo) and
+ * the selection/paste sub-mode keys (X/G/R/C/[/]/arrows/…), because those need more than a
+ * single B press to become usable, so "press B to build" would be misleading. Pure; the caller
+ * is responsible for only invoking it while actually in-game (pointer locked, no dialog open).
+ */
+export function playModeGatedMessage(
+  code: string,
+  key: string,
+  ctrl: boolean,
+): string | undefined {
+  if (ctrl) return undefined;
+  if (/^[1-9]$/.test(key)) return PLAY_MODE_BUILD_HINT;
+  if (code === 'KeyI' || code === 'KeyV') return PLAY_MODE_BUILD_HINT;
+  return undefined;
+}
+
 /** Wheel-to-hotbar-step mapping. Returns 0 when editing is blocked or there is no scroll delta. */
 export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
   if (!canEditNow) return 0;
@@ -172,6 +196,8 @@ export interface InputCallbacks {
   getExperienceMode: () => ExperienceMode;
   /** Invoked when B is pressed in play mode (switch to build). */
   onEnterBuild: () => void;
+  /** Invoked when T is pressed in play mode — toggles the world tour (start if idle, else end). */
+  onToggleTour: () => void;
   onBuilderIntent: (intent: BuilderIntent) => void;
   onBuilderClick: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
   onToggleGhost: () => void;
@@ -233,6 +259,15 @@ export function registerInputListeners(ctx: InputContext): () => void {
         else if (e.code === 'KeyL') callbacks.onToggleHeadlamp();
         else if (e.code === 'KeyM') callbacks.onToggleMap();
         else if (e.code === 'KeyH') callbacks.onCycleHand();
+        // Tour toggle and the build hints only make sense while actually in-game: gate them on
+        // pointer lock so keys don't fire behind the pause menu / an open dialog.
+        else if (rig.locked && !callbacks.isInventoryOpen()) {
+          if (e.code === 'KeyT') callbacks.onToggleTour();
+          else {
+            const hint = playModeGatedMessage(e.code, e.key, e.ctrlKey);
+            if (hint) callbacks.onStatusChange(hint);
+          }
+        }
         return;
       }
 

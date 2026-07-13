@@ -20,8 +20,62 @@ import {
   setHoldRepeat,
   loadHoldRepeat,
   saveHoldRepeat,
+  playModeGatedMessage,
+  PLAY_MODE_BUILD_HINT,
   type ReachStorage,
 } from '../src/app/input';
+
+describe('playModeGatedMessage', () => {
+  it('hints for hotbar digits, matched on the typed key', () => {
+    for (const d of ['1', '5', '9']) {
+      expect(playModeGatedMessage(`Digit${d}`, d, false)).toBe(PLAY_MODE_BUILD_HINT);
+    }
+  });
+
+  it('hints for inventory (I) and placement ghost (V)', () => {
+    expect(playModeGatedMessage('KeyI', 'i', false)).toBe(PLAY_MODE_BUILD_HINT);
+    expect(playModeGatedMessage('KeyV', 'v', false)).toBe(PLAY_MODE_BUILD_HINT);
+  });
+
+  it('stays silent for roam keys and mode toggles handled elsewhere', () => {
+    for (const [code, key] of [
+      ['KeyW', 'w'],
+      ['KeyB', 'b'],
+      ['KeyL', 'l'],
+      ['KeyM', 'm'],
+      ['KeyH', 'h'],
+      ['KeyT', 't'],
+      ['F1', 'F1'],
+    ] as const) {
+      expect(playModeGatedMessage(code, key, false)).toBeUndefined();
+    }
+  });
+
+  it('stays silent for selection/paste sub-mode keys (a single B press will not enable them)', () => {
+    for (const [code, key] of [
+      ['KeyX', 'x'],
+      ['KeyG', 'g'],
+      ['KeyR', 'r'],
+      ['KeyC', 'c'],
+      ['KeyU', 'u'],
+      ['BracketLeft', '['],
+      ['BracketRight', ']'],
+      ['ArrowUp', 'ArrowUp'],
+      ['PageUp', 'PageUp'],
+      ['KeyN', 'n'],
+    ] as const) {
+      expect(playModeGatedMessage(code, key, false)).toBeUndefined();
+    }
+  });
+
+  it('ignores Ctrl combos so Ctrl+Z / Ctrl+Y do not toast', () => {
+    expect(playModeGatedMessage('KeyZ', 'z', true)).toBeUndefined();
+    expect(playModeGatedMessage('KeyY', 'y', true)).toBeUndefined();
+    // Bare Z/Y do nothing even in build mode (undo/redo need Ctrl), so no hint either.
+    expect(playModeGatedMessage('KeyZ', 'z', false)).toBeUndefined();
+    expect(playModeGatedMessage('KeyY', 'y', false)).toBeUndefined();
+  });
+});
 
 describe('hold-to-repeat setting', () => {
   const fakeStore = (
