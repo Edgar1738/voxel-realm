@@ -8,9 +8,16 @@ export const CREATIVE_BLOCKS: BlockId[] = BLOCK_DEFS.filter((d) => d.creative).m
 export class CreativeInventory {
   private readonly slots: BlockId[];
   selectedSlot = 0;
+  /**
+   * Fired after any successful slot selection or block assignment. Set by Game to persist the
+   * hotbar; kept here so every mutation path (number keys, wheel, picker, middle-click pick) goes
+   * through one place and persistence can't drift.
+   */
+  onChange?: () => void;
 
-  constructor(blocks: BlockId[] = CREATIVE_BLOCKS.slice(0, 9)) {
+  constructor(blocks: BlockId[] = CREATIVE_BLOCKS.slice(0, 9), selectedSlot = 0) {
     this.slots = [...blocks];
+    if (selectedSlot >= 0 && selectedSlot < this.slots.length) this.selectedSlot = selectedSlot;
   }
 
   /** A copy of the current hotbar slots. */
@@ -27,6 +34,7 @@ export class CreativeInventory {
   selectSlot(index: number): void {
     if (index < 0 || index >= this.slots.length) return;
     this.selectedSlot = index;
+    this.onChange?.();
   }
 
   /** Moves the selection by `delta` slots, wrapping around both ends. */
@@ -34,10 +42,12 @@ export class CreativeInventory {
     const n = this.slots.length;
     if (n === 0) return;
     this.selectedSlot = (((this.selectedSlot + delta) % n) + n) % n;
+    this.onChange?.();
   }
 
   /** Puts a block id into the currently selected slot. */
   pickBlock(id: BlockId): void {
     this.slots[this.selectedSlot] = id;
+    this.onChange?.();
   }
 }

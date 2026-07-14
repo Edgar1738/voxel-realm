@@ -329,6 +329,7 @@ vi.mock('../src/edit/EditService', () => ({
 }));
 
 vi.mock('../src/app/CreativeInventory', () => ({
+  CREATIVE_BLOCKS: [1, 2, 3, 4, 5, 6, 7, 8, 9],
   CreativeInventory: vi.fn(function CreativeInventory() {
     return {
       selectedBlock: 1,

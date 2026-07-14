@@ -120,6 +120,54 @@ describe('CREATIVE_BLOCKS derivation', () => {
   });
 });
 
+describe('CreativeInventory construction with a selected slot', () => {
+  it('starts on the given slot when in range', () => {
+    const inv = new CreativeInventory(CREATIVE_BLOCKS.slice(0, 9), 4);
+    expect(inv.selectedSlot).toBe(4);
+  });
+
+  it('falls back to slot 0 when the given slot is out of range', () => {
+    const inv = new CreativeInventory(CREATIVE_BLOCKS.slice(0, 9), 99);
+    expect(inv.selectedSlot).toBe(0);
+  });
+});
+
+describe('CreativeInventory.onChange', () => {
+  it('fires on selectSlot, cycleSlot, and pickBlock (every mutation path)', () => {
+    const inv = new CreativeInventory();
+    let calls = 0;
+    inv.onChange = () => {
+      calls += 1;
+    };
+    inv.selectSlot(3);
+    inv.cycleSlot(1);
+    inv.pickBlock(CACTUS);
+    expect(calls).toBe(3);
+  });
+
+  it('does not fire on an out-of-range selectSlot (nothing changed)', () => {
+    const inv = new CreativeInventory();
+    let calls = 0;
+    inv.onChange = () => {
+      calls += 1;
+    };
+    inv.selectSlot(-1);
+    inv.selectSlot(999);
+    expect(calls).toBe(0);
+  });
+
+  it('is not invoked during construction', () => {
+    // A hook set after construction never sees the initial slot fill.
+    const inv = new CreativeInventory(CREATIVE_BLOCKS.slice(0, 9), 2);
+    let calls = 0;
+    inv.onChange = () => {
+      calls += 1;
+    };
+    expect(calls).toBe(0);
+    expect(inv.selectedSlot).toBe(2);
+  });
+});
+
 describe('CreativeInventory.cycleSlot', () => {
   it('advances by one', () => {
     const inv = new CreativeInventory([1, 2, 3] as never);

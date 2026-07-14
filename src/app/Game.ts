@@ -44,6 +44,7 @@ import { PlayerController, PLAYER_HALF } from '../player/PlayerController';
 import type { SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
+import { loadHotbar, saveHotbar } from './hotbarPrefs';
 import { createCreativeUi, type DialogAction, type BlueprintEntry } from './CreativeUi';
 import { createWorldMapUi } from './WorldMapUi';
 import { buildMapPalette } from './worldMapRender';
@@ -317,7 +318,15 @@ export class Game {
     };
 
     const edit = new EditService(manager);
-    const inventory = new CreativeInventory();
+    // Per-world hotbar: restore the saved palette + selected slot, and persist through one hook so
+    // every mutation path (number keys, wheel, picker, middle-click pick) is covered.
+    const hotbarPrefs = loadHotbar(localStorage, worldName);
+    const inventory = new CreativeInventory(hotbarPrefs.slots, hotbarPrefs.selectedSlot);
+    inventory.onChange = () =>
+      saveHotbar(localStorage, worldName, {
+        slots: inventory.hotbar,
+        selectedSlot: inventory.selectedSlot,
+      });
     const audio = new AudioEngine();
     const movementSounds = new MovementSoundTracker();
     const particles = new BlockParticles();
