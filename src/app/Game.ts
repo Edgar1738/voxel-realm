@@ -104,7 +104,7 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
 import { loadResume, saveResume, clearResume, resumeToSpawn } from './resumeState';
-import { loadWaypoint, saveWaypoint, clearWaypoint, type Waypoint } from './waypoint';
+import { loadWaypoint, saveWaypoint, clearWaypoint, waypointBearing, type Waypoint } from './waypoint';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
 import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
@@ -1349,6 +1349,22 @@ export class Game {
       if (resumeAccum >= 1) {
         resumeAccum = 0;
         saveResumeNow();
+      }
+
+      // Waypoint compass: steer the player to their dropped waypoint. Hidden while a tour runs
+      // (the tour HUD owns the same spot); auto-clears once within a few blocks.
+      if (waypoint && tourIndex === undefined) {
+        const b = waypointBearing(player.position.x, player.position.z, rig.yaw, waypoint);
+        if (b.arrived) {
+          waypoint = undefined;
+          clearWaypoint(localStorage, worldName);
+          ui.setWaypointChip(null);
+          setStatus('Waypoint reached');
+        } else {
+          ui.setWaypointChip({ angleRad: b.angle, distance: Math.round(b.distance) });
+        }
+      } else {
+        ui.setWaypointChip(null);
       }
 
       // Sprint feedback: ease the FOV out while sprinting and back on release.

@@ -199,6 +199,8 @@ export interface CreativeUi {
   setNotice(text: string | null): void;
   /** Drives the quiet save indicator (build mode). `null` hides it; separate from the toast. */
   setSaveStatus(state: 'pending' | 'saving' | 'idle' | 'error' | null): void;
+  /** Drives the waypoint compass chip; `null` hides it. Arrow angle is radians, distance in blocks. */
+  setWaypointChip(state: { angleRad: number; distance: number } | null): void;
   renderHotbar(): void;
   /** Opens or closes the inventory modal (fade/scale; inert when closed). */
   setInventoryOpen(open: boolean): void;
@@ -631,6 +633,33 @@ export function createCreativeUi(
   tourEnd.setAttribute('aria-label', 'End tour');
   tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
 
+  // Waypoint compass: a top-center chip with an arrow (rotated toward the waypoint, relative to
+  // the look direction) and the remaining distance. Shares the tour HUD's spot; the host hides it
+  // while a tour runs so the two never overlap.
+  const waypointChip = document.createElement('div');
+  waypointChip.className = 'waypoint-chip';
+  waypointChip.setAttribute('role', 'status');
+  const waypointArrow = document.createElement('span');
+  waypointArrow.className = 'waypoint-arrow';
+  waypointArrow.textContent = '▲';
+  waypointArrow.setAttribute('aria-hidden', 'true');
+  const waypointDistance = document.createElement('span');
+  waypointDistance.className = 'waypoint-distance';
+  waypointChip.append(waypointArrow, waypointDistance);
+  let waypointChipShown = false;
+  const setWaypointChip = (state: { angleRad: number; distance: number } | null): void => {
+    if (state === null) {
+      if (!waypointChipShown) return;
+      waypointChipShown = false;
+      waypointChip.classList.remove('is-visible');
+      return;
+    }
+    waypointChipShown = true;
+    waypointArrow.style.transform = `rotate(${state.angleRad}rad)`;
+    waypointDistance.textContent = `${state.distance} blocks`;
+    waypointChip.classList.add('is-visible');
+  };
+
   // Cold-start streaming banner: honest feedback while the first chunk ring generates and
   // meshes, so a slow machine sees progress instead of empty sky ("is it broken?").
   const loadingHud = document.createElement('div');
@@ -657,7 +686,18 @@ export function createCreativeUi(
       : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
   };
 
-  root.append(dock, scrim, status, saveStatus, notice, hotbar, tourHud, loadingHud, dialogScrim);
+  root.append(
+    dock,
+    scrim,
+    status,
+    saveStatus,
+    notice,
+    hotbar,
+    tourHud,
+    waypointChip,
+    loadingHud,
+    dialogScrim,
+  );
   document.body.append(root);
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
@@ -1254,6 +1294,7 @@ export function createCreativeUi(
     setStatus,
     setNotice,
     setSaveStatus,
+    setWaypointChip,
     renderHotbar,
     setInventoryOpen,
     isInventoryOpen,
