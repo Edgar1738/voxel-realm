@@ -737,6 +737,10 @@
       }
       #world-map.is-open {
         display: flex;
+        pointer-events: auto; /* interactive when open: click the canvas / backdrop */
+      }
+      .world-map-canvas {
+        cursor: crosshair;
       }
       .world-map-panel {
         display: flex;

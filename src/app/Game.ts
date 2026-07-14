@@ -104,6 +104,7 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
 import { loadResume, saveResume, clearResume, resumeToSpawn } from './resumeState';
+import { loadWaypoint, saveWaypoint, clearWaypoint, type Waypoint } from './waypoint';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
 import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
@@ -262,6 +263,11 @@ export class Game {
     // position/look/flying for this world (kept in localStorage, never in the world's own save).
     if (bootSave.discardedIncompatible) clearResume(localStorage, worldName);
     const resume = bootSave.discardedIncompatible ? undefined : loadResume(localStorage, worldName);
+    // The navigation waypoint is likewise per-world and dropped when the world is regenerated.
+    if (bootSave.discardedIncompatible) clearWaypoint(localStorage, worldName);
+    let waypoint: Waypoint | undefined = bootSave.discardedIncompatible
+      ? undefined
+      : loadWaypoint(localStorage, worldName);
     // Curated worlds can carry their own spawn/look in meta; a URL override wins for debugging;
     // resume sits between them (see resolveSpawn precedence).
     const spawnOverrides = parseSpawnOverrides(window.location.search);
@@ -626,6 +632,7 @@ export class Game {
           await persistence.suppressAndClear();
           await store.clearDeltas();
           clearResume(localStorage, worldName); // don't resume into a world that no longer exists
+          clearWaypoint(localStorage, worldName); // and don't point at a landmark that's now gone
         } catch (err) {
           console.error('Voxel Realm: reset failed', err);
         }
@@ -902,12 +909,30 @@ export class Game {
     applyExperience(experience);
     if (curated && !introSeen()) void openWorldInfo();
 
-    // World map (M): a player-centered top-down snapshot of the loaded world with landmark
-    // labels and the tour route. Rendered once per open.
-    const worldMap = createWorldMapUi();
+    // Re-acquire pointer lock from a user gesture (map close / backdrop). Chrome only enforces a
+    // cooldown after an Esc-exit; our map open exits programmatically, so this is immediate.
+    const grabPointerLock = (): void => {
+      const req = canvas.requestPointerLock() as Promise<void> | undefined;
+      void req?.catch(() => {});
+    };
+
+    // World map (M): a player-centered top-down snapshot of the loaded world with landmark labels,
+    // the tour route, and the navigation waypoint. Clicking places/moves/clears the waypoint, so
+    // opening it must free the cursor from pointer lock (and the pause listener must ignore that).
+    const worldMap = createWorldMapUi({
+      onSetWaypoint: (x, z) => {
+        waypoint = { x, z };
+        saveWaypoint(localStorage, worldName, waypoint);
+      },
+      onClearWaypoint: () => {
+        waypoint = undefined;
+        clearWaypoint(localStorage, worldName);
+      },
+      onClose: grabPointerLock,
+    });
     const mapPalette = buildMapPalette();
     const toggleWorldMap = (): void => {
-      worldMap.toggle({
+      const nowOpen = worldMap.toggle({
         center: { x: Math.floor(player.position.x), z: Math.floor(player.position.z) },
         yaw: rig.yaw,
         radius: manager.viewDistance * CHUNK_SIZE_X,
@@ -919,7 +944,14 @@ export class Game {
           found: discovery.isFound(l.name),
         })),
         tour: route ?? [],
+        ...(waypoint ? { waypoint } : {}),
       });
+      // Free the cursor to click the map on open; recapture it on close (from this keypress).
+      if (nowOpen) {
+        if (rig.locked) document.exitPointerLock();
+      } else {
+        grabPointerLock();
+      }
     };
 
     // Escape pause menu: losing pointer lock in-game (Esc, alt-tab) opens it. The lock-loss
@@ -983,7 +1015,8 @@ export class Game {
       'pointerlockchange',
       () => {
         if (document.pointerLockElement === canvas) return;
-        if (pauseBusy || ui.isInventoryOpen() || ui.isDialogOpen()) return;
+        // The map intentionally releases the lock so its canvas is clickable — that isn't a pause.
+        if (pauseBusy || ui.isInventoryOpen() || ui.isDialogOpen() || worldMap.isOpen()) return;
         void openPauseMenu();
       },
       { signal: pauseListener.signal },

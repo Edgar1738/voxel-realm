@@ -5,6 +5,7 @@
 // doesn't change enough while glancing at a map to justify per-frame redraws). All pixel
 // math lives in worldMapRender.ts; this file owns the DOM and marker drawing only.
 import { renderMapPixels, type MapRGB, type SurfaceSampler } from './worldMapRender';
+import { mapClickToWorld, worldToMapPixel, nearestWithin, type Waypoint } from './waypoint';
 
 export interface WorldMapContext {
   center: { x: number; z: number };
@@ -18,7 +19,21 @@ export interface WorldMapContext {
   /** `found: false` renders an anonymous gray dot — the name stays hidden until discovered. */
   landmarks: ReadonlyArray<{ name: string; x: number; z: number; found?: boolean }>;
   tour: ReadonlyArray<{ name?: string; x: number; z: number }>;
+  /** The current navigation waypoint, drawn as a cyan pin; clicking it again clears it. */
+  waypoint?: Waypoint;
 }
+
+/** Map interaction events; the map owns click→placement, the host owns persistence + pointer lock. */
+export interface WorldMapCallbacks {
+  onSetWaypoint(x: number, z: number): void;
+  onClearWaypoint(): void;
+  /** The map was dismissed by a backdrop click, so the host can re-acquire pointer lock. */
+  onClose(): void;
+}
+
+/** Click tolerance (CSS px) for snapping to a landmark or clearing the current waypoint. */
+const CLICK_HIT_CSS = 12;
+const WAYPOINT_COLOR = '#3fd8ff';
 
 export interface WorldMapUi {
   /** Opens (rendering fresh) or closes; returns whether the map is now open. */
@@ -30,7 +45,7 @@ export interface WorldMapUi {
 
 const GOLD = '#ffd34d';
 
-export function createWorldMapUi(): WorldMapUi {
+export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
   const root = document.createElement('div');
   root.id = 'world-map';
   root.setAttribute('aria-hidden', 'true');
@@ -42,12 +57,13 @@ export function createWorldMapUi(): WorldMapUi {
   canvas.className = 'world-map-canvas';
   const hint = document.createElement('div');
   hint.className = 'world-map-hint';
-  hint.textContent = 'M to close · gold = tour route · dots = landmarks';
+  hint.textContent = 'Click to set a waypoint · click it again to clear · M to close';
   panel.append(title, canvas, hint);
   root.append(panel);
   document.body.append(root);
 
   let open = false;
+  let currentCtx: WorldMapContext | undefined;
 
   const draw = (ctx2d: CanvasRenderingContext2D, ctx: WorldMapContext): void => {
     const img = renderMapPixels(ctx.sample, ctx.palette, ctx.center.x, ctx.center.z, ctx.radius);
@@ -101,6 +117,20 @@ export function createWorldMapUi(): WorldMapUi {
       ctx2d.fillText(l.name, px + 3 * labelScale, pz - 2 * labelScale);
     }
 
+    // Navigation waypoint: a cyan ring + dot (drawn above landmarks, below the player arrow).
+    if (ctx.waypoint) {
+      const { px, pz } = worldToMapPixel(ctx.waypoint.x, ctx.waypoint.z, ctx.center, ctx.radius);
+      ctx2d.strokeStyle = WAYPOINT_COLOR;
+      ctx2d.fillStyle = WAYPOINT_COLOR;
+      ctx2d.lineWidth = 1.5 * labelScale;
+      ctx2d.beginPath();
+      ctx2d.arc(px, pz, 3.2 * labelScale, 0, Math.PI * 2);
+      ctx2d.stroke();
+      ctx2d.beginPath();
+      ctx2d.arc(px, pz, 1.2 * labelScale, 0, Math.PI * 2);
+      ctx2d.fill();
+    }
+
     // Player arrow at the center, rotated to the look direction (map stays north-up;
     // forward (−sin yaw, −cos yaw) maps to a screen rotation of −yaw).
     const c = ctx.radius + 0.5;
@@ -125,9 +155,74 @@ export function createWorldMapUi(): WorldMapUi {
   const close = (): void => {
     if (!open) return;
     open = false;
+    currentCtx = undefined;
     root.classList.remove('is-open');
     root.setAttribute('aria-hidden', 'true');
   };
+
+  /** Update the drawn waypoint locally (so a click shows instantly) and redraw. */
+  const redrawWaypoint = (wp: Waypoint | undefined): void => {
+    if (!currentCtx) return;
+    const next: WorldMapContext = { ...currentCtx };
+    if (wp) next.waypoint = wp;
+    else delete next.waypoint;
+    currentCtx = next;
+    const ctx2d = canvas.getContext('2d');
+    if (ctx2d) draw(ctx2d, next);
+  };
+
+  // Placing / snapping / clearing a waypoint from a map click. Landmarks (discovered only) win
+  // over bare placement; a click on the existing waypoint clears it.
+  canvas.addEventListener('click', (e) => {
+    if (!open || !currentCtx || !callbacks) return;
+    const rect = canvas.getBoundingClientRect();
+    const hit = mapClickToWorld(
+      e.clientX,
+      e.clientY,
+      rect,
+      canvas.width,
+      currentCtx.center,
+      currentCtx.radius,
+    );
+    const hitRadius = CLICK_HIT_CSS * (canvas.width / rect.width);
+
+    const discovered = currentCtx.landmarks.filter((l) => l.found !== false);
+    const lmPixels = discovered.map((l) =>
+      worldToMapPixel(l.x, l.z, currentCtx!.center, currentCtx!.radius),
+    );
+    const lm = nearestWithin(hit.px, hit.pz, lmPixels, hitRadius);
+    if (lm >= 0) {
+      const t = discovered[lm];
+      redrawWaypoint({ x: t.x, z: t.z });
+      callbacks.onSetWaypoint(t.x, t.z);
+      return;
+    }
+
+    if (currentCtx.waypoint) {
+      const wpPx = worldToMapPixel(
+        currentCtx.waypoint.x,
+        currentCtx.waypoint.z,
+        currentCtx.center,
+        currentCtx.radius,
+      );
+      if (nearestWithin(hit.px, hit.pz, [wpPx], hitRadius) === 0) {
+        redrawWaypoint(undefined);
+        callbacks.onClearWaypoint();
+        return;
+      }
+    }
+
+    redrawWaypoint({ x: hit.x, z: hit.z });
+    callbacks.onSetWaypoint(hit.x, hit.z);
+  });
+
+  // A click on the dimmed backdrop (never the panel) dismisses the map.
+  root.addEventListener('click', (e) => {
+    if (e.target === root && open) {
+      close();
+      callbacks?.onClose();
+    }
+  });
 
   return {
     toggle(ctx: WorldMapContext): boolean {
@@ -137,6 +232,7 @@ export function createWorldMapUi(): WorldMapUi {
       }
       const ctx2d = canvas.getContext('2d');
       if (!ctx2d) return false;
+      currentCtx = ctx;
       title.textContent = ctx.title;
       draw(ctx2d, ctx);
       open = true;
