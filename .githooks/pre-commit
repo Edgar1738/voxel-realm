@@ -1,0 +1,20 @@
+#!/bin/sh
+# Auto-fix Prettier/ESLint issues on staged TS files so CI's Lint gate
+# (npm run lint == eslint over src + tests, with prettier/prettier: error)
+# never trips on formatting. Formatting-only failures are the #1 cause of
+# red CI on this repo since commits land straight on main.
+
+files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(src|tests)/.*\.ts$')
+[ -z "$files" ] && exit 0
+
+# eslint-plugin-prettier violations are auto-fixable — fix, then re-stage.
+echo "$files" | xargs npx eslint --fix
+echo "$files" | xargs git add
+
+# Gate: block the commit only if unfixable lint errors survive the fix pass.
+if ! echo "$files" | xargs npx eslint; then
+  echo ""
+  echo "✖ pre-commit: ESLint errors remain after auto-fix — resolve them, then commit again."
+  echo "  (formatting was already auto-fixed and re-staged; these are real lint errors)"
+  exit 1
+fi

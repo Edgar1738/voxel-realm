@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepare": "git config core.hooksPath .githooks",
     "world:archive": "node --disable-warning=ExperimentalWarning scripts/worldArchive.ts",
     "world:restore": "node --disable-warning=ExperimentalWarning scripts/worldRestore.ts",
     "world:package": "node --disable-warning=ExperimentalWarning scripts/worldPackage.ts",
