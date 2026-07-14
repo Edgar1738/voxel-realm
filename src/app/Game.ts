@@ -238,7 +238,10 @@ export class Game {
     bootStats.begin('systems+ui');
 
     // Debounced per-chunk persistence.
-    const persistence = createPersistence(store, manager);
+    const persistence = createPersistence(store, manager, {
+      // Quiet save indicator for builders. Play mode makes no edits, so keep it hidden there.
+      onStatus: (s) => ui.setSaveStatus(experience === 'build' ? s : null),
+    });
     manager.onChunkDeltaChanged = (key) => persistence.scheduleFlush(key);
 
     // Block physics: water flows, sand falls. Every edit batch (player, builder,

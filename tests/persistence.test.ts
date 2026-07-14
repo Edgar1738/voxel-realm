@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { SaveStore } from '../src/persistence/SaveStore';
 import type { ChunkManager } from '../src/world/ChunkManager';
-import { createPersistence } from '../src/app/persistence';
+import { createPersistence, type SaveStatus } from '../src/app/persistence';
 
 const SAVE_DEBOUNCE_MS = 250;
 
@@ -203,5 +203,95 @@ describe('createPersistence', () => {
     persistence.dispose();
     persistence.dispose();
     expect(save).toHaveBeenCalledTimes(1); // nothing pending -> no extra writes
+  });
+});
+
+describe('createPersistence — save status', () => {
+  it('reports pending -> saving -> idle for a normal edit', async () => {
+    const statuses: SaveStatus[] = [];
+    const persistence = createPersistence(makeStore(), makeManager(), {
+      onStatus: (s) => statuses.push(s),
+    });
+
+    persistence.scheduleFlush('0,0');
+    expect(statuses).toEqual(['pending']);
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(statuses).toEqual(['pending', 'saving', 'idle']);
+  });
+
+  it('never reports a save for an empty flush (pagehide with nothing dirty)', async () => {
+    const statuses: SaveStatus[] = [];
+    createPersistence(makeStore(), makeManager(), { onStatus: (s) => statuses.push(s) });
+
+    fire('pagehide');
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(statuses).toEqual([]);
+  });
+
+  it('reports error (not idle) on a failed write, then idle after a successful retry', async () => {
+    let attempts = 0;
+    const save = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('disk full');
+      return undefined;
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const statuses: SaveStatus[] = [];
+    const persistence = createPersistence(makeStore(save), makeManager(), {
+      onStatus: (s) => statuses.push(s),
+    });
+
+    persistence.scheduleFlush('0,0');
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS); // first write fails
+    expect(statuses).toEqual(['pending', 'saving', 'error']);
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS); // retry succeeds
+    expect(statuses).toEqual(['pending', 'saving', 'error', 'saving', 'idle']);
+  });
+
+  it('does not flash idle when new edits arrive during an in-flight write', async () => {
+    let resolveFirst: (() => void) | undefined;
+    let calls = 0;
+    const save = ((): Promise<void> => {
+      calls += 1;
+      if (calls === 1) return new Promise<void>((r) => (resolveFirst = r));
+      return Promise.resolve();
+    }) as SaveStore['saveChunkDelta'];
+    const statuses: SaveStatus[] = [];
+    const persistence = createPersistence(makeStore(save), makeManager(), {
+      onStatus: (s) => statuses.push(s),
+    });
+
+    persistence.scheduleFlush('0,0');
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS); // first write in flight, unresolved
+    expect(statuses).toEqual(['pending', 'saving']);
+
+    persistence.scheduleFlush('1,0'); // new dirt while saving must not downgrade to pending
+    expect(statuses).toEqual(['pending', 'saving']);
+
+    resolveFirst?.(); // first write settles with '1,0' still dirty -> pending, never idle
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses).toEqual(['pending', 'saving', 'pending']);
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS); // second flush writes '1,0'
+    expect(statuses).toEqual(['pending', 'saving', 'pending', 'saving', 'idle']);
+  });
+
+  it('does not report Saved (idle) when suppressed for a reset', async () => {
+    const statuses: SaveStatus[] = [];
+    const persistence = createPersistence(makeStore(), makeManager(), {
+      onStatus: (s) => statuses.push(s),
+    });
+
+    persistence.scheduleFlush('0,0');
+    expect(statuses).toEqual(['pending']);
+
+    await persistence.suppressAndClear();
+    expect(statuses).toEqual(['pending']); // no saving, no idle
+
+    persistence.scheduleFlush('9,9'); // suppressed -> silent
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(statuses).toEqual(['pending']);
   });
 });

@@ -197,6 +197,8 @@ export interface CreativeUi {
   setStatus(text: string): void;
   /** Shows a persistent banner (e.g. a storage warning), or hides it when passed `null`. */
   setNotice(text: string | null): void;
+  /** Drives the quiet save indicator (build mode). `null` hides it; separate from the toast. */
+  setSaveStatus(state: 'pending' | 'saving' | 'idle' | 'error' | null): void;
   renderHotbar(): void;
   /** Opens or closes the inventory modal (fade/scale; inert when closed). */
   setInventoryOpen(open: boolean): void;
@@ -241,6 +243,7 @@ export interface CreativeUi {
 }
 
 const STATUS_VISIBLE_MS = 1600;
+const SAVE_STATUS_SAVED_MS = 1400; // how long the "Saved" confirmation lingers before fading
 
 function button(text: string): HTMLButtonElement {
   const b = document.createElement('button');
@@ -584,6 +587,13 @@ export function createCreativeUi(
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
 
+  // Quiet, dedicated save indicator (bottom-left) — kept separate from the transient status toast
+  // so "Saving…/Saved" never overwrites gameplay messages like "Placed …" (see setSaveStatus).
+  const saveStatus = document.createElement('div');
+  saveStatus.className = 'save-status';
+  saveStatus.setAttribute('role', 'status');
+  saveStatus.setAttribute('aria-live', 'polite');
+
   // Persistent top-center banner for sticky warnings (e.g. storage unavailable). Distinct from the
   // transient status toast so a data-loss warning can't fade away before the player notices it.
   const notice = document.createElement('div');
@@ -647,7 +657,7 @@ export function createCreativeUi(
       : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
   };
 
-  root.append(dock, scrim, status, notice, hotbar, tourHud, loadingHud, dialogScrim);
+  root.append(dock, scrim, status, saveStatus, notice, hotbar, tourHud, loadingHud, dialogScrim);
   document.body.append(root);
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
@@ -1165,6 +1175,30 @@ export function createCreativeUi(
     notice.style.display = text ? 'block' : 'none';
   };
 
+  // Save indicator: shows while saving, briefly confirms "Saved", and holds on an error until the
+  // retry succeeds. `null` hides it (e.g. leaving build mode). It never touches the status toast.
+  let saveStatusTimer: number | undefined;
+  const setSaveStatus = (state: 'pending' | 'saving' | 'idle' | 'error' | null): void => {
+    if (saveStatusTimer !== undefined) {
+      window.clearTimeout(saveStatusTimer);
+      saveStatusTimer = undefined;
+    }
+    if (state === null || state === 'pending') {
+      saveStatus.classList.remove('is-visible', 'is-error');
+      return;
+    }
+    saveStatus.classList.toggle('is-error', state === 'error');
+    saveStatus.textContent =
+      state === 'saving' ? 'Saving…' : state === 'error' ? 'Save failed — retrying' : 'Saved';
+    saveStatus.classList.add('is-visible');
+    if (state === 'idle') {
+      saveStatusTimer = window.setTimeout(() => {
+        saveStatus.classList.remove('is-visible');
+        saveStatusTimer = undefined;
+      }, SAVE_STATUS_SAVED_MS);
+    }
+  };
+
   const renderHotbar = (): void => {
     hotbar.replaceChildren();
     inventory.hotbar.forEach((id, index) => {
@@ -1219,6 +1253,7 @@ export function createCreativeUi(
     setHoldRepeatUi,
     setStatus,
     setNotice,
+    setSaveStatus,
     renderHotbar,
     setInventoryOpen,
     isInventoryOpen,
