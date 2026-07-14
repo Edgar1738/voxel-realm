@@ -49,7 +49,8 @@ export function parseResume(raw: string | null): ResumeState | undefined {
   if (typeof data !== 'object' || data === null) return undefined;
   const r = data as Record<string, unknown>;
   if (r.v !== RESUME_VERSION) return undefined;
-  if (!isNum(r.x) || !isNum(r.y) || !isNum(r.z) || !isNum(r.yaw) || !isNum(r.pitch)) return undefined;
+  if (!isNum(r.x) || !isNum(r.y) || !isNum(r.z) || !isNum(r.yaw) || !isNum(r.pitch))
+    return undefined;
   if (typeof r.flying !== 'boolean') return undefined;
   const pitch = Math.max(-HALF_PI, Math.min(HALF_PI, r.pitch));
   return { x: r.x, y: r.y, z: r.z, yaw: r.yaw, pitch, flying: r.flying };

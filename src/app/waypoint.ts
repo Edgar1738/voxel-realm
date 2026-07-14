@@ -84,12 +84,7 @@ export interface Bearing {
  * yaw turns the view. The arrow angle is the waypoint's world heading (clockwise from -Z) brought
  * into the player's frame, so it reads "turn this much from where you're looking".
  */
-export function waypointBearing(
-  px: number,
-  pz: number,
-  yaw: number,
-  wp: Waypoint,
-): Bearing {
+export function waypointBearing(px: number, pz: number, yaw: number, wp: Waypoint): Bearing {
   const dx = wp.x - px;
   const dz = wp.z - pz;
   const distance = Math.hypot(dx, dz);

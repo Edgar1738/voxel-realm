@@ -132,11 +132,7 @@ export const PLAY_MODE_BUILD_HINT = 'Play mode — press B to build';
  * single B press to become usable, so "press B to build" would be misleading. Pure; the caller
  * is responsible for only invoking it while actually in-game (pointer locked, no dialog open).
  */
-export function playModeGatedMessage(
-  code: string,
-  key: string,
-  ctrl: boolean,
-): string | undefined {
+export function playModeGatedMessage(code: string, key: string, ctrl: boolean): string | undefined {
   if (ctrl) return undefined;
   if (/^[1-9]$/.test(key)) return PLAY_MODE_BUILD_HINT;
   if (code === 'KeyI' || code === 'KeyV') return PLAY_MODE_BUILD_HINT;

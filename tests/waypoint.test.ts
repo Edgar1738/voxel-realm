@@ -17,7 +17,9 @@ import {
 
 const HALF_PI = Math.PI / 2;
 
-function fakeStore(init: Record<string, string> = {}): WaypointStore & { data: Record<string, string> } {
+function fakeStore(
+  init: Record<string, string> = {},
+): WaypointStore & { data: Record<string, string> } {
   const data = { ...init };
   return {
     data,

@@ -14,7 +14,9 @@ import {
 
 const STATE: ResumeState = { x: 10, y: 64.5, z: -20, yaw: 1.2, pitch: -0.3, flying: false };
 
-function fakeStore(init: Record<string, string> = {}): ResumeStore & { data: Record<string, string> } {
+function fakeStore(
+  init: Record<string, string> = {},
+): ResumeStore & { data: Record<string, string> } {
   const data = { ...init };
   return {
     data,

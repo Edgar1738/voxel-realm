@@ -46,7 +46,11 @@ describe('resolveSpawn – boot spawn/look precedence', () => {
 
   it('resume beats meta but loses to a URL override, per field', () => {
     const meta = { spawn: { x: 1, y: 2, z: 3 }, look: { yaw: 1.5, pitch: -0.2 } };
-    const resume = { spawn: { x: 40, y: 41, z: 42 }, look: { yaw: 0.7, pitch: 0.1 }, flying: false };
+    const resume = {
+      spawn: { x: 40, y: 41, z: 42 },
+      look: { yaw: 0.7, pitch: 0.1 },
+      flying: false,
+    };
     // No override: resume wins both fields, and flying rides along.
     expect(resolveSpawn(meta, {}, resume, FALLBACK)).toEqual({
       spawn: { x: 40, y: 41, z: 42 },

@@ -60,7 +60,8 @@ export function createPersistence(
   function settle(): void {
     if (savesSuppressed || inFlight.size > 0) return;
     if (cycleErrored) setStatus('error');
-    else if (dirty.size > 0) setStatus('pending'); // new edits arrived mid-write
+    else if (dirty.size > 0)
+      setStatus('pending'); // new edits arrived mid-write
     else setStatus('idle');
   }
 
