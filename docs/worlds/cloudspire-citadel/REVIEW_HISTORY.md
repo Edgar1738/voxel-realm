@@ -1,5 +1,19 @@
 # Review History — Cloudspire Citadel
 
+## 2026-07-13 — P2 cleanups (Claude)
+
+Minor follow-ups, straight to main:
+
+- Dropped the buried court fountain at `(CX, CZ+30)` (it sat inside the palace footprint; the
+  visible court fountain lives in `buildInnerCourt`).
+- Trimmed the spire glass bays — windows now only on the wider lower stages (`half >= 7`) at height
+  4, so the narrow upper stages + crown read as solid spire instead of a thin glass lattice at range.
+- Removed the stale `docs/worlds/.hermes-tmp.*` sentinel dir.
+- Investigated the "dead-on-arrival right-edge column": **not a bug** — it's the outer-wall gate/corner
+  towers + pinnacles flanking the citadel, foreshortened by the wide arrival FOV.
+
+Re-baked `.vrw` so the shipped save matches. Preview left as the P1 hero (change is subtle).
+
 ## 2026-07-13 — P1 polish (Claude)
 
 **Status:** IMPLEMENTED WORLD — **showcase on main** (P1 committed straight to main)

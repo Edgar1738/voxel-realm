@@ -66,10 +66,10 @@ export function buildGardens(s: CitadelStamp): void {
     }
   }
 
-  // Fountains (graded to their own terrace height)
+  // Fountains (graded to their own terrace height). The court fountain lives in buildInnerCourt;
+  // a third at (CX, CZ+30) used to be buried inside the palace footprint and has been dropped.
   fountain(s, CX - 35, CZ - 20, cloudspireTerraceY(CX - 35, CZ - 20));
   fountain(s, CX + 35, CZ - 20, cloudspireTerraceY(CX + 35, CZ - 20));
-  fountain(s, CX, CZ + 30, GP); // palace court
 
   // Reflecting pool, west garden (contained raised basin at grade)
   const px0 = CX - 55;

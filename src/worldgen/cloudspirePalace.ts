@@ -259,13 +259,14 @@ export function buildMainSpire(s: CitadelStamp): void {
     hollowTower(s, KCX, KCZ, st.half, y, y1, LIMESTONE, true);
     // Floor decks
     s.slab(KCX - st.half + 1, KCZ - st.half + 1, KCX + st.half - 1, KCZ + st.half - 1, y, PLANKS);
-    // Windows
-    if (st.half >= 4) {
+    // Windows — only on the wider lower stages so the narrow upper stages + crown read as a
+    // solid spire, not a thin glass lattice at range.
+    if (st.half >= 7) {
       for (let wy = y + 4; wy < y1 - 4; wy += 8) {
-        pointedWindow(s, KCX - st.half, wy, KCZ, 5, 'x');
-        pointedWindow(s, KCX + st.half, wy, KCZ, 5, 'x');
-        pointedWindow(s, KCX, wy, KCZ - st.half, 5, 'z');
-        pointedWindow(s, KCX, wy, KCZ + st.half, 5, 'z');
+        pointedWindow(s, KCX - st.half, wy, KCZ, 4, 'x');
+        pointedWindow(s, KCX + st.half, wy, KCZ, 4, 'x');
+        pointedWindow(s, KCX, wy, KCZ - st.half, 4, 'z');
+        pointedWindow(s, KCX, wy, KCZ + st.half, 4, 'z');
       }
     }
     // Spiral connecting stages (offset so not solid core block-in)
