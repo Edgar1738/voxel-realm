@@ -55,6 +55,19 @@ export class ViewDistanceGovernor {
   }
 
   /**
+   * Lower (or raise) the adaptive ceiling. Clamps the current distance into the new range and
+   * clears the measurement window — samples taken under a different cap shouldn't decide the next
+   * step. Returns the current view distance so the caller can apply it to the chunk manager + fog
+   * in one place. Raising the cap lets the governor grow back up naturally over the next windows.
+   */
+  setMaxVd(maxVd: number): number {
+    this.opts.maxVd = Math.max(this.opts.minVd, Math.floor(maxVd));
+    if (this.current > this.opts.maxVd) this.current = this.opts.maxVd;
+    this.window.length = 0;
+    return this.current;
+  }
+
+  /**
    * Feeds one frame. Returns the new view distance if it changed this tick, else undefined.
    * Never adjusts while `streaming` (frame times are transiently inflated by chunk loading)
    * or during the post-change cooldown.

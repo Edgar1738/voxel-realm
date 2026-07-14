@@ -65,4 +65,32 @@ describe('ViewDistanceGovernor', () => {
     expect(g.sample(16, false)).toBe(4); // window=[16,16] -> grow, never shrink
     expect(g.viewDistance).toBe(4);
   });
+
+  describe('setMaxVd', () => {
+    it('lowers the ceiling, clamps current down, and returns the new distance', () => {
+      const g = gov(1, 16, 12);
+      expect(g.setMaxVd(6)).toBe(6);
+      expect(g.viewDistance).toBe(6);
+    });
+
+    it('leaves current alone when it already fits under the new cap', () => {
+      const g = gov(1, 16, 4);
+      expect(g.setMaxVd(10)).toBe(4);
+      expect(g.viewDistance).toBe(4);
+    });
+
+    it('never drops the cap below minVd', () => {
+      const g = gov(4, 16, 8);
+      expect(g.setMaxVd(1)).toBe(4);
+      expect(g.viewDistance).toBe(4);
+    });
+
+    it('clears the window so a raised cap grows from a fresh measurement', () => {
+      const g = gov(1, 16, 4);
+      g.sample(16, false); // window=[16], len 1 of 2
+      g.setMaxVd(10); // clears the window
+      expect(g.sample(16, false)).toBeUndefined(); // only 1 sample again, not enough
+      expect(g.sample(16, false)).toBe(5); // now full -> grow
+    });
+  });
 });

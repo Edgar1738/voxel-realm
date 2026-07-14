@@ -127,7 +127,7 @@ const boot = vi.hoisted(() => {
   return {
     order,
     scene: {},
-    camera: { position: { x: 0, z: 0 } },
+    camera: { position: { x: 0, z: 0 }, fov: 70, updateProjectionMatrix: vi.fn() },
     texture: { dispose: vi.fn(() => order.push('texture.dispose')) },
     material: { dispose: vi.fn(() => order.push('material.dispose')) },
     transparentMaterial: { dispose: vi.fn(() => order.push('transparentMaterial.dispose')) },
@@ -225,6 +225,7 @@ vi.mock('../src/render/CameraRig', () => ({
       })),
       applyEye: vi.fn(),
       applyPlayerView: vi.fn(),
+      setLookSettings: vi.fn(),
       toggleMode: vi.fn(() => {
         rig.mode = rig.mode === 'first' ? 'third' : 'first';
         return rig.mode;

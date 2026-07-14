@@ -103,7 +103,13 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   },
   {
     heading: 'Blueprint paste',
-    lines: ['Click to paste', '[ ] rotate', 'U mirror', '+/- array count', 'Arrows / PgUp-Dn nudge'],
+    lines: [
+      'Click to paste',
+      '[ ] rotate',
+      'U mirror',
+      '+/- array count',
+      'Arrows / PgUp-Dn nudge',
+    ],
   },
   { heading: 'Reach', lines: ['Shift + wheel adjusts reach'] },
 ];
@@ -122,6 +128,18 @@ export interface PauseDialogOpts {
   /** View-bob setting (motion-sickness opt-out); toggles apply live via the callback. */
   viewBob: boolean;
   onViewBob(on: boolean): void;
+  /** Mouse-look sensitivity multiplier (1 = default); applies live. */
+  sensitivity: number;
+  onSensitivity(value: number): void;
+  /** Field of view in degrees; applies live. */
+  fov: number;
+  onFov(value: number): void;
+  /** Invert vertical mouse-look; applies live. */
+  invertY: boolean;
+  onInvertY(on: boolean): void;
+  /** Adaptive view-distance ceiling: Short / Medium / Far; applies live. */
+  viewQuality: 'short' | 'medium' | 'far';
+  onViewQuality(quality: 'short' | 'medium' | 'far'): void;
   /** Downloads a shareable copy of the world (the dialog stays open; a toast confirms). */
   onShare(): void;
 }
@@ -1107,6 +1125,43 @@ export function createCreativeUi(
         resolve(action);
       };
 
+      // A labeled range row with a live numeric readout (sensitivity, FOV). Applies on input.
+      const labeledRange = (
+        labelText: string,
+        min: number,
+        max: number,
+        step: number,
+        value: number,
+        format: (v: number) => string,
+        onInput: (v: number) => void,
+      ): HTMLElement => {
+        const row = document.createElement('div');
+        row.className = 'pause-setting';
+        const label = document.createElement('span');
+        label.className = 'pause-setting-label';
+        const readout = document.createElement('span');
+        readout.className = 'pause-setting-value';
+        const range = document.createElement('input');
+        range.type = 'range';
+        range.className = 'pause-setting-range';
+        range.min = String(min);
+        range.max = String(max);
+        range.step = String(step);
+        range.value = String(value);
+        range.setAttribute('aria-label', labelText);
+        const sync = (): void => {
+          label.textContent = labelText;
+          readout.textContent = format(Number(range.value));
+        };
+        range.addEventListener('input', () => {
+          sync();
+          onInput(Number(range.value));
+        });
+        sync();
+        row.append(label, range, readout);
+        return row;
+      };
+
       const actions = document.createElement('div');
       actions.className = 'pause-actions';
       const resume = button('Resume');
@@ -1168,12 +1223,74 @@ export function createCreativeUi(
       });
       syncBob();
 
+      // Look sensitivity: slider maps 30–250 to a 0.30–2.50 multiplier.
+      const sensRow = labeledRange(
+        'Mouse sensitivity',
+        30,
+        250,
+        5,
+        Math.round(opts.sensitivity * 100),
+        (v) => `×${(v / 100).toFixed(2)}`,
+        (v) => opts.onSensitivity(v / 100),
+      );
+      const fovRow = labeledRange(
+        'Field of view',
+        50,
+        100,
+        1,
+        Math.round(opts.fov),
+        (v) => `${v}°`,
+        (v) => opts.onFov(v),
+      );
+
+      // Invert-Y toggle (same pattern as view bob).
+      let invertY = opts.invertY;
+      const invertBtn = button('');
+      invertBtn.className = 'dialog-btn pause-btn';
+      const syncInvert = (): void => {
+        invertBtn.textContent = `Invert Y: ${invertY ? 'on' : 'off'}`;
+        invertBtn.setAttribute('aria-pressed', String(invertY));
+      };
+      invertBtn.addEventListener('click', () => {
+        invertY = !invertY;
+        opts.onInvertY(invertY);
+        syncInvert();
+      });
+      syncInvert();
+
+      // View-distance quality cycle: Short / Medium / Far.
+      const QUALITIES = ['short', 'medium', 'far'] as const;
+      const QUALITY_LABEL = { short: 'Short', medium: 'Medium', far: 'Far' } as const;
+      let quality = opts.viewQuality;
+      const qualityBtn = button('');
+      qualityBtn.className = 'dialog-btn pause-btn';
+      const syncQuality = (): void => {
+        qualityBtn.textContent = `View distance: ${QUALITY_LABEL[quality]}`;
+      };
+      qualityBtn.addEventListener('click', () => {
+        quality = QUALITIES[(QUALITIES.indexOf(quality) + 1) % QUALITIES.length];
+        opts.onViewQuality(quality);
+        syncQuality();
+      });
+      syncQuality();
+
       const share = button('Download world copy');
       share.className = 'dialog-btn pause-btn';
       share.title = 'Save this world as a file you can share; others import it from the menu';
       share.addEventListener('click', () => opts.onShare());
 
-      actions.append(resume, guide, soundRow, bobBtn, share, worlds);
+      actions.append(
+        resume,
+        guide,
+        soundRow,
+        sensRow,
+        fovRow,
+        invertBtn,
+        qualityBtn,
+        bobBtn,
+        share,
+        worlds,
+      );
       panel.append(title, worldLine, actions);
       const close = openDialogPanel(panel, () => finish('resume'));
     });

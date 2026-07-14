@@ -779,6 +779,28 @@
       .pause-panel {
         max-width: 300px;
       }
+      .pause-setting {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 2px 8px;
+        padding: 4px 2px;
+      }
+      .pause-setting-label {
+        font-size: 13px;
+        color: #cdd5df;
+      }
+      .pause-setting-value {
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: #9aa4b1;
+        text-align: right;
+      }
+      .pause-setting-range {
+        grid-column: 1 / -1;
+        width: 100%;
+        accent-color: #ffd34d;
+      }
       .pause-actions {
         display: flex;
         flex-direction: column;

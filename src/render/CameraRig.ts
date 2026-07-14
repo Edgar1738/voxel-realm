@@ -2,7 +2,8 @@ import { Euler, Vector3, type PerspectiveCamera } from 'three';
 import type { InputState } from '../player/PlayerController';
 import type { Vec3 } from '../core/types';
 
-const SENSITIVITY = 0.0025;
+/** Base radians-per-pixel; the player's sensitivity setting is a multiplier on this. */
+export const BASE_LOOK_SENSITIVITY = 0.0025;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 /** Two W presses within this window arm sprint (Minecraft's classic double-tap). */
 const DOUBLE_TAP_MS = 300;
@@ -35,6 +36,8 @@ export class CameraRig {
   locked = false;
   mode: CameraMode = 'first';
 
+  private sensitivity = BASE_LOOK_SENSITIVITY;
+  private invertY = false;
   private readonly pressed = new Set<string>();
   private toggleFlyQueued = false;
   /** Sprint arms on a double-tap of W (Ctrl+W closes browser tabs) and drops on W release. */
@@ -94,8 +97,9 @@ export class CameraRig {
       'mousemove',
       (e) => {
         if (!this.locked) return;
-        this.yaw -= e.movementX * SENSITIVITY;
-        this.pitch -= e.movementY * SENSITIVITY;
+        this.yaw -= e.movementX * this.sensitivity;
+        const dPitch = e.movementY * this.sensitivity;
+        this.pitch -= this.invertY ? -dPitch : dPitch;
         this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
       },
       { signal },
@@ -129,6 +133,14 @@ export class CameraRig {
   /** Removes all event listeners registered by this rig. */
   dispose(): void {
     this.inputController.abort();
+  }
+
+  /** Applies look preferences live. `sensitivityMultiplier` scales the base radians-per-pixel. */
+  setLookSettings(opts: { sensitivityMultiplier?: number; invertY?: boolean }): void {
+    if (opts.sensitivityMultiplier !== undefined) {
+      this.sensitivity = BASE_LOOK_SENSITIVITY * opts.sensitivityMultiplier;
+    }
+    if (opts.invertY !== undefined) this.invertY = opts.invertY;
   }
 
   /** Snapshot of input intents; consumes the one-frame fly-toggle edge. */

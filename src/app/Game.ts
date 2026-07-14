@@ -104,7 +104,25 @@ import type { FrameProfiler } from './FrameProfiler';
 import type { RoamDriver } from './RoamBench';
 import { resolveSpawn, parseSpawnOverrides, clampSpawnY, groundSpawnY } from './bootSpawn';
 import { loadResume, saveResume, clearResume, resumeToSpawn } from './resumeState';
-import { loadWaypoint, saveWaypoint, clearWaypoint, waypointBearing, type Waypoint } from './waypoint';
+import {
+  loadWaypoint,
+  saveWaypoint,
+  clearWaypoint,
+  waypointBearing,
+  type Waypoint,
+} from './waypoint';
+import {
+  loadSensitivity,
+  saveSensitivity,
+  loadFov,
+  saveFov,
+  loadInvertY,
+  saveInvertY,
+  loadViewQuality,
+  saveViewQuality,
+  qualityMaxVd,
+  type ViewQuality,
+} from './playerPrefs';
 import { initialExperienceMode, isCuratedWorld, type ExperienceMode } from './experienceMode';
 import { curatedPresetMeta } from './curatedPreset';
 import { tourRoute, tourTick, tourStep } from './tour';
@@ -138,8 +156,7 @@ import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
 const MAX_DT = 0.05; // clamp to keep collision substeps sane on frame drops
-const BASE_FOV = 70; // must match the Renderer's PerspectiveCamera construction
-const SPRINT_FOV_KICK = 8; // Minecraft-style widening while sprinting
+const SPRINT_FOV_KICK = 8; // Minecraft-style widening while sprinting, added on top of the base FOV
 // Camera eye eases up this many blocks/sec when the player steps up (stairs/ledges), so a
 // 1-block step-up smooths over ~110ms instead of snapping the view a full block.
 const STEP_EYE_SPEED = 9;
@@ -197,7 +214,11 @@ export class Game {
     // The meta that actually governs this boot. After an incompatible discard the durable meta
     // was rewritten to `generatedMeta`, so the stale loaded meta must not drive spawn/landmarks/
     // tour/title/map. Everything below reads `activeMeta`, never `bootMeta.meta`, for consistency.
-    const activeMeta = resolveActiveMeta(bootMeta.meta, generatedMeta, bootSave.discardedIncompatible);
+    const activeMeta = resolveActiveMeta(
+      bootMeta.meta,
+      generatedMeta,
+      bootSave.discardedIncompatible,
+    );
     const curatedTitle = activeMeta?.title?.trim();
     if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
 
@@ -979,6 +1000,28 @@ export class Game {
           },
           viewBob: viewBobOn,
           onViewBob: (on) => setViewBob(on),
+          sensitivity: lookSensitivity,
+          onSensitivity: (v) => {
+            lookSensitivity = v;
+            saveSensitivity(localStorage, v);
+            rig.setLookSettings({ sensitivityMultiplier: v });
+          },
+          fov: configuredFov,
+          onFov: (v) => {
+            configuredFov = v;
+            saveFov(localStorage, v);
+            // Apply immediately (the sprint kick still rides on top next frame).
+            renderer.camera.fov = configuredFov + (player.sprinting ? SPRINT_FOV_KICK : 0);
+            renderer.camera.updateProjectionMatrix();
+          },
+          invertY: invertLook,
+          onInvertY: (on) => {
+            invertLook = on;
+            saveInvertY(localStorage, on);
+            rig.setLookSettings({ invertY: on });
+          },
+          viewQuality,
+          onViewQuality: (q) => applyViewQuality(q),
           onShare: () => {
             void (async () => {
               // Fresh meta (dev setMeta can change it after boot) + the live delta map, so
@@ -1303,6 +1346,28 @@ export class Game {
     let fogInitialized = false;
     let settlePending = usingDefaultSpawn;
     let smoothEyeY = player.eye().y; // eased eye height so stair/ledge step-ups don't snap the view
+    // Player settings (global, from the pause menu). Look sensitivity/invert-Y feed the rig; FOV is
+    // a single configured base the sprint kick rides on; view quality caps the adaptive governor.
+    let lookSensitivity = loadSensitivity(localStorage);
+    let invertLook = loadInvertY(localStorage);
+    let configuredFov = loadFov(localStorage);
+    let viewQuality: ViewQuality = loadViewQuality(localStorage);
+    rig.setLookSettings({ sensitivityMultiplier: lookSensitivity, invertY: invertLook });
+    // Apply the configured FOV before the first frame so nothing eases from the camera's initial 70.
+    renderer.camera.fov = configuredFov;
+    renderer.camera.updateProjectionMatrix();
+    governor.setMaxVd(qualityMaxVd(viewQuality)); // boot VD is small; this only caps future growth
+    /** Live view-distance quality change: clamp the governor, then sync the manager + fog once. */
+    const applyViewQuality = (q: ViewQuality): void => {
+      viewQuality = q;
+      saveViewQuality(localStorage, q);
+      const capped = governor.setMaxVd(qualityMaxVd(q));
+      if (capped !== manager.viewDistance) {
+        manager.setViewDistance(capped);
+        applyFogRange(chunkMaterials, capped * CHUNK_SIZE_X);
+      }
+    };
+
     // View bob: on by default, toggleable from the pause menu (motion-sickness opt-out).
     let viewBobOn = true;
     try {
@@ -1368,7 +1433,7 @@ export class Game {
       }
 
       // Sprint feedback: ease the FOV out while sprinting and back on release.
-      const targetFov = BASE_FOV + (player.sprinting ? SPRINT_FOV_KICK : 0);
+      const targetFov = configuredFov + (player.sprinting ? SPRINT_FOV_KICK : 0);
       if (Math.abs(renderer.camera.fov - targetFov) > 0.05) {
         renderer.camera.fov += (targetFov - renderer.camera.fov) * Math.min(1, cdt * 8);
         renderer.camera.updateProjectionMatrix();
