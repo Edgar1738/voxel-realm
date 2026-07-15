@@ -261,6 +261,35 @@ function sampleTrack(
   return frames[frames.length - 1];
 }
 
+function transformsEqual(
+  a: CharacterTransform | undefined,
+  b: CharacterTransform | undefined,
+): boolean {
+  if (!a || !b) return a === b;
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+}
+
+/**
+ * A looping clip samples `elapsed % duration`, so a track whose last keyframe differs from its
+ * first snaps once per cycle. Catch that at construction instead of shipping a visible pop.
+ */
+function assertLoopingClipIsCyclic(clip: CharacterAnimationClip): void {
+  if (clip.loop === false) return;
+  const mask = clip.mask ? new Set(clip.mask) : undefined;
+  for (const track of clip.tracks) {
+    if (mask && !mask.has(track.joint)) continue;
+    const frames = track.keyframes;
+    if (frames.length < 2) continue;
+    const first = frames[0];
+    const last = frames[frames.length - 1];
+    if (!transformsEqual(first.pos, last.pos) || !transformsEqual(first.rotation, last.rotation)) {
+      throw new Error(
+        `looping clip ${clip.id} track ${track.joint} must end where it begins (or set loop: false)`,
+      );
+    }
+  }
+}
+
 /** Data-driven keyframe player with easing, looping, crossfades, masks, and additive tracks. */
 export class CharacterAnimator {
   private readonly clips = new Map<string, CharacterAnimationClip>();
@@ -282,6 +311,7 @@ export class CharacterAnimator {
   ) {
     for (const clip of clips) {
       if (clip.duration <= 0) throw new Error(`character clip ${clip.id} must have a duration`);
+      assertLoopingClipIsCyclic(clip);
       this.clips.set(clip.id, clip);
       if (clip.mask) this.masks.set(clip.id, new Set(clip.mask));
     }

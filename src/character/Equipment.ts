@@ -194,6 +194,11 @@ export class EquipmentRig {
     return copyEquipmentLoadout(this.loadout);
   }
 
+  /** Allocation-free check for per-frame callers that only need "is anything equipped". */
+  isEmpty(): boolean {
+    return this.loadout.main === undefined && this.loadout.off === undefined;
+  }
+
   setVisible(visible: boolean): void {
     for (const mount of this.mounts.values()) mount.visible = visible;
   }

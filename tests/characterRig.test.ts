@@ -96,6 +96,27 @@ describe('CharacterAnimator', () => {
     expect(rig.joint('arm')?.rotation.x).toBe(0.7);
   });
 
+  it('rejects looping clips whose masked-in tracks do not end where they begin', () => {
+    const rig = new CharacterRig(new Group(), [{ id: 'root' }]);
+    const snapping: CharacterAnimationClip = {
+      id: 'snapping',
+      label: 'Snapping',
+      duration: 1,
+      tracks: [
+        {
+          joint: 'root',
+          keyframes: [
+            { time: 0, rotation: [0, 0, 0] },
+            { time: 1, rotation: [0, 0, 2] },
+          ],
+        },
+      ],
+    };
+    expect(() => new CharacterAnimator(rig, [snapping])).toThrow('must end where it begins');
+    // The same track is fine when the clip opts out of looping.
+    expect(() => new CharacterAnimator(rig, [{ ...snapping, loop: false }])).not.toThrow();
+  });
+
   it('provides reusable animation easing curves', () => {
     expect(characterEase('linear', 0.25)).toBe(0.25);
     expect(characterEase('ease-in', 0.5)).toBe(0.25);

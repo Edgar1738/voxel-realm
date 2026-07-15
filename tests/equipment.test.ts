@@ -28,7 +28,9 @@ describe('shared equipment', () => {
     const rightWrist = new Group();
     const leftWrist = new Group();
     const rig = new EquipmentRig({ main: rightWrist, off: leftWrist });
+    expect(rig.isEmpty()).toBe(true);
     rig.setLoadout({ main: 'sword', off: 'baguette' });
+    expect(rig.isEmpty()).toBe(false);
     expect(rig.state()).toEqual({ main: 'sword', off: 'baguette' });
     expect(rightWrist.getObjectByName('equipment:sword')).toBeDefined();
     expect(leftWrist.getObjectByName('equipment:baguette')).toBeDefined();

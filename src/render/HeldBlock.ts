@@ -224,10 +224,9 @@ export class HeldBlock {
    * punch dip. `bobY` is the view-bob vertical offset so hand and eye move together.
    */
   update(dt: number, opts: { visible: boolean; yaw: number; pitch: number; bobY: number }): void {
-    const equipment = this.equipment.state();
     const handShown =
       this.displayMode === 'play'
-        ? equipment.main !== undefined || equipment.off !== undefined
+        ? !this.equipment.isEmpty()
         : this.mode === 'block'
           ? this.mesh !== undefined
           : this.toolGroup !== undefined;

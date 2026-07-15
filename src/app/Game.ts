@@ -369,7 +369,6 @@ export class Game {
     // First-person held block (the selected hotbar block in the lower right, build mode only).
     const heldBlock = new HeldBlock(registry);
     heldBlock.attach(renderer.scene, renderer.camera);
-    heldBlock.setEquipment(DEFAULT_PLAYER_EQUIPMENT);
 
     // Ambience: weather cycles on its own clock; __vr.weather() pins a kind for testing.
     const weather = new Weather((intensity) => audio.playThunder(intensity));
@@ -1206,16 +1205,23 @@ export class Game {
       setStatus('Three-Flag Trial started — follow the pink beacon');
     };
 
+    let challengeHudShown = false;
     const updatePiperChallenge = (dt: number): void => {
       if (!threeFlagRun) {
-        ui.setChallengeHud(undefined);
-        challengeMarker.update(undefined, false);
+        // Hide once when a run ends; don't rewrite the HUD/marker every idle frame.
+        if (challengeHudShown) {
+          challengeHudShown = false;
+          ui.setChallengeHud(undefined);
+          challengeMarker.update(undefined, false);
+        }
         return;
       }
+      challengeHudShown = true;
       const tick = tickThreeFlagChallenge(threeFlagRun, player.position.x, player.position.z, dt);
       if (tick.reached) audio.playTick();
       if (tick.completed) {
         threeFlagRun = undefined;
+        challengeHudShown = false;
         challengeMarker.update(undefined, false);
         ui.setChallengeHud(undefined);
         const previousBest = npcProgress.piperBestSeconds;
@@ -1894,7 +1900,9 @@ export class Game {
       );
       // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
       updateTour();
-      updatePiperChallenge(cdt);
+      // The trial clock freezes while the pointer is unlocked (pause menu, dialogs): the
+      // player can't move then, and best times shouldn't be penalized for pausing.
+      updatePiperChallenge(rig.locked ? cdt : 0);
       tickDiscovery(cdt);
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });

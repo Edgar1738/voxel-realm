@@ -680,7 +680,11 @@ export function createCreativeUi(
   interactionPrompt.setAttribute('role', 'status');
   interactionPrompt.style.display = 'none';
 
+  // Called every frame from the render loop; skip DOM writes when the text hasn't changed.
+  let interactionPromptText: string | undefined;
   const setInteractionPrompt = (text: string | undefined): void => {
+    if (text === interactionPromptText) return;
+    interactionPromptText = text;
     interactionPrompt.style.display = text ? 'block' : 'none';
     interactionPrompt.textContent = text ?? '';
   };
