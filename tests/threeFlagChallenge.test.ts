@@ -34,5 +34,7 @@ describe('Three-Flag Trial', () => {
   it('formats scorecard time consistently', () => {
     expect(formatChallengeTime(9.2)).toBe('0:09.2');
     expect(formatChallengeTime(65)).toBe('1:05.0');
+    expect(formatChallengeTime(59.97)).toBe('1:00.0'); // tenths round up across the minute
+    expect(formatChallengeTime(119.96)).toBe('2:00.0');
   });
 });

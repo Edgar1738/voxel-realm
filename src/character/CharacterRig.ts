@@ -269,6 +269,12 @@ export class CharacterAnimator {
   private transitionElapsed = 0;
   private transitionDuration = 0;
   private transitionFrom: CharacterPoseSnapshot | undefined;
+  // Per-frame scratch state: the rest pose is immutable, `scratch` is refilled from it each
+  // update, and masks are precomputed — the hot loop allocates nothing while idle.
+  private readonly restCache: CharacterPoseSnapshot;
+  private readonly scratch: CharacterPoseSnapshot;
+  private readonly masks = new Map<string, ReadonlySet<string>>();
+  private atRest = true;
 
   constructor(
     private readonly rig: CharacterRig,
@@ -277,7 +283,10 @@ export class CharacterAnimator {
     for (const clip of clips) {
       if (clip.duration <= 0) throw new Error(`character clip ${clip.id} must have a duration`);
       this.clips.set(clip.id, clip);
+      if (clip.mask) this.masks.set(clip.id, new Set(clip.mask));
     }
+    this.restCache = rig.restPose();
+    this.scratch = rig.restPose();
   }
 
   play(id: string, playback: CharacterAnimationPlayback = {}): boolean {
@@ -297,6 +306,7 @@ export class CharacterAnimator {
     this.elapsed = 0;
     this.transitionFrom = undefined;
     this.rig.reset();
+    this.atRest = true;
     return stopped;
   }
 
@@ -311,18 +321,33 @@ export class CharacterAnimator {
   update(dt: number): void {
     const clip = this.active;
     if (!clip) {
-      this.rig.reset();
+      // Reset once when a clip ends; afterwards the rig stays at rest so callers (walk
+      // swing, manual poses) can write joints without being stomped every frame.
+      if (!this.atRest) {
+        this.rig.reset();
+        this.atRest = true;
+      }
       return;
     }
+    this.atRest = false;
     this.elapsed += Math.max(0, dt);
     const time =
       clip.loop === false ? Math.min(clip.duration, this.elapsed) : this.elapsed % clip.duration;
-    const target = this.rig.restPose();
-    const mask = clip.mask ? new Set(clip.mask) : undefined;
+    const target = this.scratch;
+    for (const [id, rest] of this.restCache) {
+      const value = target.get(id)!;
+      value.pos[0] = rest.pos[0];
+      value.pos[1] = rest.pos[1];
+      value.pos[2] = rest.pos[2];
+      value.rotation[0] = rest.rotation[0];
+      value.rotation[1] = rest.rotation[1];
+      value.rotation[2] = rest.rotation[2];
+    }
+    const mask = this.masks.get(clip.id);
     for (const track of clip.tracks) {
       if (mask && !mask.has(track.joint)) continue;
       const sampled = sampleTrack(track, time);
-      const rest = this.rig.restTransform(track.joint);
+      const rest = this.restCache.get(track.joint);
       const jointTarget = target.get(track.joint);
       if (!sampled || !rest || !jointTarget) continue;
       if (sampled.pos) {

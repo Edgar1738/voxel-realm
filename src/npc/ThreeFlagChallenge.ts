@@ -57,8 +57,9 @@ export function tickThreeFlagChallenge(
 }
 
 export function formatChallengeTime(seconds: number): string {
-  const safe = Math.max(0, seconds);
-  const minutes = Math.floor(safe / 60);
-  const remainder = safe - minutes * 60;
+  // Round to tenths before splitting so 59.97s formats as 1:00.0, never 0:60.0.
+  const tenths = Math.round(Math.max(0, seconds) * 10);
+  const minutes = Math.floor(tenths / 600);
+  const remainder = (tenths % 600) / 10;
   return `${minutes}:${remainder.toFixed(1).padStart(4, '0')}`;
 }

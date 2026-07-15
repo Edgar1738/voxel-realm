@@ -106,15 +106,27 @@ export class NpcSystem {
     return findNpcTarget(this.definitions, origin, direction, undefined, obstacleDistance);
   }
 
-  /** Returns an NPC box only from its anchor cell, avoiding duplicate collision responses. */
+  /**
+   * Returns an NPC box from every voxel cell it overlaps, so the collision sweep finds it no
+   * matter which side the player approaches from. Duplicate reports across cells are harmless:
+   * the axis sweep clamps against each box independently, so re-testing the same box is
+   * idempotent.
+   */
   collisionBoxesAt(wx: number, wy: number, wz: number): AABB[] {
     const boxes: AABB[] = [];
     for (const npc of this.definitions) {
       const box = collisionBox(npc);
       if (!box) continue;
-      if (wx !== Math.floor(npc.position.x) || wz !== Math.floor(npc.position.z)) continue;
-      if (wy !== Math.floor(box[1])) continue;
-      boxes.push(box);
+      if (
+        wx < box[3] &&
+        wx + 1 > box[0] &&
+        wy < box[4] &&
+        wy + 1 > box[1] &&
+        wz < box[5] &&
+        wz + 1 > box[2]
+      ) {
+        boxes.push(box);
+      }
     }
     return boxes;
   }

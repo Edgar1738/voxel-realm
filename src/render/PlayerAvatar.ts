@@ -680,11 +680,12 @@ export class PlayerAvatar {
     this.swingAmp += (targetAmp - this.swingAmp) * Math.min(1, dt * SWING_EASE);
     const swing = Math.sin(this.phase) * this.swingAmp;
     if (!this.animator.activeId() && this.manualPose.size === 0) {
-      // Legs lead; arms counter-swing. Elbow/knee joints remain free for richer authored motion.
-      this.rig.joint('right-hip')!.rotation.x += swing;
-      this.rig.joint('left-hip')!.rotation.x -= swing;
-      this.rig.joint('right-shoulder')!.rotation.x -= swing;
-      this.rig.joint('left-shoulder')!.rotation.x += swing;
+      // Legs lead; arms counter-swing. Absolute writes (rest rotation is zero for these
+      // joints): the idle animator no longer resets the rig every frame.
+      this.rig.joint('right-hip')!.rotation.x = swing;
+      this.rig.joint('left-hip')!.rotation.x = -swing;
+      this.rig.joint('right-shoulder')!.rotation.x = -swing;
+      this.rig.joint('left-shoulder')!.rotation.x = swing;
     }
     for (const [id, transform] of this.manualPose) this.rig.set(id, transform);
   }

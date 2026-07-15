@@ -77,6 +77,25 @@ describe('CharacterAnimator', () => {
     expect(animator.play('missing')).toBe(false);
   });
 
+  it('leaves external joint writes untouched while idle', () => {
+    const rig = new CharacterRig(new Group(), [
+      { id: 'root', pos: [0, 2, 0] },
+      { id: 'arm', parent: 'root' },
+    ]);
+    const animator = new CharacterAnimator(rig, clips);
+    // Never played: idle updates must not stomp caller-owned joint state (walk swing).
+    rig.joint('arm')!.rotation.x = 0.5;
+    animator.update(0.016);
+    expect(rig.joint('arm')?.rotation.x).toBe(0.5);
+    // After a clip stops, exactly one reset happens, then joints stay caller-owned again.
+    animator.play('masked-bob', { transitionSeconds: 0 });
+    animator.update(0.25);
+    animator.stop();
+    rig.joint('arm')!.rotation.x = 0.7;
+    animator.update(0.016);
+    expect(rig.joint('arm')?.rotation.x).toBe(0.7);
+  });
+
   it('provides reusable animation easing curves', () => {
     expect(characterEase('linear', 0.25)).toBe(0.25);
     expect(characterEase('ease-in', 0.5)).toBe(0.25);

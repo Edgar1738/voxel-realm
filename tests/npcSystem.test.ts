@@ -13,11 +13,27 @@ describe('NPC catalog and collision', () => {
     expect(npcDefinitionsForPreset('default')).toEqual([]);
   });
 
-  it('exposes one world-space collision box from Piper’s anchor cell', () => {
+  it('exposes Piper’s collision box from every cell it overlaps', () => {
     const system = new NpcSystem([NPC_CATALOG.piper]);
+    // Box spans y 63.0–64.8 within column (0, 18): both vertical cells report it.
     expect(system.collisionBoxesAt(0, 63, 18)).toHaveLength(1);
+    expect(system.collisionBoxesAt(0, 64, 18)).toHaveLength(1);
     expect(system.collisionBoxesAt(-1, 63, 18)).toEqual([]);
+    expect(system.collisionBoxesAt(0, 65, 18)).toEqual([]);
     expect(system.intersectsVoxel(0, 63, 18)).toBe(true);
+    system.dispose();
+  });
+
+  it('reports a box straddling a column boundary from both columns', () => {
+    const straddler = {
+      ...NPC_CATALOG.piper,
+      id: 'straddler',
+      position: { x: 0, y: 63.9, z: 18.5 }, // box x spans -0.34..0.34 across columns -1 and 0
+    };
+    const system = new NpcSystem([straddler]);
+    expect(system.collisionBoxesAt(0, 63, 18)).toHaveLength(1);
+    expect(system.collisionBoxesAt(-1, 63, 18)).toHaveLength(1);
+    expect(system.collisionBoxesAt(1, 63, 18)).toEqual([]);
     system.dispose();
   });
 

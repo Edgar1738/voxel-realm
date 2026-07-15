@@ -1171,6 +1171,8 @@ export class Game {
     });
 
     const aimedNpc = (): NpcDefinition | undefined => {
+      // Most worlds have no NPCs; skip the per-frame interaction raycast entirely there.
+      if (npcSystem.definitions.length === 0) return undefined;
       const { origin, dir } = aimRay();
       const obstacle = raycastVoxels(previewSampler, origin, dir, NPC_INTERACTION_RANGE);
       const obstacleDistance = obstacle
