@@ -32,6 +32,13 @@ import {
   resolveHandMode,
   saveHandModeId,
 } from '../character/HandModes';
+import {
+  DEFAULT_PLAYER_EQUIPMENT,
+  isEquipmentId,
+  isEquipmentSlot,
+  type EquipmentLoadout,
+} from '../character/Equipment';
+import type { CharacterJointTransform } from '../character/CharacterRig';
 import { clipCameraDistance } from './aim';
 import { ChunkManager } from '../world/ChunkManager';
 import { MeshWorkerPool } from '../world/MeshWorkerPool';
@@ -153,6 +160,25 @@ import {
   type BlueprintStore,
 } from './BlueprintStore';
 import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
+import { NpcSystem } from '../npc/NpcSystem';
+import { npcDefinitionsForPreset } from '../npc/NpcCatalog';
+import { NPC_INTERACTION_RANGE } from '../npc/NpcTargeting';
+import { resolveNpcDialogue } from '../npc/NpcDialogue';
+import {
+  CROWN_CIRCUIT_LANDMARKS,
+  clearNpcProgress,
+  loadNpcProgress,
+  saveNpcProgress,
+} from '../npc/NpcProgress';
+import {
+  THREE_FLAG_WAYPOINTS,
+  challengeDistance,
+  formatChallengeTime,
+  startThreeFlagChallenge,
+  tickThreeFlagChallenge,
+  type ThreeFlagRun,
+} from '../npc/ThreeFlagChallenge';
+import type { NpcDefinition, NpcDialogueContext } from '../npc/NpcTypes';
 
 const SEED: WorldSeed = 1337;
 const SPAWN: Vec3 = { x: 8, y: 100, z: 8 }; // start flying above origin while chunks load
@@ -304,13 +330,21 @@ export class Game {
     // are intentional positions and must not be settled onto the ground.
     const usingDefaultSpawn = spawnState.positionSource === 'default';
     // Resume restores the player's locomotion mode; every other spawn source boots flying.
-    const player = new PlayerController(spawnState.spawn, spawnState.flying ?? true);
+    const player = new PlayerController(
+      spawnState.spawn,
+      spawnState.flying ?? preset !== 'sunmeadow-trials',
+    );
+    const npcSystem = new NpcSystem(npcDefinitionsForPreset(preset));
+    npcSystem.attach((object) => renderer.add(object));
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
       isClimbable(x: number, y: number, z: number): boolean;
       isBarrier(x: number, y: number, z: number): boolean;
     } = {
-      collisionBoxes: (x: number, y: number, z: number) => manager.collisionBoxesAt(x, y, z),
+      collisionBoxes: (x: number, y: number, z: number) => [
+        ...manager.collisionBoxesAt(x, y, z),
+        ...npcSystem.collisionBoxesAt(x, y, z),
+      ],
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
       isClimbable: (x: number, y: number, z: number) =>
         registry.isClimbable(manager.getBlock(x, y, z)),
@@ -365,6 +399,7 @@ export class Game {
     const initialHandMode = resolveHandMode(handModeId);
     const avatarSkinTarget: { current?: PlayerAvatar } = {};
     const initialPlayerSkin = resolvePlayerSkin(playerSkinId);
+    heldBlock.setEquipment(initialPlayerSkin.equipment ?? DEFAULT_PLAYER_EQUIPMENT);
 
     const ui = createCreativeUi(
       registry,
@@ -394,6 +429,9 @@ export class Game {
       const skin = resolvePlayerSkin(id);
       playerSkinId = skin.id;
       avatarSkinTarget.current?.setSkin(skin.id);
+      const equipment = skin.equipment ?? DEFAULT_PLAYER_EQUIPMENT;
+      heldBlock.setEquipment(equipment);
+      avatarSkinTarget.current?.setEquipment(equipment);
       ui.setSkinUi(skin.id, skin.name);
       if (persist) {
         try {
@@ -663,6 +701,7 @@ export class Game {
           await store.clearDeltas();
           clearResume(localStorage, worldName); // don't resume into a world that no longer exists
           clearWaypoint(localStorage, worldName); // and don't point at a landmark that's now gone
+          clearNpcProgress(localStorage, worldName);
         } catch (err) {
           console.error('Voxel Realm: reset failed', err);
         }
@@ -815,6 +854,7 @@ export class Game {
 
     const applyExperience = (mode: ExperienceMode): void => {
       experience = mode;
+      heldBlock.setDisplayMode(mode);
       if (mode === 'play') {
         ui.setInventoryOpen(false);
         if (builder.mode !== 'off') builder.toggleMode(); // leave build tools; keep clipboard
@@ -835,6 +875,9 @@ export class Game {
     // not only by the distance readout.
     const tourMarker = new TourMarker();
     tourMarker.attach((o) => renderer.add(o));
+    const challengeMarker = new TourMarker(0xff4a9f);
+    challengeMarker.attach((o) => renderer.add(o));
+    let threeFlagRun: ThreeFlagRun | undefined;
     const route = tourRoute(activeMeta);
     let tourIndex: number | undefined;
     const endTour = (message: string): void => {
@@ -845,6 +888,11 @@ export class Game {
     };
     const startTour = (): void => {
       if (!route) return void setStatus('This world has no tour');
+      if (threeFlagRun) {
+        threeFlagRun = undefined;
+        ui.setChallengeHud(undefined);
+        challengeMarker.update(undefined, false);
+      }
       tourIndex = 0;
       setStatus('Tour started — follow the gold beacon');
     };
@@ -877,10 +925,25 @@ export class Game {
 
     // Landmark discovery medals: walking near a landmark marks it found, persisted per save.
     // The map and info dialog hide undiscovered names behind "???" so exploring reveals them.
+    const npcProgress = loadNpcProgress(localStorage, worldName);
     const discovery = new LandmarkDiscovery(
       activeMeta?.landmarks ?? [],
       `vr.landmarksFound.${worldName}`,
     );
+    const crownFoundCount = (): number =>
+      CROWN_CIRCUIT_LANDMARKS.filter((name) => discovery.isFound(name)).length;
+    const completeCrownCircuitIfReady = (): boolean => {
+      if (
+        npcProgress.crownCircuit !== 'active' ||
+        crownFoundCount() < CROWN_CIRCUIT_LANDMARKS.length
+      ) {
+        return false;
+      }
+      npcProgress.crownCircuit = 'complete';
+      saveNpcProgress(localStorage, worldName, npcProgress);
+      return true;
+    };
+    completeCrownCircuitIfReady();
     let discoveryTimer = 0;
     const tickDiscovery = (cdt: number): void => {
       if (discovery.total === 0) return;
@@ -890,11 +953,15 @@ export class Game {
       const found = discovery.tick(player.position.x, player.position.z);
       if (found.length === 0) return;
       audio.playTick();
-      setStatus(
-        discovery.complete
-          ? `All ${discovery.total} landmarks discovered — world explored!`
-          : `Discovered: ${found.map((l) => l.name).join(', ')} (${discovery.foundCount}/${discovery.total})`,
-      );
+      if (completeCrownCircuitIfReady()) {
+        setStatus('The Crown’s Circuit is restored — return to Lady Aurelia');
+      } else {
+        setStatus(
+          discovery.complete
+            ? `All ${discovery.total} landmarks discovered — world explored!`
+            : `Discovered: ${found.map((l) => l.name).join(', ')} (${discovery.foundCount}/${discovery.total})`,
+        );
+      }
     };
 
     // World intro/info panel: shown once per save on a curated first visit, reopenable via Info.
@@ -1081,6 +1148,7 @@ export class Game {
 
     // Visible player character, shown only in third-person view.
     const avatar = new PlayerAvatar(playerSkinId);
+    avatar.setEquipment(initialPlayerSkin.equipment ?? DEFAULT_PLAYER_EQUIPMENT);
     avatarSkinTarget.current = avatar;
     avatar.attach((o) => renderer.add(o));
     // The avatar is the scene's only lit (MeshLambert) material — chunks, particles, weather,
@@ -1100,6 +1168,149 @@ export class Game {
       origin: player.eye(),
       dir: lookDirectionFromYawPitch(rig.yaw, rig.pitch),
     });
+
+    const aimedNpc = (): NpcDefinition | undefined => {
+      // Most worlds have no NPCs; skip the per-frame interaction raycast entirely there.
+      if (npcSystem.definitions.length === 0) return undefined;
+      const { origin, dir } = aimRay();
+      const obstacle = raycastVoxels(previewSampler, origin, dir, NPC_INTERACTION_RANGE);
+      const obstacleDistance = obstacle
+        ? Math.hypot(
+            obstacle.point.x - origin.x,
+            obstacle.point.y - origin.y,
+            obstacle.point.z - origin.z,
+          )
+        : Infinity;
+      return npcSystem.target(origin, dir, obstacleDistance);
+    };
+
+    const npcDialogueContext = (): NpcDialogueContext => ({
+      challengeRunning: threeFlagRun !== undefined,
+      ...(npcProgress.piperBestSeconds !== undefined
+        ? { challengeBestSeconds: npcProgress.piperBestSeconds }
+        : {}),
+      crownCircuitState: npcProgress.crownCircuit,
+      crownFound: crownFoundCount(),
+      crownTotal: CROWN_CIRCUIT_LANDMARKS.length,
+    });
+
+    const startPiperChallenge = (): void => {
+      if (tourIndex !== undefined) endTour('Tour ended');
+      threeFlagRun = startThreeFlagChallenge();
+      challengeMarker.update(THREE_FLAG_WAYPOINTS[0], true);
+      npcSystem.playPose('piper-green', 'point-course', {
+        holdSeconds: 2.2,
+        returnTo: 'idle-club',
+      });
+      setStatus('Three-Flag Trial started — follow the pink beacon');
+    };
+
+    let challengeHudShown = false;
+    const updatePiperChallenge = (dt: number): void => {
+      if (!threeFlagRun) {
+        // Hide once when a run ends; don't rewrite the HUD/marker every idle frame.
+        if (challengeHudShown) {
+          challengeHudShown = false;
+          ui.setChallengeHud(undefined);
+          challengeMarker.update(undefined, false);
+        }
+        return;
+      }
+      challengeHudShown = true;
+      const tick = tickThreeFlagChallenge(threeFlagRun, player.position.x, player.position.z, dt);
+      if (tick.reached) audio.playTick();
+      if (tick.completed) {
+        threeFlagRun = undefined;
+        challengeHudShown = false;
+        challengeMarker.update(undefined, false);
+        ui.setChallengeHud(undefined);
+        const previousBest = npcProgress.piperBestSeconds;
+        const isBest = previousBest === undefined || tick.elapsed < previousBest;
+        if (isBest) {
+          npcProgress.piperBestSeconds = tick.elapsed;
+          saveNpcProgress(localStorage, worldName, npcProgress);
+        }
+        setStatus(
+          `Three-Flag Trial complete — ${formatChallengeTime(tick.elapsed)}` +
+            (isBest ? ' · new best!' : ''),
+        );
+        npcSystem.playPose('piper-green', 'cheer', {
+          holdSeconds: 2.4,
+          returnTo: 'idle-hip',
+        });
+        return;
+      }
+      threeFlagRun = tick.run;
+      if (!threeFlagRun) return;
+      const target = THREE_FLAG_WAYPOINTS[threeFlagRun.index];
+      challengeMarker.update(target, true);
+      ui.setChallengeHud({
+        name: target.name,
+        distance: challengeDistance(threeFlagRun, player.position.x, player.position.z),
+        index: threeFlagRun.index,
+        total: THREE_FLAG_WAYPOINTS.length,
+        elapsed: formatChallengeTime(threeFlagRun.elapsed),
+        ...(npcProgress.piperBestSeconds !== undefined
+          ? { best: formatChallengeTime(npcProgress.piperBestSeconds) }
+          : {}),
+      });
+    };
+
+    let dialogueBusy = false;
+    const interactWithNpc = async (): Promise<void> => {
+      if (dialogueBusy || ui.isDialogOpen() || worldMap.isOpen()) return;
+      const npc = aimedNpc();
+      if (!npc) return void setStatus('No one is close enough to speak with');
+      if (npc.id === 'piper-green') {
+        npcSystem.playPose(npc.id, 'wave', {
+          holdSeconds: 1.4,
+          returnTo: threeFlagRun ? 'idle-club' : 'idle-hip',
+        });
+      }
+      dialogueBusy = true;
+      ui.setInteractionPrompt(undefined);
+      let nodeId = npc.dialogue.start;
+      try {
+        while (true) {
+          const node = resolveNpcDialogue(npc, nodeId, npcDialogueContext());
+          if (!node) break;
+          const choicePromise = ui.showDialog({
+            title: `${npc.name} — ${npc.role}`,
+            message: node.message,
+            actions: node.actions.map(({ id, label }) => ({ id, label })),
+          });
+          // Open the dialog before releasing pointer lock so the pause listener recognizes the
+          // intentional unlock and leaves the NPC conversation in control of the screen.
+          if (rig.locked) document.exitPointerLock();
+          const choice = await choicePromise;
+          const action = node.actions.find((candidate) => candidate.id === choice);
+          if (!action) break;
+          if (action.effect === 'start-tour') {
+            startTour();
+            break;
+          }
+          if (action.effect === 'start-three-flag') {
+            startPiperChallenge();
+            break;
+          }
+          if (action.effect === 'start-crown-circuit') {
+            npcProgress.crownCircuit = 'active';
+            saveNpcProgress(localStorage, worldName, npcProgress);
+            const completed = completeCrownCircuitIfReady();
+            setStatus(
+              completed
+                ? 'The Crown’s Circuit was already complete — speak with Lady Aurelia again'
+                : 'Crown’s Circuit started — seek the three Sunseal stations',
+            );
+            break;
+          }
+          if (action.effect === 'close' || !action.next) break;
+          nodeId = action.next;
+        }
+      } finally {
+        dialogueBusy = false;
+      }
+    };
 
     const builderAim = (): import('../edit/VoxelRaycast').VoxelRaycastHit | undefined => {
       const { origin, dir } = aimRay();
@@ -1279,7 +1490,9 @@ export class Game {
         },
         getTool: () => tool,
         getTunnelConfig: () => tunnelConfig,
-        intersectsPlayer: (x, y, z) => voxelIntersectsPlayer(x, y, z, player.position, PLAYER_HALF),
+        intersectsPlayer: (x, y, z) =>
+          voxelIntersectsPlayer(x, y, z, player.position, PLAYER_HALF) ||
+          npcSystem.intersectsVoxel(x, y, z),
         getBuildMode: () => builder.mode,
         getExperienceMode: () => experience,
         onEnterBuild: () => {
@@ -1329,6 +1542,28 @@ export class Game {
         onToggleView: () => {
           const next = rig.toggleMode();
           setStatus(next === 'third' ? 'Third-person view (F1)' : 'First-person view (F1)');
+        },
+        onCyclePlayerAnimation: (direction) => {
+          const state = avatar.cycleAnimation(direction);
+          const animation = state.animations.find(({ id }) => id === state.animation);
+          if (!animation) return void setStatus('Player animation stopped (K / Shift+K)');
+          const viewHint = rig.mode === 'third' ? '' : ' — press F1 to view';
+          setStatus(`Player animation: ${animation.label}${viewHint} (K / Shift+K)`);
+        },
+        onInteract: () => void interactWithNpc(),
+        onCycleNpcPose: (direction) => {
+          const npc = aimedNpc();
+          if (!npc) return void setStatus('Aim at an NPC to change their pose');
+          const pose = npcSystem.cyclePose(npc.id, direction);
+          if (!pose) return void setStatus(`${npc.name} has no alternate poses`);
+          setStatus(`${npc.name} pose: ${pose.label} (P / Shift+P)`);
+        },
+        onCycleNpcAnimation: (direction) => {
+          const npc = aimedNpc();
+          if (!npc) return void setStatus('Aim at an NPC to change their animation');
+          const animation = npcSystem.cycleAnimation(npc.id, direction);
+          if (!animation) return void setStatus(`${npc.name} has no looping animations`);
+          setStatus(`${npc.name} animation: ${animation.label} (O / Shift+O · P stops)`);
         },
         onReachChange: (reach) => {
           try {
@@ -1427,7 +1662,7 @@ export class Game {
 
       // Waypoint compass: steer the player to their dropped waypoint. Hidden while a tour runs
       // (the tour HUD owns the same spot); auto-clears once within a few blocks.
-      if (waypoint && tourIndex === undefined) {
+      if (waypoint && tourIndex === undefined && threeFlagRun === undefined) {
         const b = waypointBearing(player.position.x, player.position.z, rig.yaw, waypoint);
         if (b.arrived) {
           waypoint = undefined;
@@ -1487,17 +1722,18 @@ export class Game {
         );
       }
       rig.applyPlayerView(viewEye, thirdDistance);
-      // First-person hand: the block cube shows in build mode only (play mode reads as
-      // scenery, not a toolbar), but cosmetic tools may roam in play mode too.
+      // First-person hand: build keeps the selected hotbar block/tool preview; play swaps to
+      // the shared main/off-hand equipment without changing what block edits place.
       heldBlock.setBlock(inventory.selectedBlock);
-      const handAllowed = handModeId === 'block' ? experience === 'build' : true;
       heldBlock.update(cdt, {
-        visible: rig.mode === 'first' && handAllowed && rig.locked && !ui.isInventoryOpen(),
+        visible: rig.mode === 'first' && rig.locked && !ui.isInventoryOpen(),
         yaw: rig.yaw,
         pitch: rig.pitch,
         bobY,
       });
+      avatar.setEquipmentVisible(experience === 'play');
       avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
+      npcSystem.update(cdt, player.position);
       const move = movementSounds.update(
         cdt,
         player.position.x,
@@ -1652,8 +1888,21 @@ export class Game {
           targetOverlay.update(undefined, false);
         }
       }
+      const npcPromptOn =
+        rig.locked &&
+        !ui.isInventoryOpen() &&
+        !ui.isDialogOpen() &&
+        !worldMap.isOpen() &&
+        !dialogueBusy;
+      const npcTarget = npcPromptOn ? aimedNpc() : undefined;
+      ui.setInteractionPrompt(
+        npcTarget ? `E — Speak with ${npcTarget.name}, ${npcTarget.role}` : undefined,
+      );
       // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
       updateTour();
+      // The trial clock freezes while the pointer is unlocked (pause menu, dialogs): the
+      // player can't move then, and best times shouldn't be penalized for pausing.
+      updatePiperChallenge(rig.locked ? cdt : 0);
       tickDiscovery(cdt);
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });
@@ -1691,9 +1940,129 @@ export class Game {
           if (mode !== undefined) applyHandMode(mode, false);
           return handModeId;
         },
+        equipment: (target = 'player'): EquipmentLoadout => {
+          if (target === 'player') return heldBlock.equipmentState();
+          const state = npcSystem.equipmentState(target);
+          if (!state) throw new Error(`unknown NPC: ${target}`);
+          return state;
+        },
+        equip: (target: string, slot: string, item: string): EquipmentLoadout => {
+          if (!isEquipmentSlot(slot)) throw new Error(`unknown equipment slot: ${slot}`);
+          if (!isEquipmentId(item)) throw new Error(`unknown equipment item: ${item}`);
+          if (target === 'player') {
+            heldBlock.equip(slot, item);
+            avatar.equip(slot, item);
+            return heldBlock.equipmentState();
+          }
+          if (!npcSystem.equip(target, slot, item)) {
+            throw new Error(`unknown NPC or missing ${slot}-hand wrist: ${target}`);
+          }
+          return npcSystem.equipmentState(target)!;
+        },
+        unequip: (target: string, slot: string): EquipmentLoadout => {
+          if (!isEquipmentSlot(slot)) throw new Error(`unknown equipment slot: ${slot}`);
+          if (target === 'player') {
+            heldBlock.unequip(slot);
+            avatar.unequip(slot);
+            return heldBlock.equipmentState();
+          }
+          if (!npcSystem.unequip(target, slot)) {
+            throw new Error(`unknown NPC or missing ${slot}-hand wrist: ${target}`);
+          }
+          return npcSystem.equipmentState(target)!;
+        },
+        playerAnimation: {
+          list: () => avatar.animationState(),
+          play: (animationId: string) => {
+            if (!avatar.playAnimation(animationId)) {
+              throw new Error(`unknown player animation: ${animationId}`);
+            }
+            return avatar.animationState();
+          },
+          cycle: (direction = 1) => avatar.cycleAnimation(direction < 0 ? -1 : 1),
+          stop: () => {
+            avatar.stopAnimation();
+            return avatar.animationState();
+          },
+        },
+        character: {
+          player: {
+            joints: () => avatar.jointState(),
+            joint: (id: string, transform?: CharacterJointTransform) => {
+              if (transform && !avatar.setJointTransform(id, transform)) {
+                throw new Error(`unknown player joint: ${id}`);
+              }
+              const state = avatar.jointState().find((joint) => joint.id === id);
+              if (!state) throw new Error(`unknown player joint: ${id}`);
+              return state;
+            },
+            reset: () => {
+              avatar.resetJoints();
+              return avatar.jointState();
+            },
+            exportPose: () => avatar.exportPose(),
+          },
+          npc: {
+            joints: (npcId: string) => {
+              const state = npcSystem.jointState(npcId);
+              if (!state) throw new Error(`unknown NPC: ${npcId}`);
+              return state;
+            },
+            joint: (npcId: string, id: string, transform?: CharacterJointTransform) => {
+              if (transform && !npcSystem.setJointTransform(npcId, id, transform)) {
+                throw new Error(`unknown NPC or joint: ${npcId}/${id}`);
+              }
+              const state = npcSystem.jointState(npcId)?.find((joint) => joint.id === id);
+              if (!state) throw new Error(`unknown NPC or joint: ${npcId}/${id}`);
+              return state;
+            },
+            reset: (npcId: string) => {
+              if (!npcSystem.resetJoints(npcId)) throw new Error(`unknown NPC: ${npcId}`);
+              return npcSystem.jointState(npcId)!;
+            },
+            exportPose: (npcId: string) => {
+              const pose = npcSystem.exportPose(npcId);
+              if (!pose) throw new Error(`unknown NPC: ${npcId}`);
+              return pose;
+            },
+          },
+        },
         // Headless tour driving: rAF is suspended in hidden capture tabs, so agents step the
         // same loop path (`tick`) after moving the player.
         tour: { start: startTour, end: () => endTour('Tour ended'), tick: updateTour },
+        npc: {
+          list: () => npcSystem.poseStates(),
+          pose: (npcId: string, poseId?: string) => {
+            if (poseId !== undefined && !npcSystem.playPose(npcId, poseId)) {
+              throw new Error(`unknown NPC or pose: ${npcId}/${poseId}`);
+            }
+            const state = npcSystem.poseState(npcId);
+            if (!state) throw new Error(`unknown NPC: ${npcId}`);
+            return state;
+          },
+          cycle: (npcId: string, direction = 1) => {
+            const pose = npcSystem.cyclePose(npcId, direction < 0 ? -1 : 1);
+            if (!pose) throw new Error(`NPC has no poses: ${npcId}`);
+            return npcSystem.poseState(npcId)!;
+          },
+          animate: (npcId: string, animationId: string) => {
+            if (!npcSystem.playAnimation(npcId, animationId)) {
+              throw new Error(`unknown NPC or animation: ${npcId}/${animationId}`);
+            }
+            return npcSystem.poseState(npcId)!;
+          },
+          cycleAnimation: (npcId: string, direction = 1) => {
+            const animation = npcSystem.cycleAnimation(npcId, direction < 0 ? -1 : 1);
+            if (!animation) throw new Error(`NPC has no animations: ${npcId}`);
+            return npcSystem.poseState(npcId)!;
+          },
+          stop: (npcId: string) => {
+            npcSystem.stopAnimation(npcId);
+            const state = npcSystem.poseState(npcId);
+            if (!state) throw new Error(`unknown NPC: ${npcId}`);
+            return state;
+          },
+        },
         // Optional dt steps the swarm once headlessly (hidden capture tabs suspend rAF).
         life: (dtSeconds?: number) => {
           if (dtSeconds && dtSeconds > 0) {
@@ -1775,6 +2144,7 @@ export class Game {
       hudTeardown?.();
       celestial.dispose();
       avatar.dispose();
+      npcSystem.dispose();
       weather.dispose();
       ambientLife.dispose();
       critters.dispose();
@@ -1783,6 +2153,7 @@ export class Game {
       pasteGhost.dispose();
       heldBlock.dispose();
       tourMarker.dispose();
+      challengeMarker.dispose();
       targetOverlay.dispose();
       sink.disposeAll();
       mipTexture.dispose(); // sink.disposeAll frees the crisp base; free its mipmapped sibling too

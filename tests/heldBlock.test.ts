@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Scene, PerspectiveCamera, type Mesh, type MeshBasicMaterial } from 'three';
+import { Scene, PerspectiveCamera, type Mesh, type MeshBasicMaterial, type Object3D } from 'three';
 import { HeldBlock } from '../src/render/HeldBlock';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { AIR, STONE, GRASS, STONE_SLAB, FLOWER } from '../src/blocks/blocks';
@@ -16,8 +16,8 @@ function makeHeld() {
   return { held, scene, camera, group };
 }
 
-const meshOf = (group: { children: unknown[] }): Mesh | undefined =>
-  group.children[0] as Mesh | undefined;
+const meshOf = (group: Object3D): Mesh | undefined =>
+  group.getObjectByName('held:block') as Mesh | undefined;
 
 describe('HeldBlock', () => {
   it('attaches to the camera and stays hidden until visible + a block is set', () => {
@@ -68,9 +68,9 @@ describe('HeldBlock', () => {
   it('AIR (or an unknown id) empties the hand', () => {
     const { held, group } = makeHeld();
     held.setBlock(STONE);
-    expect(group.children).toHaveLength(1);
+    expect(meshOf(group)).toBeDefined();
     held.setBlock(AIR);
-    expect(group.children).toHaveLength(0);
+    expect(meshOf(group)).toBeUndefined();
     held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
     expect(group.visible).toBe(false); // visible flag alone can't show an empty hand
   });
@@ -91,11 +91,11 @@ describe('HeldBlock', () => {
     expect(group.visible).toBe(true);
     const blockMesh = meshOf(group)!;
     expect(blockMesh.visible).toBe(false); // cube stays built but hidden
-    const tool = group.children[1] as { children: unknown[] };
+    const tool = group.getObjectByName('held:tool:axe')!;
     expect(tool.children.length).toBeGreaterThanOrEqual(3); // handle + head parts
     held.setMode('block');
     expect(blockMesh.visible).toBe(true);
-    expect(group.children).toHaveLength(1); // tool torn down
+    expect(group.getObjectByName('held:tool:axe')).toBeUndefined();
   });
 
   it('tool modes show even with an empty block hand; empty mode hides everything', () => {
@@ -115,12 +115,35 @@ describe('HeldBlock', () => {
   it('tool parts share cached spec textures (wood handle reused across tools)', () => {
     const { held, group } = makeHeld();
     held.setMode('pickaxe');
-    const handleMap = (g: { children: unknown[] }): unknown =>
-      ((g.children[0] as { children: Mesh[] }).children[0].material as MeshBasicMaterial).map;
-    const pickHandle = handleMap(group);
+    const handleMap = (kind: 'pickaxe' | 'axe'): unknown =>
+      (
+        (group.getObjectByName(`held:tool:${kind}`)!.children[0] as Mesh)
+          .material as MeshBasicMaterial
+      ).map;
+    const pickHandle = handleMap('pickaxe');
     held.setMode('axe');
-    const axeHandle = handleMap(group);
+    const axeHandle = handleMap('axe');
     expect(axeHandle).toBe(pickHandle);
+  });
+
+  it('keeps the hotbar block in build mode and swaps to main/off equipment in play mode', () => {
+    const { held, group } = makeHeld();
+    held.setBlock(STONE);
+    held.setEquipment({ main: 'sword', off: 'baguette' });
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(meshOf(group)?.visible).toBe(true);
+    expect(group.getObjectByName('equipment:sword')?.parent?.visible).toBe(false);
+
+    held.setDisplayMode('play');
+    held.update(0.016, { visible: true, yaw: 0, pitch: 0, bobY: 0 });
+    expect(meshOf(group)?.visible).toBe(false);
+    expect(group.getObjectByName('equipment:sword')).toBeDefined();
+    expect(group.getObjectByName('equipment:baguette')).toBeDefined();
+    expect(group.getObjectByName('equipment:sword')?.parent?.visible).toBe(true);
+
+    held.unequip('off');
+    expect(held.equipmentState()).toEqual({ main: 'sword' });
+    expect(group.getObjectByName('equipment:baguette')).toBeUndefined();
   });
 
   it('punch dips the hand and decays back to the rest pose', () => {

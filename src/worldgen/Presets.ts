@@ -20,6 +20,7 @@ import { createGrandKeepGenerator, grandKeepSurfaceAt, GRAND_KEEP } from './Gran
 import { grandKeepSite } from './grandKeepSite';
 import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
 import { cloudspireSite } from './cloudspireSite';
+import { sunmeadowSite } from './sunmeadowSite';
 import {
   cottage,
   well,
@@ -62,7 +63,8 @@ export type WorldPreset =
   | 'ashen-reach'
   | 'harbor'
   | 'grand-keep'
-  | 'cloudspire-citadel';
+  | 'cloudspire-citadel'
+  | 'sunmeadow-trials';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -80,6 +82,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'harbor',
   'grand-keep',
   'cloudspire-citadel',
+  'sunmeadow-trials',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -390,6 +393,11 @@ export function createGenerator(preset: WorldPreset): {
             },
           ),
         ],
+      };
+    case 'sunmeadow-trials':
+      return {
+        generator: new FlatGenerator(flatColumn(SEA_LEVEL, GRASS, DIRT, STONE)),
+        overlays: [sunmeadowSite()],
       };
     case 'default':
     default:

@@ -19,11 +19,11 @@ export class TourMarker {
   readonly beam: Mesh;
   readonly pad: Mesh;
 
-  constructor() {
+  constructor(color = BEACON_COLOR) {
     this.beam = new Mesh(
       new CylinderGeometry(BEAM_RADIUS, BEAM_RADIUS * 0.65, BEAM_HEIGHT, 10),
       new MeshBasicMaterial({
-        color: BEACON_COLOR,
+        color,
         transparent: true,
         opacity: 0.42,
         depthWrite: false,
@@ -32,7 +32,7 @@ export class TourMarker {
     this.pad = new Mesh(
       new BoxGeometry(PAD_SIZE, PAD_HEIGHT, PAD_SIZE),
       new MeshBasicMaterial({
-        color: BEACON_COLOR,
+        color,
         transparent: true,
         opacity: 0.85,
         depthWrite: false,

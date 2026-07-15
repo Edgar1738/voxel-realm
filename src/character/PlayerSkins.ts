@@ -1,3 +1,5 @@
+import type { EquipmentLoadout } from './Equipment';
+
 export type PlayerSkinId =
   | 'realm-scout'
   | 'castle-mason'
@@ -38,7 +40,8 @@ export type PlayerAccessoryId =
   | 'quiver'
   | 'pauldrons'
   | 'cloak'
-  | 'mantle';
+  | 'mantle'
+  | 'scout-kit';
 
 export type PlayerSkinPalette = Record<PlayerSkinSlot, number>;
 
@@ -48,6 +51,8 @@ export interface PlayerSkin {
   description: string;
   palette: PlayerSkinPalette;
   accessories: readonly PlayerAccessoryId[];
+  /** Optional play-mode wrist equipment authored as part of this skin. */
+  equipment?: Readonly<EquipmentLoadout>;
 }
 
 export const DEFAULT_PLAYER_SKIN_ID: PlayerSkinId = 'realm-scout';
@@ -78,7 +83,8 @@ export const BUILT_IN_PLAYER_SKINS: readonly PlayerSkin[] = [
       cloak: 0x314c3a,
       hood: 0x3e7c59,
     },
-    accessories: ['hair', 'brow', 'satchel', 'backpack'],
+    accessories: ['hair', 'brow', 'satchel', 'backpack', 'scout-kit'],
+    equipment: { main: 'sword', off: 'baguette' },
   },
   {
     id: 'castle-mason',

@@ -1,4 +1,4 @@
-// What the first-person hand shows. Purely cosmetic: 'block' renders the selected hotbar
+// What the first-person hand shows in build mode. Purely cosmetic: 'block' renders the selected hotbar
 // block (the classic build view), the tools are viewmodels only, and 'empty' hides the hand.
 // Placing/breaking always uses the selected hotbar block regardless of mode.
 export type HandModeId = 'block' | 'pickaxe' | 'axe' | 'sword' | 'empty';

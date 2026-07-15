@@ -139,6 +139,21 @@ export function playModeGatedMessage(code: string, key: string, ctrl: boolean): 
   return undefined;
 }
 
+/** P cycles the aimed NPC pose; Shift+P cycles backward. */
+export function npcPoseDirection(code: string, shift: boolean): 1 | -1 | 0 {
+  return code === 'KeyP' ? (shift ? -1 : 1) : 0;
+}
+
+/** O cycles looping NPC animations; Shift+O cycles backward. */
+export function npcAnimationDirection(code: string, shift: boolean): 1 | -1 | 0 {
+  return code === 'KeyO' ? (shift ? -1 : 1) : 0;
+}
+
+/** K cycles player animations; Shift+K cycles backward. */
+export function playerAnimationDirection(code: string, shift: boolean): 1 | -1 | 0 {
+  return code === 'KeyK' ? (shift ? -1 : 1) : 0;
+}
+
 /** Wheel-to-hotbar-step mapping. Returns 0 when editing is blocked or there is no scroll delta. */
 export function hotbarWheelDelta(deltaY: number, canEditNow: boolean): number {
   if (!canEditNow) return 0;
@@ -204,6 +219,14 @@ export interface InputCallbacks {
   onToggleMap: () => void;
   /** Invoked when F1 is pressed — toggles first/third-person (works in play and build modes). */
   onToggleView: () => void;
+  /** Invoked by K / Shift+K to cycle the local player's looping animation. */
+  onCyclePlayerAnimation: (direction: 1 | -1) => void;
+  /** Invoked when E is pressed while in-game; the host resolves the currently aimed NPC. */
+  onInteract: () => void;
+  /** Invoked by P / Shift+P to cycle poses on the currently aimed NPC. */
+  onCycleNpcPose: (direction: 1 | -1) => void;
+  /** Invoked by O / Shift+O to cycle looping animations on the aimed NPC. */
+  onCycleNpcAnimation: (direction: 1 | -1) => void;
   /** Invoked after a Shift+wheel reach change, with the new reach value. */
   onReachChange: (reach: number) => void;
 }
@@ -248,6 +271,32 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
 
+      const playerAnimationStep = playerAnimationDirection(e.code, e.shiftKey);
+      if (playerAnimationStep !== 0) {
+        if (rig.locked && !callbacks.isInventoryOpen()) {
+          e.preventDefault();
+          callbacks.onCyclePlayerAnimation(playerAnimationStep);
+        }
+        return;
+      }
+
+      const poseDirection = npcPoseDirection(e.code, e.shiftKey);
+      if (poseDirection !== 0) {
+        if (rig.locked && !callbacks.isInventoryOpen()) {
+          e.preventDefault();
+          callbacks.onCycleNpcPose(poseDirection);
+        }
+        return;
+      }
+      const animationDirection = npcAnimationDirection(e.code, e.shiftKey);
+      if (animationDirection !== 0) {
+        if (rig.locked && !callbacks.isInventoryOpen()) {
+          e.preventDefault();
+          callbacks.onCycleNpcAnimation(animationDirection);
+        }
+        return;
+      }
+
       // Play mode: creative shortcuts are inert. B enters build mode; L (headlamp) passes
       // through below; movement/look/fly live in CameraRig and are untouched.
       if (!creativeInputAllowed(callbacks.getExperienceMode())) {
@@ -258,7 +307,8 @@ export function registerInputListeners(ctx: InputContext): () => void {
         // Tour toggle and the build hints only make sense while actually in-game: gate them on
         // pointer lock so keys don't fire behind the pause menu / an open dialog.
         else if (rig.locked && !callbacks.isInventoryOpen()) {
-          if (e.code === 'KeyT') callbacks.onToggleTour();
+          if (e.code === 'KeyE') callbacks.onInteract();
+          else if (e.code === 'KeyT') callbacks.onToggleTour();
           else {
             const hint = playModeGatedMessage(e.code, e.key, e.ctrlKey);
             if (hint) callbacks.onStatusChange(hint);
@@ -288,7 +338,10 @@ export function registerInputListeners(ctx: InputContext): () => void {
         callbacks.onInventoryToggle(open);
         return;
       }
-      // KeyE is intentionally reserved for a future interact/use action — no binding today.
+      if (e.code === 'KeyE') {
+        if (rig.locked && !callbacks.isInventoryOpen()) callbacks.onInteract();
+        return;
+      }
       if (e.code === 'Escape' && callbacks.isInventoryOpen()) {
         callbacks.onInventoryToggle(false);
         return;

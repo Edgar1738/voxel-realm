@@ -37,6 +37,72 @@ describe('PlayerAvatar', () => {
     expect(legPivot.rotation.x).toBe(0);
   });
 
+  it('loops a hip-thrust animation by counter-moving the hips and upper body', () => {
+    const avatar = new PlayerAvatar('keep-mage');
+    expect(avatar.playAnimation('hip-thrust-loop')).toBe(true);
+    avatar.update({ x: 0, y: 0, z: 0 }, 0, true, { dh: 0, dt: 0.25 });
+
+    const hips = avatar.group.getObjectByName('animation:hips')!;
+    const upperBody = avatar.group.getObjectByName('animation:upper-body')!;
+    expect(Math.abs(hips.position.z)).toBeGreaterThan(0.1);
+    expect(Math.abs(hips.rotation.x)).toBeGreaterThan(0.1);
+    expect(upperBody.rotation.x * hips.rotation.x).toBeLessThan(0);
+  });
+
+  it('loops a jump-cheer animation with vertical lift and both hands overhead', () => {
+    const avatar = new PlayerAvatar();
+    expect(avatar.playAnimation('jump-cheer-loop')).toBe(true);
+    avatar.update({ x: 0, y: 0, z: 0 }, 0, true, { dh: 0, dt: 0.52 });
+
+    const animationRoot = avatar.group.getObjectByName('animation:root')!;
+    const rightArm = avatar.group.getObjectByName('right-arm')!.parent!;
+    const leftArm = avatar.group.getObjectByName('left-arm')!.parent!;
+    expect(animationRoot.position.y).toBeGreaterThan(0.4);
+    expect(rightArm.rotation.z).toBeGreaterThan(2.5);
+    expect(leftArm.rotation.z).toBeLessThan(-2.5);
+  });
+
+  it('uses the V2 spine, elbow, knee, ankle, neck, and head hierarchy on every skin', () => {
+    for (const skin of ['realm-scout', 'keep-mage', 'frost-knight']) {
+      const avatar = new PlayerAvatar(skin);
+      const ids = avatar.jointState().map(({ id }) => id);
+      expect(ids).toEqual(
+        expect.arrayContaining([
+          'pelvis',
+          'spine-lower',
+          'chest',
+          'neck',
+          'head',
+          'right-elbow',
+          'left-elbow',
+          'right-knee',
+          'left-knee',
+          'right-ankle',
+          'left-ankle',
+        ]),
+      );
+    }
+  });
+
+  it('supports live joint posing, reset, and JSON-ready pose export', () => {
+    const avatar = new PlayerAvatar();
+    expect(avatar.setJointTransform('chest', { rotation: [0.2, -0.1, 0.3] })).toBe(true);
+    expect(avatar.setJointTransform('missing', { rotation: [1, 0, 0] })).toBe(false);
+    expect(avatar.exportPose().chest.rotation).toEqual([0.2, -0.1, 0.3]);
+    avatar.resetJoints();
+    expect(avatar.exportPose().chest.rotation).toEqual([0, 0, 0]);
+  });
+
+  it('cycles both player animations and then returns to the neutral pose', () => {
+    const avatar = new PlayerAvatar();
+    expect(avatar.animationState().animation).toBeUndefined();
+    expect(avatar.cycleAnimation(1).animation).toBe('hip-thrust-loop');
+    expect(avatar.cycleAnimation(1).animation).toBe('jump-cheer-loop');
+    expect(avatar.cycleAnimation(1).animation).toBeUndefined();
+    expect(avatar.playAnimation('missing')).toBe(false);
+    expect(avatar.stopAnimation()).toBe(false);
+  });
+
   it('uses Realm Scout as the default skin', () => {
     const avatar = new PlayerAvatar();
     const torso = avatar.group.getObjectByName('torso') as Mesh;
@@ -48,6 +114,10 @@ describe('PlayerAvatar', () => {
     const headMat = head.material as MeshLambertMaterial;
     expect(headMat.map).toBeNull();
     expect(headMat.color.getHex()).toBe(resolvePlayerSkin('realm-scout').palette.skin);
+    expect((avatar.group.getObjectByName('scout-scarf') as Mesh).visible).toBe(true);
+    expect(avatar.group.getObjectByName('jaw')).toBeDefined();
+    expect(avatar.group.getObjectByName('right-forearm')).toBeDefined();
+    expect(avatar.group.getObjectByName('right-calf')).toBeDefined();
   });
 
   it('shares one texture per color+style across parts and skin swaps', () => {
@@ -120,6 +190,21 @@ describe('PlayerAvatar', () => {
 
   it('starts hidden (first-person default)', () => {
     expect(new PlayerAvatar().group.visible).toBe(false);
+  });
+
+  it('mounts shared main/off equipment at the animated wrist joints', () => {
+    const avatar = new PlayerAvatar();
+    avatar.setEquipment({ main: 'sword', off: 'baguette' });
+    const rightWrist = avatar.group.getObjectByName('joint:right-wrist')!;
+    const leftWrist = avatar.group.getObjectByName('joint:left-wrist')!;
+    expect(rightWrist.getObjectByName('equipment:sword')).toBeDefined();
+    expect(leftWrist.getObjectByName('equipment:baguette')).toBeDefined();
+    expect(avatar.equipmentState()).toEqual({ main: 'sword', off: 'baguette' });
+
+    avatar.setEquipmentVisible(false);
+    expect(rightWrist.getObjectByName('equipment-slot:main')?.visible).toBe(false);
+    avatar.unequip('off');
+    expect(avatar.equipmentState()).toEqual({ main: 'sword' });
   });
 
   it('update copies center, yaw and visibility when shown', () => {

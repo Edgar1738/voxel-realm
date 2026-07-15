@@ -138,6 +138,8 @@ const boot = vi.hoisted(() => {
     playerConstructorArgs: [] as unknown[],
     playerAvatarConstructorArgs: [] as unknown[],
     avatarSetSkin: vi.fn(),
+    avatarSetEquipment: vi.fn(),
+    heldSetEquipment: vi.fn(),
     avatarAttach: vi.fn(),
     avatarDispose: vi.fn(() => order.push('avatar.dispose')),
     avatarUpdate: vi.fn(),
@@ -244,6 +246,11 @@ vi.mock('../src/render/HeldBlock', () => ({
       punch: vi.fn(),
       setBlock: vi.fn(),
       setMode: vi.fn(),
+      setDisplayMode: vi.fn(),
+      setEquipment: boot.heldSetEquipment,
+      equip: vi.fn(() => true),
+      unequip: vi.fn(() => true),
+      equipmentState: vi.fn(() => ({ main: 'sword', off: 'baguette' })),
       update: vi.fn(),
       dispose: vi.fn(),
     };
@@ -309,9 +316,51 @@ vi.mock('../src/player/PlayerController', () => ({
 vi.mock('../src/render/PlayerAvatar', () => ({
   PlayerAvatar: vi.fn(function PlayerAvatar(...args: unknown[]) {
     boot.playerAvatarConstructorArgs = args;
+    const animations = [
+      { id: 'hip-thrust-loop', label: 'Hip thrust' },
+      { id: 'jump-cheer-loop', label: 'Jump cheer' },
+    ];
+    let animation: string | undefined;
+    let chestRotation: [number, number, number] = [0, 0, 0];
+    const animationState = () => ({ ...(animation ? { animation } : {}), animations });
+    const jointState = () => [
+      { id: 'chest', pos: [0, 0.2, 0], rotation: chestRotation },
+      { id: 'right-wrist', parent: 'right-elbow', pos: [0, -0.27, 0], rotation: [0, 0, 0] },
+    ];
     return {
       attach: boot.avatarAttach,
       setSkin: boot.avatarSetSkin,
+      setEquipment: boot.avatarSetEquipment,
+      setEquipmentVisible: vi.fn(),
+      equip: vi.fn(() => true),
+      unequip: vi.fn(() => true),
+      animationState: vi.fn(animationState),
+      playAnimation: vi.fn((id: string) => {
+        if (!animations.some(({ id: animationId }) => animationId === id)) return false;
+        animation = id;
+        return true;
+      }),
+      cycleAnimation: vi.fn((direction: 1 | -1 = 1) => {
+        const sequence = [undefined, ...animations.map(({ id }) => id)];
+        const next = (sequence.indexOf(animation) + direction + sequence.length) % sequence.length;
+        animation = sequence[next];
+        return animationState();
+      }),
+      stopAnimation: vi.fn(() => {
+        const stopped = animation !== undefined;
+        animation = undefined;
+        return stopped;
+      }),
+      jointState: vi.fn(jointState),
+      setJointTransform: vi.fn((id: string, transform: { rotation?: [number, number, number] }) => {
+        if (id !== 'chest') return false;
+        if (transform.rotation) chestRotation = transform.rotation;
+        return true;
+      }),
+      resetJoints: vi.fn(() => {
+        chestRotation = [0, 0, 0];
+      }),
+      exportPose: vi.fn(() => ({ chest: { pos: [0, 0.2, 0], rotation: chestRotation } })),
       update: boot.avatarUpdate,
       dispose: boot.avatarDispose,
     };
@@ -560,6 +609,55 @@ describe('Game.boot composition', () => {
     cleanup();
   });
 
+  it('wires shared equip/unequip dev commands for the player loadout', async () => {
+    const cleanup = await bootGame();
+    const { installDevControls } = await import('../src/app/DevControls');
+    const context = vi.mocked(installDevControls).mock.calls[0]![0];
+
+    expect(context.equipment()).toEqual({ main: 'sword', off: 'baguette' });
+    expect(context.equip('player', 'main', 'sword')).toEqual({
+      main: 'sword',
+      off: 'baguette',
+    });
+    expect(context.unequip('player', 'off')).toEqual({ main: 'sword', off: 'baguette' });
+    expect(() => context.equip('player', 'head', 'sword')).toThrow('unknown equipment slot: head');
+    expect(() => context.equip('player', 'main', 'pickaxe')).toThrow(
+      'unknown equipment item: pickaxe',
+    );
+
+    cleanup();
+  });
+
+  it('wires player animation dev commands for every skin', async () => {
+    const cleanup = await bootGame();
+    const { installDevControls } = await import('../src/app/DevControls');
+    const { playerAnimation } = vi.mocked(installDevControls).mock.calls[0]![0];
+
+    expect(playerAnimation.list().animation).toBeUndefined();
+    expect(playerAnimation.play('hip-thrust-loop').animation).toBe('hip-thrust-loop');
+    expect(playerAnimation.cycle().animation).toBe('jump-cheer-loop');
+    expect(playerAnimation.stop().animation).toBeUndefined();
+    expect(() => playerAnimation.play('missing')).toThrow('unknown player animation: missing');
+
+    cleanup();
+  });
+
+  it('wires the live player pose-authoring surface', async () => {
+    const cleanup = await bootGame();
+    const { installDevControls } = await import('../src/app/DevControls');
+    const { player } = vi.mocked(installDevControls).mock.calls[0]![0].character;
+
+    expect(player.joints().map(({ id }) => id)).toContain('chest');
+    expect(player.joint('chest', { rotation: [0.2, 0.1, -0.3] }).rotation).toEqual([
+      0.2, 0.1, -0.3,
+    ]);
+    expect(player.exportPose().chest.rotation).toEqual([0.2, 0.1, -0.3]);
+    expect(player.reset().find(({ id }) => id === 'chest')?.rotation).toEqual([0, 0, 0]);
+    expect(() => player.joint('missing')).toThrow('unknown player joint: missing');
+
+    cleanup();
+  });
+
   it('boots the avatar and selector from a stored built-in skin', async () => {
     vi.stubGlobal('localStorage', makeStorage({ 'vr.playerSkin': 'keep-mage' }));
 
@@ -617,9 +715,20 @@ describe('Game.boot composition', () => {
   it('cycles the selector through built-in skins and persists the chosen id', async () => {
     const cleanup = await bootGame();
 
+    expect(boot.heldSetEquipment).toHaveBeenLastCalledWith({
+      main: 'sword',
+      off: 'baguette',
+    });
+    expect(boot.avatarSetEquipment).toHaveBeenLastCalledWith({
+      main: 'sword',
+      off: 'baguette',
+    });
+
     skinSelectorConfig().onCycle();
 
     expect(boot.avatarSetSkin).toHaveBeenLastCalledWith('castle-mason');
+    expect(boot.heldSetEquipment).toHaveBeenLastCalledWith({ main: 'sword' });
+    expect(boot.avatarSetEquipment).toHaveBeenLastCalledWith({ main: 'sword' });
     expect(boot.ui!.setSkinUi).toHaveBeenLastCalledWith('castle-mason', 'Castle Mason');
     expect(localStorage.getItem('vr.playerSkin')).toBe('castle-mason');
     expect(boot.ui!.setStatus).toHaveBeenCalledWith('Skin: Castle Mason');

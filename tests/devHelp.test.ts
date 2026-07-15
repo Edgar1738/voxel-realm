@@ -12,6 +12,11 @@ describe('DEV_HELP', () => {
       'blockAt',
       'world',
       'ambient',
+      'npc',
+      'playerAnimation',
+      'character',
+      'equip',
+      'unequip',
       'help',
     ]) {
       expect(DEV_HELP[key], `missing help for ${key}`).toBeTypeOf('string');

@@ -21,6 +21,9 @@ import {
   loadHoldRepeat,
   saveHoldRepeat,
   playModeGatedMessage,
+  npcPoseDirection,
+  npcAnimationDirection,
+  playerAnimationDirection,
   PLAY_MODE_BUILD_HINT,
   type ReachStorage,
 } from '../src/app/input';
@@ -74,6 +77,30 @@ describe('playModeGatedMessage', () => {
     // Bare Z/Y do nothing even in build mode (undo/redo need Ctrl), so no hint either.
     expect(playModeGatedMessage('KeyZ', 'z', false)).toBeUndefined();
     expect(playModeGatedMessage('KeyY', 'y', false)).toBeUndefined();
+  });
+});
+
+describe('npcPoseDirection', () => {
+  it('maps P and Shift+P to forward and backward cycling', () => {
+    expect(npcPoseDirection('KeyP', false)).toBe(1);
+    expect(npcPoseDirection('KeyP', true)).toBe(-1);
+    expect(npcPoseDirection('KeyO', false)).toBe(0);
+  });
+});
+
+describe('npcAnimationDirection', () => {
+  it('maps O and Shift+O to forward and backward animation cycling', () => {
+    expect(npcAnimationDirection('KeyO', false)).toBe(1);
+    expect(npcAnimationDirection('KeyO', true)).toBe(-1);
+    expect(npcAnimationDirection('KeyP', false)).toBe(0);
+  });
+});
+
+describe('playerAnimationDirection', () => {
+  it('maps K and Shift+K to forward and backward animation cycling', () => {
+    expect(playerAnimationDirection('KeyK', false)).toBe(1);
+    expect(playerAnimationDirection('KeyK', true)).toBe(-1);
+    expect(playerAnimationDirection('KeyP', false)).toBe(0);
   });
 });
 

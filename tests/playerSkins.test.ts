@@ -38,6 +38,8 @@ describe('built-in player skins', () => {
   it('defaults to the Realm Scout skin', () => {
     expect(DEFAULT_PLAYER_SKIN_ID).toBe('realm-scout');
     expect(resolvePlayerSkin().id).toBe('realm-scout');
+    expect(resolvePlayerSkin().equipment).toEqual({ main: 'sword', off: 'baguette' });
+    expect(resolvePlayerSkin('castle-mason').equipment).toBeUndefined();
   });
 
   it('falls back to the default skin for unknown ids', () => {
