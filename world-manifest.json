@@ -908,7 +908,7 @@
       },
       "look": {
         "yaw": 3.141592653589793,
-        "pitch": 0.12
+        "pitch": 0.5
       },
       "landmarks": [
         { "name": "Arrival Overlook", "x": 0, "y": 118, "z": -210 },
@@ -917,9 +917,9 @@
         { "name": "Grand Cathedral", "x": 0, "y": 115, "z": -54 },
         { "name": "Inner Palace Court", "x": 0, "y": 114, "z": -14 },
         { "name": "Great Hall", "x": 0, "y": 114, "z": 24 },
-        { "name": "Sky Bridge", "x": 50, "y": 205, "z": 24 },
-        { "name": "Crown Balcony", "x": 0, "y": 417, "z": 24 },
-        { "name": "East Waterfall", "x": 70, "y": 100, "z": -30 },
+        { "name": "Sky Bridge", "x": 50, "y": 206, "z": 24 },
+        { "name": "Crown Balcony", "x": 0, "y": 418, "z": 24 },
+        { "name": "East Waterfall", "x": 70, "y": 113, "z": -30 },
         { "name": "Wizard Tower", "x": -55, "y": 160, "z": 35 }
       ],
       "tour": [

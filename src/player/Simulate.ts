@@ -61,7 +61,7 @@ export function simulateSteps(
 export interface WalkOptions {
   dt?: number;
   maxFrames?: number;
-  /** Horizontal distance to the target counted as "arrived". */
+  /** Horizontal distance to the target counted as "arrived" (vertical tolerance is one block). */
   arriveDist?: number;
   /** Consecutive no-progress frames before giving up (blocked / unreachable). */
   stuckFrames?: number;
@@ -71,7 +71,7 @@ export interface WalkResult {
   arrived: boolean;
   frames: number;
   finalPos: Vec3;
-  /** Horizontal distance still to the target when the walk stopped. */
+  /** Three-dimensional distance still to the target when the walk stopped. */
   remaining: number;
   /** True when it stopped because it stopped making progress (not on arrival / frame cap). */
   stuck: boolean;
@@ -79,8 +79,9 @@ export interface WalkResult {
 
 /**
  * Walks the player toward `target` under real physics, re-aiming (a straight beeline) each frame.
- * Stops on arrival (within `arriveDist`), at `maxFrames`, or after `stuckFrames` consecutive
- * no-progress frames. Auto-hops when stalled so 1-block ledges and straight stairs are climbed.
+ * Stops on arrival (within horizontal `arriveDist` and one vertical block), at `maxFrames`, or
+ * after `stuckFrames` consecutive no-progress frames. Auto-hops when stalled so 1-block ledges
+ * and straight stairs are climbed.
  * A `stuck` result with a non-trivial `remaining` means it couldn't get there on foot — a wall,
  * an unclimbable ledge, or a capped exit. For winding routes (a spiral stair) chain waypoints.
  */
@@ -96,13 +97,15 @@ export function walkToward(
   const stuckLimit = opts.stuckFrames ?? 24;
 
   let stuckCount = 0;
-  let prevRemaining = Infinity;
+  let prevProgressDistance = Infinity;
 
   for (let f = 0; f < maxFrames; f++) {
     const dx = target.x - player.position.x;
+    const dy = target.y - player.position.y;
     const dz = target.z - player.position.z;
-    const remaining = Math.hypot(dx, dz);
-    if (remaining <= arriveDist)
+    const remaining = Math.hypot(dx, dy, dz);
+    const progressDistance = Math.hypot(dx, dz);
+    if (progressDistance <= arriveDist && Math.abs(dy) <= 1)
       return {
         arrived: true,
         frames: f,
@@ -112,9 +115,9 @@ export function walkToward(
       };
 
     // No measurable progress since the previous frame → count toward "stuck".
-    if (prevRemaining - remaining < 1e-3) stuckCount++;
+    if (prevProgressDistance - progressDistance < 1e-3) stuckCount++;
     else stuckCount = 0;
-    prevRemaining = remaining;
+    prevProgressDistance = progressDistance;
     if (stuckCount >= stuckLimit)
       return {
         arrived: false,
@@ -129,12 +132,13 @@ export function walkToward(
   }
 
   const dxEnd = target.x - player.position.x;
+  const dyEnd = target.y - player.position.y;
   const dzEnd = target.z - player.position.z;
   return {
     arrived: false,
     frames: maxFrames,
     finalPos: { ...player.position },
-    remaining: Math.hypot(dxEnd, dzEnd),
+    remaining: Math.hypot(dxEnd, dyEnd, dzEnd),
     stuck: false,
   };
 }

@@ -44,10 +44,11 @@ export function dressWorld(s: CitadelStamp): void {
   }
 
   // Hidden garden alcove (secret 2)
-  s.fill(CX + 42, G + 1, -55, CX + 50, G + 6, -48, LIMESTONE);
-  s.fill(CX + 43, G + 1, -54, CX + 49, G + 5, -49, AIR);
-  s.set(CX + 46, G + 2, -51, GLOWSTONE);
-  s.fill(CX + 42, G + 2, -52, CX + 42, G + 4, -50, AIR); // entrance slit
+  const alcoveY = cloudspireTerraceY(CX + 46, -51);
+  s.fill(CX + 42, alcoveY + 1, -55, CX + 50, alcoveY + 6, -48, LIMESTONE);
+  s.fill(CX + 43, alcoveY + 1, -54, CX + 49, alcoveY + 5, -49, AIR);
+  s.set(CX + 46, alcoveY + 2, -51, GLOWSTONE);
+  s.fill(CX + 42, alcoveY + 2, -52, CX + 42, alcoveY + 4, -50, AIR); // entrance slit
 
   // Extra roof pinnacles on outer towers for skyline
   for (let i = 0; i < 12; i++) {
@@ -82,8 +83,14 @@ export function clearHeroRoute(s: CitadelStamp): void {
     SPAWN.z + 4,
     AIR,
   );
-  // Gate passage
-  s.fill(CX - 5, G + 1, Z0 - 3, CX + 5, G + 9, Z0 + 20, AIR);
+  // Gate passage. Clear above each graded column without deleting the rising path surface at
+  // the north edge (the former fixed-y box cut an eight-block trench at Z0 + 20).
+  for (let z = Z0 - 3; z <= Z0 + 20; z++) {
+    for (let x = CX - 5; x <= CX + 5; x++) {
+      const gy = cloudspireTerraceY(x, z);
+      s.fill(x, gy + 1, z, x, Math.max(G + 9, gy + 4), z, AIR);
+    }
+  }
   // Path spine — clear the walking corridor above the graded processional so the avenue
   // stays open where the terrace rises toward the cathedral.
   for (let z = Z0 + 20; z < CATH.z0; z++) {

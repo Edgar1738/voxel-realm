@@ -27,8 +27,6 @@ import {
   STAIR_Z1,
   SPIRE,
   spireAccessibleY,
-  CX,
-  CZ,
   GP,
 } from './cloudspireFrame';
 import {
@@ -63,7 +61,7 @@ export function buildPalace(s: CitadelStamp): void {
   switchbackStair(s, STAIR_X0, STAIR_X1, STAIR_Z0, STAIR_Z1, FLOOR.ground, FLOOR.roof, 5);
   // Open stair doors every floor
   for (const fy of PALACE_STACK) {
-    s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 2, STAIR_X0, fy + 4, STAIR_Z0 + 10, AIR);
+    s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 1, STAIR_X0, fy + 4, STAIR_Z0 + 14, AIR);
   }
 
   // Secondary west spiral
@@ -252,7 +250,6 @@ function buildHighFloor(s: CitadelStamp): void {
 /** Multi-stage central spire above palace roof. */
 export function buildMainSpire(s: CitadelStamp): void {
   let y = SPIRE.baseY;
-  let prevHalf = 24;
   for (let i = 0; i < SPIRE.stages.length; i++) {
     const st = SPIRE.stages[i];
     const y1 = y + st.height;
@@ -269,13 +266,32 @@ export function buildMainSpire(s: CitadelStamp): void {
         pointedWindow(s, KCX, wy, KCZ + st.half, 4, 'z');
       }
     }
+    // Each narrowing stage opens onto the previous stage's setback deck. Without this east
+    // doorway the spiral arrived outside a sealed, smaller tower shell.
+    if (i > 0 && i < 5) {
+      s.fill(KCX + st.half, y + 1, KCZ - 1, KCX + st.half, y + 4, KCZ + 1, AIR);
+    }
     // Spiral connecting stages (offset so not solid core block-in)
     if (i < 5) {
       const scx = KCX + Math.max(1, st.half - 3);
       const scz = KCZ;
-      spiralStair(s, scx, scz, y + 1, y1, PLANKS, DEEPSLATE);
-      // Door from interior to stair
-      s.fill(KCX, y + 1, KCZ - 1, scx, y + 3, KCZ + 1, AIR);
+      const stairTop = i === 4 ? spireAccessibleY() : y1;
+      spiralStair(s, scx, scz, y + 1, stairTop, PLANKS, DEEPSLATE);
+      // Stop short of the 3x3 stair footprint: the old corridor erased its first two steps.
+      if (scx - 2 >= KCX) {
+        s.fill(KCX, y + 1, KCZ - 1, scx - 2, y + 3, KCZ + 1, AIR);
+      }
+
+      // A complete landing supports the stair endpoint and the walk to the next-stage door.
+      const deckY = i === 4 ? spireAccessibleY() : y1;
+      s.slab(
+        KCX - st.half + 1,
+        KCZ - st.half + 1,
+        KCX + st.half - 1,
+        KCZ + st.half - 1,
+        deckY,
+        PLANKS,
+      );
     }
     // Balcony on stages 1, 3, 4
     if (i === 1 || i === 3 || i === 4) {
@@ -287,17 +303,15 @@ export function buildMainSpire(s: CitadelStamp): void {
       s.set(KCX, y + Math.floor(st.height / 2), KCZ - st.half, CYAN_GLASS);
       s.set(KCX, y + Math.floor(st.height / 2), KCZ + st.half, CYAN_GLASS);
     }
-    prevHalf = st.half;
     y = y1;
   }
   // Peak
   steepRoof(s, KCX, KCZ, 3, y, SLATE);
   pinnacle(s, KCX, y + 4, KCZ, 12);
-  s.set(KCX, spireAccessibleY() + 2, KCZ, GLOWSTONE);
-
   // Ensure crown balcony walkable air
   const crownY = spireAccessibleY();
   s.fill(KCX - 3, crownY + 1, KCZ - 3, KCX + 3, crownY + 4, KCZ + 3, AIR);
+  s.set(KCX, crownY + 4, KCZ, GLOWSTONE);
 
   // Obvious doorway from the palace roof into the spire base (was corner-gap-only access).
   const spireDoorZ = KCZ - SPIRE.stages[0].half; // south face of stage 0, facing the roof
@@ -324,10 +338,6 @@ export function buildMainSpire(s: CitadelStamp): void {
   );
   s.set(KCX - 2, SPIRE.baseY + 1, spireDoorZ - 1, LANTERN);
   s.set(KCX + 2, SPIRE.baseY + 1, spireDoorZ - 1, LANTERN);
-
-  void prevHalf;
-  void CX;
-  void CZ;
 }
 
 /** Sky bridge from palace high floor to observatory secondary tower. */
@@ -353,6 +363,6 @@ export function clearPalaceRoute(s: CitadelStamp): void {
   // Hall → stair
   s.fill(KCX + 8, FLOOR.ground + 1, STAIR_Z0 + 4, STAIR_X0, FLOOR.ground + 4, STAIR_Z0 + 8, AIR);
   for (const fy of PALACE_STACK) {
-    s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 2, STAIR_X0, fy + 4, STAIR_Z0 + 10, AIR);
+    s.fill(STAIR_X0, fy + 1, STAIR_Z0 + 1, STAIR_X0, fy + 4, STAIR_Z0 + 14, AIR);
   }
 }

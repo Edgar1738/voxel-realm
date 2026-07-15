@@ -10,6 +10,7 @@ import {
   KCX,
   KCZ,
   G,
+  GP,
 } from '../worldgen/cloudspireFrame';
 
 /** Metadata for procedural-but-authored worlds, giving new worlds a curated arrival and tour. */
@@ -99,7 +100,7 @@ export function curatedPresetMeta(
         { name: 'Great Hall', x: KCX, y: FLOOR.hall + 1, z: KCZ },
         { name: 'Sky Bridge', x: KEEP.x1 + 10, y: FLOOR.high + 3, z: KCZ },
         { name: 'Crown Balcony', x: KCX, y: crownY + 1, z: KCZ },
-        { name: 'East Waterfall', x: 70, y: G + 4, z: -30 },
+        { name: 'East Waterfall', x: 70, y: GP + 1, z: -30 },
         { name: 'Wizard Tower', x: -55, y: 160, z: 35 },
       ],
       tour: [

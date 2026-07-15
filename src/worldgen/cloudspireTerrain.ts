@@ -13,6 +13,7 @@ import {
   DEEPSLATE,
 } from '../blocks/blocks';
 import { CitadelStamp, hash2 } from './CitadelStamp';
+import { cloudspireTerraceY } from './CloudspireGenerator';
 import {
   G,
   CX,
@@ -200,11 +201,14 @@ export function buildLowerDistrict(s: CitadelStamp): void {
     const x1 = p.x + p.w;
     const z0 = p.z;
     const z1 = p.z + p.d;
-    s.walls(x0, G + 1, z0, x1, G + p.h, z1, LIMESTONE);
-    s.slab(x0, z0, x1, z1, G + 1, PLANKS);
-    s.slab(x0, z0, x1, z1, G + p.h, SLATE);
+    const baseY = cloudspireTerraceY((x0 + x1) >> 1, (z0 + z1) >> 1);
+    // Clear the varying natural cap, then author the whole shell relative to local grade.
+    s.fill(x0, baseY + 1, z0, x1, baseY + p.h + Math.floor(p.w / 2) + 3, z1, AIR);
+    s.walls(x0, baseY + 1, z0, x1, baseY + p.h, z1, LIMESTONE);
+    s.slab(x0, z0, x1, z1, baseY + 1, PLANKS);
+    s.slab(x0, z0, x1, z1, baseY + p.h, SLATE);
     // Windows
-    for (let y = G + 3; y < G + p.h - 2; y += 4) {
+    for (let y = baseY + 3; y < baseY + p.h - 2; y += 4) {
       s.set(x0, y, Math.floor((z0 + z1) / 2), AIR);
       s.set(x1, y, Math.floor((z0 + z1) / 2), AIR);
     }
@@ -212,10 +216,10 @@ export function buildLowerDistrict(s: CitadelStamp): void {
     const doorZ = z1;
     s.fill(
       Math.floor((x0 + x1) / 2) - 1,
-      G + 2,
+      baseY + 2,
       doorZ,
       Math.floor((x0 + x1) / 2) + 1,
-      G + 4,
+      baseY + 4,
       doorZ,
       AIR,
     );
@@ -224,7 +228,7 @@ export function buildLowerDistrict(s: CitadelStamp): void {
       Math.floor((x0 + x1) / 2),
       Math.floor((z0 + z1) / 2),
       Math.floor(p.w / 2) + 1,
-      G + p.h + 1,
+      baseY + p.h + 1,
       SLATE,
     );
   }
@@ -233,7 +237,7 @@ export function buildLowerDistrict(s: CitadelStamp): void {
   for (let wz = Z0 - 40; wz < Z0 - 5; wz++) {
     for (let wx = CX - 20; wx <= CX + 20; wx++) {
       if (Math.abs(wx - CX) <= 4) continue;
-      if (hash2(wx, wz, 0x9a11) > 0.7) s.set(wx, G, wz, GRASS);
+      if (hash2(wx, wz, 0x9a11) > 0.7) s.set(wx, cloudspireTerraceY(wx, wz), wz, GRASS);
     }
   }
 }

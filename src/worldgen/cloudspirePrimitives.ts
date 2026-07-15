@@ -15,6 +15,7 @@ import {
   OAK_FENCE,
   COBBLE_WALL,
   STAIRS_STONE,
+  WATER,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, spiralStair } from './CitadelStamp';
@@ -41,7 +42,7 @@ export function stairFlightZ(
   dir: 1 | -1,
   block: BlockId = STAIRS_STONE,
 ): void {
-  const facing = dir > 0 ? FACING.S : FACING.N;
+  const facing = dir > 0 ? FACING.N : FACING.S;
   for (let i = 0; i < steps; i++) {
     const y = yStart + i;
     const z = zStart + i * dir;
@@ -62,7 +63,7 @@ export function stairFlightX(
   dir: 1 | -1,
   block: BlockId = STAIRS_STONE,
 ): void {
-  const facing = dir > 0 ? FACING.E : FACING.W;
+  const facing = dir > 0 ? FACING.W : FACING.E;
   for (let i = 0; i < steps; i++) {
     const y = yStart + i;
     const x = xStart + i * dir;
@@ -92,61 +93,46 @@ export function switchbackStair(
   s.fill(wellX0 + 1, yBottom, wellZ0 + 1, wellX1 - 1, yTop - 1, wellZ1 - 1, AIR);
 
   const midX = Math.floor((wellX0 + wellX1) / 2);
-  const stepX0 = midX - Math.floor(width / 2);
-  const stepX1 = stepX0 + width - 1;
-  const flightRise = 6;
+  const interiorWidth = wellX1 - wellX0 - 1;
+  const laneWidth = Math.min(Math.max(2, width - 1), Math.floor((interiorWidth - 1) / 2));
+  const westX0 = wellX0 + 1;
+  const westX1 = westX0 + laneWidth - 1;
+  const eastX1 = wellX1 - 1;
+  const eastX0 = eastX1 - laneWidth + 1;
+  const flightRise = 10;
+  const southLanding = wellZ0 + 1;
+  const positiveStart = southLanding + 1;
+  const northLanding = positiveStart + flightRise + 2;
+  const negativeStart = northLanding - 1;
+  if (northLanding > wellZ1 - 1) {
+    spiralStair(s, midX, Math.floor((wellZ0 + wellZ1) / 2), yBottom, yTop, STONE, wall);
+    return;
+  }
+  // Bottom-floor approach from the west-side door into the first northbound flight.
+  s.fill(wellX0 + 1, yBottom, southLanding, wellX1 - 1, yBottom, southLanding, PLANKS);
   let y = yBottom;
   let goingPosZ = true;
-  let safety = 0;
-  while (y < yTop && safety < 50) {
-    safety++;
+  while (y < yTop) {
     const remaining = yTop - y;
     const steps = Math.min(flightRise, remaining);
-    const zLen = wellZ1 - wellZ0 - 2;
-    if (zLen < steps) {
-      spiralStair(s, midX, Math.floor((wellZ0 + wellZ1) / 2), y, yTop, STONE, wall);
-      return;
-    }
     if (goingPosZ) {
-      const zStart = wellZ0 + 1;
-      stairFlightZ(s, stepX0, stepX1, zStart, y, steps, 1, step);
+      stairFlightZ(s, westX0, westX1, positiveStart, y, steps, 1, step);
       const landY = y + steps;
-      const landZ = zStart + steps;
-      if (landY < yTop) {
-        s.fill(
-          wellX0 + 1,
-          landY,
-          landZ,
-          wellX1 - 1,
-          landY,
-          Math.min(landZ + 2, wellZ1 - 1),
-          PLANKS,
-        );
-        s.set(wellX0 + 2, landY + 1, landZ + 1, LANTERN);
-      }
+      stairFlightZ(s, westX0, westX1, positiveStart + steps, landY - 1, 1, 1, step);
+      stairFlightZ(s, westX0, westX1, positiveStart + steps + 1, landY, 1, 1, step);
+      s.fill(wellX0 + 1, landY, northLanding, wellX1 - 1, landY, northLanding, PLANKS);
     } else {
-      const zStart = wellZ1 - 1;
-      stairFlightZ(s, stepX0, stepX1, zStart, y, steps, -1, step);
+      stairFlightZ(s, eastX0, eastX1, negativeStart, y, steps, -1, step);
       const landY = y + steps;
-      const landZ = zStart - steps;
-      if (landY < yTop) {
-        s.fill(
-          wellX0 + 1,
-          landY,
-          Math.max(landZ - 2, wellZ0 + 1),
-          wellX1 - 1,
-          landY,
-          landZ,
-          PLANKS,
-        );
-        s.set(wellX1 - 2, landY + 1, landZ - 1, LANTERN);
-      }
+      stairFlightZ(s, eastX0, eastX1, negativeStart - steps, landY - 1, 1, -1, step);
+      stairFlightZ(s, eastX0, eastX1, negativeStart - steps - 1, landY, 1, -1, step);
+      s.fill(wellX0 + 1, landY, southLanding, wellX1 - 1, landY, southLanding, PLANKS);
     }
     y += steps;
     goingPosZ = !goingPosZ;
   }
-  for (let fy = yBottom; fy <= yTop; fy += 6) {
-    s.fill(wellX0, fy + 1, wellZ0 + 3, wellX0, fy + 3, wellZ0 + 6, AIR);
+  for (let fy = yBottom; fy <= yTop; fy += flightRise) {
+    s.fill(wellX0, fy + 1, southLanding, wellX0, fy + 4, northLanding, AIR);
   }
 }
 
@@ -406,8 +392,7 @@ export function fountain(s: CitadelStamp, cx: number, cz: number, y: number, r =
       if (dx * dx + dz * dz <= r * r) {
         s.set(cx + dx, y, cz + dz, CARVED_LIMESTONE);
         if (dx * dx + dz * dz <= (r - 1) * (r - 1)) {
-          s.set(cx + dx, y + 1, cz + dz, AIR);
-          // water placed by water module; basin only here
+          s.set(cx + dx, y + 1, cz + dz, WATER);
           s.set(cx + dx, y, cz + dz, STONE);
         }
       }

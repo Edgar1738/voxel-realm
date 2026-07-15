@@ -68,12 +68,12 @@ export function buildGardens(s: CitadelStamp): void {
 
   // Fountains (graded to their own terrace height). The court fountain lives in buildInnerCourt;
   // a third at (CX, CZ+30) used to be buried inside the palace footprint and has been dropped.
-  fountain(s, CX - 35, CZ - 20, cloudspireTerraceY(CX - 35, CZ - 20));
-  fountain(s, CX + 35, CZ - 20, cloudspireTerraceY(CX + 35, CZ - 20));
+  fountain(s, CX - 45, CZ - 70, cloudspireTerraceY(CX - 45, CZ - 70));
+  fountain(s, CX + 45, CZ - 70, cloudspireTerraceY(CX + 45, CZ - 70));
 
   // Reflecting pool, west garden (contained raised basin at grade)
-  const px0 = CX - 55;
-  const px1 = CX - 35;
+  const px0 = CX - 75;
+  const px1 = CX - 55;
   const pz0 = CZ + 5;
   const pz1 = CZ + 25;
   const py = cloudspireTerraceY((px0 + px1) >> 1, (pz0 + pz1) >> 1);
@@ -154,7 +154,8 @@ function gradedBorder(s: CitadelStamp, x0: number, z0: number, x1: number, z1: n
 
 /** Inner palace court dressing. */
 export function buildInnerCourt(s: CitadelStamp): void {
-  fountain(s, CX, KEEP.z0 - 10, GP);
+  // Offset into the open west court so the processional clear cannot erase the jet.
+  fountain(s, CX - 48, KEEP.z0 - 10, cloudspireTerraceY(CX - 48, KEEP.z0 - 10));
   // Statue plinths
   for (const [x, z] of [
     [CX - 15, KEEP.z0 - 12],

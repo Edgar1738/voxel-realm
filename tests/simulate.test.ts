@@ -64,4 +64,11 @@ describe('walkToward', () => {
     expect(r.stuck).toBe(true);
     expect(r.remaining).toBeGreaterThan(3); // stalled well short of the target
   });
+
+  it('does not report arrival when only the horizontal coordinates match', () => {
+    const player = new PlayerController({ x: 0, y: 1.9, z: 0 }, false);
+    const r = walkToward(player, world(), { x: 0, y: 20, z: 0 });
+    expect(r.arrived).toBe(false);
+    expect(r.remaining).toBeGreaterThan(16);
+  });
 });

@@ -12,7 +12,7 @@ import {
   OAK_FENCE,
 } from '../blocks/blocks';
 import { CitadelStamp } from './CitadelStamp';
-import { CATH, CATH_CX, CATH_CZ, GP, CX } from './cloudspireFrame';
+import { CATH, CATH_CX, CATH_CZ, GP } from './cloudspireFrame';
 import {
   pointedWindow,
   buttress,
@@ -67,10 +67,12 @@ export function buildCathedral(s: CitadelStamp): void {
   s.walls(midX - 10, floor, z1, midX + 10, floor + wallH - 6, apseZ1, LIMESTONE);
   s.fill(midX - 9, floor, z1, midX + 9, floor + wallH - 7, apseZ1 - 1, AIR);
   s.slab(midX - 9, z1, midX + 9, apseZ1 - 1, floor, PLANKS);
-  // Altar
-  s.fill(midX - 3, floor + 1, apseZ1 - 6, midX + 3, floor + 2, apseZ1 - 3, CARVED_LIMESTONE);
-  s.set(midX, floor + 3, apseZ1 - 4, GOLD_TRIM);
-  s.set(midX, floor + 4, apseZ1 - 4, GLOWSTONE);
+  // Altar offset from the processional aisle so the final route clear preserves it.
+  const altarX = midX - 7;
+  const altarZ = z1 + 2;
+  s.fill(altarX - 3, floor + 1, altarZ - 2, altarX + 3, floor + 2, altarZ + 1, CARVED_LIMESTONE);
+  s.set(altarX, floor + 3, altarZ, GOLD_TRIM);
+  s.set(altarX, floor + 4, altarZ, GLOWSTONE);
 
   // Clerestory + tall windows on long walls
   for (let z = z0 + 5; z < z1 - 3; z += 5) {
@@ -177,8 +179,6 @@ export function buildCathedral(s: CitadelStamp): void {
   for (let z = z0 + 10; z < z1 - 8; z += 10) {
     s.set(midX, floor + wallH + 6, z, CYAN_GLASS);
   }
-
-  void CX;
 }
 
 /** Ensure cathedral processional openings stay clear. */

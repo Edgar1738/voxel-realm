@@ -3,12 +3,11 @@ import { CitadelStamp } from './CitadelStamp';
 import { FALLS } from './cloudspireFrame';
 import { CLOUDSPIRE, cloudspireTerraceY } from './CloudspireGenerator';
 
-// Elevated cistern moved east of the cathedral (was centred at x20 and floated over the
-// cathedral's east flank + the garden); now stands on support piers down to grade.
+// Elevated cistern east of the cathedral on support piers down to grade.
 const RES = {
   y: CLOUDSPIRE.reservoirY,
-  cx: 44,
-  cz: -30,
+  cx: CLOUDSPIRE.reservoirCx,
+  cz: CLOUDSPIRE.reservoirCz,
   half: 12,
 };
 
@@ -39,8 +38,6 @@ export function buildWater(s: CitadelStamp): void {
   ] as const) {
     const gy = cloudspireTerraceY(px, pz);
     s.fill(px - 1, gy, pz - 1, px, y - 4, pz, LIMESTONE);
-    // nick the base so the piers read as an arcade rather than solid walls
-    s.fill(px - 1, gy + 3, pz - 1, px, gy + 6, pz, AIR);
   }
 
   // Aqueduct channel feeding the east cascade
@@ -53,12 +50,15 @@ export function buildWater(s: CitadelStamp): void {
 
   // Waterfall cascades — a wide sheet in a stone chute with a two-tier ledge and a contained pool.
   for (const f of FALLS) {
+    const basinFloor = Math.max(f.bottom - 1, cloudspireTerraceY(f.x, f.z));
+    const waterY = basinFloor + 1;
+
     // Header pool + spill lip
     s.fill(f.x - 4, f.top - 2, f.z - 3, f.x + 4, f.top, f.z + 3, LIMESTONE);
     s.fill(f.x - 3, f.top - 1, f.z - 2, f.x + 3, f.top - 1, f.z + 2, WATER);
 
     // Wide falling sheet inside a stone chute
-    for (let yb = f.bottom; yb <= f.top; yb++) {
+    for (let yb = waterY; yb <= f.top; yb++) {
       for (let dx = -2; dx <= 2; dx++) s.set(f.x + dx, yb, f.z, WATER);
       s.set(f.x - 3, yb, f.z, LIMESTONE);
       s.set(f.x + 3, yb, f.z, LIMESTONE);
@@ -67,26 +67,26 @@ export function buildWater(s: CitadelStamp): void {
     }
 
     // Mid ledge → a second cascade tier spilling forward
-    const midY = (f.top + f.bottom) >> 1;
+    const midY = (f.top + waterY) >> 1;
     s.fill(f.x - 3, midY, f.z + 1, f.x + 3, midY, f.z + 2, LIMESTONE);
     for (let dx = -2; dx <= 2; dx++) s.set(f.x + dx, midY + 1, f.z + 1, WATER);
 
     // Contained splash basin
-    s.fill(f.x - 5, f.bottom - 1, f.z - 4, f.x + 5, f.bottom - 1, f.z + 5, STONE);
+    s.fill(f.x - 5, basinFloor, f.z - 4, f.x + 5, basinFloor, f.z + 5, STONE);
     for (let z = f.z - 4; z <= f.z + 5; z++) {
       for (let x = f.x - 5; x <= f.x + 5; x++) {
         const rim = x === f.x - 5 || x === f.x + 5 || z === f.z - 4 || z === f.z + 5;
         if (rim) {
-          s.set(x, f.bottom, z, CARVED_LIMESTONE);
-          s.set(x, f.bottom + 1, z, CARVED_LIMESTONE);
+          s.set(x, waterY, z, CARVED_LIMESTONE);
+          s.set(x, waterY + 1, z, CARVED_LIMESTONE);
         } else {
-          s.set(x, f.bottom, z, WATER);
+          s.set(x, waterY, z, WATER);
         }
       }
     }
 
     // Grotto alcove behind the falls
-    s.fill(f.x - 5, f.bottom + 2, f.z + 5, f.x + 5, f.bottom + 2, f.z + 8, LIMESTONE);
-    s.fill(f.x - 4, f.bottom + 3, f.z + 5, f.x + 4, f.bottom + 5, f.z + 7, AIR);
+    s.fill(f.x - 5, waterY, f.z + 5, f.x + 5, waterY + 6, f.z + 9, LIMESTONE);
+    s.fill(f.x - 4, waterY + 1, f.z + 5, f.x + 4, waterY + 5, f.z + 8, AIR);
   }
 }

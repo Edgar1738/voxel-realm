@@ -34,10 +34,10 @@ export const CLOUDSPIRE = {
   /** Where mountain skirt returns toward plains. */
   skirtRadius: 210,
   plainsY: 72,
-  /** Elevated reservoir north of the city (waterfall source). */
+  /** Elevated reservoir east of the cathedral (waterfall source). */
   reservoirY: 140,
-  reservoirCx: 0,
-  reservoirCz: -40,
+  reservoirCx: 50,
+  reservoirCz: -30,
 } as const;
 
 const PLAINS_FBM: FbmOptions = { octaves: 3, persistence: 0.5, lacunarity: 2, frequency: 1 / 120 };

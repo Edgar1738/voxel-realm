@@ -127,7 +127,7 @@ export const STAIR_Z1 = KEEP.z0 + 34;
 
 // Spawn / arrival
 export const SPAWN = { x: 0, y: 118.5, z: -210 } as const;
-export const LOOK = { yaw: Math.PI, pitch: 0.12 } as const;
+export const LOOK = { yaw: Math.PI, pitch: 0.5 } as const;
 
 // Waterfall outlets (world coords)
 export const FALLS = [

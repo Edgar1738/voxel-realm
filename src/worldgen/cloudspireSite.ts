@@ -35,9 +35,8 @@ export function cloudspireSite(): Overlay {
     buildOuterWalls(s);
     buildGatehouse(s);
     buildWallAccess(s);
-    buildLowerDistrict(s);
-
     buildGardens(s);
+    buildLowerDistrict(s);
     buildWater(s);
 
     buildCathedral(s);
