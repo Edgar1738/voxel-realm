@@ -1712,7 +1712,7 @@ export class Game {
       }
       // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
       let thirdDistance = THIRD_PERSON_DISTANCE;
-      if (rig.mode === 'third') {
+      if (rig.mode === 'third' && !rig.photoMode) {
         const look = lookDirectionFromYawPitch(rig.yaw, rig.pitch);
         thirdDistance = clipCameraDistance(
           (x, y, z) => manager.isSolid(x, y, z),
@@ -1721,6 +1721,9 @@ export class Game {
           THIRD_PERSON_DISTANCE,
         );
       }
+      // Streaming stays player-anchored, so cap the photo camera one chunk inside the loaded
+      // ring — past it there is only fog and ungenerated void.
+      rig.setPhotoRange(Math.max(CHUNK_SIZE_X, (manager.viewDistance - 1) * CHUNK_SIZE_X));
       rig.applyPlayerView(viewEye, thirdDistance);
       // First-person hand: build keeps the selected hotbar block/tool preview; play swaps to
       // the shared main/off-hand equipment without changing what block edits place.
@@ -1856,7 +1859,7 @@ export class Game {
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
       }
-      if (builder.mode !== 'off' && rig.locked && !ui.isInventoryOpen()) {
+      if (builder.mode !== 'off' && rig.locked && !rig.photoMode && !ui.isInventoryOpen()) {
         targetOverlay.update(undefined, false);
         selectionBox.update(builder.selectionBox(), true);
         if (builder.mode === 'pasting') {
@@ -1873,7 +1876,8 @@ export class Game {
         selectionBox.update(undefined, false);
         pasteGhost.update(undefined, undefined, false);
         // Play mode: no targeting outline/ghost — the world reads as scenery, not edit targets.
-        const previewOn = rig.locked && !ui.isInventoryOpen() && experience === 'build';
+        const previewOn =
+          rig.locked && !rig.photoMode && !ui.isInventoryOpen() && experience === 'build';
         if (previewOn) {
           const aimHere = aimRay();
           const previewHit = raycastVoxels(previewSampler, aimHere.origin, aimHere.dir, getReach());
@@ -1890,6 +1894,7 @@ export class Game {
       }
       const npcPromptOn =
         rig.locked &&
+        !rig.photoMode &&
         !ui.isInventoryOpen() &&
         !ui.isDialogOpen() &&
         !worldMap.isOpen() &&
@@ -1900,9 +1905,10 @@ export class Game {
       );
       // Tour HUD: live distance to the active waypoint, advancing (and finishing) on arrival.
       updateTour();
-      // The trial clock freezes while the pointer is unlocked (pause menu, dialogs): the
-      // player can't move then, and best times shouldn't be penalized for pausing.
-      updatePiperChallenge(rig.locked ? cdt : 0);
+      // The trial clock freezes while the pointer is unlocked (pause menu, dialogs) or the
+      // player is parked in photo mode: they can't move then, and best times shouldn't be
+      // penalized for pausing or framing a shot.
+      updatePiperChallenge(rig.locked && !rig.photoMode ? cdt : 0);
       tickDiscovery(cdt);
       sink.sortTransparent({ x: renderer.camera.position.x, z: renderer.camera.position.z });
     });

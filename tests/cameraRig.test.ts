@@ -341,3 +341,174 @@ describe('CameraRig view modes', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Photo mode (F2)
+// ---------------------------------------------------------------------------
+
+/** Camera stub with a live position for photo-mode movement tests. */
+function makePhotoCamera() {
+  const position = {
+    x: 0,
+    y: 0,
+    z: 0,
+    set(x: number, y: number, z: number) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+    },
+  };
+  return {
+    position,
+    quaternion: { setFromEuler: vi.fn() },
+    getWorldDirection: vi.fn(),
+  } as unknown as import('three').PerspectiveCamera;
+}
+
+async function makeLockedRig(blocked: () => boolean = () => false) {
+  vi.resetModules();
+  const { CameraRig } = await import('../src/render/CameraRig');
+  const cam = makePhotoCamera();
+  const canvas = makeCanvas();
+  const rig = new CameraRig(cam, canvas, undefined, blocked);
+  fakeDocument.pointerLockElement = canvas as unknown as Element;
+  fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+  return { rig, cam, canvas };
+}
+
+const pressF2 = (): void =>
+  void fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'F2' }));
+
+describe('CameraRig photo mode', () => {
+  it('enters from first-person and exiting restores first-person', async () => {
+    const { rig } = await makeLockedRig();
+    expect(rig.mode).toBe('first');
+    pressF2();
+    expect(rig.photoMode).toBe(true);
+    expect(rig.mode).toBe('third'); // avatar stays visible
+    pressF2();
+    expect(rig.photoMode).toBe(false);
+    expect(rig.mode).toBe('first');
+  });
+
+  it('enters from third-person and exiting restores third-person', async () => {
+    const { rig } = await makeLockedRig();
+    rig.toggleMode();
+    pressF2();
+    expect(rig.photoMode).toBe(true);
+    pressF2();
+    expect(rig.mode).toBe('third');
+  });
+
+  it('F1 during photo mode exits photo mode without corrupting the remembered mode', async () => {
+    const { rig } = await makeLockedRig();
+    pressF2(); // enter from first
+    const mode = rig.toggleMode();
+    expect(rig.photoMode).toBe(false);
+    expect(mode).toBe('third'); // exit restored 'first', then F1 toggled it
+  });
+
+  it('does not enter while the pointer is unlocked or a menu blocks input', async () => {
+    const { rig } = await makeLockedRig();
+    fakeDocument.pointerLockElement = null;
+    fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+    pressF2();
+    expect(rig.photoMode).toBe(false);
+
+    let blocked = false;
+    const second = await makeLockedRig(() => blocked);
+    blocked = true;
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'F2' }));
+    expect(second.rig.photoMode).toBe(false);
+  });
+
+  it('returns neutral player input while active, and W drives the camera not the player', async () => {
+    const { rig } = await makeLockedRig();
+    pressF2();
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+    fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyF' }));
+    const input = rig.getInput();
+    expect(input.forward).toBe(false);
+    expect(input.toggleFly).toBe(false);
+  });
+
+  it('advances the camera by speed × dt along the photo look, independent of player yaw', async () => {
+    const now = vi.spyOn(performance, 'now');
+    try {
+      now.mockReturnValue(1000);
+      const { rig, cam } = await makeLockedRig();
+      pressF2(); // photo yaw/pitch seeded from player (0, 0) → forward = −Z
+      rig.yaw = Math.PI / 2; // later player-yaw changes must not steer the photo camera
+      fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+      now.mockReturnValue(1020); // 20 ms frame
+      rig.applyPlayerView({ x: 0, y: 0, z: 0 });
+      expect(cam.position.x).toBeCloseTo(0, 6);
+      expect(cam.position.z).toBeCloseTo(-12 * 0.02, 6); // default speed 12
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('normalizes diagonal movement and clamps travel to the photo range', async () => {
+    const now = vi.spyOn(performance, 'now');
+    try {
+      now.mockReturnValue(1000);
+      const { rig, cam } = await makeLockedRig();
+      pressF2();
+      fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+      fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyD' }));
+      now.mockReturnValue(1020);
+      rig.applyPlayerView({ x: 0, y: 0, z: 0 });
+      const travelled = Math.hypot(cam.position.x, cam.position.z);
+      expect(travelled).toBeCloseTo(12 * 0.02, 6); // same speed as a single key
+
+      rig.setPhotoRange(0.1); // eye at origin → camera must be pulled back onto the sphere
+      now.mockReturnValue(1040);
+      rig.applyPlayerView({ x: 0, y: 0, z: 0 });
+      expect(Math.hypot(cam.position.x, cam.position.y, cam.position.z)).toBeCloseTo(0.1, 6);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('stops photo movement while the pointer is unlocked', async () => {
+    const now = vi.spyOn(performance, 'now');
+    try {
+      now.mockReturnValue(1000);
+      const { rig, cam } = await makeLockedRig();
+      pressF2();
+      fakeWindow.dispatchEvent(new FakeKeyboardEvent('keydown', { code: 'KeyW' }));
+      fakeDocument.pointerLockElement = null;
+      fakeDocument.dispatchEvent(new Event('pointerlockchange'));
+      now.mockReturnValue(1020);
+      rig.applyPlayerView({ x: 0, y: 0, z: 0 });
+      expect(cam.position.z).toBeCloseTo(0, 6);
+    } finally {
+      now.mockRestore();
+    }
+  });
+});
+
+describe('photoSpeedStep', () => {
+  it('scroll up speeds up, scroll down slows down, clamped to [2, 96]', async () => {
+    const { photoSpeedStep } = await import('../src/render/CameraRig');
+    expect(photoSpeedStep(12, -100)).toBe(14);
+    expect(photoSpeedStep(12, 100)).toBe(10);
+    expect(photoSpeedStep(2, 100)).toBe(2);
+    expect(photoSpeedStep(96, -100)).toBe(96);
+    expect(photoSpeedStep(3, 100)).toBe(2); // never zero or negative
+  });
+});
+
+describe('clampToRange', () => {
+  it('leaves positions inside the sphere untouched and projects outside ones onto it', async () => {
+    const { clampToRange } = await import('../src/render/CameraRig');
+    const anchor = { x: 10, y: 20, z: 30 };
+    const inside = { x: 12, y: 20, z: 30 };
+    expect(clampToRange(inside, anchor, 5)).toBe(inside);
+    const out = clampToRange({ x: 30, y: 20, z: 30 }, anchor, 5);
+    expect(out).toEqual({ x: 15, y: 20, z: 30 });
+    // zero offset stays put (no division by zero)
+    expect(clampToRange({ ...anchor }, anchor, 0)).toEqual(anchor);
+  });
+});

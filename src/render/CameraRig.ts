@@ -11,6 +11,27 @@ const PHOTO_MIN_SPEED = 2;
 const PHOTO_MAX_SPEED = 96;
 const PHOTO_SPEED_STEP = 2;
 
+/** Next photo-mode fly speed for a wheel delta (scroll up = faster), clamped to a sane range. */
+export function photoSpeedStep(speed: number, deltaY: number): number {
+  const next = speed + (deltaY < 0 ? PHOTO_SPEED_STEP : -PHOTO_SPEED_STEP);
+  return Math.max(PHOTO_MIN_SPEED, Math.min(PHOTO_MAX_SPEED, next));
+}
+
+/**
+ * Clamps a photo-camera position to a sphere of `range` around `anchor` (the player's eye).
+ * Streaming stays player-anchored during photo mode, so the camera must not out-fly the
+ * loaded ring — beyond it there is only fog and ungenerated void.
+ */
+export function clampToRange(pos: Vec3, anchor: Vec3, range: number): Vec3 {
+  const dx = pos.x - anchor.x;
+  const dy = pos.y - anchor.y;
+  const dz = pos.z - anchor.z;
+  const d = Math.hypot(dx, dy, dz);
+  if (d <= range || d === 0) return pos;
+  const s = range / d;
+  return { x: anchor.x + dx * s, y: anchor.y + dy * s, z: anchor.z + dz * s };
+}
+
 /** How far the third-person camera trails behind the eye, before obstruction clipping. */
 export const THIRD_PERSON_DISTANCE = 4;
 
@@ -54,6 +75,8 @@ export class CameraRig {
   private photoSpeed = 12;
   private photoLastFrameMs = performance.now();
   private photoReturnMode: CameraMode = 'third';
+  /** Max camera distance from the player's eye; Game keeps this inside the loaded chunk ring. */
+  private photoRange = Infinity;
 
   constructor(
     private readonly camera: PerspectiveCamera,
@@ -109,13 +132,13 @@ export class CameraRig {
       'wheel',
       (e) => {
         if (!this.photoMode) return;
+        // Claim the wheel outright: without stopImmediatePropagation the hotbar/reach
+        // wheel handler (registered later on the same canvas) would also fire.
         e.preventDefault();
-        this.photoSpeed = Math.max(
-          PHOTO_MIN_SPEED,
-          Math.min(PHOTO_MAX_SPEED, this.photoSpeed + (e.deltaY < 0 ? PHOTO_SPEED_STEP : -PHOTO_SPEED_STEP)),
-        );
+        e.stopImmediatePropagation();
+        this.photoSpeed = photoSpeedStep(this.photoSpeed, e.deltaY);
       },
-      { passive: false, signal },
+      { capture: true, passive: false, signal },
     );
     document.addEventListener('pointerlockerror', showLockError, { signal });
 
@@ -156,7 +179,10 @@ export class CameraRig {
       (e) => {
         if (e.code === 'F2') {
           e.preventDefault();
-          if (!e.repeat) this.togglePhotoMode();
+          // Enter only from live gameplay (pointer locked, no menu/dialog up); exit always works.
+          if (!e.repeat && (this.photoMode || (this.locked && !this.isInputBlocked()))) {
+            this.togglePhotoMode();
+          }
           return;
         }
         // Double-tap detection needs the fresh-press edge, so check before pressed.add
@@ -240,7 +266,11 @@ export class CameraRig {
     return this.mode;
   }
 
-  /** Enter/exit an independent flying camera while leaving the player frozen in place. */
+  /**
+   * Enter/exit an independent flying camera while leaving the player frozen in place.
+   * The photo camera has no collision (it may pass through blocks by design) but is kept
+   * within {@link setPhotoRange} of the player so it never leaves the loaded chunk ring.
+   */
   togglePhotoMode(): boolean {
     if (this.photoMode) {
       this.exitPhotoMode();
@@ -265,7 +295,12 @@ export class CameraRig {
     this.photoLastFrameMs = performance.now();
   }
 
-  private updatePhotoCamera(): void {
+  /** Max photo-camera distance from the player's eye (world units); Infinity disables the clamp. */
+  setPhotoRange(range: number): void {
+    this.photoRange = range;
+  }
+
+  private updatePhotoCamera(eye: Vec3): void {
     const now = performance.now();
     const dt = Math.min(0.05, Math.max(0, (now - this.photoLastFrameMs) / 1000));
     this.photoLastFrameMs = now;
@@ -301,9 +336,16 @@ export class CameraRig {
     const length = Math.hypot(dx, dy, dz);
     if (length === 0) return;
     const distance = this.photoSpeed * dt;
-    this.camera.position.x += (dx / length) * distance;
-    this.camera.position.y += (dy / length) * distance;
-    this.camera.position.z += (dz / length) * distance;
+    const next = clampToRange(
+      {
+        x: this.camera.position.x + (dx / length) * distance,
+        y: this.camera.position.y + (dy / length) * distance,
+        z: this.camera.position.z + (dz / length) * distance,
+      },
+      eye,
+      this.photoRange,
+    );
+    this.camera.position.set(next.x, next.y, next.z);
   }
 
   /** Writes the eye position + look orientation to the camera (first-person snap). */
@@ -321,7 +363,7 @@ export class CameraRig {
    */
   applyPlayerView(eye: Vec3, thirdDistance = THIRD_PERSON_DISTANCE): void {
     if (this.photoMode) {
-      this.updatePhotoCamera();
+      this.updatePhotoCamera(eye);
       return;
     }
     this.euler.set(this.pitch, this.yaw, 0);
