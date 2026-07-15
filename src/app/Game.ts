@@ -1651,7 +1651,9 @@ export class Game {
       daynight.advance(cdt);
       if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
       celestial.update(daynight.time, renderer.camera.position);
-      player.update(cdt, rig.getInput(), rig.yaw, sampler);
+      // Photo mode freezes the player completely — no gravity, water drift, or collisions —
+      // so the subject holds its pose exactly where F2 was pressed. Physics resumes on exit.
+      if (!rig.photoMode) player.update(cdt, rig.getInput(), rig.yaw, sampler);
 
       // Resume snapshot at ~1 Hz (the signature guard inside skips writes when nothing moved).
       resumeAccum += cdt;
@@ -1677,7 +1679,9 @@ export class Game {
       }
 
       // Sprint feedback: ease the FOV out while sprinting and back on release.
-      const targetFov = configuredFov + (player.sprinting ? SPRINT_FOV_KICK : 0);
+      // No sprint kick in photo mode: physics is frozen, so a stale sprinting flag from the
+      // moment F2 was pressed must not hold the FOV wide.
+      const targetFov = configuredFov + (player.sprinting && !rig.photoMode ? SPRINT_FOV_KICK : 0);
       if (Math.abs(renderer.camera.fov - targetFov) > 0.05) {
         renderer.camera.fov += (targetFov - renderer.camera.fov) * Math.min(1, cdt * 8);
         renderer.camera.updateProjectionMatrix();
@@ -1767,14 +1771,23 @@ export class Game {
       applyTime(chunkMaterials, animTime);
       const rolled = weatherClock.advance(cdt);
       if (rolled !== undefined) weather.setKind(rolled);
+      // Ambience centers on the viewpoint: the photo camera when detached (so rain, birds,
+      // and critters stay in frame far from the player), otherwise the player's eye.
+      const ambienceEye = rig.photoMode ? renderer.camera.position : eye;
       // Drops die on solids *and* water surfaces — rain must not streak through lakes.
-      weather.update(cdt, eye, isSolidOrWater);
+      weather.update(cdt, ambienceEye, isSolidOrWater);
       const skyNow = skyState(daynight.time);
-      ambientLife.update(cdt, eye, skyNow.daylight, getBlockAt);
+      ambientLife.update(cdt, ambienceEye, skyNow.daylight, getBlockAt);
       ticker.update(cdt);
-      critters.update(cdt, eye, critterEnv);
+      critters.update(cdt, ambienceEye, critterEnv);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
-      const submerged = manager.isWater(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
+      // Underwater fog/audio track the rendering viewpoint too: a photo camera dipped into a
+      // lake reads as underwater even while the frozen player stands dry on shore.
+      const submerged = manager.isWater(
+        Math.floor(ambienceEye.x),
+        Math.floor(ambienceEye.y),
+        Math.floor(ambienceEye.z),
+      );
       underwaterFactor = stepUnderwaterFactor(underwaterFactor, submerged, cdt);
       const fogRange = fogRangeFor(manager.viewDistance * CHUNK_SIZE_X);
       const surfaceFog: FogParams = {
