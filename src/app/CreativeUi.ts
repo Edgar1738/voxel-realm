@@ -87,6 +87,10 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
       'M map',
       'F1 first / third person',
       'H hand item',
+      'K / Shift+K player animation',
+      'E talk to NPC',
+      'P / Shift+P NPC pose',
+      'O / Shift+O NPC animation',
     ],
   },
   {
@@ -151,6 +155,15 @@ export interface TourHudStatus {
   index: number;
   total: number;
   done: boolean;
+}
+
+export interface ChallengeHudStatus {
+  name: string;
+  distance: number;
+  index: number;
+  total: number;
+  elapsed: string;
+  best?: string;
 }
 
 /** Weather-cycle button states: the four pinned conditions plus the automatic cycle. */
@@ -243,6 +256,10 @@ export interface CreativeUi {
   setExperienceMode(mode: 'play' | 'build'): void;
   /** Shows/updates the tour HUD, or hides it when passed undefined. */
   setTourHud(status: TourHudStatus | undefined): void;
+  /** Shows the aimed NPC interaction hint, or hides it when passed undefined. */
+  setInteractionPrompt(text: string | undefined): void;
+  /** Shows/updates Piper's timed challenge HUD, or hides it when passed undefined. */
+  setChallengeHud(status: ChallengeHudStatus | undefined): void;
   /** Cold-start streaming banner ("Building the world — 42%"), hidden when passed undefined. */
   setLoadingHud(text: string | undefined): void;
   /**
@@ -459,13 +476,13 @@ export function createCreativeUi(
   };
   setSkinUi(skinSelector?.initial.id ?? 'realm-scout', skinSelector?.initial.name ?? 'Realm Scout');
 
-  // Hand mode selector: cosmetic first-person hand (block cube, tools, or empty). H also cycles.
+  // Build-hand selector: selected block, cosmetic tools, or empty. H also cycles.
   const handButton = button('');
   handButton.className = 'skin-btn';
   handButton.addEventListener('click', () => handSelector?.onCycle());
   const setHandUi = (id: string, name: string): void => {
     handButton.textContent = `Hand: ${name}`;
-    handButton.title = `First-person hand: ${name} - click or press H to cycle`;
+    handButton.title = `Build-mode hand: ${name} - click or press H to cycle`;
     handButton.setAttribute('aria-label', handButton.title);
     handButton.dataset.hand = id;
   };
@@ -651,6 +668,35 @@ export function createCreativeUi(
   tourEnd.setAttribute('aria-label', 'End tour');
   tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
 
+  const challengeHud = document.createElement('div');
+  challengeHud.className = 'challenge-hud';
+  challengeHud.setAttribute('role', 'status');
+  challengeHud.style.display = 'none';
+  const challengeLabel = document.createElement('span');
+  challengeHud.append(challengeLabel);
+
+  const interactionPrompt = document.createElement('div');
+  interactionPrompt.className = 'interaction-prompt';
+  interactionPrompt.setAttribute('role', 'status');
+  interactionPrompt.style.display = 'none';
+
+  const setInteractionPrompt = (text: string | undefined): void => {
+    interactionPrompt.style.display = text ? 'block' : 'none';
+    interactionPrompt.textContent = text ?? '';
+  };
+
+  const setChallengeHud = (status: ChallengeHudStatus | undefined): void => {
+    if (!status) {
+      challengeHud.style.display = 'none';
+      return;
+    }
+    challengeHud.style.display = 'flex';
+    const best = status.best ? ` · Best ${status.best}` : '';
+    challengeLabel.textContent =
+      `${status.index + 1}/${status.total} ${status.name} · ${Math.round(status.distance)}m` +
+      ` · ${status.elapsed}${best}`;
+  };
+
   // Waypoint compass: a top-center chip with an arrow (rotated toward the waypoint, relative to
   // the look direction) and the remaining distance. Shares the tour HUD's spot; the host hides it
   // while a tour runs so the two never overlap.
@@ -712,6 +758,8 @@ export function createCreativeUi(
     notice,
     hotbar,
     tourHud,
+    challengeHud,
+    interactionPrompt,
     waypointChip,
     loadingHud,
     dialogScrim,
@@ -1420,6 +1468,8 @@ export function createCreativeUi(
     showBlueprintDialog,
     setExperienceMode,
     setTourHud,
+    setInteractionPrompt,
+    setChallengeHud,
     setLoadingHud,
     showWorldInfoDialog,
     isDialogOpen,

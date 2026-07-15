@@ -27,6 +27,15 @@ export const DEV_HELP: Record<string, string> = {
   dayLength: 'dayLength(seconds) — full cycle length (freeze with a huge value)',
   headlamp: 'headlamp(on=true) — camera-centered glow for dark caves (not persisted)',
   hand: "hand(mode?) — get/set first-person hand: 'block'|'pickaxe'|'axe'|'sword'|'empty'",
+  equipment: "equipment(target='player') -> {main?,off?} — inspect player or NPC equipment",
+  equip:
+    "equip(target, slot, item) — target 'player' or NPC id; slot 'main'|'off'; item 'sword'|'baguette'",
+  unequip: "unequip(target, slot) — clear a 'main' or 'off' wrist slot for player/NPC",
+  npc: 'npc.list() · npc.pose(id, pose?) · npc.cycle(id, direction=1) · npc.animate(id, animation) · npc.cycleAnimation(id, direction=1) · npc.stop(id)',
+  playerAnimation:
+    "playerAnimation.list() · play('hip-thrust-loop'|'jump-cheer-loop') · cycle(direction=1) · stop()",
+  character:
+    'character.player.joints()/joint(id, {pos?,rotation?})/reset()/exportPose() · character.npc.joints(id)/joint(npcId, jointId, transform)/reset(id)/exportPose(id)',
   weather: "weather(kind) — pin 'clear'|'rain'|'storm'|'snow', or 'auto' to resume the cycle",
   sound: 'sound(on=true, volume?) — toggle audio / set volume 0..1 (persisted like the HUD)',
   view: 'view(maxWidth?, quality?) -> dataURL',

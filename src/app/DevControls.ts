@@ -41,6 +41,10 @@ import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
 import type { EditOutcome, SetVoxel } from '../edit/EditTypes';
+import type { NpcPoseState } from '../npc/NpcTypes';
+import type { EquipmentLoadout } from '../character/Equipment';
+import type { PlayerAnimationState } from '../render/PlayerAvatar';
+import type { CharacterJointState, CharacterJointTransform } from '../character/CharacterRig';
 import {
   listWorlds,
   copyWorld,
@@ -91,8 +95,43 @@ export interface DevControlsContext {
   headlamp: (on: boolean) => void;
   /** Gets (no arg) or sets the first-person hand mode; session-only, never persisted. */
   hand: (mode?: string) => string;
+  /** Shared player/NPC equipment state and session-only mutations. */
+  equipment: (target?: string) => EquipmentLoadout;
+  equip: (target: string, slot: string, item: string) => EquipmentLoadout;
+  unequip: (target: string, slot: string) => EquipmentLoadout;
+  /** Local-player third-person animation inspection and manual playback. */
+  playerAnimation: {
+    list(): PlayerAnimationState;
+    play(animationId: string): PlayerAnimationState;
+    cycle(direction?: number): PlayerAnimationState;
+    stop(): PlayerAnimationState;
+  };
+  /** Live pose-authoring surface shared by the player rig and articulated NPCs. */
+  character: {
+    player: {
+      joints(): CharacterJointState[];
+      joint(id: string, transform?: CharacterJointTransform): CharacterJointState;
+      reset(): CharacterJointState[];
+      exportPose(): Record<string, CharacterJointTransform>;
+    };
+    npc: {
+      joints(npcId: string): CharacterJointState[];
+      joint(npcId: string, id: string, transform?: CharacterJointTransform): CharacterJointState;
+      reset(npcId: string): CharacterJointState[];
+      exportPose(npcId: string): Record<string, CharacterJointTransform>;
+    };
+  };
   /** Play-mode tour HUD controls; `tick` steps the loop path once (hidden tabs suspend rAF). */
   tour?: { start(): void; end(): void; tick(): void };
+  /** Authored NPC pose inspection and manual playback. */
+  npc: {
+    list(): NpcPoseState[];
+    pose(npcId: string, poseId?: string): NpcPoseState;
+    cycle(npcId: string, direction?: number): NpcPoseState;
+    animate(npcId: string, animationId: string): NpcPoseState;
+    cycleAnimation(npcId: string, direction?: number): NpcPoseState;
+    stop(npcId: string): NpcPoseState;
+  };
   /** Pins the weather ('auto' resumes the natural cycle); returns the active kind. */
   weather?: (kind: 'clear' | 'rain' | 'storm' | 'snow' | 'auto') => string;
   /** Live ambient-creature census; pass a dt to step the swarm once headlessly. */
@@ -422,6 +461,12 @@ export function installDevControls(ctx: DevControlsContext): void {
   };
 
   const api = {
+    npc: ctx.npc,
+    playerAnimation: ctx.playerAnimation,
+    character: ctx.character,
+    equipment: ctx.equipment,
+    equip: ctx.equip,
+    unequip: ctx.unequip,
     // --- roam ---
     pos: (): Vec3 => ({ ...player.position }),
     look: (): { yaw: number; pitch: number } => ({ yaw: rig.yaw, pitch: rig.pitch }),

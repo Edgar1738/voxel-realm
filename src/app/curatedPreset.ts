@@ -18,6 +18,32 @@ export function curatedPresetMeta(
   seed: number,
   version: number,
 ): WorldMeta | undefined {
+  if (preset === 'sunmeadow-trials') {
+    return {
+      seed,
+      version,
+      preset,
+      title: 'Sunmeadow Trial Grounds',
+      description:
+        'A bright recreation meadow hosted by Piper Green. Meet her beneath the start pavilion, then race through the Rose Flag, Sand Bend, and Sun Crown.',
+      spawn: { x: 0.5, y: 63.9, z: 30.5 },
+      look: { yaw: 0, pitch: 0 },
+      atmosphere: { weather: 'clear', timeOfDay: 0.4, fogNear: 110, fogFar: 300 },
+      landmarks: [
+        { name: 'Start Pavilion', x: 0, y: 63, z: 28 },
+        { name: 'Rose Flag', x: -24, y: 63, z: 2 },
+        { name: 'Sand Bend', x: 24, y: 63, z: -22 },
+        { name: 'Sun Crown', x: 0, y: 63, z: -52 },
+      ],
+      tour: [
+        { name: 'Start Pavilion', x: 0, y: 63, z: 24 },
+        { name: 'Rose Flag', x: -24, y: 63, z: 2 },
+        { name: 'Sand Bend', x: 24, y: 63, z: -22 },
+        { name: 'Sun Crown', x: 0, y: 63, z: -52 },
+      ],
+    };
+  }
+
   if (preset === 'ashen-reach') {
     return {
       seed,

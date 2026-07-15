@@ -32,34 +32,38 @@ Open the URL, click to lock the pointer, and you're in.
 
 ## Controls
 
-| Input | Action |
-|---|---|
-| `WASD` / mouse | Move / look |
-| Double-tap `W` | Sprint |
-| `Space` / `Shift` | Up (jump) / down |
-| `F` | Toggle fly |
-| `B` | Toggle build / play mode |
-| `T` | Guided tour (play mode) / cycle tools (build mode) |
-| `M` | World map |
-| `F1` | First / third person |
-| `L` | Headlamp |
-| `H` | Hand item |
-| Left / middle / right click | Break / pick / place |
-| `1–9`, mouse wheel | Hotbar slot |
-| `I` | Creative inventory |
-| `V` | Placement ghost |
-| `X` / `G` / `R` / `C` | Fill / clear / replace / copy region |
-| `[` `]`, `U`, `+`/`-` | Rotate / mirror / array a paste |
-| Arrows, `PgUp`/`PgDn`, `N` | Nudge a paste on X/Z, up/down, reset |
-| `Ctrl`+`Z` / `Ctrl`+`Y` | Undo / redo |
-| `Shift` + wheel | Adjust reach |
-| `Esc` | Close / cancel |
+| Input                       | Action                                             |
+| --------------------------- | -------------------------------------------------- |
+| `WASD` / mouse              | Move / look                                        |
+| Double-tap `W`              | Sprint                                             |
+| `Space` / `Shift`           | Up (jump) / down                                   |
+| `F`                         | Toggle fly                                         |
+| `B`                         | Toggle build / play mode                           |
+| `T`                         | Guided tour (play mode) / cycle tools (build mode) |
+| `M`                         | World map                                          |
+| `F1`                        | First / third person                               |
+| `K` / `Shift`+`K`           | Next / previous player looping animation           |
+| `L`                         | Headlamp                                           |
+| `H`                         | Build-mode hand preview                            |
+| `E`                         | Talk to a nearby NPC                               |
+| `P` / `Shift`+`P`           | Next / previous pose for the aimed NPC             |
+| `O` / `Shift`+`O`           | Next / previous NPC looping animation              |
+| Left / middle / right click | Break / pick / place                               |
+| `1–9`, mouse wheel          | Hotbar slot                                        |
+| `I`                         | Creative inventory                                 |
+| `V`                         | Placement ghost                                    |
+| `X` / `G` / `R` / `C`       | Fill / clear / replace / copy region               |
+| `[` `]`, `U`, `+`/`-`       | Rotate / mirror / array a paste                    |
+| Arrows, `PgUp`/`PgDn`, `N`  | Nudge a paste on X/Z, up/down, reset               |
+| `Ctrl`+`Z` / `Ctrl`+`Y`     | Undo / redo                                        |
+| `Shift` + wheel             | Adjust reach                                       |
+| `Esc`                       | Close / cancel                                     |
 
 ## Worlds
 
 The world is selected with URL query params:
 
-- `?world=<preset>` — terrain preset: `default`, `flat`, `void`, `arena`, `amplified`, `islands`, `canyon`, `villages`, `caverns`, `frontier`, `citadel`
+- `?world=<preset>` — terrain preset: `default`, `flat`, `void`, `arena`, `amplified`, `islands`, `canyon`, `villages`, `caverns`, `frontier`, `citadel`, `sunmeadow-trials`
 - `?save=<name>` — named save; loads from `.saves/<name>` via the dev server (an existing save remembers its own preset)
 - `?spawn=x,y,z` and `?look=yaw,pitch` — spawn overrides
 
@@ -82,8 +86,27 @@ npm run world:package    # package a world for sharing
 The dev build exposes `window.__vr` in the console — pose the camera, roam a route, build with shape helpers (box, ring, octagon, cone), toggle AO/fog/headlamp, run headless reachability checks, and capture screenshots to disk. Start with:
 
 ```js
-__vr.help()
+__vr.help();
+__vr.npc.list();
+__vr.npc.pose('piper-green', 'wave');
+__vr.npc.animate('piper-green', 'clap-loop');
+__vr.npc.stop('piper-green');
+__vr.playerAnimation.play('hip-thrust-loop');
+__vr.playerAnimation.play('jump-cheer-loop');
+__vr.playerAnimation.stop();
+__vr.character.player.joints();
+__vr.character.player.joint('chest', { rotation: [0.15, 0, -0.1] });
+__vr.character.player.exportPose();
+__vr.character.npc.joints('piper-green');
+__vr.character.npc.joint('piper-green', 'right-elbow', { rotation: [0, 0, -1.2] });
+__vr.equipment('player');
+__vr.equip('player', 'main', 'sword');
+__vr.equipment('piper-green');
+__vr.unequip('player', 'off');
 ```
+
+See [Character V2 authoring](docs/character-v2.md) for the shared joint hierarchy, animation clip
+format, silhouette rules, and live pose workflow.
 
 ## Development
 

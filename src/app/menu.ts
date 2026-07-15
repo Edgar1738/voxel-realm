@@ -90,6 +90,11 @@ export const CREATE_CARDS: readonly CreateCard[] = [
       ['islands', 'Archipelago', 'Island peaks rising from open water.'],
       ['canyon', 'Canyonlands', 'A high plateau cut by deep ravines, ruins on the mesas.'],
       ['villages', 'Villages', 'Gentle plains dotted with generated villages.'],
+      [
+        'sunmeadow-trials',
+        'Sunmeadow Trials',
+        'Meet Piper Green and race a compact three-flag meadow challenge.',
+      ],
       ['ashen-reach', 'Ashen Reach', 'A volcanic frontier: cross the ember bridge to Cinderkeep.'],
       ['citadel', 'The Citadel', 'A ruined fortress-kingdom with a dungeon below.'],
       ['harbor', 'Harbor', 'A coastal harbor town on the waterline.'],
