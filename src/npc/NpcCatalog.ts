@@ -164,29 +164,40 @@ const PIPER_PARTS: readonly NpcPartDefinition[] = [
     joint: 'chest',
     style: 'fabric',
   }),
-  part('midriff', [0.43, 0.2, 0.28], [0, -0.05, 0], 'magenta', {
+  part('midriff', [0.38, 0.2, 0.26], [0, -0.05, 0], 'magenta', {
     joint: 'spine',
     style: 'fabric',
   }),
-  part('right-top-panel', [0.2, 0.24, 0.035], [0.15, -0.06, -0.18], 'magentaDark', {
-    joint: 'chest',
-    rotation: [0, 0, -0.08],
-    style: 'fabric',
-  }),
-  part('left-top-panel', [0.2, 0.24, 0.035], [-0.15, -0.06, -0.18], 'magentaDark', {
-    joint: 'chest',
-    rotation: [0, 0, 0.08],
-    style: 'fabric',
-  }),
-  part('collar', [0.35, 0.07, 0.34], [0, 0.13, 0], 'white', {
+  part('bust-lower', [0.5, 0.22, 0.2], [0, -0.1, -0.16], 'magenta', {
     joint: 'chest',
     style: 'fabric',
   }),
-  part('waist', [0.56, 0.12, 0.35], [0, -0.14, 0], 'magentaDark', {
+  part('bust-upper', [0.4, 0.16, 0.12], [0, 0.02, -0.22], 'magenta', {
+    joint: 'chest',
+    style: 'fabric',
+  }),
+  part('right-top-panel', [0.19, 0.26, 0.035], [0.15, -0.04, -0.28], 'magentaDark', {
+    joint: 'chest',
+    rotation: [0, 0, -0.18],
+    style: 'fabric',
+  }),
+  part('left-top-panel', [0.19, 0.26, 0.035], [-0.15, -0.04, -0.28], 'magentaDark', {
+    joint: 'chest',
+    rotation: [0, 0, 0.18],
+    style: 'fabric',
+  }),
+  part('shoulders', [0.35, 0.07, 0.34], [0, 0.13, 0], 'skin', {
+    joint: 'chest',
+  }),
+  part('waist', [0.5, 0.12, 0.33], [0, -0.14, 0], 'magentaDark', {
     joint: 'pose-root',
     style: 'fabric',
   }),
   part('skirt', [0.66, 0.45, 0.42], [0, -0.42, 0], 'white', {
+    joint: 'pose-root',
+    style: 'fabric',
+  }),
+  part('skirt-flare', [0.78, 0.18, 0.5], [0, -0.6, 0], 'white', {
     joint: 'pose-root',
     style: 'fabric',
   }),
@@ -241,7 +252,23 @@ const PIPER_PARTS: readonly NpcPartDefinition[] = [
     joint: 'left-wrist',
     style: 'leather',
   }),
-  part('necklace', [0.34, 0.055, 0.035], [0, 0.13, -0.18], 'white', {
+  part('pearl-1', [0.05, 0.05, 0.04], [-0.14, 0.14, -0.185], 'white', {
+    joint: 'chest',
+    style: 'metal',
+  }),
+  part('pearl-2', [0.05, 0.05, 0.04], [-0.07, 0.11, -0.19], 'white', {
+    joint: 'chest',
+    style: 'metal',
+  }),
+  part('pearl-3', [0.05, 0.05, 0.04], [0, 0.095, -0.195], 'white', {
+    joint: 'chest',
+    style: 'metal',
+  }),
+  part('pearl-4', [0.05, 0.05, 0.04], [0.07, 0.11, -0.19], 'white', {
+    joint: 'chest',
+    style: 'metal',
+  }),
+  part('pearl-5', [0.05, 0.05, 0.04], [0.14, 0.14, -0.185], 'white', {
     joint: 'chest',
     style: 'metal',
   }),
@@ -259,19 +286,25 @@ const PIPER_PARTS: readonly NpcPartDefinition[] = [
   part('right-ear', [0.075, 0.13, 0.09], [0.275, -0.04, 0], 'skin', { anchor: 'head' }),
   part('left-ear', [0.075, 0.13, 0.09], [-0.275, -0.04, 0], 'skin', { anchor: 'head' }),
   part('hair-cap', [0.54, 0.14, 0.52], [0, 0.22, 0.02], 'hair', { anchor: 'head' }),
-  part('right-bob', [0.14, 0.42, 0.2], [0.24, -0.1, 0.03], 'hair', { anchor: 'head' }),
-  part('left-bob', [0.14, 0.42, 0.2], [-0.24, -0.1, 0.03], 'hair', { anchor: 'head' }),
-  part('hair-nape', [0.38, 0.2, 0.12], [0, -0.18, 0.22], 'hair', { anchor: 'head' }),
-  part('visor-band', [0.56, 0.13, 0.5], [0, 0.25, 0], 'white', { anchor: 'head', style: 'fabric' }),
-  part('visor-brim', [0.58, 0.055, 0.34], [0, 0.23, -0.25], 'white', {
+  part('right-bob', [0.15, 0.56, 0.24], [0.25, -0.17, 0.05], 'hair', { anchor: 'head' }),
+  part('left-bob', [0.15, 0.56, 0.24], [-0.25, -0.17, 0.05], 'hair', { anchor: 'head' }),
+  part('right-bob-front', [0.11, 0.4, 0.1], [0.21, -0.1, -0.19], 'hair', { anchor: 'head' }),
+  part('left-bob-front', [0.11, 0.4, 0.1], [-0.21, -0.1, -0.19], 'hair', { anchor: 'head' }),
+  part('bangs', [0.5, 0.16, 0.06], [0, 0.14, -0.235], 'hair', { anchor: 'head' }),
+  part('hair-back', [0.52, 0.44, 0.08], [0, -0.02, 0.26], 'hair', { anchor: 'head' }),
+  part('hair-nape', [0.4, 0.34, 0.14], [0, -0.24, 0.23], 'hair', { anchor: 'head' }),
+  part('visor-band', [0.56, 0.11, 0.5], [0, 0.28, 0], 'white', { anchor: 'head', style: 'fabric' }),
+  part('visor-brim', [0.58, 0.055, 0.34], [0, 0.26, -0.25], 'white', {
     anchor: 'head',
     style: 'fabric',
   }),
-  part('visor-mark-left', [0.07, 0.055, 0.025], [-0.045, 0.27, -0.268], 'magenta', {
+  part('visor-mark-left', [0.08, 0.045, 0.025], [-0.05, 0.275, -0.268], 'ink', {
     anchor: 'head',
+    rotation: [0, 0, -0.3],
   }),
-  part('visor-mark-right', [0.07, 0.055, 0.025], [0.045, 0.27, -0.268], 'magenta', {
+  part('visor-mark-right', [0.11, 0.045, 0.025], [0.045, 0.3, -0.268], 'ink', {
     anchor: 'head',
+    rotation: [0, 0, 0.45],
   }),
   part('right-eye', [0.12, 0.11, 0.035], [0.11, 0.04, -0.245], 'eye', { anchor: 'head' }),
   part('left-eye', [0.12, 0.11, 0.035], [-0.11, 0.04, -0.245], 'eye', { anchor: 'head' }),
@@ -279,11 +312,11 @@ const PIPER_PARTS: readonly NpcPartDefinition[] = [
   part('left-pupil', [0.055, 0.065, 0.035], [-0.1, 0.035, -0.267], 'pupil', { anchor: 'head' }),
   part('right-brow', [0.12, 0.035, 0.025], [0.11, 0.12, -0.263], 'hair', { anchor: 'head' }),
   part('left-brow', [0.12, 0.035, 0.025], [-0.11, 0.12, -0.263], 'hair', { anchor: 'head' }),
-  part('right-cheek', [0.09, 0.07, 0.025], [0.16, -0.09, -0.258], 'blush', { anchor: 'head' }),
-  part('left-cheek', [0.09, 0.07, 0.025], [-0.16, -0.09, -0.258], 'blush', { anchor: 'head' }),
+  part('right-cheek', [0.11, 0.08, 0.025], [0.17, -0.08, -0.258], 'blush', { anchor: 'head' }),
+  part('left-cheek', [0.11, 0.08, 0.025], [-0.17, -0.08, -0.258], 'blush', { anchor: 'head' }),
   part('nose', [0.08, 0.1, 0.08], [0, -0.035, -0.28], 'skinShadow', { anchor: 'head' }),
-  part('smile', [0.2, 0.065, 0.03], [0, -0.16, -0.26], 'mouth', { anchor: 'head' }),
-  part('teeth', [0.13, 0.035, 0.025], [0, -0.142, -0.28], 'white', { anchor: 'head' }),
+  part('smile', [0.24, 0.08, 0.03], [0, -0.16, -0.26], 'mouth', { anchor: 'head' }),
+  part('teeth', [0.17, 0.04, 0.025], [0, -0.138, -0.28], 'white', { anchor: 'head' }),
 ];
 
 const PIPER_JOINTS: readonly NpcJointDefinition[] = [
@@ -581,7 +614,8 @@ const PIPER: NpcDefinition = {
   palette: {
     skin: 0xdca07c,
     skinShadow: 0xbc775f,
-    hair: 0xe8bb32,
+    hair: 0xf2c53d,
+    ink: 0x1c1c1c,
     eye: 0xf6f4ef,
     pupil: 0x222735,
     blush: 0xe87582,
