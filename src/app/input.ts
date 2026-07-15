@@ -271,6 +271,11 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
 
+      // Photo mode is observation-only: every gameplay shortcut below (edits, builder ops,
+      // undo/redo, NPC interaction, pose/animation cycling, hotbar, tools, inventory) is inert.
+      // F1 above still exits photo mode; F2 is handled by CameraRig before this listener.
+      if (rig.photoMode) return;
+
       const playerAnimationStep = playerAnimationDirection(e.code, e.shiftKey);
       if (playerAnimationStep !== 0) {
         if (rig.locked && !callbacks.isInventoryOpen()) {
@@ -518,6 +523,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
   canvas.addEventListener(
     'wheel',
     (e) => {
+      if (rig.photoMode) return; // photo mode owns the wheel (fly-speed control)
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
       if (e.shiftKey) {
@@ -540,6 +546,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
     'mousedown',
     (e) => {
       // Play mode: no click edits at all — break/place/pick/builder are all world-mutating.
+      if (rig.photoMode) return; // defense in depth; CameraRig already swallows canvas clicks
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
       const hit = raycastHit();
