@@ -271,11 +271,6 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
 
-      // Photo mode is observation-only: every gameplay shortcut below (edits, builder ops,
-      // undo/redo, NPC interaction, pose/animation cycling, hotbar, tools, inventory) is inert.
-      // F1 above still exits photo mode; F2 is handled by CameraRig before this listener.
-      if (rig.photoMode) return;
-
       const playerAnimationStep = playerAnimationDirection(e.code, e.shiftKey);
       if (playerAnimationStep !== 0) {
         if (rig.locked && !callbacks.isInventoryOpen()) {
@@ -301,6 +296,12 @@ export function registerInputListeners(ctx: InputContext): () => void {
         }
         return;
       }
+
+      // Photo mode is scene direction, not editing: the animation/pose cycling above stays
+      // live (the aim ray follows the photo camera), but every world-mutating shortcut below
+      // (edits, builder ops, undo/redo, NPC interaction, hotbar, tools, inventory) is inert.
+      // F1 above still exits photo mode; F2 is handled by CameraRig before this listener.
+      if (rig.photoMode) return;
 
       // Play mode: creative shortcuts are inert. B enters build mode; L (headlamp) passes
       // through below; movement/look/fly live in CameraRig and are untouched.

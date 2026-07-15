@@ -78,6 +78,11 @@ export class CameraRig {
   /** Max camera distance from the player's eye; Game keeps this inside the loaded chunk ring. */
   private photoRange = Infinity;
 
+  /** Detached-camera look, for aiming scene-direction keys (NPC pose/animation) in photo mode. */
+  photoLook(): { yaw: number; pitch: number } {
+    return { yaw: this.photoYaw, pitch: this.photoPitch };
+  }
+
   constructor(
     private readonly camera: PerspectiveCamera,
     canvas: HTMLCanvasElement,

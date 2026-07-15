@@ -1163,11 +1163,22 @@ export class Game {
 
     // Interaction ray: origin at the player's eye, direction from yaw/pitch. Used for every
     // break/place/toggle/builder aim so reach stays anchored to the head, not the render camera
-    // (which sits behind the player in third-person).
-    const aimRay = (): { origin: Vec3; dir: Vec3 } => ({
-      origin: player.eye(),
-      dir: lookDirectionFromYawPitch(rig.yaw, rig.pitch),
-    });
+    // (which sits behind the player in third-person). Photo mode aims from the detached camera
+    // instead — its only live consumers there are the NPC pose/animation scene-direction keys.
+    const aimRay = (): { origin: Vec3; dir: Vec3 } => {
+      if (rig.photoMode) {
+        const look = rig.photoLook();
+        const p = renderer.camera.position;
+        return {
+          origin: { x: p.x, y: p.y, z: p.z },
+          dir: lookDirectionFromYawPitch(look.yaw, look.pitch),
+        };
+      }
+      return {
+        origin: player.eye(),
+        dir: lookDirectionFromYawPitch(rig.yaw, rig.pitch),
+      };
+    };
 
     const aimedNpc = (): NpcDefinition | undefined => {
       // Most worlds have no NPCs; skip the per-frame interaction raycast entirely there.
