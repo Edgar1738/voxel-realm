@@ -7,11 +7,14 @@ export const BASE_LOOK_SENSITIVITY = 0.0025;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 /** Two W presses within this window arm sprint (Minecraft's classic double-tap). */
 const DOUBLE_TAP_MS = 300;
+const PHOTO_MIN_SPEED = 2;
+const PHOTO_MAX_SPEED = 96;
+const PHOTO_SPEED_STEP = 2;
 
 /** How far the third-person camera trails behind the eye, before obstruction clipping. */
 export const THIRD_PERSON_DISTANCE = 4;
 
-/** Which viewpoint the render camera uses; `first` is the classic eye-in-head view. */
+/** Which viewpoint the player camera uses; photo mode is tracked separately. */
 export type CameraMode = 'first' | 'third';
 
 /**
@@ -35,6 +38,7 @@ export class CameraRig {
   pitch = 0;
   locked = false;
   mode: CameraMode = 'first';
+  photoMode = false;
 
   private sensitivity = BASE_LOOK_SENSITIVITY;
   private invertY = false;
@@ -45,6 +49,11 @@ export class CameraRig {
   private lastForwardTapMs = -Infinity;
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
   private readonly inputController = new AbortController();
+  private photoYaw = 0;
+  private photoPitch = 0;
+  private photoSpeed = 12;
+  private photoLastFrameMs = performance.now();
+  private photoReturnMode: CameraMode = 'third';
 
   constructor(
     private readonly camera: PerspectiveCamera,
@@ -77,6 +86,37 @@ export class CameraRig {
       },
       { signal },
     );
+    // Detached photo mode is observation-only: swallow world clicks before edit/NPC handlers.
+    canvas.addEventListener(
+      'mousedown',
+      (e) => {
+        if (!this.photoMode) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      },
+      { capture: true, signal },
+    );
+    canvas.addEventListener(
+      'contextmenu',
+      (e) => {
+        if (!this.photoMode) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      },
+      { capture: true, signal },
+    );
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        if (!this.photoMode) return;
+        e.preventDefault();
+        this.photoSpeed = Math.max(
+          PHOTO_MIN_SPEED,
+          Math.min(PHOTO_MAX_SPEED, this.photoSpeed + (e.deltaY < 0 ? PHOTO_SPEED_STEP : -PHOTO_SPEED_STEP)),
+        );
+      },
+      { passive: false, signal },
+    );
     document.addEventListener('pointerlockerror', showLockError, { signal });
 
     document.addEventListener(
@@ -97,8 +137,14 @@ export class CameraRig {
       'mousemove',
       (e) => {
         if (!this.locked) return;
-        this.yaw -= e.movementX * this.sensitivity;
         const dPitch = e.movementY * this.sensitivity;
+        if (this.photoMode) {
+          this.photoYaw -= e.movementX * this.sensitivity;
+          this.photoPitch -= this.invertY ? -dPitch : dPitch;
+          this.photoPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.photoPitch));
+          return;
+        }
+        this.yaw -= e.movementX * this.sensitivity;
         this.pitch -= this.invertY ? -dPitch : dPitch;
         this.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.pitch));
       },
@@ -108,15 +154,20 @@ export class CameraRig {
     window.addEventListener(
       'keydown',
       (e) => {
+        if (e.code === 'F2') {
+          e.preventDefault();
+          if (!e.repeat) this.togglePhotoMode();
+          return;
+        }
         // Double-tap detection needs the fresh-press edge, so check before pressed.add
         // (held-key auto-repeat also arrives as keydown and must not count as a tap).
-        if (e.code === 'KeyW' && !this.pressed.has('KeyW')) {
+        if (!this.photoMode && e.code === 'KeyW' && !this.pressed.has('KeyW')) {
           const now = performance.now();
           if (now - this.lastForwardTapMs < DOUBLE_TAP_MS) this.sprinting = true;
           this.lastForwardTapMs = now;
         }
         this.pressed.add(e.code);
-        if (e.code === 'KeyF') this.toggleFlyQueued = true;
+        if (!this.photoMode && e.code === 'KeyF') this.toggleFlyQueued = true;
       },
       { signal },
     );
@@ -145,7 +196,7 @@ export class CameraRig {
 
   /** Snapshot of input intents; consumes the one-frame fly-toggle edge. */
   getInput(): InputState {
-    if (!this.locked || this.isInputBlocked()) {
+    if (!this.locked || this.isInputBlocked() || this.photoMode) {
       this.toggleFlyQueued = false;
       this.sprinting = false;
       return {
@@ -184,8 +235,75 @@ export class CameraRig {
 
   /** Flips between first- and third-person and returns the new mode. */
   toggleMode(): CameraMode {
+    if (this.photoMode) this.exitPhotoMode();
     this.mode = this.mode === 'first' ? 'third' : 'first';
     return this.mode;
+  }
+
+  /** Enter/exit an independent flying camera while leaving the player frozen in place. */
+  togglePhotoMode(): boolean {
+    if (this.photoMode) {
+      this.exitPhotoMode();
+      return false;
+    }
+    this.photoReturnMode = this.mode;
+    this.mode = 'third';
+    this.photoMode = true;
+    this.photoYaw = this.yaw;
+    this.photoPitch = this.pitch;
+    this.photoLastFrameMs = performance.now();
+    this.pressed.clear();
+    this.toggleFlyQueued = false;
+    this.sprinting = false;
+    return true;
+  }
+
+  private exitPhotoMode(): void {
+    this.photoMode = false;
+    this.mode = this.photoReturnMode;
+    this.pressed.clear();
+    this.photoLastFrameMs = performance.now();
+  }
+
+  private updatePhotoCamera(): void {
+    const now = performance.now();
+    const dt = Math.min(0.05, Math.max(0, (now - this.photoLastFrameMs) / 1000));
+    this.photoLastFrameMs = now;
+    this.euler.set(this.photoPitch, this.photoYaw, 0);
+    this.camera.quaternion.setFromEuler(this.euler);
+    if (!this.locked || this.isInputBlocked()) return;
+
+    const forward = lookDirectionFromYawPitch(this.photoYaw, this.photoPitch);
+    const right = { x: Math.cos(this.photoYaw), z: -Math.sin(this.photoYaw) };
+    let dx = 0;
+    let dy = 0;
+    let dz = 0;
+    if (this.pressed.has('KeyW')) {
+      dx += forward.x;
+      dy += forward.y;
+      dz += forward.z;
+    }
+    if (this.pressed.has('KeyS')) {
+      dx -= forward.x;
+      dy -= forward.y;
+      dz -= forward.z;
+    }
+    if (this.pressed.has('KeyD')) {
+      dx += right.x;
+      dz += right.z;
+    }
+    if (this.pressed.has('KeyA')) {
+      dx -= right.x;
+      dz -= right.z;
+    }
+    if (this.pressed.has('Space')) dy += 1;
+    if (this.pressed.has('ShiftLeft') || this.pressed.has('ShiftRight')) dy -= 1;
+    const length = Math.hypot(dx, dy, dz);
+    if (length === 0) return;
+    const distance = this.photoSpeed * dt;
+    this.camera.position.x += (dx / length) * distance;
+    this.camera.position.y += (dy / length) * distance;
+    this.camera.position.z += (dz / length) * distance;
   }
 
   /** Writes the eye position + look orientation to the camera (first-person snap). */
@@ -202,6 +320,10 @@ export class CameraRig {
    * straight back along −look by `thirdDistance` (already obstruction-clipped by the caller).
    */
   applyPlayerView(eye: Vec3, thirdDistance = THIRD_PERSON_DISTANCE): void {
+    if (this.photoMode) {
+      this.updatePhotoCamera();
+      return;
+    }
     this.euler.set(this.pitch, this.yaw, 0);
     this.camera.quaternion.setFromEuler(this.euler);
     if (this.mode === 'first') {
