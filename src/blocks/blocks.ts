@@ -58,6 +58,12 @@ export const STAIRS_SLATE: BlockId = 46;
 export const CYAN_GLASS: BlockId = 47;
 /** Limited gold / luminous trim for spire and altar accents. */
 export const GOLD_TRIM: BlockId = 48;
+/** Solid cracked volcanic rock with a warm internal glow. */
+export const MAGMA: BlockId = 49;
+/** Dense dark volcanic stone used around deep magma chambers. */
+export const BASALT: BlockId = 50;
+/** Glassy stone found where magma chambers cool along their outer shelves. */
+export const OBSIDIAN: BlockId = 51;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -597,6 +603,34 @@ export const BLOCK_DEFS: BlockDef[] = [
       pattern: 'glow',
       colors: [[235, 200, 90]],
     },
+  },
+  {
+    id: MAGMA,
+    name: 'magma',
+    opaque: true,
+    transparent: false,
+    light: 9,
+    creative: true,
+    faces: {
+      pattern: 'ore',
+      colors: [[255, 102, 24]],
+    },
+  },
+  {
+    id: BASALT,
+    name: 'basalt',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([55, 58, 64]),
+  },
+  {
+    id: OBSIDIAN,
+    name: 'obsidian',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([42, 28, 58]),
   },
 ];
 

@@ -3,6 +3,7 @@ import { VoxelView } from './VoxelView';
 import { emitShaped, mergeMeshData } from '../mesh/emitShaped';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
 import type { MeshPass } from '../mesh/MeshPass';
+import { lavaPass, waterPass } from '../mesh/MeshPass';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { ChunkMeshes, MeshData } from '../mesh/MeshTypes';
 
@@ -78,6 +79,8 @@ export function meshChunkView(
   return {
     opaque: mergeMeshData(mesher.mesh(view, opaque, capY), shaped.slabs),
     transparent: mesher.mesh(view, transparent, capY),
+    water: mesher.mesh(view, waterPass(registry), capY),
+    lava: mesher.mesh(view, lavaPass(registry), capY),
     cutout: shaped.cross,
   };
 }
@@ -109,7 +112,13 @@ export function runMeshJob(
 /** The result buffers a worker moves (not copies) back to the main thread. */
 export function meshTransferables(meshes: ChunkMeshes): ArrayBuffer[] {
   const buffers = new Set<ArrayBuffer>();
-  for (const bucket of [meshes.opaque, meshes.transparent, meshes.cutout]) {
+  for (const bucket of [
+    meshes.opaque,
+    meshes.transparent,
+    meshes.water,
+    meshes.lava,
+    meshes.cutout,
+  ]) {
     for (const arr of Object.values(bucket) as Array<Float32Array | Uint32Array>) {
       if (arr.buffer instanceof ArrayBuffer && arr.buffer.byteLength > 0) buffers.add(arr.buffer);
     }

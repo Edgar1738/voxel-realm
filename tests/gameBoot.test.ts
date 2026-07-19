@@ -131,6 +131,8 @@ const boot = vi.hoisted(() => {
     texture: { dispose: vi.fn(() => order.push('texture.dispose')) },
     material: { dispose: vi.fn(() => order.push('material.dispose')) },
     transparentMaterial: { dispose: vi.fn(() => order.push('transparentMaterial.dispose')) },
+    waterMaterial: { dispose: vi.fn(() => order.push('waterMaterial.dispose')) },
+    lavaMaterial: { dispose: vi.fn(() => order.push('lavaMaterial.dispose')) },
     cutoutMaterial: { dispose: vi.fn(() => order.push('cutoutMaterial.dispose')) },
     registryConstructorArgs: [] as unknown[],
     cameraRigConstructorArgs: [] as unknown[],
@@ -176,6 +178,8 @@ vi.mock('../src/render/TextureArray', () => ({
 vi.mock('../src/render/ChunkMaterial', () => ({
   createChunkMaterial: vi.fn(() => boot.material),
   createTransparentMaterial: vi.fn(() => boot.transparentMaterial),
+  createWaterMaterial: vi.fn(() => boot.waterMaterial),
+  createLavaMaterial: vi.fn(() => boot.lavaMaterial),
   createCutoutMaterial: vi.fn(() => boot.cutoutMaterial),
 }));
 

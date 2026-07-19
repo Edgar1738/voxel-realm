@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { buildBlockTextures, type BlockDef } from '../src/blocks/blocks';
-import { opaquePass, transparentPass } from '../src/mesh/MeshPass';
-import { AIR, GRASS, STONE, WATER, GLASS } from '../src/blocks/blocks';
+import { lavaPass, opaquePass, transparentPass, waterPass } from '../src/mesh/MeshPass';
+import { AIR, GRASS, STONE, WATER, GLASS, LAVA } from '../src/blocks/blocks';
 
 const reg = new BlockRegistry();
 
@@ -22,8 +22,9 @@ describe('opaquePass', () => {
 
 describe('transparentPass', () => {
   const pass = transparentPass(reg);
-  it('includes transparent blocks, excludes air and opaque solids', () => {
-    expect(pass.includes(WATER)).toBe(true);
+  it('includes glass-like blocks, excluding liquids, air, and opaque solids', () => {
+    expect(pass.includes(WATER)).toBe(false);
+    expect(pass.includes(LAVA)).toBe(false);
     expect(pass.includes(STONE)).toBe(false);
     expect(pass.includes(AIR)).toBe(false);
   });
@@ -41,6 +42,17 @@ describe('transparentPass', () => {
     expect(pass.faceVisible(WATER, GLASS)).toBe(true);
     expect(pass.faceVisible(GLASS, WATER)).toBe(true);
     expect(pass.faceVisible(GLASS, GLASS)).toBe(false); // same type still culled
+  });
+});
+
+describe('liquid passes', () => {
+  it('keeps water and lava in separate material buckets', () => {
+    const water = waterPass(reg);
+    const lava = lavaPass(reg);
+    expect(water.includes(WATER)).toBe(true);
+    expect(water.includes(LAVA)).toBe(false);
+    expect(lava.includes(LAVA)).toBe(true);
+    expect(lava.includes(WATER)).toBe(false);
   });
 });
 

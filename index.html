@@ -63,6 +63,35 @@
         width: 18px;
         height: 2px;
       }
+      #lava-heat {
+        position: fixed;
+        inset: 0;
+        z-index: 4;
+        pointer-events: none;
+        opacity: 0;
+        background:
+          radial-gradient(
+            circle at center,
+            transparent 34%,
+            rgba(255, 68, 0, 0.18) 72%,
+            rgba(80, 8, 0, 0.58)
+          ),
+          linear-gradient(rgba(255, 125, 24, 0.08), rgba(120, 12, 0, 0.2));
+        box-shadow: inset 0 0 90px rgba(255, 74, 0, 0.42);
+        transition: opacity 180ms ease;
+      }
+      #lava-heat.active {
+        opacity: 1;
+        animation: lava-heat-pulse 1.8s ease-in-out infinite alternate;
+      }
+      @keyframes lava-heat-pulse {
+        from {
+          filter: saturate(0.9) brightness(0.96);
+        }
+        to {
+          filter: saturate(1.2) brightness(1.08);
+        }
+      }
       #creative-ui {
         position: fixed;
         inset: 0;
@@ -758,6 +787,30 @@
           sans-serif;
         color: #eef2f6;
       }
+      .world-map-controls {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+      }
+      .world-map-control {
+        padding: 5px 9px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.07);
+        color: #eef2f6;
+        font:
+          11px system-ui,
+          sans-serif;
+        cursor: pointer;
+      }
+      .world-map-control:hover:not(:disabled) {
+        border-color: rgba(255, 177, 60, 0.75);
+        background: rgba(255, 123, 32, 0.16);
+      }
+      .world-map-control:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
       .world-map-canvas {
         width: min(66vmin, 560px);
         height: min(66vmin, 560px);
@@ -1334,6 +1387,7 @@
   <body>
     <canvas id="app"></canvas>
     <div id="menu" hidden></div>
+    <div id="lava-heat" aria-hidden="true"></div>
     <div id="crosshair"></div>
     <div id="overlay">
       Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use

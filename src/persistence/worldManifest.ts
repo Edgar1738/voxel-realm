@@ -17,6 +17,8 @@ export interface WorldManifestEntry {
   preset: string;
   seed: number;
   version: number;
+  /** Base terrain generation used when the shipped package is opened. */
+  worldgenVersion?: number;
   spawn: MetaPoint;
   look: WorldLook;
   landmarks: Array<{ name: string } & MetaPoint>;
@@ -77,6 +79,7 @@ export function buildManifestEntry(
     preset: meta.preset ?? 'default',
     seed: meta.seed,
     version: meta.version,
+    ...(meta.worldgenVersion === undefined ? {} : { worldgenVersion: meta.worldgenVersion }),
     spawn: { ...meta.spawn },
     look: { ...meta.look },
     landmarks: (meta.landmarks ?? []).map((l) => ({ ...l })),
@@ -105,6 +108,9 @@ export function manifestEntryProblems(entry: WorldManifestEntry): string[] {
   if (!entry.preset) p.push('preset is empty');
   if (!Number.isInteger(entry.seed)) p.push('seed is not an integer');
   if (!Number.isInteger(entry.version)) p.push('version is not an integer');
+  if (entry.worldgenVersion !== undefined && !Number.isInteger(entry.worldgenVersion)) {
+    p.push('worldgenVersion is not an integer');
+  }
   if (!pointFinite(entry.spawn)) p.push('spawn is not finite');
   if (!Number.isFinite(entry.look.yaw) || !Number.isFinite(entry.look.pitch))
     p.push('look is not finite');
@@ -155,6 +161,13 @@ export function entryMetaProblems(
   if (meta.seed !== entry.seed) p.push(`snapshot seed ${meta.seed} != manifest ${entry.seed}`);
   if (meta.version !== entry.version)
     p.push(`snapshot version ${meta.version} != manifest ${entry.version}`);
+  if (
+    entry.worldgenVersion !== undefined &&
+    meta.worldgenVersion !== undefined &&
+    meta.worldgenVersion !== entry.worldgenVersion
+  ) {
+    p.push(`snapshot worldgenVersion ${meta.worldgenVersion} != manifest ${entry.worldgenVersion}`);
+  }
   if ((meta.preset ?? 'default') !== entry.preset)
     p.push(`snapshot preset ${meta.preset ?? 'default'} != manifest ${entry.preset}`);
   if (!meta.spawn || !meta.look) p.push('snapshot meta is missing spawn/look');

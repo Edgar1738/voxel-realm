@@ -76,6 +76,8 @@ uniform float uTorch;
 uniform float uTorchRadius;
 uniform float uTime;
 uniform float uWaveAmp;
+uniform float uFluidKind;
+uniform float uLavaGlow;
 uniform float uAoStrength;
 uniform vec3 uSkyColor;
 uniform float uAmbientStrength;
@@ -101,11 +103,11 @@ void main() {
   vec4 texel = texture(uTex, vec3(vUv, vLayer));
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
   vec3 base = texel.rgb * vTint;
-  // Water surface treatment (transparent pass only; uWaveAmp is 0 on every other pass):
+  // Water surface treatment (water pass only):
   // the two-sine shimmer, a deep-blue depth tint, and a sky-tinted grazing-angle rim.
   // fres (view-angle fresnel) is reused for the alpha and to gate the glint further down.
   float fres = 0.0;
-  if (uWaveAmp > 0.0) {
+  if (uFluidKind > 0.5 && uFluidKind < 1.5) {
     float wave = sin(vWorldPos.x * 1.6 + vWorldPos.z * 0.7 + uTime * 1.4) *
                  sin(vWorldPos.z * 1.9 - vWorldPos.x * 0.5 + uTime * 1.1);
     base *= 1.0 + uWaveAmp * wave;
@@ -114,6 +116,13 @@ void main() {
     fres = pow(1.0 - clamp(dot(Nv, V), 0.0, 1.0), uFresnelPower);
     base = mix(base, uWaterDeep, uWaterDepthTint);
     base = mix(base, uSkyColor, fres * uFresnelTint);
+  } else if (uFluidKind > 1.5) {
+    // Lava moves more slowly and heavily than water. It keeps its authored orange texture,
+    // gains a rolling hot/cool pulse, and never receives sky fresnel or blue depth tint.
+    float lavaWave = sin(vWorldPos.x * 0.72 + vWorldPos.z * 0.31 + uTime * 0.55) *
+                     sin(vWorldPos.z * 0.81 - vWorldPos.x * 0.27 + uTime * 0.43);
+    base *= 1.0 + uWaveAmp * lavaWave;
+    base = mix(base, vec3(1.0, 0.16, 0.015), 0.12 + 0.06 * lavaWave);
   }
   // Diffuse sun/moon term in world space: uLightDir is world-space, so it must pair with
   // vWorldNormal (vNormal is view-space and would make shading swim as the camera turns).
@@ -145,9 +154,13 @@ void main() {
   vec3 ambient = hueTint * mix(0.72, 1.0, up);
   vec3 tintMul = mix(vec3(1.0), ambient, uAmbientStrength);
   vec3 color = base * tintMul * shade * level;
+  if (uFluidKind > 1.5) {
+    float pulse = 0.82 + 0.18 * sin(uTime * 0.7 + vWorldPos.x * 0.18 + vWorldPos.z * 0.14);
+    color += base * uLavaGlow * pulse;
+  }
   // Water sun glint: a Blinn-Phong highlight confined to top faces in daylight, so night
   // and underwater water stay calm. Sky-tinted so the sparkle matches the time of day.
-  if (uWaveAmp > 0.0) {
+  if (uFluidKind > 0.5 && uFluidKind < 1.5) {
     vec3 Nv = normalize(vNormal);
     vec3 V = normalize(-vViewPos);
     vec3 Lv = normalize((viewMatrix * vec4(normalize(uLightDir), 0.0)).xyz);
@@ -161,7 +174,7 @@ void main() {
   // Water alpha varies with view angle: near-transparent looking straight down (fres≈0
   // keeps uAlpha), opaque/reflective at grazing angles (fres→1).
   float outAlpha = uAlpha;
-  if (uWaveAmp > 0.0) outAlpha = mix(uAlpha, 1.0, fres);
+  if (uFluidKind > 0.5 && uFluidKind < 1.5) outAlpha = mix(uAlpha, 1.0, fres);
   fragColor = vec4(color, outAlpha);
 }
 `;
@@ -178,6 +191,8 @@ interface MaterialOpts {
   alphaTest?: number;
   swayAmp?: number;
   waveAmp?: number;
+  fluidKind?: number;
+  lavaGlow?: number;
 }
 
 function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShaderMaterial {
@@ -188,6 +203,8 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
     alphaTest = 0,
     swayAmp = 0,
     waveAmp = 0,
+    fluidKind = 0,
+    lavaGlow = 0,
   } = opts;
   const material = new RawShaderMaterial({
     glslVersion: GLSL3,
@@ -209,6 +226,8 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
       uTime: { value: 0.0 },
       uSwayAmp: { value: swayAmp },
       uWaveAmp: { value: waveAmp },
+      uFluidKind: { value: fluidKind },
+      uLavaGlow: { value: lavaGlow },
       uAoStrength: { value: 1.0 },
       // Sky-tint ambient (Part 1): default matches the fog color; DayNight overwrites it live.
       uSkyColor: { value: new Vector3(0.529, 0.725, 0.91) },
@@ -233,13 +252,31 @@ export function createChunkMaterial(tex: DataArrayTexture): RawShaderMaterial {
   return buildMaterial(tex);
 }
 
-/** Translucent material for the transparent pass (water/glass; drawn after opaque, no depth write). */
+/** Glass-like transparent blocks: no liquid waves, tint, or fresnel. */
 export function createTransparentMaterial(tex: DataArrayTexture): RawShaderMaterial {
+  return buildMaterial(tex, { alpha: 0.68, transparent: true, doubleSide: true });
+}
+
+/** Water material: translucent waves, depth tint, fresnel, and daylight glint. */
+export function createWaterMaterial(tex: DataArrayTexture): RawShaderMaterial {
   return buildMaterial(tex, {
     alpha: 0.72,
     transparent: true,
     doubleSide: true,
     waveAmp: WATER_WAVE_AMP,
+    fluidKind: 1,
+  });
+}
+
+/** Lava material: nearly opaque, slow rolling heat, and an additive emissive pulse. */
+export function createLavaMaterial(tex: DataArrayTexture): RawShaderMaterial {
+  return buildMaterial(tex, {
+    alpha: 0.92,
+    transparent: true,
+    doubleSide: true,
+    waveAmp: 0.08,
+    fluidKind: 2,
+    lavaGlow: 0.42,
   });
 }
 
