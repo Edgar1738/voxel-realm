@@ -28,6 +28,9 @@ import {
   OAK_DOOR,
   STAIRS_SLATE,
   STAIRS_STONE,
+  BOOKSHELF,
+  FURNACE,
+  PLANK_SLAB,
 } from '../src/blocks/blocks';
 import { FACING } from '../src/world/VoxelState';
 
@@ -437,6 +440,16 @@ describe('stonehaven terrain composition', () => {
     }
   });
 
+  it('furnishes the halls: hearth, library wall, and the long table', () => {
+    const { at } = sampler();
+    expect(at(-77, 119, 116)).toBe(FURNACE); // the hearth in its chimney breast
+    expect(at(-74, 119, 124)).toBe(BOOKSHELF); // the library wall
+    expect(at(-74, 120, 124)).toBe(BOOKSHELF);
+    expect(at(-74, 120, 122)).toBe(PLANK_SLAB); // the long table top
+    expect(at(-74, 119, 123)).toBe(PLANK_SLAB); // a bench beside it
+    expect(at(-74, 135, 117)).toBe(BOOKSHELF); // the upper-hall study shelves
+  });
+
   it('provides a protected wall-walk with stair access from the ward', () => {
     const { at } = sampler();
     const w = STONEHAVEN_SITES.ward;
@@ -463,6 +476,10 @@ describe('stonehaven terrain composition', () => {
     expect(at(66, 62, 96)).toBe(STONE);
     expect(at(66, 64, 96)).toBe(AIR);
     expect(at(62, 63, 96)).toBe(STONE); // the rim holds the west edge
+    // Header pool at the top of the descent: rimmed water the cascade pours from.
+    const hH = stonehavenSurfaceAt(SEED, 85, 104);
+    expect(at(85, hH, 104)).toBe(WATER);
+    expect(at(88, hH, 104)).toBe(STONE); // rim
   });
 
   it('keeps trees out of the village square and off the lake', () => {

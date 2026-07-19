@@ -367,34 +367,42 @@ describe('cloudspire curated metadata', () => {
 });
 
 describe('cloudspire shipped package', () => {
-  it('matches every bundled non-air voxel to the fresh generator, including state', () => {
-    const bytes = readFileSync(new URL('../public/worlds/cloudspire-citadel.vrw', import.meta.url));
-    const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const { deltas, dropped } = decodeWorldBinary(binary, { isValidBlockId: () => true });
-    const { chunkOf } = makeSampler();
-    let checked = 0;
-    let mismatch: string | undefined;
+  // Regenerating 242 authored chunks takes ~7 s alone and legitimately exceeds the default
+  // 20 s under full-suite parallel load (observed flaking as sibling suites grew heavier).
+  it(
+    'matches every bundled non-air voxel to the fresh generator, including state',
+    { timeout: 60_000 },
+    () => {
+      const bytes = readFileSync(
+        new URL('../public/worlds/cloudspire-citadel.vrw', import.meta.url),
+      );
+      const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const { deltas, dropped } = decodeWorldBinary(binary, { isValidBlockId: () => true });
+      const { chunkOf } = makeSampler();
+      let checked = 0;
+      let mismatch: string | undefined;
 
-    for (const [key, entries] of deltas) {
-      const { cx, cz } = parseChunkKey(key);
-      const chunk = chunkOf(cx, cz);
-      for (const [index, packed] of entries) {
-        const local = indexToLocal(index);
-        const actualId = chunk.get(local.x, local.y, local.z);
-        const actualState = chunk.getState(local.x, local.y, local.z);
-        if (actualId !== voxelId(packed) || actualState !== voxelState(packed)) {
-          mismatch = `${key}:${index} expected ${voxelId(packed)}/${voxelState(packed)} got ${actualId}/${actualState}`;
-          break;
+      for (const [key, entries] of deltas) {
+        const { cx, cz } = parseChunkKey(key);
+        const chunk = chunkOf(cx, cz);
+        for (const [index, packed] of entries) {
+          const local = indexToLocal(index);
+          const actualId = chunk.get(local.x, local.y, local.z);
+          const actualState = chunk.getState(local.x, local.y, local.z);
+          if (actualId !== voxelId(packed) || actualState !== voxelState(packed)) {
+            mismatch = `${key}:${index} expected ${voxelId(packed)}/${voxelState(packed)} got ${actualId}/${actualState}`;
+            break;
+          }
+          checked++;
         }
-        checked++;
+        if (mismatch) break;
       }
-      if (mismatch) break;
-    }
 
-    expect(dropped).toBe(0);
-    expect(mismatch).toBeUndefined();
-    expect(checked).toBeGreaterThan(1_000_000);
-  });
+      expect(dropped).toBe(0);
+      expect(mismatch).toBeUndefined();
+      expect(checked).toBeGreaterThan(1_000_000);
+    },
+  );
 });
 
 describe('cloudspire atmosphere parse defaults', () => {

@@ -221,6 +221,37 @@ M4 captures: `.claude/worktrees/stonehaven-m4/.captures/stonehaven-m4-*.jpg`.
   would give it more mass from the village view.
 - Gate flanking bastion still worth a look in play; keep watching.
 
+## Milestone 6: Dressing Pass
+
+**Date:** 2026-07-19 (branch `experiment/project-stonehaven-m6` off main `52fd4cd`)
+
+### Resolved from M5's observations
+- "The great hall is bare" → RESOLVED: hearth (cobble chimney breast + furnace) on the north
+  wall under the existing lantern, a two-high bookshelf library along the south wall, a long
+  plank-and-trestle table with floor-slab benches, and a study (shelves + reading table) in the
+  upper hall. The door lane and stair shaft stay clear — the court→hall walk still verifies.
+- "The cascade is thin at the top" → the upper 55% of the sheet is now 3 wide, and a
+  stone-rimmed header pool sits at the top of the descent so the fall visibly pours from
+  somewhere.
+- "Watch the SW flanking bastion" → RESOLVED as intentional: probed from below the switchback
+  (`stonehaven-m6-probe-bastion.jpg`) it reads as a flanking tower guarding the climb, with the
+  limestone gate frame visible beyond. No change.
+
+### Test-suite health (unrelated file, deliberate)
+- `tests/cloudspire.test.ts`'s full-package comparison regenerates 242 authored chunks (~7 s
+  standalone) and had begun flaking on the default 20 s timeout under full-suite load as
+  sibling suites grew. It now declares `{ timeout: 60_000 }` with a comment.
+
+### Verification
+- 1,666 tests (27 stonehaven) / tsc / lint / build green; hall walkthrough re-verified after
+  furnishing; captures `stonehaven-m6-01-great-hall`, `-02-falls`, `-probe-bastion`.
+
+### M7 candidate observations
+- The header pool is invisible from the village (behind the crest) — audible/particle water
+  effects or a taller spill notch would sell it from afar.
+- Upper-hall study could take a CYAN_GLASS window facing the lake.
+- The village interiors (harbormaster/inn) are empty shells; same furnishing treatment applies.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08

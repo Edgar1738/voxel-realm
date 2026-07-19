@@ -16,6 +16,9 @@ import {
   STAIRS_SLATE,
   STAIRS_STONE,
   WATER,
+  BOOKSHELF,
+  FURNACE,
+  PLANK_SLAB,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
@@ -462,6 +465,23 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
   s.set(k.x1 - 2, 123, k.z1 - 2, LANTERN);
   s.set(u.x0 + 1, 138, u.z1 - 1, LANTERN);
 
+  // M6 furnishing — the hall reads lived-in, not carved-and-left. Everything keeps clear of
+  // the door lane (z 119..121, east of the shaft) and the shaft itself.
+  // Hearth: a cobble chimney breast on the north wall with a working furnace at its heart.
+  s.fill(-78, 119, k.z0 + 2, -76, 122, k.z0 + 2, COBBLESTONE);
+  s.set(-77, 119, k.z0 + 2, FURNACE);
+  // Library: a two-high bookshelf wall along the south side.
+  s.fill(k.x0 + 2, 119, k.z1 - 2, k.x1 - 2, 120, k.z1 - 2, BOOKSHELF);
+  // The long table: plank top on fence trestles, floor-slab benches alongside.
+  s.set(-77, 119, 122, OAK_FENCE);
+  s.set(-72, 119, 122, OAK_FENCE);
+  s.fill(-77, 120, 122, -72, 120, 122, PLANK_SLAB);
+  s.fill(-76, 119, 123, -73, 119, 123, PLANK_SLAB);
+  // Upper hall: a study — bookshelves along the north wall, a reading table by the lantern.
+  s.fill(u.x0 + 1, 135, u.z0 + 1, u.x1 - 1, 135, u.z0 + 1, BOOKSHELF);
+  s.set(-72, 135, 122, OAK_FENCE);
+  s.set(-72, 136, 122, PLANK_SLAB);
+
   // Entrance: a limestone-framed doorway in the east face, reached by a grand stone stair
   // cut up the knoll from the ward court (one rise per column — walkable by construction).
   s.fill(k.x1 - 1, 119, 119, k.x1, 122, 121, AIR); // door tunnel through the east wall
@@ -584,10 +604,18 @@ function buildFalls(s: CitadelStamp, seed: WorldSeed): void {
     const t = i / steps;
     const cx = Math.round(A.x + (B.x - A.x) * t);
     const cz = Math.round(A.z + (B.z - A.z) * t);
-    for (const [ox, oz] of [
+    // 3 wide on the upper face (where the M5 sheet read thin from the village), narrowing to
+    // 2 as it nears the shore.
+    const wide = [
+      [0, -1],
       [0, 0],
       [0, 1],
-    ] as const) {
+    ] as const;
+    const narrow = [
+      [0, 0],
+      [0, 1],
+    ] as const;
+    for (const [ox, oz] of t < 0.55 ? wide : narrow) {
       const wx = cx + ox;
       const wz = cz + oz;
       if (!owned(s, wx, wz)) continue;
@@ -595,6 +623,22 @@ function buildFalls(s: CitadelStamp, seed: WorldSeed): void {
       if (h <= 64 || h > 84) continue; // only the descent face; the pool takes over at the shore
       s.set(wx, h - 1, wz, STONE); // seal the bed
       s.set(wx, h, wz, WATER); // water flush with the ground line
+    }
+  }
+  // Header pool at the top of the descent: a stone-rimmed basin the cascade visibly pours from.
+  const head = { cx: 85, cz: 104, r: 2.4 };
+  const hH = stonehavenSurfaceAt(seed, head.cx, head.cz);
+  for (let wz = head.cz - 4; wz <= head.cz + 4; wz++) {
+    for (let wx = head.cx - 4; wx <= head.cx + 4; wx++) {
+      if (!owned(s, wx, wz)) continue;
+      const d = Math.hypot(wx - head.cx, wz - head.cz);
+      if (d <= head.r) {
+        s.set(wx, hH - 1, wz, STONE);
+        s.set(wx, hH, wz, WATER);
+        s.set(wx, hH + 1, wz, AIR);
+      } else if (d <= head.r + 1.2) {
+        s.set(wx, hH, wz, STONE);
+      }
     }
   }
   // Splash pool: stone floor and rim one block above the lake, water at shore level.
