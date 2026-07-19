@@ -23,6 +23,9 @@ import {
   PLANKS,
   LANTERN,
   COBBLE_WALL,
+  CARVED_LIMESTONE,
+  GLOWSTONE,
+  OAK_DOOR,
 } from '../src/blocks/blocks';
 
 const SEED = 1337;
@@ -78,7 +81,8 @@ describe('stonehaven terrain composition', () => {
       const cb = b.generator.generateBaseChunk(SEED, cx, cz);
       applyOverlays(ca, cx, cz, SEED, a.overlays);
       applyOverlays(cb, cx, cz, SEED, b.overlays);
-      for (let y = 0; y < WORLD_HEIGHT; y += 7) {
+      // Every voxel, every layer — a sparse stride can miss overlay-only differences.
+      for (let y = 0; y < WORLD_HEIGHT; y += 1) {
         for (let x = 0; x < CHUNK_SIZE_X; x++) {
           for (let z = 0; z < CHUNK_SIZE_Z; z++) {
             expect(ca.get(x, y, z)).toBe(cb.get(x, y, z));
@@ -227,8 +231,59 @@ describe('stonehaven terrain composition', () => {
     expect(at(midX, b.deckY - 2, midZ)).toBe(AIR); // the open span beneath
     // The terrain gap is real: the groove passes well under the deck…
     expect(stonehavenSurfaceAt(SEED, midX, midZ)).toBeLessThan(b.deckY - 4);
-    // …and the graded road meets the deck flush at the north approach.
-    expect(Math.abs(stonehavenSurfaceAt(SEED, 100, 104) - b.deckY)).toBeLessThanOrEqual(1);
+    // …and the graded road meets the deck flush at BOTH approaches.
+    expect(Math.abs(stonehavenSurfaceAt(SEED, 100, 104) - b.deckY)).toBeLessThanOrEqual(1); // north
+    expect(Math.abs(stonehavenSurfaceAt(SEED, 104, 118) - b.deckY)).toBeLessThanOrEqual(1); // south
+  });
+
+  it('offers a continuous post-overlay walking surface through the bridge area', () => {
+    const { at } = makeSampler();
+    const road = stonehavenRoad();
+    // Topmost solid block in the plausible walking band — deck or graded road, whichever exists.
+    const topSolid = (px: number, pz: number): number => {
+      for (let y = 100; y >= 78; y--) {
+        const id = at(px, y, pz);
+        if (id !== AIR && id !== WATER) return y;
+      }
+      return -1;
+    };
+    let prev: number | undefined;
+    let samples = 0;
+    for (let a = 0; a <= road.length; a += 1) {
+      const p = road.pointAt(a);
+      const px = Math.round(p.x);
+      const pz = Math.round(p.z);
+      if (px < 97 || px > 107 || pz < 98 || pz > 124) {
+        prev = undefined;
+        continue;
+      }
+      const h = topSolid(px, pz);
+      expect(h).toBeGreaterThan(0);
+      if (prev !== undefined) expect(Math.abs(h - prev)).toBeLessThanOrEqual(1);
+      prev = h;
+      samples++;
+    }
+    expect(samples).toBeGreaterThan(20); // the walk really crossed the gorge section
+  });
+
+  it('generates authored features identically regardless of chunk generation order', () => {
+    // The bridge + falls-bench chunk (6,7) spans authored features that cross chunk borders.
+    // Generate it alone, and generate it after its neighbors, from independent generators —
+    // any cross-chunk ordering dependency in terrain or overlays would diverge the bytes.
+    const alone = makeSampler();
+    const afterNeighbors = makeSampler();
+    afterNeighbors.chunkOf(6, 6);
+    afterNeighbors.chunkOf(7, 7);
+    afterNeighbors.chunkOf(5, 7);
+    const ca = alone.chunkOf(6, 7);
+    const cb = afterNeighbors.chunkOf(6, 7);
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+      for (let x = 0; x < CHUNK_SIZE_X; x++) {
+        for (let z = 0; z < CHUNK_SIZE_Z; z++) {
+          expect(ca.get(x, y, z)).toBe(cb.get(x, y, z));
+        }
+      }
+    }
   });
 
   it('builds the harbor quay and a lamplit pier at the waterfront', () => {
@@ -242,26 +297,82 @@ describe('stonehaven terrain composition', () => {
     expect([STONE, COBBLESTONE]).toContain(at(hb.cx - 8, hb.apronY, hb.cz + 1));
   });
 
-  it('raises fortress massing: keep above the knoll, walls, and a lit gate over the road', () => {
+  it('raises masonry fortress massing distinct from the natural crag', () => {
     const { at } = makeSampler();
     const w = STONEHAVEN_SITES.ward;
     const k = w.keep;
-    const kx = Math.round((k.x0 + k.x1) / 2);
-    const kz = Math.round((k.z0 + k.z1) / 2);
-    expect(at(kx, k.topY, kz)).toBe(STONE); // the keep mass tops out at the authored height
-    expect(at(kx, k.topY + 2, kz)).toBe(AIR); // …and is a rimmed roof, not a spike of fill
-    // Curtain wall stands above the plateau on the east edge.
-    expect(at(w.x1, w.wallTopY, Math.round((w.z0 + w.z1) / 2))).toBe(STONE);
-    // The gate passage is walkable air over the road surface, under a stone lintel.
-    const g = w.gate;
-    const gh = stonehavenSurfaceAt(SEED, -66, g.z);
-    expect(at(-66, gh + 1, g.z)).toBe(AIR);
-    expect(at(-66, gh + 2, g.z)).toBe(AIR);
-    expect(at(-66, gh + 4, g.z)).toBe(STONE);
-    // The ward court is paved where the climb arrives.
+    // Curtain wall: cobblestone masonry (not natural stone) above the plinth on the east edge.
+    expect(at(w.x1, w.wallTopY, Math.round((w.z0 + w.z1) / 2))).toBe(COBBLESTONE);
+    // Bastion crown: pale limestone ring at the tower top (the long-range architecture cue).
+    expect(at(w.x1 + 2, w.towerTopY + 1, w.z1)).toBe(CARVED_LIMESTONE);
+    // Keep: cobble body, limestone quoin, set-back upper storey topping out at its own height.
+    expect(at(k.x1, 126, k.z1)).toBe(CARVED_LIMESTONE); // corner quoin column
+    const u = k.upper;
+    const ux = Math.round((u.x0 + u.x1) / 2);
+    const uz = Math.round((u.z0 + u.z1) / 2);
+    expect(at(ux, u.topY, uz)).toBe(COBBLESTONE); // upper storey mass
+    expect(at(ux, u.topY + 2, uz)).toBe(AIR); // rimmed roof, not a spike of fill
+    // The fire tower rises past the upper storey with the glowstone basin on top.
+    const b = w.beacon;
+    expect(b.topY).toBeGreaterThan(u.topY + 4);
+    expect(at(b.x0 + 1, b.topY + 1, b.z0 + 1)).toBe(GLOWSTONE);
+    // The ward court is paved where the climb arrives, with the lit waymark plinth.
     const hC = stonehavenSurfaceAt(SEED, -58, 132);
     expect([STONE, COBBLESTONE]).toContain(at(-58, hC, 132));
-    expect(at(-58, hC + 2, 132)).toBe(LANTERN); // the waymark plinth
+    expect(at(-58, hC + 2, 132)).toBe(LANTERN);
+  });
+
+  it('frames a traversable gate: level floor, headroom across the full width, limestone arch', () => {
+    const { at } = makeSampler();
+    const g = STONEHAVEN_SITES.ward.gate;
+    let prev: number | undefined;
+    for (let wx = g.x0; wx <= g.x1; wx++) {
+      const h = stonehavenSurfaceAt(SEED, wx, g.z);
+      if (prev !== undefined) expect(Math.abs(h - prev)).toBeLessThanOrEqual(1); // level threshold
+      prev = h;
+      for (let wz = g.z - 1; wz <= g.z + 1; wz++) {
+        for (let wy = h + 1; wy <= h + 3; wy++) {
+          expect(at(wx, wy, wz)).toBe(AIR); // full-width, full-depth headroom
+        }
+      }
+      expect(at(wx, h + 5, g.z)).toBe(CARVED_LIMESTONE); // the arch lintel overhead
+    }
+    // Limestone jambs flank the opening.
+    const jh = stonehavenSurfaceAt(SEED, g.x0 - 1, g.z);
+    expect(at(g.x0 - 1, jh + 2, g.z)).toBe(CARVED_LIMESTONE);
+  });
+
+  it('keeps the pier deck walkable and dry over open water', () => {
+    const { at } = makeSampler();
+    const hb = STONEHAVEN_SITES.harbor;
+    const pier = hb.pier;
+    for (let wz = pier.z0; wz <= pier.z1; wz++) {
+      expect(at(pier.x, hb.apronY, wz)).toBe(PLANKS); // continuous center deck
+      expect(at(pier.x, hb.apronY + 1, wz)).toBe(AIR); // clear walking headroom
+      expect(at(pier.x, hb.apronY + 2, wz)).toBe(AIR);
+    }
+    expect(at(pier.x, hb.apronY - 1, Math.round((pier.z0 + pier.z1) / 2 + 3))).toBe(WATER);
+  });
+
+  it('frames the harbor with village masses while keeping the lake corridor open', () => {
+    const { at } = makeSampler();
+    const v = STONEHAVEN_SITES.village;
+    // Harbormaster's house: cobble base wall, oak door facing the plaza, slate roof above.
+    expect(at(v.harbormaster.x0, v.harbormaster.floorY + 2, 1)).toBe(COBBLESTONE);
+    expect(at(v.harbormaster.door.x, v.harbormaster.floorY + 1, v.harbormaster.door.z)).toBe(
+      OAK_DOOR,
+    );
+    // Inn: plank upper storey on the north side of the plaza.
+    expect(at(v.inn.x0, v.inn.floorY + 5, Math.round((v.inn.z0 + v.inn.z1) / 2))).toBe(PLANKS);
+    // Boathouse: open mouth toward the water (south face air at walking height).
+    const bMidX = Math.round((v.boathouse.x0 + v.boathouse.x1) / 2);
+    expect(at(bMidX, v.boathouse.floorY + 1, v.boathouse.z1)).toBe(AIR);
+    // The plaza-to-quay corridor stays walkable: nothing solid at head height down the middle.
+    for (let wz = 5; wz <= 15; wz++) {
+      const h = stonehavenSurfaceAt(SEED, 16, wz);
+      expect(at(16, h + 1, wz)).toBe(AIR);
+      expect(at(16, h + 2, wz)).toBe(AIR);
+    }
   });
 
   it('paves the road with a solid cobble center line', () => {

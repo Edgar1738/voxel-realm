@@ -118,6 +118,63 @@
 - From the south-shore vista the tier dome dominates and the wall line only peeks; the falls-rim overlook is the stronger fortress view. Consider lifting the curtain or pushing it to the plateau rim in M4.
 - The turret beacon partially coincides with the moon from the harbor angle; still reads as a lit point. A taller fire tower would separate it.
 
+## Milestone 4: Readability Pass
+
+**Date:** 2026-07-18 (implemented on `experiment/project-stonehaven-m4` off main `5d73fd7`; uncommitted pending Edgar's review)
+
+### Resolved from M3's findings
+- "Fortress merges with the crag" → RESOLVED: all built faces are now masonry — cobblestone
+  bodies over a two-course natural-stone plinth, carved-limestone trim (bastion crowns, gate
+  jambs + arch lintel, keep quoins). The hewn-from-the-mountain base survives in the plinths
+  and buttress ribs; the architecture above reads as construction in every capture.
+- "Beacon coincides with the moon" → RESOLVED: the beacon is a dedicated fire tower (top 146)
+  rising past the keep's new upper storey (140); at dusk it burns clearly above the skyline.
+- "Keep reads as a featureless cube" → set-back crenellated upper storey, limestone quoins,
+  shadow-slit windows at two storey lines.
+- "Curtain only peeks from the vistas" → wallTop 116 / towers 123 + buttress rhythm; the wall
+  line reads from both pullouts.
+
+### What Changed (beyond the fortress)
+- Village framing: harbormaster's house + inn flanking the plaza (floor 65) and a boathouse on
+  the quay apron (floor 63) — cobble base, plank upper, glass, oak doors, hanging lanterns,
+  slate hip roofs. The x 10..23 lake corridor is kept open by construction.
+- Route continuity (found by the new tests + live walkthrough):
+  - Bridge deck widened to 7 (x 99..105): the road crosses the gorge on a diagonal, and the
+    5-wide deck put the south-end centerline on top of the parapet (a 2-block step).
+  - Bridge-approach paving: the gorge-proximity skip now only skips columns that truly dropped
+    into the gap; the approaches are paved again (they had reverted to grass and sprouted
+    flowers mid-road).
+  - Pier: the corridor above the deck is air-cleared — the shore lip sat at 64 (one above the
+    apron) and the pier dead-ended into the grass bank at its first two segments.
+- Tests: 17 → 22. Determinism now byte-compares every Y layer; both bridge approaches; a
+  continuous top-solid walk through the gorge; generation-order identity for the bridge chunk;
+  full-width gate floor/headroom/arch; pier walkability; village + corridor guarantees.
+
+### Verification
+- 1,661 tests green (192 files), tsc clean, lint clean, build passes (known bundle warning).
+- Live `__vr.simulate` traversals: bridge (101,102)→(106,125); plaza→pier head; road→gate→ward
+  (−74,148)→(−61,108,136). Gotcha for future passes: simulate's `yaw` is RADIANS, heading
+  `(−sin ψ, −cos ψ)`, and the avatar must be teleported ~1.5 above `surface().y` or it embeds.
+
+### Capture reproduction (record for M5+)
+All via `__vr.fog(260,460)` + `preloadArea` + `pov(ex,ey,ez, tx,ty,tz)` + `save(name,{hud:false})`,
+noon (`time(0.4)`) except 07 at dusk (`time(0.82)`):
+- 01 village arrival: pov(16,86,−42, 0,80,120)
+- 02 harbor quay: pov(−8,74,−8, 18,62,26) — moved from M3's (2,70,−4): the harbormaster's
+  house now stands on the old camera spot
+- 03 bridge: pov(84,98,98, 103,89,112)
+- 04 vista pullout: pov(40, surface+2.6, 160, −74,122,120)
+- 05 gate approach: pov(−78, surface+2.6, 152, −66,107,138)
+- 06 falls overlook: pov(90, surface+2.6, 120, −40,105,118)
+- 07 dusk beacon: pov(16,70,16, −74,128,120)
+M4 captures: `.claude/worktrees/stonehaven-m4/.captures/stonehaven-m4-*.jpg`.
+
+### Current (M5 candidate) observations
+- Slate hip roofs are chunky up close; stair-based roofing would refine them.
+- Fortress interiors, keep entrance, and wall-walk access do not exist yet.
+- The SW flanking bastion stands close beside the gate switchback — dramatic, but watch it.
+- The waterfall lip itself (the falls bench's lake cliff) still has no authored water feature.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08

@@ -143,19 +143,44 @@ export const STONEHAVEN_SITES = {
     apronY: SEA_LEVEL + 1,
     pier: { x: 15, z0: 16, z1: 27 },
   },
-  /** The stone bridge where the road crosses the stream gorge on the falls bench. */
-  bridge: { x0: 100, x1: 104, z0: 105, z1: 117, deckY: 92 },
-  /** The fortress ward: curtain wall + corner bastions on the plateau, keep massing on the knoll. */
+  /** The stone bridge where the road crosses the stream gorge on the falls bench. The deck is
+   *  7 wide because the road crosses on a diagonal — at the south end the centerline runs at
+   *  x≈104.3, which a 5-wide deck put on top of the parapet. */
+  bridge: { x0: 99, x1: 105, z0: 105, z1: 117, deckY: 92 },
+  /**
+   * The fortress ward: curtain wall + corner bastions on the plateau, keep massing on the knoll.
+   * M4: the built faces are masonry (cobblestone over a stone plinth, pale carved-limestone trim)
+   * so architecture separates from the crag's natural rock; the curtain rises higher, the keep
+   * carries a set-back upper storey, and the beacon moved onto its own taller fire tower.
+   */
   ward: {
     x0: -74,
     x1: -42,
     z0: 112,
     z1: 140,
-    wallTopY: 114,
-    towerTopY: 120,
+    wallTopY: 116,
+    towerTopY: 123,
     gate: { x0: -68, x1: -64, z: 140 },
-    keep: { x0: -80, x1: -68, z0: 114, z1: 126, topY: 134 },
-    turret: { x0: -80, x1: -77, z0: 114, z1: 117, topY: 140 },
+    keep: {
+      x0: -80,
+      x1: -68,
+      z0: 114,
+      z1: 126,
+      topY: 134,
+      upper: { x0: -78, x1: -70, z0: 116, z1: 124, topY: 140 },
+    },
+    beacon: { x0: -80, x1: -77, z0: 114, z1: 117, topY: 146 },
+  },
+  /**
+   * Waterfront village massing (M4): just enough built frontage to make the harbor read as
+   * inhabited — a harbormaster's house and an inn flanking the plaza on the bench (floor y 65),
+   * and a boathouse on the quay apron (floor y 63). The lake/fortress sightline south of the
+   * plaza stays open by construction: nothing is placed in the x 10..23 corridor.
+   */
+  village: {
+    harbormaster: { x0: 2, z0: -3, x1: 9, z1: 4, floorY: 65, door: { x: 9, z: 1 } },
+    inn: { x0: 24, z0: -9, x1: 31, z1: -2, floorY: 65, door: { x: 27, z: -2 } },
+    boathouse: { x0: 2, z0: 10, x1: 9, z1: 15, floorY: 63 },
   },
   /** Road pullouts framing destination views: the south-shore fortress vista, the falls-bench
    *  rim overlook (lake below, the keep straight across the water — clear of the stream gorge). */
