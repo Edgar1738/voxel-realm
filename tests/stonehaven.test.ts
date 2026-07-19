@@ -32,6 +32,9 @@ import {
   FURNACE,
   PLANK_SLAB,
   CYAN_GLASS,
+  STAIRS_PLANK,
+  STONE_SLAB,
+  GLASS,
 } from '../src/blocks/blocks';
 import { FACING } from '../src/world/VoxelState';
 
@@ -460,6 +463,31 @@ describe('stonehaven terrain composition', () => {
     expect(at(27, v.inn.floorY + 2, -6)).toBe(PLANK_SLAB); // the inn's common table top
     expect(at(27, v.inn.floorY + 1, -5)).toBe(PLANK_SLAB); // a bench beside it
     expect(at(30, v.inn.floorY + 1, -8)).toBe(FURNACE); // the kitchen hearth
+  });
+
+  it('raises the inn loft and lights the cottages at night', () => {
+    const { at } = sampler();
+    const v = STONEHAVEN_SITES.village;
+    const loftY = v.inn.floorY + 5;
+    expect(at(28, loftY, -6)).toBe(PLANKS); // the loft floor over the common room
+    expect(at(26, v.inn.floorY + 1, -3)).toBe(STAIRS_PLANK); // first step of the loft stair
+    expect(at(30, loftY, -3)).toBe(STAIRS_PLANK); // …rising all the way up
+    expect(at(27, loftY + 1, -4)).toBe(PLANK_SLAB); // a cot under the rafters
+    expect(at(28, loftY - 1, -6)).toBe(LANTERN); // the common room stays lit under the loft
+    expect(at(28, v.inn.floorY + 6, v.inn.z0)).toBe(GLASS); // upper-storey window
+    // Door transoms glow after dark.
+    expect(at(v.harbormaster.door.x, v.harbormaster.floorY + 3, v.harbormaster.door.z)).toBe(
+      LANTERN,
+    );
+    expect(at(v.inn.door.x, v.inn.floorY + 3, v.inn.door.z)).toBe(LANTERN);
+  });
+
+  it('crowns the keep roof with the summit overlook', () => {
+    const { at } = sampler();
+    const u = STONEHAVEN_SITES.ward.keep.upper;
+    expect(at(-74, u.topY + 1, u.z0)).toBe(COBBLE_WALL); // the see-through view rail
+    expect(at(-74, u.topY + 1, u.z0 + 1)).toBe(STONE_SLAB); // the bench at the rail
+    expect(at(-76, u.topY + 2, u.z0)).toBe(LANTERN); // the overlook lamp
   });
 
   it('provides a protected wall-walk with stair access from the ward', () => {

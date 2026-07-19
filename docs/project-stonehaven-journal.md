@@ -284,6 +284,36 @@ M4 captures: `.claude/worktrees/stonehaven-m4/.captures/stonehaven-m4-*.jpg`.
 - The journey's last unbuilt beat from the original M2 list: a summit overlook marker above the
   keep (flag, cairn, or view plinth).
 
+## Milestone 8: Night Warmth, the Loft, and the Summit
+
+**Date:** 2026-07-19 (branch `experiment/project-stonehaven-m8` off main `0a7cafe`)
+
+### Resolved from M7's observations
+- "Cottages dim at night" → lantern transoms set into the wall above each cottage door; the
+  night capture (`stonehaven-m8-03-village-night.jpg`) shows a lamplit, inhabited waterfront.
+- "Inn could take a sleeping loft" → the inn is now two storeys (`tall` shell option: +3 plank
+  courses, second-storey windows): a plank loft floor over the common room, a straight plank
+  stair along the south wall, two slab cots, and a lantern hung under the loft so the common
+  room stays lit. Loft climb walk-verified (25.5,67) → (30.7,71.9).
+- "Summit overlook marker" → the journey's final beat: where the spiral emerges on the keep
+  roof, the north rim opens into a see-through crenel rail with slab benches and a lamp —
+  looking back down the whole valley (falls, bridge, village, harbor).
+
+### Route findings fixed during the walkthrough
+- The first loft-stair design climbed a single column entered from the side; the player's
+  collision box clipped the neighboring support stack and stalled. Rebuilt as a straight run
+  along the south wall with a clear approach. (Also: voxel centers are at n+0.5 of the LOWER
+  index — a walk-probe "at z −3" stands at z −2.5.)
+
+### Verification
+- 1,669 tests (30 stonehaven) / tsc / lint / build green.
+- Captures: `stonehaven-m8-01-loft`, `-02-summit-overlook`, `-03-village-night`.
+
+### Status
+The original M2 journey list — harbor, village, residential frontage, forest road, bridge,
+fortress, summit — now has every beat built, furnished, lit, and walk-verified. Future work is
+elective polish (ambient sound at the falls, NPCs, seasonal dressing), not missing beats.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08

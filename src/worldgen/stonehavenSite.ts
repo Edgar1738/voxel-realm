@@ -20,6 +20,8 @@ import {
   FURNACE,
   PLANK_SLAB,
   CYAN_GLASS,
+  STAIRS_PLANK,
+  STONE_SLAB,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
@@ -233,11 +235,12 @@ function hipRoof(
 function buildingShell(
   s: CitadelStamp,
   box: ShellBox,
-  opts: { door?: { x: number; z: number }; openFace?: 'south' },
+  opts: { door?: { x: number; z: number }; openFace?: 'south'; tall?: boolean },
 ): void {
-  const wallTop = box.floorY + 5;
+  // `tall` raises the shell three courses for a second storey (the inn's sleeping loft).
+  const wallTop = box.floorY + (opts.tall ? 8 : 5);
   s.slab(box.x0, box.z0, box.x1, box.z1, box.floorY, COBBLESTONE); // floor
-  // Walls: 3 cobble courses under 2 plank courses.
+  // Walls: 3 cobble courses under plank courses to the top.
   for (const [y0, y1, id] of [
     [box.floorY + 1, box.floorY + 3, COBBLESTONE],
     [box.floorY + 4, wallTop, PLANKS],
@@ -250,13 +253,16 @@ function buildingShell(
     // Boathouse mouth: the whole south face opens toward the water.
     s.fill(box.x0 + 1, box.floorY + 1, box.z1, box.x1 - 1, wallTop - 1, box.z1, AIR);
   }
-  // Windows: one per long face at sill height.
+  // Windows: one per long face at sill height (both storeys when tall).
   const midX = Math.round((box.x0 + box.x1) / 2);
   const midZ = Math.round((box.z0 + box.z1) / 2);
-  s.set(midX, box.floorY + 3, box.z0, GLASS);
-  if (opts.openFace !== 'south') s.set(midX, box.floorY + 3, box.z1, GLASS);
-  s.set(box.x0, box.floorY + 3, midZ, GLASS);
-  s.set(box.x1, box.floorY + 3, midZ, GLASS);
+  const sills = opts.tall ? [box.floorY + 3, box.floorY + 6] : [box.floorY + 3];
+  for (const sy of sills) {
+    s.set(midX, sy, box.z0, GLASS);
+    if (opts.openFace !== 'south') s.set(midX, sy, box.z1, GLASS);
+    s.set(box.x0, sy, midZ, GLASS);
+    s.set(box.x1, sy, midZ, GLASS);
+  }
   if (opts.door) {
     s.fill(opts.door.x, box.floorY + 1, opts.door.z, opts.door.x, box.floorY + 2, opts.door.z, AIR);
     s.set(opts.door.x, box.floorY + 1, opts.door.z, OAK_DOOR);
@@ -270,7 +276,7 @@ function buildVillage(s: CitadelStamp): void {
   const v = STONEHAVEN_SITES.village;
   if (!overlaps(s, v.harbormaster.x0 - 1, v.inn.z0 - 1, v.inn.x1 + 1, v.boathouse.z1 + 1)) return;
   buildingShell(s, v.harbormaster, { door: v.harbormaster.door });
-  buildingShell(s, v.inn, { door: v.inn.door });
+  buildingShell(s, v.inn, { door: v.inn.door, tall: true }); // two storeys: the loft (M8)
   buildingShell(s, v.boathouse, { openFace: 'south' });
 
   // M7: the shells get lives. The harbormaster keeps a stove, ledgers, and a chart desk; the
@@ -284,11 +290,31 @@ function buildVillage(s: CitadelStamp): void {
 
   const iFloor = v.inn.floorY + 1; // 66
   s.set(30, iFloor, -8, FURNACE); // kitchen hearth in the north-east corner
-  s.set(25, iFloor, -6, OAK_FENCE); // the common table: trestles + plank top
+  s.set(26, iFloor, -6, OAK_FENCE); // the common table: trestles + plank top
   s.set(30, iFloor, -6, OAK_FENCE);
-  s.fill(25, iFloor + 1, -6, 30, iFloor + 1, -6, PLANK_SLAB);
-  s.fill(26, iFloor, -7, 29, iFloor, -7, PLANK_SLAB); // benches down both sides
-  s.fill(26, iFloor, -5, 29, iFloor, -5, PLANK_SLAB);
+  s.fill(26, iFloor + 1, -6, 30, iFloor + 1, -6, PLANK_SLAB);
+  s.fill(27, iFloor, -7, 29, iFloor, -7, PLANK_SLAB); // benches down both sides
+  s.fill(27, iFloor, -5, 29, iFloor, -5, PLANK_SLAB);
+  // The sleeping loft (M8): a plank floor over the common room, reached by a straight plank
+  // stair along the south wall — a clear run from the door, no side-entry squeeze.
+  const loftY = v.inn.floorY + 5; // floor blocks at 70, stand on 71
+  s.fill(25, loftY, v.inn.z0 + 1, v.inn.x1 - 1, loftY, -4, PLANKS); // open stairwell over z -3
+  for (let i = 0; i <= 4; i++) {
+    const sx = 26 + i;
+    const sy = iFloor + i;
+    if (sy - 1 >= iFloor) s.fill(sx, iFloor, -3, sx, sy - 1, -3, PLANKS); // step support
+    s.set(sx, sy, -3, STAIRS_PLANK, packState(FACING.W, 0)); // rises toward +x, up to the loft
+  }
+  s.fill(27, loftY + 1, -4, 28, loftY + 1, -4, PLANK_SLAB); // cot one
+  s.fill(29, loftY + 1, v.inn.z0 + 1, 30, loftY + 1, v.inn.z0 + 1, PLANK_SLAB); // cot two
+  // The shell's ceiling lantern now lights the loft; hang one under the loft floor so the
+  // common room below stays warm too.
+  s.set(28, loftY - 1, -6, LANTERN);
+
+  // Door transoms (M8): a lit lantern set into the wall above each cottage door, so the
+  // village windows glow warm from outside after dark.
+  s.set(v.harbormaster.door.x, v.harbormaster.floorY + 3, v.harbormaster.door.z, LANTERN);
+  s.set(v.inn.door.x, v.inn.floorY + 3, v.inn.door.z, LANTERN);
 }
 
 /**
@@ -501,6 +527,14 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
   s.set(-72, 135, 122, OAK_FENCE);
   s.set(-72, 136, 122, PLANK_SLAB);
   s.fill(-74, 136, u.z0, -73, 137, u.z0, CYAN_GLASS);
+
+  // The summit overlook (M8) — the journey's final payoff where the spiral emerges: the roof's
+  // north rim opens into a see-through crenel rail, with a slab bench and a lamp beside it,
+  // looking back down the whole valley — falls, bridge, village, harbor.
+  s.fill(-75, u.topY + 1, u.z0, -72, u.topY + 1, u.z0, COBBLE_WALL);
+  s.set(-74, u.topY + 1, u.z0 + 1, STONE_SLAB);
+  s.set(-72, u.topY + 1, u.z0 + 1, STONE_SLAB);
+  s.set(-76, u.topY + 2, u.z0, LANTERN);
 
   // Entrance: a limestone-framed doorway in the east face, reached by a grand stone stair
   // cut up the knoll from the ward court (one rise per column — walkable by construction).
