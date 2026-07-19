@@ -3,6 +3,7 @@ import { createGenerator, isWorldPreset, WORLD_PRESETS } from '../src/worldgen/P
 import {
   STONEHAVEN,
   STONEHAVEN_STREAM,
+  STONEHAVEN_SITES,
   stonehavenSurfaceAt,
   stonehavenCapAt,
   stonehavenRoad,
@@ -10,7 +11,19 @@ import {
 import { applyOverlays } from '../src/worldgen/Generator';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
-import { AIR, WATER, GRASS, SNOW, STONE, SAND, GRAVEL } from '../src/blocks/blocks';
+import {
+  AIR,
+  WATER,
+  GRASS,
+  SNOW,
+  STONE,
+  SAND,
+  GRAVEL,
+  COBBLESTONE,
+  PLANKS,
+  LANTERN,
+  COBBLE_WALL,
+} from '../src/blocks/blocks';
 
 const SEED = 1337;
 
@@ -76,8 +89,9 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('keeps the village bench near-level around the spawn origin', () => {
+    // z stops at 4: south of that the harbor apron intentionally steps down to the quay level.
     for (let x = -20; x <= 20; x += 5) {
-      for (let z = -16; z <= 8; z += 4) {
+      for (let z = -16; z <= 4; z += 4) {
         const h = stonehavenSurfaceAt(SEED, x, z);
         expect(Math.abs(h - STONEHAVEN.village.benchY)).toBeLessThanOrEqual(1);
       }
@@ -153,7 +167,8 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('paints believable caps: grass bench, beach at the waterline, rock on cliffs', () => {
-    expect(stonehavenCapAt(SEED, 8, 8)).toBe(GRASS);
+    // North of the plaza — (8,8) now sits on the harbor apron's shingle edge by design.
+    expect(stonehavenCapAt(SEED, 0, -6)).toBe(GRASS);
     // North crag face (toward the lake) is a cliff.
     const cliffCap = stonehavenCapAt(SEED, STONEHAVEN.crag.cx + 4, STONEHAVEN.crag.cz - 30);
     expect([STONE, GRAVEL]).toContain(cliffCap);
@@ -173,10 +188,19 @@ describe('stonehaven terrain composition', () => {
 
   it('grades a walkable, dry road from the square to the outer ward', () => {
     const road = stonehavenRoad();
+    const b = STONEHAVEN_SITES.bridge;
     let prev: number | undefined;
     for (let a = 0; a <= road.length; a += 1) {
       const p = road.pointAt(a);
-      const h = stonehavenSurfaceAt(SEED, Math.round(p.x), Math.round(p.z));
+      const px = Math.round(p.x);
+      const pz = Math.round(p.z);
+      // Over the gorge the terrain intentionally opens under the road; the stamped bridge deck
+      // carries the walk there (asserted in the milestone-3 anchor tests below).
+      if (px >= b.x0 && px <= b.x1 && pz >= b.z0 && pz <= b.z1) {
+        prev = undefined;
+        continue;
+      }
+      const h = stonehavenSurfaceAt(SEED, px, pz);
       expect(h).toBeGreaterThan(SEA_LEVEL); // never underwater
       if (prev !== undefined) {
         expect(Math.abs(h - prev)).toBeLessThanOrEqual(1); // single-block steps at worst
@@ -190,6 +214,73 @@ describe('stonehaven terrain composition', () => {
     function STONEHAVEN_ROAD_END(): number {
       const p = road.pts[road.pts.length - 1];
       return stonehavenSurfaceAt(SEED, p.x, p.z);
+    }
+  });
+
+  it('spans the stream gorge with a stone bridge over an open arch', () => {
+    const { at } = makeSampler();
+    const b = STONEHAVEN_SITES.bridge;
+    const midX = Math.round((b.x0 + b.x1) / 2);
+    const midZ = Math.round((b.z0 + b.z1) / 2);
+    expect(at(midX, b.deckY, midZ)).toBe(STONE); // the deck
+    expect(at(b.x0, b.deckY + 1, midZ)).toBe(COBBLE_WALL); // a parapet
+    expect(at(midX, b.deckY - 2, midZ)).toBe(AIR); // the open span beneath
+    // The terrain gap is real: the groove passes well under the deck…
+    expect(stonehavenSurfaceAt(SEED, midX, midZ)).toBeLessThan(b.deckY - 4);
+    // …and the graded road meets the deck flush at the north approach.
+    expect(Math.abs(stonehavenSurfaceAt(SEED, 100, 104) - b.deckY)).toBeLessThanOrEqual(1);
+  });
+
+  it('builds the harbor quay and a lamplit pier at the waterfront', () => {
+    const { at } = makeSampler();
+    const hb = STONEHAVEN_SITES.harbor;
+    const pier = hb.pier;
+    expect(at(pier.x, hb.apronY, pier.z1)).toBe(PLANKS); // pier head deck
+    expect(at(pier.x, hb.apronY - 1, pier.z1)).toBe(WATER); // standing over the lake
+    expect(at(pier.x - 1, hb.apronY + 2, pier.z1)).toBe(LANTERN); // head lamps
+    // The esplanade is paved at apron level (sampled west of the road ramp's blend zone).
+    expect([STONE, COBBLESTONE]).toContain(at(hb.cx - 8, hb.apronY, hb.cz + 1));
+  });
+
+  it('raises fortress massing: keep above the knoll, walls, and a lit gate over the road', () => {
+    const { at } = makeSampler();
+    const w = STONEHAVEN_SITES.ward;
+    const k = w.keep;
+    const kx = Math.round((k.x0 + k.x1) / 2);
+    const kz = Math.round((k.z0 + k.z1) / 2);
+    expect(at(kx, k.topY, kz)).toBe(STONE); // the keep mass tops out at the authored height
+    expect(at(kx, k.topY + 2, kz)).toBe(AIR); // …and is a rimmed roof, not a spike of fill
+    // Curtain wall stands above the plateau on the east edge.
+    expect(at(w.x1, w.wallTopY, Math.round((w.z0 + w.z1) / 2))).toBe(STONE);
+    // The gate passage is walkable air over the road surface, under a stone lintel.
+    const g = w.gate;
+    const gh = stonehavenSurfaceAt(SEED, -66, g.z);
+    expect(at(-66, gh + 1, g.z)).toBe(AIR);
+    expect(at(-66, gh + 2, g.z)).toBe(AIR);
+    expect(at(-66, gh + 4, g.z)).toBe(STONE);
+    // The ward court is paved where the climb arrives.
+    const hC = stonehavenSurfaceAt(SEED, -58, 132);
+    expect([STONE, COBBLESTONE]).toContain(at(-58, hC, 132));
+    expect(at(-58, hC + 2, 132)).toBe(LANTERN); // the waymark plinth
+  });
+
+  it('paves the road with a solid cobble center line', () => {
+    const { at } = makeSampler();
+    for (const p of [
+      { x: 56, z: 16 },
+      { x: 83, z: 52 },
+      { x: 42, z: 168 },
+    ]) {
+      const h = stonehavenSurfaceAt(SEED, p.x, p.z);
+      expect(at(p.x, h, p.z)).toBe(COBBLESTONE);
+    }
+  });
+
+  it('paves both viewpoint pullouts', () => {
+    const { at } = makeSampler();
+    for (const vp of STONEHAVEN_SITES.viewpoints) {
+      const h = stonehavenSurfaceAt(SEED, vp.x, vp.z);
+      expect([STONE, COBBLESTONE, GRAVEL]).toContain(at(vp.x, h, vp.z));
     }
   });
 

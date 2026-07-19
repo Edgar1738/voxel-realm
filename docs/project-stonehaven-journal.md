@@ -95,6 +95,29 @@
 - Stonehaven is promising but not compositionally ready. The route spine is the right foundation, but the world currently has fewer than ten truly screenshot-worthy places.
 - Recommended next step: approve a focused composition pass that adjusts terrain/road/framing and adds only minimal landmark massing necessary to test the journey. Keep final architecture and decorative density for later.
 
+## Milestone 3: Composition Pass
+
+**Date:** 2026-07-18
+
+### What Changed
+- All authored anchors live in one exported `STONEHAVEN_SITES` constant (generator + site overlay + tests read the same data).
+- Harbor: a level quay apron terrain-cut into the bench's lake edge (y 63), stone esplanade + quay wall, and a 3-wide plank pier on wood pilings with lantern-lit head. The M2 "empty waterfront" is now an arrival.
+- Village plaza: bordered cobble square at the road's first waypoint with flanking lamps; steps down to the quay.
+- Bridge: the terrain now opens a real gap where the road corridor crosses the stream gorge; a stone deck with cobble-wall parapets and headwall abutments spans it flush with the graded road. Road paving skips the gorge (the deck carries it).
+- Road material hierarchy: solid cobble center line (dist < 1.3), gravel shoulders with sparse cobbles, frayed edge — replaces the per-column cobble/gravel/stone confetti M2 flagged.
+- Fortress massing blockout: curtain wall with merlons + three corner bastions on the plateau, twin-tower gatehouse with lintel + cleared passage over the road, keep block with crenellated rim on the knoll, and a glowstone beacon basin on the lake-facing turret (visible across the water at night). Ward court: paved circle with a lit waymark plinth where the climb arrives.
+- Viewpoints: two pullouts (south-shore meadow at (40,160); falls-bench rim at (90,120)) with parapet on the view side, gravel spur to the road, wayside lamp, and 15-block tree clearings for sightlines.
+
+### Verification
+- 1335 tests pass (17 stonehaven, including new anchor tests: bridge span + flush approach, quay/pier, keep/gate/court, cobble center line, pullouts); tsc + lint clean.
+- Fresh captures in `.captures/`: `stonehaven-m3-01-village-arrival` (plaza + pier + keep silhouette across the lake — the destination promise M2 found missing), `-02-harbor-quay`, `-03-bridge`, `-04-vista-pullout`, `-05-gate-approach`, `-06-falls-overlook`, `-07-dusk-beacon`.
+
+### Findings / M4 Notes
+- The first viewpoint originally sat on the mountain-apron scree at (70,153) — surface probing in the live game caught it; moved to the meadow at (40,160). Probe `__vr.surface()` before anchoring anything to "flat" ground.
+- Fortress massing is plain STONE, which merges with the crag's natural rock — reads as hewn-from-the-mountain. Acceptable for blockout; if M4 wants "built" readability, face the walls in a masonry material (cobble/stone brick) or raise the curtain another 4–6 blocks.
+- From the south-shore vista the tier dome dominates and the wall line only peeks; the falls-rim overlook is the stronger fortress view. Consider lifting the curtain or pushing it to the plateau rim in M4.
+- The turret beacon partially coincides with the moon from the harbor angle; still reads as a lit point. A taller fire tower would separate it.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08

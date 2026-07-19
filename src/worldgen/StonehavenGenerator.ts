@@ -126,6 +126,45 @@ export function stonehavenRoad(): RouteSpline {
   return road;
 }
 
+/**
+ * Milestone 3 composition anchors. Like STONEHAVEN itself these are read by BOTH the terrain
+ * field (aprons, the bridge gap, tree clearings) and the site overlay (paving, massing), so
+ * every authored object seats exactly on ground shaped to receive it.
+ */
+export const STONEHAVEN_SITES = {
+  /** The village plaza: the road's first waypoint, paved as an arrival square. */
+  plaza: { cx: 16, cz: 4, r: 7 },
+  /** The harbor: a level quay apron cut into the bench's lake edge, one block above water. */
+  harbor: {
+    cx: 16,
+    cz: 11,
+    rx: 13,
+    rz: 5.5,
+    apronY: SEA_LEVEL + 1,
+    pier: { x: 15, z0: 16, z1: 27 },
+  },
+  /** The stone bridge where the road crosses the stream gorge on the falls bench. */
+  bridge: { x0: 100, x1: 104, z0: 105, z1: 117, deckY: 92 },
+  /** The fortress ward: curtain wall + corner bastions on the plateau, keep massing on the knoll. */
+  ward: {
+    x0: -74,
+    x1: -42,
+    z0: 112,
+    z1: 140,
+    wallTopY: 114,
+    towerTopY: 120,
+    gate: { x0: -68, x1: -64, z: 140 },
+    keep: { x0: -80, x1: -68, z0: 114, z1: 126, topY: 134 },
+    turret: { x0: -80, x1: -77, z0: 114, z1: 117, topY: 140 },
+  },
+  /** Road pullouts framing destination views: the south-shore fortress vista, the falls-bench
+   *  rim overlook (lake below, the keep straight across the water — clear of the stream gorge). */
+  viewpoints: [
+    { x: 40, z: 160, r: 4 },
+    { x: 90, z: 120, r: 4 },
+  ],
+} as const;
+
 // Bearings from the valley center (+x east, +z south).
 const THETA_EAST = 0;
 const THETA_SOUTH = Math.PI / 2;
@@ -233,6 +272,16 @@ function stonehavenHeight(s: Samplers, wx: number, wz: number): number {
     h = lerp(h, STONEHAVEN.village.benchY + detail * 0.7, w);
   }
 
+  // 4.5 The harbor apron: a hard, level quay bench cut into the village bench's lake edge one
+  //     block above the waterline, so the quay wall and pier seat on crisp, dry ground. The
+  //     lake carve (next) trims its southern lip into the waterfront.
+  const hb = STONEHAVEN_SITES.harbor;
+  const tH = superellipseT(wx - hb.cx, wz - hb.cz, hb.rx, hb.rz, 3);
+  if (tH < 1) {
+    const w = Math.min(1, smoothstep01((1 - tH) / 0.3));
+    h = lerp(h, hb.apronY, w);
+  }
+
   // 5. The lake basin, smooth-min carved through whatever it meets — including the village
   //    bench, whose cut edge becomes the harbor waterfront.
   const tL = superellipseT(dx, dz, STONEHAVEN.lake.rx, STONEHAVEN.lake.rz, STONEHAVEN.lake.pow);
@@ -276,7 +325,14 @@ function stonehavenHeight(s: Samplers, wx: number, wz: number): number {
   const rHit = road.project(wx, wz);
   if (rHit.dist < 10) {
     const target = road.yAt(rHit.along);
-    const w = 1 - smoothstep01((rHit.dist - 3.5) / 6.5);
+    let w = 1 - smoothstep01((rHit.dist - 3.5) / 6.5);
+    // The bridge gap: where the road corridor crosses the stream gorge, fade the grading out so
+    // the groove passes beneath instead of being filled — the site overlay spans it with the
+    // stone bridge deck at road level, abutments seating on the graded ends.
+    if (wx > 40 && wz > 60 && wx < 170 && wz < 150) {
+      const sHit = polylineProject(wx, wz, STONEHAVEN_STREAM);
+      if (sHit.dist < 6) w *= smoothstep01((sHit.dist - 2.5) / 3.5);
+    }
     h = lerp(h, target, w);
   }
 
@@ -386,6 +442,11 @@ function inClearing(wx: number, wz: number): boolean {
     if (polylineProject(wx, wz, STONEHAVEN_STREAM).dist < 11) return true;
   }
   if (road.project(wx, wz).dist < 7) return true;
+  // Vista clearings: keep the pullouts' framed views (fortress across the water, the falls lip)
+  // open — a treeless wedge is what turns a road bend into a destination glimpse.
+  for (const vp of STONEHAVEN_SITES.viewpoints) {
+    if (Math.hypot(wx - vp.x, wz - vp.z) < 15) return true;
+  }
   return false;
 }
 
