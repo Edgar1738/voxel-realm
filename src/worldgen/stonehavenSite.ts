@@ -19,6 +19,7 @@ import {
   BOOKSHELF,
   FURNACE,
   PLANK_SLAB,
+  CYAN_GLASS,
 } from '../blocks/blocks';
 import { packState, FACING } from '../world/VoxelState';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
@@ -271,6 +272,23 @@ function buildVillage(s: CitadelStamp): void {
   buildingShell(s, v.harbormaster, { door: v.harbormaster.door });
   buildingShell(s, v.inn, { door: v.inn.door });
   buildingShell(s, v.boathouse, { openFace: 'south' });
+
+  // M7: the shells get lives. The harbormaster keeps a stove, ledgers, and a chart desk; the
+  // inn earns its name with a hearth and a long common table with benches down both sides.
+  const hFloor = v.harbormaster.floorY + 1; // 66: standing level inside
+  s.set(3, hFloor, 2, FURNACE); // stove against the west wall
+  s.fill(3, hFloor, -2, 4, hFloor, -2, BOOKSHELF); // the ledgers
+  s.set(7, hFloor, 3, OAK_FENCE); // chart desk in the south-east corner
+  s.set(7, hFloor + 1, 3, PLANK_SLAB);
+  s.set(6, hFloor, 3, PLANK_SLAB); // a stool beside it
+
+  const iFloor = v.inn.floorY + 1; // 66
+  s.set(30, iFloor, -8, FURNACE); // kitchen hearth in the north-east corner
+  s.set(25, iFloor, -6, OAK_FENCE); // the common table: trestles + plank top
+  s.set(30, iFloor, -6, OAK_FENCE);
+  s.fill(25, iFloor + 1, -6, 30, iFloor + 1, -6, PLANK_SLAB);
+  s.fill(26, iFloor, -7, 29, iFloor, -7, PLANK_SLAB); // benches down both sides
+  s.fill(26, iFloor, -5, 29, iFloor, -5, PLANK_SLAB);
 }
 
 /**
@@ -477,10 +495,12 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
   s.set(-72, 119, 122, OAK_FENCE);
   s.fill(-77, 120, 122, -72, 120, 122, PLANK_SLAB);
   s.fill(-76, 119, 123, -73, 119, 123, PLANK_SLAB);
-  // Upper hall: a study — bookshelves along the north wall, a reading table by the lantern.
+  // Upper hall: a study — bookshelves along the north wall, a reading table by the lantern,
+  // and (M7) a cyan-glass window in the north face looking out over the lake to the village.
   s.fill(u.x0 + 1, 135, u.z0 + 1, u.x1 - 1, 135, u.z0 + 1, BOOKSHELF);
   s.set(-72, 135, 122, OAK_FENCE);
   s.set(-72, 136, 122, PLANK_SLAB);
+  s.fill(-74, 136, u.z0, -73, 137, u.z0, CYAN_GLASS);
 
   // Entrance: a limestone-framed doorway in the east face, reached by a grand stone stair
   // cut up the knoll from the ward court (one rise per column — walkable by construction).
@@ -615,7 +635,7 @@ function buildFalls(s: CitadelStamp, seed: WorldSeed): void {
       [0, 0],
       [0, 1],
     ] as const;
-    for (const [ox, oz] of t < 0.55 ? wide : narrow) {
+    for (const [ox, oz] of t < 0.75 ? wide : narrow) {
       const wx = cx + ox;
       const wz = cz + oz;
       if (!owned(s, wx, wz)) continue;
@@ -637,7 +657,14 @@ function buildFalls(s: CitadelStamp, seed: WorldSeed): void {
         s.set(wx, hH, wz, WATER);
         s.set(wx, hH + 1, wz, AIR);
       } else if (d <= head.r + 1.2) {
-        s.set(wx, hH, wz, STONE);
+        // The west arc is the spill notch: water instead of rim, so the pool visibly pours
+        // toward the cascade (and the fall reads from the village side).
+        if (wx <= head.cx - 2) {
+          s.set(wx, hH - 1, wz, STONE);
+          s.set(wx, hH, wz, WATER);
+        } else {
+          s.set(wx, hH, wz, STONE);
+        }
       }
     }
   }

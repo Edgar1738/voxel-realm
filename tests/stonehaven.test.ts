@@ -31,6 +31,7 @@ import {
   BOOKSHELF,
   FURNACE,
   PLANK_SLAB,
+  CYAN_GLASS,
 } from '../src/blocks/blocks';
 import { FACING } from '../src/world/VoxelState';
 
@@ -448,6 +449,17 @@ describe('stonehaven terrain composition', () => {
     expect(at(-74, 120, 122)).toBe(PLANK_SLAB); // the long table top
     expect(at(-74, 119, 123)).toBe(PLANK_SLAB); // a bench beside it
     expect(at(-74, 135, 117)).toBe(BOOKSHELF); // the upper-hall study shelves
+    expect(at(-74, 136, 116)).toBe(CYAN_GLASS); // the study's lake window
+  });
+
+  it('gives the village interiors lives: stove, ledgers, and the inn common table', () => {
+    const { at } = sampler();
+    const v = STONEHAVEN_SITES.village;
+    expect(at(3, v.harbormaster.floorY + 1, 2)).toBe(FURNACE); // harbormaster's stove
+    expect(at(4, v.harbormaster.floorY + 1, -2)).toBe(BOOKSHELF); // the ledgers
+    expect(at(27, v.inn.floorY + 2, -6)).toBe(PLANK_SLAB); // the inn's common table top
+    expect(at(27, v.inn.floorY + 1, -5)).toBe(PLANK_SLAB); // a bench beside it
+    expect(at(30, v.inn.floorY + 1, -8)).toBe(FURNACE); // the kitchen hearth
   });
 
   it('provides a protected wall-walk with stair access from the ward', () => {
@@ -480,6 +492,7 @@ describe('stonehaven terrain composition', () => {
     const hH = stonehavenSurfaceAt(SEED, 85, 104);
     expect(at(85, hH, 104)).toBe(WATER);
     expect(at(88, hH, 104)).toBe(STONE); // rim
+    expect(at(82, hH, 104)).toBe(WATER); // the west spill notch pours toward the cascade
   });
 
   it('keeps trees out of the village square and off the lake', () => {

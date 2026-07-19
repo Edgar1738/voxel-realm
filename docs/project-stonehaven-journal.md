@@ -252,6 +252,38 @@ M4 captures: `.claude/worktrees/stonehaven-m4/.captures/stonehaven-m4-*.jpg`.
 - Upper-hall study could take a CYAN_GLASS window facing the lake.
 - The village interiors (harbormaster/inn) are empty shells; same furnishing treatment applies.
 
+## Milestone 7: Village Lives and the Visible Falls
+
+**Date:** 2026-07-19 (branch `experiment/project-stonehaven-m7` off main `7c4b964`)
+
+### Resolved from M6's observations
+- "Village interiors are empty shells" → the harbormaster's house gets a stove, ledger shelves,
+  and a chart desk; the inn earns its name with a kitchen hearth and a long common table with
+  benches down both sides. (Boathouse stays an open workshop by design.)
+- "Study could take a lake window" → a 2×2 cyan-glass window in the upper hall's north face,
+  looking across the lake to the village.
+- "Header pool invisible from the village" → the cascade's 3-wide sheet now extends down 75% of
+  the descent (was 55%), and the header's west arc is a water spill notch instead of stone rim,
+  so the pool visibly pours toward the fall. Verified from the village shore: the cascade line
+  reads across the lake (`stonehaven-m7-02-falls-from-village.jpg`).
+
+### Notes
+- Walk-probe into the harbormaster's house stops at the closed oak door — expected door
+  behavior (interaction opens it), not a blockage.
+- A suspicious "floating water" block in the falls-from-village capture was probed and is the
+  water surface's grazing-angle fresnel at the near shore, not a stray block.
+
+### Verification
+- 1,667 tests (28 stonehaven) / tsc / lint / build green.
+- Captures: `stonehaven-m7-01-inn`, `stonehaven-m7-02-falls-from-village`.
+
+### M8 candidate observations
+- Interior light is dim in the cottages at night — a window lantern or glowstone hearth ember
+  would warm them.
+- The inn could take an upper sleeping loft (second storey) if the village ever grows.
+- The journey's last unbuilt beat from the original M2 list: a summit overlook marker above the
+  keep (flag, cairn, or view plinth).
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08
