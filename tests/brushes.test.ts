@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { boxVoxels, sphereVoxels, tunnelVoxels, tunnelConfigVoxels } from '../src/edit/Brushes';
+import {
+  applyBrushModifiers,
+  boxVoxels,
+  brushStampVoxels,
+  lineVoxels,
+  sphereVoxels,
+  sweptBrushVoxels,
+  tunnelVoxels,
+  tunnelConfigVoxels,
+} from '../src/edit/Brushes';
 import type { TunnelConfig } from '../src/edit/Brushes';
 import type { WorldVoxel } from '../src/edit/EditTypes';
 
@@ -43,6 +52,44 @@ describe('sphereVoxels', () => {
     const result = sphereVoxels({ x: 5, y: -3, z: 2 }, 0);
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({ x: 5, y: -3, z: 2 });
+  });
+});
+
+describe('power brush shapes', () => {
+  it('interpolates an inclusive gap-free 3D line', () => {
+    expect(lineVoxels({ x: 0, y: 0, z: 0 }, { x: 4, y: 2, z: 1 })).toEqual([
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 1, z: 0 },
+      { x: 2, y: 1, z: 1 },
+      { x: 3, y: 2, z: 1 },
+      { x: 4, y: 2, z: 1 },
+    ]);
+  });
+
+  it('builds axis-aligned cylinders, discs, and rings', () => {
+    expect(brushStampVoxels({ x: 0, y: 0, z: 0 }, 'cylinder', 1, 'y')).toHaveLength(15);
+    expect(brushStampVoxels({ x: 0, y: 0, z: 0 }, 'disc', 1, 'y')).toHaveLength(5);
+    expect(brushStampVoxels({ x: 0, y: 0, z: 0 }, 'ring', 2, 'y')).toHaveLength(8);
+  });
+
+  it('sweeps stamps without duplicate voxels or gaps', () => {
+    const result = sweptBrushVoxels({ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, 'sphere', 1, 'x');
+    expect(result.filter((v) => v.y === 0 && v.z === 0).map((v) => v.x)).toEqual([
+      -1, 0, 1, 2, 3, 4, 5,
+    ]);
+    expect(new Set(result.map((v) => `${v.x},${v.y},${v.z}`)).size).toBe(result.length);
+  });
+
+  it('makes hollow shells and deterministic rough edges', () => {
+    const sphere = sphereVoxels({ x: 0, y: 0, z: 0 }, 3);
+    const shell = applyBrushModifiers(sphere, { shell: true, noise: false });
+    const noisyA = applyBrushModifiers(sphere, { shell: false, noise: true });
+    const noisyB = applyBrushModifiers(sphere, { shell: false, noise: true });
+    expect(shell.length).toBeLessThan(sphere.length);
+    expect(shell).not.toContainEqual({ x: 0, y: 0, z: 0 });
+    expect(noisyA).toEqual(noisyB);
+    expect(noisyA).toContainEqual({ x: 0, y: 0, z: 0 });
+    expect(noisyA.length).toBeLessThan(sphere.length);
   });
 });
 
