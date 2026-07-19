@@ -39,7 +39,8 @@ export function createBootStore(
   const entry = findManifestEntry(manifest, worldName);
   if (entry) {
     return new ShippedWorldStore(
-      () => fetchShippedWorld(env.baseUrl, entry.slug, isValidBlockId),
+      () =>
+        fetchShippedWorld(env.baseUrl, entry.slug, isValidBlockId, fetch, entry.worldgenVersion),
       new IndexedDbSaveStore(overlayDbName(entry.slug)),
     );
   }

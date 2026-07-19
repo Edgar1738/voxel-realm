@@ -4,7 +4,13 @@
 // landmark labels, the tour route, and a player arrow. Renders once per open (the world
 // doesn't change enough while glancing at a map to justify per-frame redraws). All pixel
 // math lives in worldMapRender.ts; this file owns the DOM and marker drawing only.
-import { renderMapPixels, type MapRGB, type SurfaceSampler } from './worldMapRender';
+import {
+  renderCaveMapPixels,
+  renderMapPixels,
+  type CaveSampler,
+  type MapRGB,
+  type SurfaceSampler,
+} from './worldMapRender';
 import { mapClickToWorld, worldToMapPixel, nearestWithin, type Waypoint } from './waypoint';
 
 export interface WorldMapContext {
@@ -14,6 +20,10 @@ export interface WorldMapContext {
   /** Map half-extent in blocks (typically viewDistance · chunk size). */
   radius: number;
   sample: SurfaceSampler;
+  /** Optional depth sampler enables the Surface/Cave map toggle. */
+  cave?: { y: number; sample: CaveSampler };
+  /** Open directly in cave mode when the player is already well underground. */
+  initialMode?: 'surface' | 'cave';
   palette: Map<number, MapRGB>;
   title: string;
   /** `found: false` renders an anonymous gray dot — the name stays hidden until discovered. */
@@ -53,20 +63,54 @@ export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
   panel.className = 'world-map-panel';
   const title = document.createElement('div');
   title.className = 'world-map-title';
+  const controls = document.createElement('div');
+  controls.className = 'world-map-controls';
+  const modeButton = document.createElement('button');
+  modeButton.type = 'button';
+  modeButton.className = 'world-map-control';
+  const depthDown = document.createElement('button');
+  depthDown.type = 'button';
+  depthDown.className = 'world-map-control';
+  depthDown.textContent = 'Depth −';
+  const depthUp = document.createElement('button');
+  depthUp.type = 'button';
+  depthUp.className = 'world-map-control';
+  depthUp.textContent = 'Depth +';
+  controls.append(modeButton, depthDown, depthUp);
   const canvas = document.createElement('canvas');
   canvas.className = 'world-map-canvas';
   const hint = document.createElement('div');
   hint.className = 'world-map-hint';
   hint.textContent = 'Click to set a waypoint · click it again to clear · M to close';
-  panel.append(title, canvas, hint);
+  panel.append(title, controls, canvas, hint);
   root.append(panel);
   document.body.append(root);
 
   let open = false;
   let currentCtx: WorldMapContext | undefined;
+  let mode: 'surface' | 'cave' = 'surface';
+  let caveY = 0;
 
   const draw = (ctx2d: CanvasRenderingContext2D, ctx: WorldMapContext): void => {
-    const img = renderMapPixels(ctx.sample, ctx.palette, ctx.center.x, ctx.center.z, ctx.radius);
+    const caveMode = mode === 'cave' && ctx.cave !== undefined;
+    const img = caveMode
+      ? renderCaveMapPixels(
+          ctx.cave!.sample,
+          ctx.palette,
+          ctx.center.x,
+          ctx.center.z,
+          caveY,
+          ctx.radius,
+        )
+      : renderMapPixels(ctx.sample, ctx.palette, ctx.center.x, ctx.center.z, ctx.radius);
+    title.textContent = caveMode ? `${ctx.title} · Cave Y ${caveY}` : ctx.title;
+    modeButton.textContent = caveMode ? 'Cave map' : 'Surface map';
+    controls.hidden = ctx.cave === undefined;
+    depthDown.disabled = !caveMode;
+    depthUp.disabled = !caveMode;
+    hint.textContent = caveMode
+      ? 'Wheel or Depth ± changes the slice · click for waypoint · M closes'
+      : 'Click to set a waypoint · Surface map toggles cave view · M closes';
     canvas.width = img.size;
     canvas.height = img.size;
     ctx2d.putImageData(new ImageData(img.data, img.size, img.size), 0, 0);
@@ -77,8 +121,8 @@ export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
     ];
     const labelScale = Math.max(1, img.size / 260); // keep text readable on big maps
 
-    // Tour route: a gold polyline through the waypoints, dots at each stop.
-    if (ctx.tour.length >= 2) {
+    // Surface-only annotations would be misleading on a depth slice.
+    if (!caveMode && ctx.tour.length >= 2) {
       ctx2d.strokeStyle = GOLD;
       ctx2d.globalAlpha = 0.8;
       ctx2d.lineWidth = labelScale;
@@ -102,7 +146,7 @@ export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
     // Landmarks: discovered = white dot + label; undiscovered = anonymous gray dot.
     ctx2d.font = `${Math.round(9 * labelScale)}px system-ui, sans-serif`;
     ctx2d.textBaseline = 'bottom';
-    for (const l of ctx.landmarks) {
+    for (const l of caveMode ? [] : ctx.landmarks) {
       const [px, pz] = toPx(l.x, l.z);
       if (px < 0 || pz < 0 || px > img.size || pz > img.size) continue;
       const found = l.found !== false;
@@ -171,6 +215,38 @@ export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
     if (ctx2d) draw(ctx2d, next);
   };
 
+  const redraw = (): void => {
+    if (!currentCtx) return;
+    const ctx2d = canvas.getContext('2d');
+    if (ctx2d) draw(ctx2d, currentCtx);
+  };
+
+  modeButton.addEventListener('click', () => {
+    if (!currentCtx?.cave) return;
+    mode = mode === 'surface' ? 'cave' : 'surface';
+    redraw();
+  });
+  depthDown.addEventListener('click', () => {
+    if (mode !== 'cave') return;
+    caveY = Math.max(0, caveY - 4);
+    redraw();
+  });
+  depthUp.addEventListener('click', () => {
+    if (mode !== 'cave') return;
+    caveY += 4;
+    redraw();
+  });
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      if (!open || mode !== 'cave') return;
+      e.preventDefault();
+      caveY = Math.max(0, caveY + (e.deltaY > 0 ? -4 : 4));
+      redraw();
+    },
+    { passive: false },
+  );
+
   // Placing / snapping / clearing a waypoint from a map click. Landmarks (discovered only) win
   // over bare placement; a click on the existing waypoint clears it.
   canvas.addEventListener('click', (e) => {
@@ -233,7 +309,8 @@ export function createWorldMapUi(callbacks?: WorldMapCallbacks): WorldMapUi {
       const ctx2d = canvas.getContext('2d');
       if (!ctx2d) return false;
       currentCtx = ctx;
-      title.textContent = ctx.title;
+      caveY = Math.max(0, Math.floor(ctx.cave?.y ?? 0));
+      mode = ctx.initialMode === 'cave' && ctx.cave ? 'cave' : 'surface';
       draw(ctx2d, ctx);
       open = true;
       root.classList.add('is-open');

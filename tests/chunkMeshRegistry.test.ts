@@ -85,6 +85,8 @@ function makeChunkMeshes(opaqueIndices: number, transparentIndices: number): Chu
       tint: new Float32Array(transparentIndices > 0 ? transparentIndices * 3 : 0),
       indices: new Uint32Array(transparentIndices),
     },
+    water: emptyMeshData(),
+    lava: emptyMeshData(),
     cutout: emptyMeshData(),
   };
 }

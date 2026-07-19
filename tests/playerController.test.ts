@@ -28,6 +28,10 @@ const WATER: PlayerWorld = makeWorld(
   () => false,
   () => true,
 );
+const LAVA: PlayerWorld = {
+  ...makeWorld(() => false),
+  isLava: () => true,
+};
 
 function input(partial: Partial<InputState> = {}): InputState {
   return {
@@ -170,5 +174,24 @@ describe('PlayerController (swimming)', () => {
     const p = new PlayerController({ x: 0, y: 50, z: 0 }, true);
     p.update(0.1, input(), 0, WATER);
     expect(p.position.y).toBeCloseTo(50, 5); // no buoyancy/gravity while flying
+  });
+});
+
+describe('PlayerController (creative-safe lava)', () => {
+  it('marks lava contact and moves more slowly than water without respawning', () => {
+    const inLava = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    const inWater = new PlayerController({ x: 0, y: 50, z: 0 }, false);
+    inLava.update(0.1, input({ forward: true }), 0, LAVA);
+    inWater.update(0.1, input({ forward: true }), 0, WATER);
+    expect(inLava.inLava).toBe(true);
+    expect(Math.abs(inLava.position.z)).toBeLessThan(Math.abs(inWater.position.z));
+    expect(inLava.position.y).toBeGreaterThan(49);
+  });
+
+  it('keeps full flight control while still reporting heat contact', () => {
+    const p = new PlayerController({ x: 0, y: 50, z: 0 }, true);
+    p.update(0.1, input({ up: true }), 0, LAVA);
+    expect(p.inLava).toBe(true);
+    expect(p.position.y).toBe(53);
   });
 });

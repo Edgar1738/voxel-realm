@@ -19,9 +19,26 @@ export interface WorldAtmosphere {
   fogFar?: number;
 }
 
+/** One player-spawned NPC instance. Authored preset NPCs are never serialized here. */
+export interface SpawnedNpcSave {
+  /** Stable instance identity, distinct from the catalog type. */
+  id: string;
+  /** Canonical key from the NPC catalog. */
+  type: string;
+  position: MetaPoint;
+  /** World yaw in radians. */
+  yaw: number;
+  pose?: string;
+  animation?: string;
+  /** Equipment ids are validated by the NPC runtime when restored. */
+  equipment?: { main?: string; off?: string };
+}
+
 export interface WorldMeta {
   seed: number;
   version: number;
+  /** Base-terrain algorithm. Absent means legacy v1 so old worlds never reshape silently. */
+  worldgenVersion?: number;
   /** Which world preset the saved edits belong to; a change discards them. */
   preset?: string;
   /** Optional curated-world fields. All are defensively parsed and may be absent on legacy saves. */
@@ -33,6 +50,8 @@ export interface WorldMeta {
   tour?: Array<{ name?: string } & MetaPoint>;
   /** Optional world-specific weather / time / fog (defaults when absent). */
   atmosphere?: WorldAtmosphere;
+  /** Creative-mode NPC instances; absent on legacy saves. */
+  spawnedNpcs?: SpawnedNpcSave[];
 }
 
 /** A chunk's edits as stable [voxelIndex, blockId] or [voxelIndex, blockId, state] entries. */

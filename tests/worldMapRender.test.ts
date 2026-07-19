@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMapPalette,
   heightShade,
+  renderCaveMapPixels,
   renderMapPixels,
   type SurfaceSampler,
 } from '../src/app/worldMapRender';
-import { GRASS, WATER, STONE, AIR, BLOCK_DEFS } from '../src/blocks/blocks';
+import { GRASS, WATER, STONE, AIR, BLOCK_DEFS, LAVA, MAGMA } from '../src/blocks/blocks';
 import { WORLD_HEIGHT } from '../src/core/constants';
 
 const palette = buildMapPalette();
@@ -22,6 +23,39 @@ describe('buildMapPalette', () => {
       expect(palette.has(def.id)).toBe(def.faces !== undefined);
     }
     expect(palette.has(AIR)).toBe(false);
+  });
+});
+
+describe('renderCaveMapPixels', () => {
+  const pixel = (img: { size: number; data: Uint8ClampedArray }, dx: number, dz: number) => {
+    const radius = (img.size - 1) / 2;
+    const i = ((dz + radius) * img.size + (dx + radius)) * 4;
+    return [img.data[i], img.data[i + 1], img.data[i + 2], img.data[i + 3]];
+  };
+
+  it('shows open passages, hot geology, solid walls, and unloaded space distinctly', () => {
+    const img = renderCaveMapPixels(
+      (x, _y, z) => {
+        if (x === 2) return undefined;
+        if (x === -1) return LAVA;
+        if (z === 1) return MAGMA;
+        return x === 0 ? AIR : STONE;
+      },
+      palette,
+      0,
+      0,
+      24,
+      2,
+    );
+    const passage = pixel(img, 0, 0);
+    const wall = pixel(img, 1, 0);
+    const lava = pixel(img, -1, 0);
+    const magma = pixel(img, 0, 1);
+    expect(passage[3]).toBe(255);
+    expect(wall[0]).toBeLessThan(palette.get(STONE)![0]);
+    expect(lava[0]).toBeGreaterThan(lava[1]);
+    expect(magma[0]).toBeGreaterThan(magma[2]);
+    expect(pixel(img, 2, 0)[3]).toBe(0);
   });
 });
 

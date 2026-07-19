@@ -18,11 +18,13 @@ export function curatedPresetMeta(
   preset: WorldPreset,
   seed: number,
   version: number,
+  worldgenVersion?: number,
 ): WorldMeta | undefined {
   if (preset === 'sunmeadow-trials') {
     return {
       seed,
       version,
+      ...(worldgenVersion === undefined ? {} : { worldgenVersion }),
       preset,
       title: 'Sunmeadow Trial Grounds',
       description:
@@ -49,6 +51,7 @@ export function curatedPresetMeta(
     return {
       seed,
       version,
+      ...(worldgenVersion === undefined ? {} : { worldgenVersion }),
       preset,
       title: 'Ashen Reach',
       description:
@@ -76,6 +79,7 @@ export function curatedPresetMeta(
     return {
       seed,
       version,
+      ...(worldgenVersion === undefined ? {} : { worldgenVersion }),
       preset,
       title: 'Cloudspire Citadel',
       description:

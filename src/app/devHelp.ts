@@ -32,6 +32,9 @@ export const DEV_HELP: Record<string, string> = {
     "equip(target, slot, item) — target 'player' or NPC id; slot 'main'|'off'; item 'sword'|'baguette'",
   unequip: "unequip(target, slot) — clear a 'main' or 'off' wrist slot for player/NPC",
   npc: 'npc.list() · npc.pose(id, pose?) · npc.cycle(id, direction=1) · npc.animate(id, animation) · npc.cycleAnimation(id, direction=1) · npc.stop(id)',
+  spawnNpc:
+    'spawnNpc(type, x?, y?, z?, rotation=0) -> saved NPC · omit coordinates to use aim; x/y/z identify a supporting ground block (y may be omitted)',
+  removeNpc: 'removeNpc(id) -> boolean · removes spawned NPCs; authored world NPCs are protected',
   playerAnimation:
     "playerAnimation.list() · play('hip-thrust-loop'|'jump-cheer-loop') · cycle(direction=1) · stop()",
   character:

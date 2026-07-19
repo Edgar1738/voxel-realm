@@ -23,6 +23,7 @@ export async function fetchShippedWorld(
   slug: string,
   isValidBlockId: (id: number) => boolean,
   fetchImpl: typeof fetch = fetch,
+  worldgenVersion?: number,
 ): Promise<ShippedWorldBase> {
   const t0 = performance.now();
   const res = await fetchImpl(`${baseUrl}worlds/${encodeURIComponent(slug)}.vrw`);
@@ -36,9 +37,12 @@ export async function fetchShippedWorld(
     // Boot telemetry: network vs decode split. Surfaced by window.__vrBootStats().
     recordMeasure('vr:shipped-fetch+bin', t0, tFetch);
     recordMeasure('vr:shipped-decode', tFetch, performance.now());
-    return { meta, deltas };
+    return {
+      meta: worldgenVersion === undefined ? meta : { ...meta, worldgenVersion },
+      deltas,
+    };
   }
-  return fetchShippedWorldJson(baseUrl, slug, isValidBlockId, fetchImpl);
+  return fetchShippedWorldJson(baseUrl, slug, isValidBlockId, fetchImpl, worldgenVersion);
 }
 
 /** The legacy whole-world JSON path (kept as the binary's missing-file fallback). */
@@ -47,6 +51,7 @@ async function fetchShippedWorldJson(
   slug: string,
   isValidBlockId: (id: number) => boolean,
   fetchImpl: typeof fetch,
+  worldgenVersion?: number,
 ): Promise<ShippedWorldBase> {
   const url = `${baseUrl}worlds/${encodeURIComponent(slug)}.json`;
   const t0 = performance.now();
@@ -65,7 +70,10 @@ async function fetchShippedWorldJson(
   recordMeasure('vr:shipped-fetch+json', t0, tJson);
   recordMeasure('vr:shipped-validate', tJson, tValidate);
   recordMeasure('vr:shipped-to-deltas', tValidate, performance.now());
-  return { meta: snapshot.meta, deltas };
+  return {
+    meta: worldgenVersion === undefined ? snapshot.meta : { ...snapshot.meta, worldgenVersion },
+    deltas,
+  };
 }
 
 /**

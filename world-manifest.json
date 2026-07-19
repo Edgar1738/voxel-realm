@@ -8,6 +8,7 @@
       "preset": "flat",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 0,
         "y": 63.9,
@@ -81,11 +82,7 @@
           "label": "Smugglers' Den"
         }
       ],
-      "tags": [
-        "coastal",
-        "harbor",
-        "dungeon"
-      ],
+      "tags": ["coastal", "harbor", "dungeon"],
       "packageVersion": 1,
       "chunkCount": 54,
       "preview": "worlds/previews/tidewreck-cove.jpg"
@@ -97,6 +94,7 @@
       "preset": "flat",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": -55,
         "y": 64,
@@ -188,11 +186,7 @@
           "z": 44
         }
       ],
-      "tags": [
-        "underground",
-        "caves",
-        "crystal"
-      ],
+      "tags": ["underground", "caves", "crystal"],
       "packageVersion": 1,
       "chunkCount": 32,
       "preview": "worlds/previews/caverns.jpg"
@@ -204,6 +198,7 @@
       "preset": "flat",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 780,
         "y": 64,
@@ -265,11 +260,7 @@
           "z": 599
         }
       ],
-      "tags": [
-        "monument",
-        "desert",
-        "osm"
-      ],
+      "tags": ["monument", "desert", "osm"],
       "packageVersion": 1,
       "chunkCount": 2300,
       "preview": "worlds/previews/giza.jpg"
@@ -281,6 +272,7 @@
       "preset": "flat",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 211,
         "y": 64,
@@ -366,11 +358,7 @@
           "z": 494
         }
       ],
-      "tags": [
-        "city",
-        "park",
-        "osm"
-      ],
+      "tags": ["city", "park", "osm"],
       "packageVersion": 1,
       "chunkCount": 2003,
       "preview": "worlds/previews/wash-park.jpg"
@@ -382,6 +370,7 @@
       "preset": "flat",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": -2,
         "y": 64.9,
@@ -473,11 +462,7 @@
           "z": -44
         }
       ],
-      "tags": [
-        "citadel",
-        "castle",
-        "fantasy"
-      ],
+      "tags": ["citadel", "castle", "fantasy"],
       "packageVersion": 1,
       "chunkCount": 139,
       "preview": "worlds/previews/moonspire-realm.jpg"
@@ -489,6 +474,7 @@
       "preset": "grand-keep",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 8,
         "y": 74.5,
@@ -658,12 +644,7 @@
           "z": 52
         }
       ],
-      "tags": [
-        "castle",
-        "fantasy",
-        "exploration",
-        "village"
-      ],
+      "tags": ["castle", "fantasy", "exploration", "village"],
       "packageVersion": 1,
       "chunkCount": 196,
       "preview": "worlds/previews/grand-keep.jpg"
@@ -675,6 +656,7 @@
       "preset": "ashen-reach",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 0,
         "y": 108,
@@ -742,12 +724,7 @@
           "z": -78
         }
       ],
-      "tags": [
-        "fantasy",
-        "volcanic",
-        "ruins",
-        "fortress"
-      ],
+      "tags": ["fantasy", "volcanic", "ruins", "fortress"],
       "packageVersion": 1,
       "chunkCount": 1
     },
@@ -758,6 +735,7 @@
       "preset": "default",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 560.5,
         "y": 66.4,
@@ -885,11 +863,7 @@
           "z": 3120
         }
       ],
-      "tags": [
-        "alpine",
-        "village",
-        "fantasy"
-      ],
+      "tags": ["alpine", "village", "fantasy"],
       "packageVersion": 1,
       "chunkCount": 961,
       "preview": "worlds/previews/frostvale-valley.jpg"
@@ -901,6 +875,7 @@
       "preset": "cloudspire-citadel",
       "seed": 1337,
       "version": 2,
+      "worldgenVersion": 2,
       "spawn": {
         "x": 0,
         "y": 118.5,

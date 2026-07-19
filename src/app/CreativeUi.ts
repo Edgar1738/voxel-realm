@@ -3,6 +3,8 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
 import { renderBlockIcon } from './blockIcon';
+import { renderNpcPreview } from './npcPreview';
+import type { NpcDefinition } from '../npc/NpcTypes';
 import { TUNNEL_SIZES, TUNNEL_LENGTHS, TUNNEL_PATHS, type TunnelConfig } from '../edit/Brushes';
 import {
   swatchFlatColor,
@@ -54,6 +56,19 @@ export interface BlueprintEntry {
   category: BlueprintCategory;
   /** Resolves the prefab geometry lazily (curated builders are cheap; saved loads are async). */
   load: () => Prefab | Promise<Prefab>;
+}
+
+/** Catalog-backed NPC palette item; the model definition supplies name, role, and preview data. */
+export interface NpcPaletteEntry {
+  type: string;
+  definition: NpcDefinition;
+}
+
+export interface NpcPlacementHudStatus {
+  name: string;
+  yaw: number;
+  valid?: boolean;
+  reason?: string;
 }
 
 /** Player-facing world info shown by the intro/info dialog (fallbacks applied by the caller). */
@@ -190,6 +205,8 @@ export interface CreativeUi {
   worldButton: HTMLButtonElement;
   /** Blueprint library button (click handled by Game). */
   blueprintButton: HTMLButtonElement;
+  /** Catalog-driven NPC palette button (click handled by Game). */
+  npcButton: HTMLButtonElement;
   /** Menu trigger — world info + grouped hotkey reference (click handled by Game). */
   infoButton: HTMLButtonElement;
   /** Play↔build switch (click handled by Game; Game hides it for uncurated worlds). */
@@ -249,6 +266,8 @@ export interface CreativeUi {
     entries: readonly BlueprintEntry[];
     canSave: boolean;
   }): Promise<BlueprintChoice | undefined>;
+  /** Searchable, keyboard-navigable NPC catalog. Resolves the canonical catalog type. */
+  showNpcDialog(entries: readonly NpcPaletteEntry[]): Promise<string | undefined>;
   /**
    * Play mode hides the creative chrome (tools, hotbar, world/blueprint/reset); build mode
    * restores it. Purely visual — input gating lives in input.ts, not here.
@@ -258,6 +277,8 @@ export interface CreativeUi {
   setTourHud(status: TourHudStatus | undefined): void;
   /** Shows the aimed NPC interaction hint, or hides it when passed undefined. */
   setInteractionPrompt(text: string | undefined): void;
+  /** Persistent instructions while an NPC is selected for placement. */
+  setNpcPlacementHud(status: NpcPlacementHudStatus | undefined): void;
   /** Shows/updates Piper's timed challenge HUD, or hides it when passed undefined. */
   setChallengeHud(status: ChallengeHudStatus | undefined): void;
   /** Cold-start streaming banner ("Building the world — 42%"), hidden when passed undefined. */
@@ -281,12 +302,53 @@ export interface CreativeUi {
 
 const STATUS_VISIBLE_MS = 1600;
 const SAVE_STATUS_SAVED_MS = 1400; // how long the "Saved" confirmation lingers before fading
+export const REACH_HOLD_DELAY_MS = 320;
+export const REACH_HOLD_REPEAT_MS = 80;
 
 function button(text: string): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = text;
   return b;
+}
+
+/**
+ * Makes a reach button step immediately, then repeat while the primary mouse button is held.
+ * Mouse-generated clicks are ignored because mousedown already handled them; keyboard clicks
+ * (detail 0) retain the native one-step button behavior.
+ */
+export function bindReachStepButton(
+  button: HTMLButtonElement,
+  direction: 1 | -1,
+  onReachStep: ((direction: 1 | -1) => void) | undefined,
+  releaseTarget: EventTarget = window,
+): void {
+  let delayTimer: ReturnType<typeof setTimeout> | undefined;
+  let repeatTimer: ReturnType<typeof setInterval> | undefined;
+
+  const stop = (): void => {
+    if (delayTimer !== undefined) clearTimeout(delayTimer);
+    if (repeatTimer !== undefined) clearInterval(repeatTimer);
+    delayTimer = undefined;
+    repeatTimer = undefined;
+  };
+
+  button.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+    stop();
+    onReachStep?.(direction);
+    delayTimer = setTimeout(() => {
+      delayTimer = undefined;
+      onReachStep?.(direction);
+      repeatTimer = setInterval(() => onReachStep?.(direction), REACH_HOLD_REPEAT_MS);
+    }, REACH_HOLD_DELAY_MS);
+  });
+  button.addEventListener('click', (event) => {
+    if (event.detail === 0) onReachStep?.(direction);
+  });
+  button.addEventListener('blur', stop);
+  releaseTarget.addEventListener('mouseup', stop);
+  releaseTarget.addEventListener('blur', stop);
 }
 
 /**
@@ -297,7 +359,7 @@ function button(text: string): HTMLButtonElement {
  * @param onSelectTool invoked with the tool id when a tool button is clicked.
  * @param tunnel initial tunnel settings + change callback; the strip shows only while
  *   the Tunnel tool is active in build mode.
- * @param onReachStep invoked with +1/-1 when the dock's reach +/- buttons are clicked;
+ * @param onReachStep invoked with +1/-1 when the dock's reach +/- buttons are pressed or held;
  *   the caller applies the step and reports the new value via {@link CreativeUi.setReachValue}.
  */
 export function createCreativeUi(
@@ -423,6 +485,10 @@ export function createCreativeUi(
   const blueprintButton = button('Blueprints');
   blueprintButton.className = 'world-btn';
 
+  const npcButton = button('NPCs');
+  npcButton.className = 'world-btn';
+  npcButton.title = 'Spawn characters from the NPC catalog';
+
   const infoButton = button('Menu');
   infoButton.className = 'world-btn';
   infoButton.title = 'Menu — world info and controls';
@@ -437,14 +503,14 @@ export function createCreativeUi(
   reachGroup.setAttribute('aria-label', 'Build reach');
   const reachMinus = button('−');
   reachMinus.className = 'reach-btn';
-  reachMinus.title = 'Shorter build reach (Shift+wheel down)';
+  reachMinus.title = 'Shorter build reach — hold to adjust quickly (Shift+wheel down)';
   const reachValue = document.createElement('span');
   reachValue.className = 'reach-value';
   const reachPlus = button('+');
   reachPlus.className = 'reach-btn';
-  reachPlus.title = 'Longer build reach (Shift+wheel up)';
-  reachMinus.addEventListener('click', () => onReachStep?.(-1));
-  reachPlus.addEventListener('click', () => onReachStep?.(1));
+  reachPlus.title = 'Longer build reach — hold to adjust quickly (Shift+wheel up)';
+  bindReachStepButton(reachMinus, -1, onReachStep);
+  bindReachStepButton(reachPlus, 1, onReachStep);
   reachGroup.append(reachMinus, reachValue, reachPlus);
 
   const setReachValue = (reach: number): void => {
@@ -568,6 +634,7 @@ export function createCreativeUi(
     climateGroup,
     infoButton,
     modeButton,
+    npcButton,
     blueprintButton,
     worldButton,
     reset,
@@ -680,6 +747,30 @@ export function createCreativeUi(
   interactionPrompt.setAttribute('role', 'status');
   interactionPrompt.style.display = 'none';
 
+  const npcPlacementHud = document.createElement('div');
+  npcPlacementHud.className = 'npc-placement-hud';
+  npcPlacementHud.setAttribute('role', 'status');
+  npcPlacementHud.setAttribute('aria-live', 'polite');
+  npcPlacementHud.style.display = 'none';
+  let npcPlacementHudKey = '';
+  const setNpcPlacementHud = (state: NpcPlacementHudStatus | undefined): void => {
+    if (!state) {
+      npcPlacementHudKey = '';
+      npcPlacementHud.style.display = 'none';
+      npcPlacementHud.textContent = '';
+      return;
+    }
+    const degrees = Math.round(((((state.yaw * 180) / Math.PI) % 360) + 360) % 360);
+    const validity = state.valid === false ? ` · ${state.reason ?? 'Invalid placement'}` : '';
+    const key = `${state.name}:${degrees}:${validity}`;
+    if (key === npcPlacementHudKey) return;
+    npcPlacementHudKey = key;
+    npcPlacementHud.style.display = 'block';
+    npcPlacementHud.textContent =
+      `${state.name} · ${degrees}° · LMB place · wheel or Q/E rotate · ` +
+      `Delete remove aimed · RMB/Esc cancel${validity}`;
+  };
+
   // Called every frame from the render loop; skip DOM writes when the text hasn't changed.
   let interactionPromptText: string | undefined;
   const setInteractionPrompt = (text: string | undefined): void => {
@@ -764,6 +855,7 @@ export function createCreativeUi(
     tourHud,
     challengeHud,
     interactionPrompt,
+    npcPlacementHud,
     waypointChip,
     loadingHud,
     dialogScrim,
@@ -780,6 +872,7 @@ export function createCreativeUi(
     hotbar.style.display = play ? 'none' : '';
     reset.style.display = play ? 'none' : '';
     blueprintButton.style.display = play ? 'none' : '';
+    npcButton.style.display = play ? 'none' : '';
     // worldButton visibility stays owned by Game (dev-only button); Game re-applies it on
     // every mode change so play hides it and build restores the dev-only state.
     modeButton.textContent = play ? 'Build (B)' : 'Play mode';
@@ -1064,6 +1157,130 @@ export function createCreativeUi(
       if (opts.canSave || opts.entries.some((e) => !e.curated)) panel.append(saveRow);
       renderCategory('Saved');
       const close = openDialogPanel(panel, () => finish(undefined));
+    });
+
+  const showNpcDialog = (entries: readonly NpcPaletteEntry[]): Promise<string | undefined> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('NPCs');
+      panel.classList.add('npc-panel');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'NPCs';
+      const intro = document.createElement('p');
+      intro.className = 'dialog-message';
+      intro.textContent = 'Choose a character, then place copies directly in the world.';
+
+      const search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'world-input npc-search';
+      search.placeholder = 'Search NPCs';
+      search.setAttribute('aria-label', 'Search NPCs');
+      search.setAttribute('aria-controls', 'npc-palette-grid');
+
+      const resultCount = document.createElement('div');
+      resultCount.className = 'npc-result-count';
+      resultCount.setAttribute('role', 'status');
+      resultCount.setAttribute('aria-live', 'polite');
+
+      const grid = document.createElement('div');
+      grid.id = 'npc-palette-grid';
+      grid.className = 'npc-grid';
+      grid.setAttribute('role', 'list');
+
+      const finish = (type: string | undefined): void => {
+        close();
+        resolve(type);
+      };
+
+      const filteredEntries = (): NpcPaletteEntry[] => {
+        const query = search.value.trim().toLocaleLowerCase();
+        return [...entries]
+          .filter(({ type, definition }) => {
+            if (!query) return true;
+            return `${type} ${definition.id} ${definition.name} ${definition.role}`
+              .toLocaleLowerCase()
+              .includes(query);
+          })
+          .sort((a, b) => a.definition.name.localeCompare(b.definition.name));
+      };
+
+      const renderResults = (): void => {
+        grid.replaceChildren();
+        const visible = filteredEntries();
+        resultCount.textContent = `${visible.length} NPC${visible.length === 1 ? '' : 's'}`;
+        if (visible.length === 0) {
+          const empty = document.createElement('p');
+          empty.className = 'dialog-message npc-empty';
+          empty.textContent = 'No NPCs match that search.';
+          grid.append(empty);
+          return;
+        }
+        for (const entry of visible) {
+          const { definition } = entry;
+          const item = document.createElement('div');
+          item.setAttribute('role', 'listitem');
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'npc-card';
+          card.dataset.npcType = entry.type;
+          card.setAttribute('aria-label', `Select ${definition.name}, ${definition.role}`);
+          card.title = `${definition.name} — ${definition.role}`;
+
+          const preview = document.createElement('canvas');
+          preview.className = 'npc-preview';
+          preview.setAttribute('aria-hidden', 'true');
+          renderNpcPreview(preview, definition);
+          const copy = document.createElement('span');
+          copy.className = 'npc-card-copy';
+          const name = document.createElement('span');
+          name.className = 'npc-card-name';
+          name.textContent = definition.name;
+          const role = document.createElement('span');
+          role.className = 'npc-card-role';
+          role.textContent = definition.role;
+          copy.append(name, role);
+          card.append(preview, copy);
+          card.addEventListener('click', () => finish(entry.type));
+          item.append(card);
+          grid.append(item);
+        }
+      };
+
+      search.addEventListener('input', renderResults);
+      search.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowDown') return;
+        event.preventDefault();
+        grid.querySelector<HTMLButtonElement>('.npc-card')?.focus();
+      });
+      grid.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        const cards = [...grid.querySelectorAll<HTMLButtonElement>('.npc-card')];
+        const current = cards.indexOf(document.activeElement as HTMLButtonElement);
+        if (current < 0) return;
+        const delta =
+          event.key === 'ArrowLeft'
+            ? -1
+            : event.key === 'ArrowRight'
+              ? 1
+              : event.key === 'ArrowUp'
+                ? -2
+                : 2;
+        const next = Math.max(0, Math.min(cards.length - 1, current + delta));
+        if (next === current) return;
+        event.preventDefault();
+        cards[next].focus();
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      const cancel = button('Cancel');
+      cancel.className = 'dialog-btn';
+      cancel.addEventListener('click', () => finish(undefined));
+      actions.append(cancel);
+      panel.append(title, intro, search, resultCount, grid, actions);
+      renderResults();
+      const close = openDialogPanel(panel, () => finish(undefined));
+      search.focus();
     });
 
   const showWorldInfoDialog = (
@@ -1441,6 +1658,7 @@ export function createCreativeUi(
     reset,
     worldButton,
     blueprintButton,
+    npcButton,
     infoButton,
     modeButton,
     tourPrev,
@@ -1470,9 +1688,11 @@ export function createCreativeUi(
     showDialog,
     showWorldDialog,
     showBlueprintDialog,
+    showNpcDialog,
     setExperienceMode,
     setTourHud,
     setInteractionPrompt,
+    setNpcPlacementHud,
     setChallengeHud,
     setLoadingHud,
     showWorldInfoDialog,

@@ -25,7 +25,7 @@ self.onmessage = (event: MessageEvent<GenWorkerMessage>) => {
     setSharedChunkBuffers(msg.sharedBuffers);
     shared = msg.sharedBuffers && typeof SharedArrayBuffer !== 'undefined';
     seed = msg.seed;
-    ({ generator, overlays } = createGenerator(msg.preset));
+    ({ generator, overlays } = createGenerator(msg.preset, msg.worldgenVersion));
     return;
   }
   if (!generator) throw new Error('gen worker: job before init');

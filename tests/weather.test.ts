@@ -5,6 +5,8 @@ import {
   createChunkMaterial,
   createCutoutMaterial,
   createTransparentMaterial,
+  createWaterMaterial,
+  createLavaMaterial,
   applyTime,
   PLANT_SWAY_AMP,
   WATER_WAVE_AMP,
@@ -127,11 +129,18 @@ describe('shader animation uniforms', () => {
     const opaque = createChunkMaterial(tex);
     const cutout = createCutoutMaterial(tex);
     const transparent = createTransparentMaterial(tex);
+    const water = createWaterMaterial(tex);
+    const lava = createLavaMaterial(tex);
     expect(opaque.uniforms.uSwayAmp.value).toBe(0);
     expect(opaque.uniforms.uWaveAmp.value).toBe(0);
     expect(cutout.uniforms.uSwayAmp.value).toBe(PLANT_SWAY_AMP);
     expect(cutout.uniforms.uWaveAmp.value).toBe(0);
-    expect(transparent.uniforms.uWaveAmp.value).toBe(WATER_WAVE_AMP);
+    expect(transparent.uniforms.uWaveAmp.value).toBe(0);
     expect(transparent.uniforms.uSwayAmp.value).toBe(0);
+    expect(water.uniforms.uWaveAmp.value).toBe(WATER_WAVE_AMP);
+    expect(water.uniforms.uFluidKind.value).toBe(1);
+    expect(lava.uniforms.uWaveAmp.value).toBeGreaterThan(0);
+    expect(lava.uniforms.uFluidKind.value).toBe(2);
+    expect(lava.uniforms.uLavaGlow.value).toBeGreaterThan(0);
   });
 });

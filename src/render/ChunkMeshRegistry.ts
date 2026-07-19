@@ -8,6 +8,8 @@ import type { ChunkMeshes } from '../mesh/MeshTypes';
 interface Entry {
   opaque?: Mesh;
   transparent?: Mesh;
+  water?: Mesh;
+  lava?: Mesh;
   cutout?: Mesh;
   /** Chunk coords parsed once at upload time so sortTransparent never re-parses the key per frame. */
   cx: number;
@@ -30,6 +32,8 @@ export class ChunkMeshRegistry implements ChunkSink {
     private readonly transparentMaterial: Material,
     private readonly cutoutMaterial: Material,
     private readonly texture?: Texture,
+    private readonly waterMaterial: Material = transparentMaterial,
+    private readonly lavaMaterial: Material = transparentMaterial,
   ) {}
 
   upload(key: string, meshes: ChunkMeshes): void {
@@ -55,6 +59,22 @@ export class ChunkMeshRegistry implements ChunkSink {
       this.scene.add(transparent);
       entry.transparent = transparent;
       this.transparentSetDirty = true; // new transparent mesh needs a renderOrder on the next sort
+    }
+
+    if (meshes.water.indices.length > 0) {
+      const water = buildChunkMesh(meshes.water, this.waterMaterial);
+      water.position.set(ox, 0, oz);
+      this.scene.add(water);
+      entry.water = water;
+      this.transparentSetDirty = true;
+    }
+
+    if (meshes.lava.indices.length > 0) {
+      const lava = buildChunkMesh(meshes.lava, this.lavaMaterial);
+      lava.position.set(ox, 0, oz);
+      this.scene.add(lava);
+      entry.lava = lava;
+      this.transparentSetDirty = true;
     }
 
     if (meshes.cutout.indices.length > 0) {
@@ -84,10 +104,12 @@ export class ChunkMeshRegistry implements ChunkSink {
     if (!moved && !this.transparentSetDirty) return;
 
     for (const entry of this.entries.values()) {
-      if (!entry.transparent) continue;
       const dx = (entry.cx + 0.5) * CHUNK_SIZE_X - camera.x;
       const dz = (entry.cz + 0.5) * CHUNK_SIZE_Z - camera.z;
-      entry.transparent.renderOrder = -(dx * dx + dz * dz); // farther = smaller = drawn first
+      const order = -(dx * dx + dz * dz); // farther = smaller = drawn first
+      for (const mesh of [entry.transparent, entry.water, entry.lava]) {
+        if (mesh) mesh.renderOrder = order;
+      }
     }
 
     this.transparentSetDirty = false;
@@ -112,9 +134,15 @@ export class ChunkMeshRegistry implements ChunkSink {
     for (const key of [...this.entries.keys()]) {
       this.remove(key);
     }
-    this.opaqueMaterial.dispose();
-    this.transparentMaterial.dispose();
-    this.cutoutMaterial.dispose();
+    for (const material of new Set([
+      this.opaqueMaterial,
+      this.transparentMaterial,
+      this.cutoutMaterial,
+      this.waterMaterial,
+      this.lavaMaterial,
+    ])) {
+      material.dispose();
+    }
     this.texture?.dispose();
   }
 
@@ -129,6 +157,16 @@ export class ChunkMeshRegistry implements ChunkSink {
       this.scene.remove(entry.transparent);
       entry.transparent.geometry.dispose();
       this.transparentSetDirty = true; // the transparent set shrank; force the next sort to run
+    }
+    if (entry.water) {
+      this.scene.remove(entry.water);
+      entry.water.geometry.dispose();
+      this.transparentSetDirty = true;
+    }
+    if (entry.lava) {
+      this.scene.remove(entry.lava);
+      entry.lava.geometry.dispose();
+      this.transparentSetDirty = true;
     }
     if (entry.cutout) {
       this.scene.remove(entry.cutout);

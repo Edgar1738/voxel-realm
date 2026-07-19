@@ -1,4 +1,4 @@
-import { AIR } from '../blocks/blocks';
+import { AIR, LAVA, WATER } from '../blocks/blocks';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { BlockId } from '../core/types';
 
@@ -25,8 +25,31 @@ export function opaquePass(registry: BlockRegistry): MeshPass {
  */
 export function transparentPass(registry: BlockRegistry): MeshPass {
   return {
-    includes: (id) => id !== AIR && registry.get(id).transparent && registry.shape(id) === 'cube',
+    includes: (id) =>
+      id !== AIR &&
+      id !== WATER &&
+      id !== LAVA &&
+      registry.get(id).transparent &&
+      registry.shape(id) === 'cube',
     faceVisible: (self, neighbor) =>
       neighbor === AIR || (neighbor !== self && registry.get(neighbor).transparent),
   };
+}
+
+function liquidPass(registry: BlockRegistry, liquid: BlockId): MeshPass {
+  return {
+    includes: (id) => id === liquid,
+    faceVisible: (self, neighbor) =>
+      neighbor === AIR || (neighbor !== self && registry.get(neighbor).transparent),
+  };
+}
+
+/** Water has its own material so glass and lava never inherit water fresnel/waves. */
+export function waterPass(registry: BlockRegistry): MeshPass {
+  return liquidPass(registry, WATER);
+}
+
+/** Lava has its own warm, emissive animated material. */
+export function lavaPass(registry: BlockRegistry): MeshPass {
+  return liquidPass(registry, LAVA);
 }

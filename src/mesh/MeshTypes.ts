@@ -14,9 +14,11 @@ export interface MeshData {
   indices: Uint32Array;
 }
 
-/** The opaque + transparent (water/glass) + cutout (plants) meshes produced for one chunk. */
+/** Opaque, glass-like transparent, water, lava, and cutout meshes produced for one chunk. */
 export interface ChunkMeshes {
   opaque: MeshData;
   transparent: MeshData;
+  water: MeshData;
+  lava: MeshData;
   cutout: MeshData;
 }

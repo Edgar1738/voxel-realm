@@ -22,6 +22,7 @@ type FakeUi = {
     textContent: string;
   };
   blueprintButton: { addEventListener: (...args: unknown[]) => void };
+  npcButton: { addEventListener: (...args: unknown[]) => void };
   infoButton: { addEventListener: (...args: unknown[]) => void };
   modeButton: {
     addEventListener: (...args: unknown[]) => void;
@@ -48,6 +49,7 @@ type FakeUi = {
   setStatus: ReturnType<typeof vi.fn>;
   setExperienceMode: ReturnType<typeof vi.fn>;
   setTourHud: (status: unknown) => void;
+  setNpcPlacementHud: (status: unknown) => void;
   showWorldInfoDialog: (info: unknown) => Promise<unknown>;
   setNotice: (text: string | null) => void;
   setSoundUi: (volume: number, muted: boolean) => void;
@@ -63,6 +65,7 @@ function makeUi(): FakeUi {
     reset: { addEventListener: vi.fn() },
     worldButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
     blueprintButton: { addEventListener: vi.fn() },
+    npcButton: { addEventListener: vi.fn() },
     infoButton: { addEventListener: vi.fn() },
     modeButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
     tourPrev: { addEventListener: vi.fn() },
@@ -94,8 +97,10 @@ function makeUi(): FakeUi {
     showDialog: vi.fn().mockResolvedValue('cancel'),
     showWorldDialog: vi.fn().mockResolvedValue(undefined),
     showBlueprintDialog: vi.fn().mockResolvedValue(undefined),
+    showNpcDialog: vi.fn().mockResolvedValue(undefined),
     setExperienceMode: vi.fn(),
     setTourHud: vi.fn(),
+    setNpcPlacementHud: vi.fn(),
     showWorldInfoDialog: vi.fn().mockResolvedValue(undefined),
   };
   return ui;
@@ -131,6 +136,8 @@ const boot = vi.hoisted(() => {
     texture: { dispose: vi.fn(() => order.push('texture.dispose')) },
     material: { dispose: vi.fn(() => order.push('material.dispose')) },
     transparentMaterial: { dispose: vi.fn(() => order.push('transparentMaterial.dispose')) },
+    waterMaterial: { dispose: vi.fn(() => order.push('waterMaterial.dispose')) },
+    lavaMaterial: { dispose: vi.fn(() => order.push('lavaMaterial.dispose')) },
     cutoutMaterial: { dispose: vi.fn(() => order.push('cutoutMaterial.dispose')) },
     registryConstructorArgs: [] as unknown[],
     cameraRigConstructorArgs: [] as unknown[],
@@ -176,6 +183,8 @@ vi.mock('../src/render/TextureArray', () => ({
 vi.mock('../src/render/ChunkMaterial', () => ({
   createChunkMaterial: vi.fn(() => boot.material),
   createTransparentMaterial: vi.fn(() => boot.transparentMaterial),
+  createWaterMaterial: vi.fn(() => boot.waterMaterial),
+  createLavaMaterial: vi.fn(() => boot.lavaMaterial),
   createCutoutMaterial: vi.fn(() => boot.cutoutMaterial),
 }));
 
