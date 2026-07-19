@@ -4,7 +4,18 @@ import type { CreativeInventory } from './CreativeInventory';
 import type { CameraRig } from '../render/CameraRig';
 import type { ChunkManager } from '../world/ChunkManager';
 import { raycastVoxels, type VoxelRaycastHit } from '../edit/VoxelRaycast';
-import { boxVoxels, sphereVoxels, tunnelConfigVoxels, type TunnelConfig } from '../edit/Brushes';
+import {
+  applyBrushModifiers,
+  boxVoxels,
+  brushAxis,
+  brushStampVoxels,
+  clampBrushSize,
+  sweptBrushVoxels,
+  tunnelConfigVoxels,
+  type BrushAction,
+  type BrushConfig,
+  type TunnelConfig,
+} from '../edit/Brushes';
 import { AIR } from '../blocks/blocks';
 import type { BlockId } from '../core/types';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
@@ -21,7 +32,6 @@ export const MIN_REACH = 4;
 export const MAX_REACH = 64;
 export const REACH_STEP = 2;
 const REACH_STORAGE_KEY = 'vr.buildReach';
-const SPHERE_RADIUS = 4;
 
 /** Default tunnel shape: a walkable 3x3 bore, 8 blocks deep, straight ahead. */
 export const DEFAULT_TUNNEL_CONFIG: TunnelConfig = { size: 3, length: 8, path: 'straight' };
@@ -30,6 +40,7 @@ export const DEFAULT_TUNNEL_CONFIG: TunnelConfig = { size: 3, length: 8, path: '
 export const SINGLE_REPEAT_MS = 100; // 10 digs/sec
 export const PLACE_REPEAT_MS = 100; // 10 places/sec
 export const TUNNEL_REPEAT_MS = 250; // 4 tunnel digs/sec — each dig moves many voxels
+export const SPHERE_REPEAT_MS = 250; // 4 sphere digs/sec — each dig moves many voxels
 
 /** Clamps a reach value to the valid range, snapping to the step grid from MIN_REACH. */
 export function clampReach(value: number): number {
@@ -98,8 +109,35 @@ export function saveHoldRepeat(storage: ReachStorage, enabled: boolean): void {
   storage.setItem(HOLD_REPEAT_STORAGE_KEY, enabled ? 'on' : 'off');
 }
 
-export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
-export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
+export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace' | 'custom';
+export const TOOLS: Exclude<Tool, 'custom'>[] = [
+  'single',
+  'tunnel',
+  'sphere',
+  'box-clear',
+  'fill',
+  'replace',
+];
+
+export const DEFAULT_BRUSH_CONFIG: BrushConfig = {
+  gesture: 'single',
+  shape: 'voxel',
+  action: 'clear',
+  size: 1,
+  shell: false,
+  noise: false,
+};
+
+/** Maps the original six toolbar tools onto equivalent composable brush recipes. */
+export function brushConfigForTool(tool: Tool): BrushConfig {
+  const base = { ...DEFAULT_BRUSH_CONFIG };
+  if (tool === 'tunnel') return { ...base, gesture: 'tunnel', shape: 'box', size: 3 };
+  if (tool === 'sphere') return { ...base, shape: 'sphere', size: 4 };
+  if (tool === 'box-clear') return { ...base, gesture: 'line', shape: 'box' };
+  if (tool === 'fill') return { ...base, gesture: 'line', shape: 'box', action: 'fill' };
+  if (tool === 'replace') return { ...base, gesture: 'line', shape: 'box', action: 'replace' };
+  return base;
+}
 
 /**
  * Block-edits gate. Edits are blocked while the inventory modal is open even if pointer
@@ -198,6 +236,10 @@ export interface InputCallbacks {
   getAnchor: () => WorldVoxel | undefined;
   setAnchor: (v: WorldVoxel | undefined) => void;
   getTool: () => Tool;
+  /** Current composable brush recipe, owned by Game and reflected by the power-brush HUD. */
+  getBrushConfig: () => BrushConfig;
+  /** Adjusts brush size from hold+wheel and reflects the new value in the HUD. */
+  onBrushSizeChange: (size: number) => void;
   /** Current tunnel shape settings (size/length/path), owned by the game state. */
   getTunnelConfig: () => TunnelConfig;
   /** True when placing a block at this voxel would embed the player (placement refused). */
@@ -259,11 +301,13 @@ export function registerInputListeners(ctx: InputContext): () => void {
   const controller = new AbortController();
   const { signal } = controller;
   const { canvas, rig, manager, inventory, registry, edit, previewDeps, aim, callbacks } = ctx;
+  let altHeld = false;
 
   // Single merged keydown handler covering both tool shortcuts and undo/redo.
   window.addEventListener(
     'keydown',
     (e) => {
+      if (e.code === 'AltLeft' || e.code === 'AltRight') altHeld = true;
       // Perspective toggle works in both play and build modes (default browser F1 opens help).
       if (e.code === 'F1') {
         e.preventDefault();
@@ -333,7 +377,8 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.code === 'KeyT') {
         stopRepeat();
-        const next = TOOLS[(TOOLS.indexOf(callbacks.getTool()) + 1) % TOOLS.length];
+        const currentIndex = TOOLS.findIndex((candidate) => candidate === callbacks.getTool());
+        const next = TOOLS[(currentIndex + 1) % TOOLS.length];
         callbacks.onToolChange(next);
         return;
       }
@@ -392,13 +437,22 @@ export function registerInputListeners(ctx: InputContext): () => void {
     { signal },
   );
 
+  window.addEventListener(
+    'keyup',
+    (e) => {
+      if (e.code === 'AltLeft' || e.code === 'AltRight') altHeld = false;
+    },
+    { signal },
+  );
+
   // ---- Hold-to-repeat engine ----
-  // Holding LMB (Single/Tunnel) or RMB (place) re-fires at a capped, action-specific rate.
-  // A held stroke groups its edits into one undo batch via EditService.beginGroup/endGroup,
-  // and targets are deduped so holding still never re-edits the same voxel.
+  // Holding LMB with any non-Line brush or RMB to place re-fires at a capped, action-specific
+  // rate. Stroke additionally interpolates between sampled centers so fast flight leaves no gaps.
+  // A held gesture groups all edits into one undo batch via EditService.beginGroup/endGroup.
   let repeatTimer: number | undefined;
   let repeatButton: 0 | 2 | undefined;
   let lastTargetKey = '';
+  let lastStrokeCenter: WorldVoxel | undefined;
   let strokeOpen = false;
 
   const stopRepeat = (): void => {
@@ -408,6 +462,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
     }
     repeatButton = undefined;
     lastTargetKey = '';
+    lastStrokeCenter = undefined;
     if (strokeOpen) {
       strokeOpen = false;
       edit.endGroup();
@@ -426,15 +481,90 @@ export function registerInputListeners(ctx: InputContext): () => void {
     );
   };
 
-  /** Digs with the active primary tool (single break or configured tunnel). */
-  const performDig = (hit: VoxelRaycastHit): void => {
-    if (callbacks.getTool() === 'single') {
-      callbacks.onRun([{ ...hit.block, id: AIR }], 'Broke');
+  const effectiveAction = (action: BrushAction): BrushAction => {
+    if (!altHeld || action === 'replace') return action;
+    return action === 'clear' ? 'fill' : 'clear';
+  };
+
+  const targetForAction = (hit: VoxelRaycastHit, action: BrushAction): WorldVoxel =>
+    action === 'fill' ? hit.adjacent : hit.block;
+
+  const runBrushAction = (voxels: WorldVoxel[], action: BrushAction, replaceId: BlockId): void => {
+    if (action === 'clear') {
+      callbacks.onRun(asAir(voxels), 'Cleared');
       return;
     }
-    const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
-    const voxels = tunnelConfigVoxels(hit.adjacent, dir, callbacks.getTunnelConfig());
-    callbacks.onRun(asAir(voxels), 'Tunneled');
+
+    const safe = voxels.filter((voxel) => !callbacks.intersectsPlayer(voxel.x, voxel.y, voxel.z));
+    if (action === 'fill') {
+      callbacks.onRun(asId(safe, inventory.selectedBlock), 'Filled');
+      return;
+    }
+
+    const matches = safe.filter(
+      (voxel) => manager.getBlock(voxel.x, voxel.y, voxel.z) === replaceId,
+    );
+    callbacks.onRun(
+      asId(matches, inventory.selectedBlock),
+      `Replaced ${registry.get(replaceId).name}`,
+    );
+  };
+
+  /** Runs one composable brush sample. Returns its target center for Stroke interpolation. */
+  const performBrush = (
+    hit: VoxelRaycastHit,
+    previousCenter?: WorldVoxel,
+  ): WorldVoxel | undefined => {
+    const brush = callbacks.getBrushConfig();
+    const action = effectiveAction(brush.action);
+    const center = targetForAction(hit, action);
+    const hitAxis = brushAxis(hit.normal);
+    let voxels: WorldVoxel[];
+
+    if (brush.gesture === 'line') {
+      const anchor = callbacks.getAnchor();
+      if (!anchor) {
+        callbacks.setAnchor(center);
+        callbacks.onStatusChange('Line started — click the end point');
+        return center;
+      }
+      callbacks.setAnchor(undefined);
+      const lineAxis = brushAxis({
+        x: center.x - anchor.x,
+        y: center.y - anchor.y,
+        z: center.z - anchor.z,
+      });
+      // Line + Box intentionally keeps the old two-corner region behavior. Other shapes sweep
+      // along the line, which produces beams, pipes, trenches, and rounded tunnel paths.
+      if (brush.shape === 'box') {
+        const volume =
+          (Math.abs(center.x - anchor.x) + 1) *
+          (Math.abs(center.y - anchor.y) + 1) *
+          (Math.abs(center.z - anchor.z) + 1);
+        if (volume > MAX_EDIT_VOXELS) {
+          callbacks.onStatusChange(`Selection too large (${volume} > ${MAX_EDIT_VOXELS})`);
+          return center;
+        }
+        voxels = boxVoxels(anchor, center);
+      } else {
+        voxels = sweptBrushVoxels(anchor, center, brush.shape, brush.size, lineAxis);
+      }
+    } else if (brush.gesture === 'tunnel') {
+      const direction = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
+      voxels = tunnelConfigVoxels(hit.adjacent, direction, callbacks.getTunnelConfig());
+    } else if (brush.gesture === 'stroke' && previousCenter) {
+      const strokeAxis = brushAxis({
+        x: center.x - previousCenter.x,
+        y: center.y - previousCenter.y,
+        z: center.z - previousCenter.z,
+      });
+      voxels = sweptBrushVoxels(previousCenter, center, brush.shape, brush.size, strokeAxis);
+    } else {
+      voxels = brushStampVoxels(center, brush.shape, brush.size, hitAxis);
+    }
+
+    runBrushAction(applyBrushModifiers(voxels, brush), action, hit.id);
+    return center;
   };
 
   /**
@@ -477,18 +607,19 @@ export function registerInputListeners(ctx: InputContext): () => void {
       stopRepeat();
       return;
     }
-    const tool = callbacks.getTool();
-    if (repeatButton === 0 && tool !== 'single' && tool !== 'tunnel') {
+    const brush = callbacks.getBrushConfig();
+    if (repeatButton === 0 && brush.gesture === 'line') {
       stopRepeat();
       return;
     }
     const hit = raycastHit();
     if (!hit) return; // keep holding — the aim may sweep back onto blocks
     if (repeatButton === 0) {
-      const key = targetKey(hit.block);
+      const center = targetForAction(hit, effectiveAction(brush.action));
+      const key = targetKey(center);
       if (key === lastTargetKey) return;
       lastTargetKey = key;
-      performDig(hit);
+      lastStrokeCenter = performBrush(hit, lastStrokeCenter);
     } else {
       lastTargetKey = performPlace(hit, lastTargetKey);
     }
@@ -534,12 +665,20 @@ export function registerInputListeners(ctx: InputContext): () => void {
         callbacks.onReachChange(getReach());
         return;
       }
+      const brush = callbacks.getBrushConfig();
+      if (repeatButton === 0 && brush.gesture !== 'tunnel' && brush.shape !== 'voxel') {
+        const delta = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
+        if (delta === 0) return;
+        e.preventDefault();
+        callbacks.onBrushSizeChange(clampBrushSize(brush.size + delta));
+        return;
+      }
       const delta = hotbarWheelDelta(e.deltaY, true);
       if (delta === 0) return;
       inventory.cycleSlot(delta);
       callbacks.onHotbarRender();
     },
-    { signal, passive: true },
+    { signal, passive: false },
   );
 
   // Mouse editing (placed on document so it fires while pointer is locked).
@@ -575,18 +714,20 @@ export function registerInputListeners(ctx: InputContext): () => void {
       }
       if (e.button !== 0) return;
 
-      const tool = callbacks.getTool();
-      if (tool === 'single' || tool === 'tunnel') {
-        if (getHoldRepeat()) {
-          startRepeat(0, tool === 'single' ? SINGLE_REPEAT_MS : TUNNEL_REPEAT_MS);
-          lastTargetKey = targetKey(hit.block);
-        }
-        performDig(hit);
-      } else if (tool === 'sphere') {
-        callbacks.onRun(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');
-      } else {
-        handleSelection(hit.block, inventory.selectedBlock, tool, manager, registry, callbacks);
+      const brush = callbacks.getBrushConfig();
+      if (brush.gesture !== 'line' && getHoldRepeat()) {
+        const interval =
+          brush.gesture === 'tunnel'
+            ? TUNNEL_REPEAT_MS
+            : brush.shape === 'voxel'
+              ? SINGLE_REPEAT_MS
+              : SPHERE_REPEAT_MS;
+        startRepeat(0, interval);
       }
+      lastStrokeCenter = performBrush(hit);
+      lastTargetKey = targetKey(
+        targetForAction(hit, effectiveAction(callbacks.getBrushConfig().action)),
+      );
     },
     { signal },
   );
@@ -595,47 +736,6 @@ export function registerInputListeners(ctx: InputContext): () => void {
     stopRepeat();
     controller.abort();
   };
-}
-
-function handleSelection(
-  target: WorldVoxel,
-  selected: BlockId,
-  tool: Tool,
-  manager: ChunkManager,
-  registry: BlockRegistry,
-  callbacks: InputCallbacks,
-): void {
-  const anchor = callbacks.getAnchor();
-  if (!anchor) {
-    callbacks.setAnchor(target);
-    callbacks.onStatusChange('Selection started — click the opposite corner');
-    return;
-  }
-  callbacks.setAnchor(undefined);
-
-  const volume =
-    (Math.abs(target.x - anchor.x) + 1) *
-    (Math.abs(target.y - anchor.y) + 1) *
-    (Math.abs(target.z - anchor.z) + 1);
-
-  // The volume check here is a pre-generation guard; withinEditCap handles the
-  // post-generation brush check in run().
-  if (volume > MAX_EDIT_VOXELS) {
-    callbacks.onStatusChange(`Selection too large (${volume} > ${MAX_EDIT_VOXELS})`);
-    return;
-  }
-
-  const region = boxVoxels(anchor, target);
-
-  if (tool === 'box-clear') {
-    callbacks.onRun(asAir(region), 'Cleared');
-  } else if (tool === 'fill') {
-    callbacks.onRun(asId(region, selected), 'Filled');
-  } else {
-    const replaceId = manager.getBlock(target.x, target.y, target.z);
-    const matches = region.filter((v) => manager.getBlock(v.x, v.y, v.z) === replaceId);
-    callbacks.onRun(asId(matches, selected), `Replaced ${registry.get(replaceId).name}`);
-  }
 }
 
 function asAir(voxels: WorldVoxel[]): SetVoxel[] {

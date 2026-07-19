@@ -85,7 +85,7 @@ import type { SetVoxel, VoxelChange } from '../edit/EditTypes';
 import { createPersistence } from './persistence';
 import { loadBootMeta, initializeBootSave, resolveActiveMeta } from './saveBootstrap';
 import { withinEditCap, MAX_EDIT_VOXELS } from './editCap';
-import type { TunnelConfig } from '../edit/Brushes';
+import type { BrushConfig, TunnelConfig } from '../edit/Brushes';
 import {
   registerInputListeners,
   TOOLS,
@@ -101,6 +101,7 @@ import {
   setReach,
   loadReach,
   saveReach,
+  brushConfigForTool,
   type Tool,
 } from './input';
 import { placementState } from './placement';
@@ -382,6 +383,7 @@ export class Game {
     let underwaterFactor = 0;
     let animTime = 0;
     let tool: Tool = 'single';
+    let brushConfig: BrushConfig = brushConfigForTool(tool);
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
     let tunnelConfig: TunnelConfig = { ...DEFAULT_TUNNEL_CONFIG };
     let playerSkinId = resolvePlayerSkin().id;
@@ -422,6 +424,10 @@ export class Game {
       {
         initial: { id: initialHandMode.id, name: initialHandMode.name },
         onCycle: () => cycleHandMode(),
+      },
+      {
+        initial: brushConfig,
+        onChange: (next) => applyBrushConfig(next),
       },
     );
 
@@ -555,10 +561,34 @@ export class Game {
     const setStatus = (text: string): void => {
       ui.setStatus(text);
     };
+    const brushStatus = (brush: BrushConfig): string =>
+      [
+        brush.gesture === 'single'
+          ? 'Single'
+          : brush.gesture[0].toUpperCase() + brush.gesture.slice(1),
+        brush.shape[0].toUpperCase() + brush.shape.slice(1),
+        brush.action[0].toUpperCase() + brush.action.slice(1),
+        brush.shell ? 'Shell' : '',
+        brush.noise ? 'Noise' : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+    const applyBrushConfig = (next: BrushConfig): void => {
+      brushConfig = { ...next };
+      tool = 'custom';
+      anchorVoxel = undefined;
+      ui.setActiveTool('custom');
+      ui.setBrushConfig(brushConfig);
+      setStatus(`Brush: ${brushStatus(brushConfig)}`);
+    };
+
     const setTool = (next: Tool): void => {
       tool = next;
+      brushConfig = brushConfigForTool(next);
       anchorVoxel = undefined;
       ui.setActiveTool(next);
+      ui.setBrushConfig(brushConfig);
       setStatus(`Tool: ${toolLabel(next)}`);
     };
     setTool('single');
@@ -1500,6 +1530,8 @@ export class Game {
           anchorVoxel = v;
         },
         getTool: () => tool,
+        getBrushConfig: () => brushConfig,
+        onBrushSizeChange: (size) => applyBrushConfig({ ...brushConfig, size }),
         getTunnelConfig: () => tunnelConfig,
         intersectsPlayer: (x, y, z) =>
           voxelIntersectsPlayer(x, y, z, player.position, PLAYER_HALF) ||

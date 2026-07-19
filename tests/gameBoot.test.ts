@@ -43,6 +43,7 @@ type FakeUi = {
   setHandUi: ReturnType<typeof vi.fn>;
   inventoryOpen: boolean;
   setActiveTool: (tool: string) => void;
+  setBrushConfig: (config: unknown) => void;
   setReachValue: (reach: number) => void;
   setHoldRepeatUi: (enabled: boolean) => void;
   setStatus: ReturnType<typeof vi.fn>;
@@ -80,6 +81,7 @@ function makeUi(): FakeUi {
     setHandUi: vi.fn(),
     inventoryOpen: false,
     setActiveTool: vi.fn(),
+    setBrushConfig: vi.fn(),
     setReachValue: vi.fn(),
     setHoldRepeatUi: vi.fn(),
     setStatus: vi.fn(),
@@ -449,6 +451,14 @@ vi.mock('../src/app/input', () => ({
   setHoldRepeat: vi.fn(),
   loadHoldRepeat: vi.fn(() => true),
   saveHoldRepeat: vi.fn(),
+  brushConfigForTool: vi.fn((tool: string) => ({
+    gesture: tool === 'tunnel' ? 'tunnel' : 'single',
+    shape: tool === 'tunnel' ? 'box' : 'voxel',
+    action: 'clear',
+    size: tool === 'tunnel' ? 3 : 1,
+    shell: false,
+    noise: false,
+  })),
 }));
 
 vi.mock('../src/persistence/ServerWorldCatalog', () => ({
