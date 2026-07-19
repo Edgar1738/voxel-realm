@@ -63,6 +63,11 @@ export function facingFromYaw(yaw: number): number {
  * The horizontal (dx,dz) each facing looks toward — the forward vector of the yaw that
  * {@link facingFromYaw} maps to that facing (yaw f·π/2 → (−sin, −cos)). Single source of
  * truth for facing↔direction conversions (ladder mounting, door panel edges).
+ *
+ * ⚠️ STAIR AUTHORS: do NOT derive a stair's orientation from these vectors — E/W here are
+ * compass-inverted relative to a stair's low-side convention (`stairBoxes`), which cost a
+ * worldgen pass two inverted stair runs. Use `stairState()` / `stairFacingToward()` from
+ * app/stairFacing.ts, which are documented and capture-verified.
  */
 export const FACING_DIR: ReadonlyArray<readonly [number, number]> = [
   [0, -1], // N

@@ -36,7 +36,7 @@ import {
   STONE_SLAB,
   GLASS,
 } from '../src/blocks/blocks';
-import { FACING } from '../src/world/VoxelState';
+import { stairFacingCode } from '../src/app/stairFacing';
 
 const SEED = 1337;
 
@@ -417,15 +417,31 @@ describe('stonehaven terrain composition', () => {
     }
   });
 
-  it('pitches village roofs with oriented slate stairs', () => {
+  it('pitches village roofs with slate stairs, low sides facing outward', () => {
     const { at, stateAt } = sampler();
     const v = STONEHAVEN_SITES.village;
     const midX = Math.round((v.harbormaster.x0 + v.harbormaster.x1) / 2);
+    const midZ = Math.round((v.harbormaster.z0 + v.harbormaster.z1) / 2);
     const eaveY = v.harbormaster.floorY + 6; // wallTop + 1
+    // A stair's facing is its LOW side (stairFacing.ts); a roof's low edge points outward.
     expect(at(midX, eaveY, v.harbormaster.z0 - 1)).toBe(STAIRS_SLATE);
-    expect(stateAt(midX, eaveY, v.harbormaster.z0 - 1) & 0b11).toBe(FACING.S); // rises to ridge
+    expect(stateAt(midX, eaveY, v.harbormaster.z0 - 1) & 0b11).toBe(stairFacingCode('n'));
     expect(at(midX, eaveY, v.harbormaster.z1 + 1)).toBe(STAIRS_SLATE);
-    expect(stateAt(midX, eaveY, v.harbormaster.z1 + 1) & 0b11).toBe(FACING.N);
+    expect(stateAt(midX, eaveY, v.harbormaster.z1 + 1) & 0b11).toBe(stairFacingCode('s'));
+    expect(stateAt(v.harbormaster.x0 - 1, eaveY, midZ) & 0b11).toBe(stairFacingCode('w'));
+    expect(stateAt(v.harbormaster.x1 + 1, eaveY, midZ) & 0b11).toBe(stairFacingCode('e'));
+  });
+
+  it('orients every walkable stair run with its low side toward the approach', () => {
+    const { stateAt } = sampler();
+    // Grand keep stair: approached from the ward court to the east (+x).
+    expect(stateAt(-60, 110, 120) & 0b11).toBe(stairFacingCode('e'));
+    // Wall-walk stair: approached from the ward to the south (+z).
+    expect(stateAt(STONEHAVEN_SITES.ward.x1 - 1, 109, 134) & 0b11).toBe(stairFacingCode('s'));
+    // Inn loft stair: approached from the common room to the west (-x).
+    expect(stateAt(26, STONEHAVEN_SITES.village.inn.floorY + 1, -3) & 0b11).toBe(
+      stairFacingCode('w'),
+    );
   });
 
   it('opens the keep: hall, framed entrance stair, spiral to the roof hatch', () => {

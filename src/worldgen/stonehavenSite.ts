@@ -23,7 +23,7 @@ import {
   STAIRS_PLANK,
   STONE_SLAB,
 } from '../blocks/blocks';
-import { packState, FACING } from '../world/VoxelState';
+import { stairState } from '../app/stairFacing';
 import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
 import { superellipseT, polylineProject } from './fields';
 import {
@@ -207,13 +207,15 @@ function hipRoof(
       s.fill(ax, y, az, bx, y, bz, SLATE); // ridge cap
       return;
     }
+    // A stair's facing is its LOW side (see stairFacing.ts) — for a roof, the low edge points
+    // outward, away from the ridge. The old FACING_DIR-based math had N/S inverted.
     for (let x = ax + 1; x < bx; x++) {
-      s.set(x, y, az, STAIRS_SLATE, packState(FACING.S, 0)); // north eave rises toward +z
-      s.set(x, y, bz, STAIRS_SLATE, packState(FACING.N, 0)); // south eave rises toward -z
+      s.set(x, y, az, STAIRS_SLATE, stairState('n')); // north eave: low side out toward -z
+      s.set(x, y, bz, STAIRS_SLATE, stairState('s')); // south eave: low side out toward +z
     }
     for (let z = az + 1; z < bz; z++) {
-      s.set(ax, y, z, STAIRS_SLATE, packState(FACING.W, 0)); // west eave rises toward +x
-      s.set(bx, y, z, STAIRS_SLATE, packState(FACING.E, 0)); // east eave rises toward -x
+      s.set(ax, y, z, STAIRS_SLATE, stairState('w')); // west eave: low side out toward -x
+      s.set(bx, y, z, STAIRS_SLATE, stairState('e')); // east eave: low side out toward +x
     }
     s.set(ax, y, az, SLATE); // solid hips at the corners
     s.set(bx, y, az, SLATE);
@@ -303,7 +305,7 @@ function buildVillage(s: CitadelStamp): void {
     const sx = 26 + i;
     const sy = iFloor + i;
     if (sy - 1 >= iFloor) s.fill(sx, iFloor, -3, sx, sy - 1, -3, PLANKS); // step support
-    s.set(sx, sy, -3, STAIRS_PLANK, packState(FACING.W, 0)); // rises toward +x, up to the loft
+    s.set(sx, sy, -3, STAIRS_PLANK, stairState('w')); // approach from -x, rising to the loft
   }
   s.fill(27, loftY + 1, -4, 28, loftY + 1, -4, PLANK_SLAB); // cot one
   s.fill(29, loftY + 1, v.inn.z0 + 1, 30, loftY + 1, v.inn.z0 + 1, PLANK_SLAB); // cot two
@@ -551,7 +553,7 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
       const hh = stonehavenSurfaceAt(seed, sx, sz);
       if (sy - 1 >= hh - 1) s.fill(sx, hh - 1, sz, sx, sy - 1, sz, COBBLESTONE); // step support
       for (let wy = sy + 1; wy <= sy + 3; wy++) s.set(sx, wy, sz, AIR); // cutting through the toe
-      s.set(sx, sy, sz, STAIRS_STONE, packState(FACING.E, 0)); // rises toward -x, to the door
+      s.set(sx, sy, sz, STAIRS_STONE, stairState('e')); // approach from +x, rising to the door
     }
   }
 
@@ -574,7 +576,7 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
     const hh = stonehavenSurfaceAt(seed, w.x1 - 1, sz);
     if (sy - 1 >= hh - 1) s.fill(w.x1 - 1, hh - 1, sz, w.x1 - 1, sy - 1, sz, COBBLESTONE); // support
     for (let wy = sy + 1; wy <= sy + 3; wy++) s.set(w.x1 - 1, wy, sz, AIR); // headroom
-    s.set(w.x1 - 1, sy, sz, STAIRS_STONE, packState(FACING.N, 0)); // rises toward -z, up the lane
+    s.set(w.x1 - 1, sy, sz, STAIRS_STONE, stairState('s')); // approach from +z, rising north
   }
 
   // Ward court: the paved arrival circle at the road's end, with a lit waymark plinth — the

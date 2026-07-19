@@ -1698,11 +1698,15 @@ export class Game {
         renderer.camera.updateProjectionMatrix();
       }
       const eye = player.eye();
-      // Ease the camera up small step-ups (stairs/ledges) instead of snapping a full block; snap
-      // for jumps, falls, flying, and teleports so those stay responsive.
+      // Ease the camera over small grounded steps in BOTH directions — up (stairs/ledges) and
+      // down (stair descents, which otherwise jolt a full block per step). Jumps, real falls,
+      // flying, and teleports still snap: mid-air frames take the else-branch every frame, so
+      // by landing the eased eye has already converged and nothing rubber-bands.
       const stepDy = eye.y - smoothEyeY;
       if (player.grounded && stepDy > 0 && stepDy < 1.3) {
         smoothEyeY = Math.min(eye.y, smoothEyeY + STEP_EYE_SPEED * cdt);
+      } else if (player.grounded && stepDy < 0 && stepDy > -1.3) {
+        smoothEyeY = Math.max(eye.y, smoothEyeY - STEP_EYE_SPEED * cdt);
       } else {
         smoothEyeY = eye.y;
       }

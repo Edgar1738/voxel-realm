@@ -314,6 +314,34 @@ The original M2 journey list — harbor, village, residential frontage, forest r
 fortress, summit — now has every beat built, furnished, lit, and walk-verified. Future work is
 elective polish (ambient sound at the falls, NPCs, seasonal dressing), not missing beats.
 
+## Stair Review Fixes
+
+**Date:** 2026-07-19 (branch `fix/stonehaven-stairs` off main `d33693e`), after Edgar asked for
+a full stair-traversal code review.
+
+### Findings and fixes
+- **A stair's `facing` is its LOW/approach side** (`stairFacing.ts`, `stairBoxes`), and
+  `FACING_DIR`'s E/W vectors are compass-inverted relative to that convention. The M5–M8 stairs
+  were placed with an "facing = ascent direction via FACING_DIR" model, which happened to be
+  correct for E/W runs (grand stair, loft) and 180° backward for N/S: the hip roofs' north and
+  south eaves rendered as inverted overhanging lips, and the wall-walk stair presented its
+  risers toward the climber with shadowed gaps. Fixed; all stair call sites now use
+  `stairState('n'|'e'|'s'|'w')`, and a warning comment on `FACING_DIR` points future stair
+  authors at the right helpers. Before/after captures: `review-roof-north-eave(-fixed)`,
+  `review-wallwalk-stair(-fixed)`.
+- **Stair descent camera jolt**: the eye eased only upward; every 1-block step DOWN snapped.
+  `Game.ts` now mirrors the easing for small grounded step-downs (|Δ| < 1.3); jumps, real
+  falls, flying, and teleports still snap (mid-air frames take the snap branch, so the eased
+  eye converges before landing).
+- Tests: the roof-orientation test had encoded the wrong facings — flipped, extended to all
+  four eaves, and a new test asserts the facing of every walkable stair run (grand, wall-walk,
+  loft) via `stairFacingCode`. 31 stonehaven tests.
+
+### Verified clean in the same review
+Grand stair and loft orientations; two-box stair collision (two 0.5 sub-steps per rise);
+ascent easing rate vs walk/sprint cadence; spiral (full blocks); slab furniture states. All
+five walkable runs traversed live up AND down post-fix.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08
