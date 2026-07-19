@@ -1,6 +1,6 @@
 # Handoff: Project Stonehaven (world authoring)
 
-**Last updated:** 2026-07-18, end of the Milestone 4 implementation pass (Claude).
+**Last updated:** 2026-07-19, end of the Milestone 5 pass (Claude). M4 merged to main as `852e7c0`; M5 (stair roofs, keep interiors + wall-walk, the falls cascade, test-suite health) implemented on `experiment/project-stonehaven-m5` — see the journal's M5 entry for details, findings, and M6 candidates.
 This file replaces the stale 2026-07-08 Codex handoff, which still described Milestone 2,
 forbade starting M3, called PR #57 unmerged, and reported worktree states that no longer exist.
 
@@ -13,10 +13,10 @@ forbade starting M3, called PR #57 unmerged, and reported worktree states that n
   stone bridge over a real terrain gap, fortress massing with night beacon, paved ward court,
   road material hierarchy, two vista pullouts. Independent verification at merge: 188 files /
   1,656 tests, lint + tsc clean.
-- **Milestone 4 is implemented (NOT committed)** on branch `experiment/project-stonehaven-m4`,
-  worktree `.claude/worktrees/stonehaven-m4`, based on `5d73fd7`. Edgar authorized the
-  implementation pass but not commit/push/PR/merge — the work sits in the worktree awaiting his
-  review.
+- **Milestone 4 is complete and merged** (`852e7c0`, fast-forwarded to `main` on Edgar's
+  "ship it"; CI + Pages green). **Milestone 5** (stair roofs, keep interiors + wall-walk, the
+  falls cascade, test-suite health) followed on branch `experiment/project-stonehaven-m5` in
+  the same worktree — journal has full detail.
 
 ## Milestone 4 objective (done this pass)
 
@@ -77,7 +77,6 @@ the M3 camera position — deliberate evidence of the village, not drift.
 
 ## Next exact steps
 
-1. Edgar reviews the M4 captures and the worktree diff.
-2. On approval: commit on `experiment/project-stonehaven-m4`, push, then merge to `main`
-   (same flow as M3; expect no conflicts — based on current main).
-3. Do NOT begin Milestone 5 automatically. Candidates recorded in the journal.
+1. M4 and M5 are shipped; the journal's "M6 candidate observations" hold the queued ideas
+   (great-hall furnishing, a wider cascade header, bastion-crowding watch).
+2. Do NOT begin Milestone 6 without Edgar.

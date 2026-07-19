@@ -10,7 +10,7 @@ import {
 } from '../src/worldgen/StonehavenGenerator';
 import { applyOverlays } from '../src/worldgen/Generator';
 import { ChunkData } from '../src/world/ChunkData';
-import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../src/core/constants';
 import {
   AIR,
   WATER,
@@ -26,13 +26,24 @@ import {
   CARVED_LIMESTONE,
   GLOWSTONE,
   OAK_DOOR,
+  STAIRS_SLATE,
+  STAIRS_STONE,
 } from '../src/blocks/blocks';
+import { FACING } from '../src/world/VoxelState';
 
 const SEED = 1337;
+
+/** Index of the first mismatching byte between two arrays, or -1 when identical. */
+function firstDiff(a: Uint8Array, b: Uint8Array): number {
+  if (a.length !== b.length) return Math.min(a.length, b.length);
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return i;
+  return -1;
+}
 
 /** A whole-world sampler: generates (and overlays) chunks on demand and reads by world coords. */
 function makeSampler(seed = SEED): {
   at: (wx: number, wy: number, wz: number) => number;
+  stateAt: (wx: number, wy: number, wz: number) => number;
   chunkOf: (cx: number, cz: number) => ChunkData;
 } {
   const { generator, overlays } = createGenerator('stonehaven');
@@ -52,7 +63,21 @@ function makeSampler(seed = SEED): {
     const cz = Math.floor(wz / CHUNK_SIZE_Z);
     return chunkOf(cx, cz).get(wx - cx * CHUNK_SIZE_X, wy, wz - cz * CHUNK_SIZE_Z);
   };
-  return { at, chunkOf };
+  const stateAt = (wx: number, wy: number, wz: number): number => {
+    const cx = Math.floor(wx / CHUNK_SIZE_X);
+    const cz = Math.floor(wz / CHUNK_SIZE_Z);
+    return chunkOf(cx, cz).getState(wx - cx * CHUNK_SIZE_X, wy, wz - cz * CHUNK_SIZE_Z);
+  };
+  return { at, stateAt, chunkOf };
+}
+
+// One shared sampler for all read-only block assertions: each authored-feature test touches the
+// same handful of chunks, and regenerating them per test made this file heavy enough to starve
+// the rest of the suite (the authored field is many fBm evaluations per column).
+let sharedSampler: ReturnType<typeof makeSampler> | undefined;
+function sampler(): ReturnType<typeof makeSampler> {
+  sharedSampler ??= makeSampler();
+  return sharedSampler;
 }
 
 describe('stonehaven preset registration', () => {
@@ -81,14 +106,10 @@ describe('stonehaven terrain composition', () => {
       const cb = b.generator.generateBaseChunk(SEED, cx, cz);
       applyOverlays(ca, cx, cz, SEED, a.overlays);
       applyOverlays(cb, cx, cz, SEED, b.overlays);
-      // Every voxel, every layer — a sparse stride can miss overlay-only differences.
-      for (let y = 0; y < WORLD_HEIGHT; y += 1) {
-        for (let x = 0; x < CHUNK_SIZE_X; x++) {
-          for (let z = 0; z < CHUNK_SIZE_Z; z++) {
-            expect(ca.get(x, y, z)).toBe(cb.get(x, y, z));
-          }
-        }
-      }
+      // Every voxel AND every state byte (stair facings), compared on the raw arrays — a
+      // per-voxel expect() here is ~400k slow assertions and times the suite out.
+      expect(firstDiff(ca.data, cb.data)).toBe(-1);
+      expect(firstDiff(ca.state, cb.state)).toBe(-1);
     }
   });
 
@@ -103,7 +124,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('digs a deep flooded lake south of the village', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const { cx, cz } = STONEHAVEN.valley;
     const floor = stonehavenSurfaceAt(SEED, cx, cz);
     expect(floor).toBeLessThanOrEqual(STONEHAVEN.lake.floorY + 4);
@@ -222,7 +243,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('spans the stream gorge with a stone bridge over an open arch', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const b = STONEHAVEN_SITES.bridge;
     const midX = Math.round((b.x0 + b.x1) / 2);
     const midZ = Math.round((b.z0 + b.z1) / 2);
@@ -237,7 +258,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('offers a continuous post-overlay walking surface through the bridge area', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const road = stonehavenRoad();
     // Topmost solid block in the plausible walking band — deck or graded road, whichever exists.
     const topSolid = (px: number, pz: number): number => {
@@ -277,17 +298,12 @@ describe('stonehaven terrain composition', () => {
     afterNeighbors.chunkOf(5, 7);
     const ca = alone.chunkOf(6, 7);
     const cb = afterNeighbors.chunkOf(6, 7);
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      for (let x = 0; x < CHUNK_SIZE_X; x++) {
-        for (let z = 0; z < CHUNK_SIZE_Z; z++) {
-          expect(ca.get(x, y, z)).toBe(cb.get(x, y, z));
-        }
-      }
-    }
+    expect(firstDiff(ca.data, cb.data)).toBe(-1);
+    expect(firstDiff(ca.state, cb.state)).toBe(-1);
   });
 
   it('builds the harbor quay and a lamplit pier at the waterfront', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const hb = STONEHAVEN_SITES.harbor;
     const pier = hb.pier;
     expect(at(pier.x, hb.apronY, pier.z1)).toBe(PLANKS); // pier head deck
@@ -298,7 +314,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('raises masonry fortress massing distinct from the natural crag', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const w = STONEHAVEN_SITES.ward;
     const k = w.keep;
     // Curtain wall: cobblestone masonry (not natural stone) above the plinth on the east edge.
@@ -308,10 +324,9 @@ describe('stonehaven terrain composition', () => {
     // Keep: cobble body, limestone quoin, set-back upper storey topping out at its own height.
     expect(at(k.x1, 126, k.z1)).toBe(CARVED_LIMESTONE); // corner quoin column
     const u = k.upper;
-    const ux = Math.round((u.x0 + u.x1) / 2);
-    const uz = Math.round((u.z0 + u.z1) / 2);
-    expect(at(ux, u.topY, uz)).toBe(COBBLESTONE); // upper storey mass
-    expect(at(ux, u.topY + 2, uz)).toBe(AIR); // rimmed roof, not a spike of fill
+    // Sampled off-center: the spiral-stair shaft (M5) rises through the middle of the roof.
+    expect(at(-72, u.topY, 122)).toBe(COBBLESTONE); // upper storey mass
+    expect(at(-72, u.topY + 2, 122)).toBe(AIR); // rimmed roof, not a spike of fill
     // The fire tower rises past the upper storey with the glowstone basin on top.
     const b = w.beacon;
     expect(b.topY).toBeGreaterThan(u.topY + 4);
@@ -323,7 +338,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('frames a traversable gate: level floor, headroom across the full width, limestone arch', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const g = STONEHAVEN_SITES.ward.gate;
     let prev: number | undefined;
     for (let wx = g.x0; wx <= g.x1; wx++) {
@@ -343,7 +358,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('keeps the pier deck walkable and dry over open water', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const hb = STONEHAVEN_SITES.harbor;
     const pier = hb.pier;
     for (let wz = pier.z0; wz <= pier.z1; wz++) {
@@ -355,7 +370,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('frames the harbor with village masses while keeping the lake corridor open', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     const v = STONEHAVEN_SITES.village;
     // Harbormaster's house: cobble base wall, oak door facing the plaza, slate roof above.
     expect(at(v.harbormaster.x0, v.harbormaster.floorY + 2, 1)).toBe(COBBLESTONE);
@@ -376,7 +391,7 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('paves the road with a solid cobble center line', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     for (const p of [
       { x: 56, z: 16 },
       { x: 83, z: 52 },
@@ -388,15 +403,70 @@ describe('stonehaven terrain composition', () => {
   });
 
   it('paves both viewpoint pullouts', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     for (const vp of STONEHAVEN_SITES.viewpoints) {
       const h = stonehavenSurfaceAt(SEED, vp.x, vp.z);
       expect([STONE, COBBLESTONE, GRAVEL]).toContain(at(vp.x, h, vp.z));
     }
   });
 
+  it('pitches village roofs with oriented slate stairs', () => {
+    const { at, stateAt } = sampler();
+    const v = STONEHAVEN_SITES.village;
+    const midX = Math.round((v.harbormaster.x0 + v.harbormaster.x1) / 2);
+    const eaveY = v.harbormaster.floorY + 6; // wallTop + 1
+    expect(at(midX, eaveY, v.harbormaster.z0 - 1)).toBe(STAIRS_SLATE);
+    expect(stateAt(midX, eaveY, v.harbormaster.z0 - 1) & 0b11).toBe(FACING.S); // rises to ridge
+    expect(at(midX, eaveY, v.harbormaster.z1 + 1)).toBe(STAIRS_SLATE);
+    expect(stateAt(midX, eaveY, v.harbormaster.z1 + 1) & 0b11).toBe(FACING.N);
+  });
+
+  it('opens the keep: hall, framed entrance stair, spiral to the roof hatch', () => {
+    const { at } = sampler();
+    const k = STONEHAVEN_SITES.ward.keep;
+    expect(at(-72, 121, 122)).toBe(AIR); // great hall interior
+    expect(at(-72, 137, 122)).toBe(AIR); // upper hall interior
+    expect(at(-74, 125, 120)).toBe(STONE); // spiral newel post rising through the hall
+    expect(at(-68, 120, 120)).toBe(AIR); // door tunnel through the east face
+    expect(at(k.x1, 123, 120)).toBe(CARVED_LIMESTONE); // door lintel
+    expect(at(-74, 141, 120)).toBe(STONE); // the stair emerges through the roof hatch
+    // The grand stair climbs the knoll one rise per column, all the way to the door.
+    for (let i = 0; i <= 9; i++) {
+      expect(at(-59 - i, 109 + i, 120)).toBe(STAIRS_STONE);
+      expect(at(-59 - i, 110 + i, 120)).toBe(AIR); // headroom over each step
+    }
+  });
+
+  it('provides a protected wall-walk with stair access from the ward', () => {
+    const { at } = sampler();
+    const w = STONEHAVEN_SITES.ward;
+    const lane = w.x1 - 1;
+    expect(at(lane, w.wallTopY - 1, 124)).toBe(COBBLESTONE); // the walk lane
+    expect(at(lane, w.wallTopY + 1, 124)).toBe(AIR); // open head height on the lane
+    expect(at(w.x1, w.wallTopY, 124)).toBe(COBBLESTONE); // parapet wall beside it
+    expect(at(lane, 109, 134)).toBe(STAIRS_STONE); // first step up from the ward level
+  });
+
+  it('sends the stream over the bench face as a cascade into a rimmed splash pool', () => {
+    const { at } = sampler();
+    // Cascade: water laid into the groove on the descent face.
+    let cascade = 0;
+    for (let i = 0; i <= 20; i++) {
+      const t = i / 20;
+      const wx = Math.round(84 - 18 * t);
+      const wz = Math.round(104 - 8 * t);
+      for (let y = 66; y <= 84; y++) if (at(wx, y, wz) === WATER) cascade++;
+    }
+    expect(cascade).toBeGreaterThan(5);
+    // Pool: contained water one block above the lake, over a stone floor.
+    expect(at(66, 63, 96)).toBe(WATER);
+    expect(at(66, 62, 96)).toBe(STONE);
+    expect(at(66, 64, 96)).toBe(AIR);
+    expect(at(62, 63, 96)).toBe(STONE); // the rim holds the west edge
+  });
+
   it('keeps trees out of the village square and off the lake', () => {
-    const { at } = makeSampler();
+    const { at } = sampler();
     // Scan the two chunks covering the square for any wood above the bench.
     for (const [cx, cz] of [
       [0, 0],

@@ -175,6 +175,52 @@ M4 captures: `.claude/worktrees/stonehaven-m4/.captures/stonehaven-m4-*.jpg`.
 - The SW flanking bastion stands close beside the gate switchback — dramatic, but watch it.
 - The waterfall lip itself (the falls bench's lake cliff) still has no authored water feature.
 
+## Milestone 5: Interiors, Roofcraft, and the Falls
+
+**Date:** 2026-07-19 (branch `experiment/project-stonehaven-m5` off main `852e7c0`)
+
+### Resolved from M4's observations
+- "Slate hip roofs are chunky" → RESOLVED: `hipRoof` now lays oriented slate STAIRS on every
+  ring edge (facing uphill; solid slate hips at the corners) — the village roofs read as real
+  pitched planes.
+- "Fortress interiors don't exist" → the keep opens up: a lantern-lit great hall (stand y 119),
+  an upper hall in the set-back storey (y 135), and a central `spiralStair` climbing hall →
+  upper hall → a 3×3 roof hatch (y 141). Entrance: a limestone-framed doorway in the east face
+  reached by a grand stone stair cut up the knoll from the ward court — one rise per column,
+  walk-verified (−56,120) → through the door at (−68,119.9).
+- "No wall-walk" → a protected parapet lane along the east curtain (lane top one below the
+  merlon line, lanterns on the crest), with a supported stone stair up from the ward.
+  Walk-verified: (−43,137) at ward level → up the stair → the lane's north end, 21.7 blocks.
+- "No authored waterfall" → the stream's final descent is now a cascade: source water laid
+  flush into the groove bed over a stone seal (gravity ticker can't drop sand from under it),
+  ending in a stone-rimmed splash pool on the shore beside the lake. The fluid ticker is
+  edit-driven, so undisturbed worldgen water holds its shape (Cloudspire precedent).
+
+### Route findings fixed during the live walkthrough
+- The wall-walk lane originally extended south past its access stair — a solid 7-high wall
+  blocking the approach; the lane now ends where the stair lands (z 128).
+- A lane lantern sat exactly on the stair landing and blocked the step-up; lane lanterns now
+  sit on the parapet crest.
+
+### Test-health finding
+- The M4 "compare every voxel" determinism test used ~400k `expect()` calls; under full-suite
+  load it (and the similarly heavy Cloudspire package test) hit the 20 s timeout. Both stonehaven
+  comparisons now diff the chunks' raw `data`/`state` arrays (faster AND stronger — state bytes
+  cover stair facings), and the file's read-only tests share one sampler instead of regenerating
+  the same chunks per test. Full suite: 1,665 green.
+
+### Verification
+- 1,665 tests (26 stonehaven), tsc, lint, build all green.
+- Captures: `stonehaven-m5-01-falls`, `-02-roofs`, `-03-keep-entrance`, `-04-great-hall`,
+  `-05-wall-walk`, `-06-village-arrival` (matched to the M3/M4 arrival viewpoint) in this
+  worktree's `.captures/`.
+
+### M6 candidate observations
+- The great hall is bare — furnishing (hearth, banners, bookshelf walls) is pure dressing now.
+- The cascade is thin at the top of the face; a widened upper chute or a second header pool
+  would give it more mass from the village view.
+- Gate flanking bastion still worth a look in play; keep watching.
+
 ## Render Visibility Fix
 
 **Date:** 2026-07-08

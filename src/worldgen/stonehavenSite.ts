@@ -13,8 +13,12 @@ import {
   SLATE,
   GLASS,
   OAK_DOOR,
+  STAIRS_SLATE,
+  STAIRS_STONE,
+  WATER,
 } from '../blocks/blocks';
-import { CitadelStamp, hash2 } from './CitadelStamp';
+import { packState, FACING } from '../world/VoxelState';
+import { CitadelStamp, hash2, spiralStair } from './CitadelStamp';
 import { superellipseT, polylineProject } from './fields';
 import {
   stonehavenRoad,
@@ -174,7 +178,11 @@ interface ShellBox {
   floorY: number;
 }
 
-/** A stepped slate hip roof with a 1-block eave, closing to a ridge cap. */
+/**
+ * A stepped slate hip roof with a 1-block eave, closing to a ridge cap. M5: the ring edges are
+ * slate STAIRS facing uphill (toward the ridge) with solid slate corners, so the pitch reads as
+ * a smooth roof plane instead of chunky full-block terraces.
+ */
 function hipRoof(
   s: CitadelStamp,
   x0: number,
@@ -193,7 +201,18 @@ function hipRoof(
       s.fill(ax, y, az, bx, y, bz, SLATE); // ridge cap
       return;
     }
-    s.outline(ax, az, bx, bz, y, SLATE);
+    for (let x = ax + 1; x < bx; x++) {
+      s.set(x, y, az, STAIRS_SLATE, packState(FACING.S, 0)); // north eave rises toward +z
+      s.set(x, y, bz, STAIRS_SLATE, packState(FACING.N, 0)); // south eave rises toward -z
+    }
+    for (let z = az + 1; z < bz; z++) {
+      s.set(ax, y, z, STAIRS_SLATE, packState(FACING.W, 0)); // west eave rises toward +x
+      s.set(bx, y, z, STAIRS_SLATE, packState(FACING.E, 0)); // east eave rises toward -x
+    }
+    s.set(ax, y, az, SLATE); // solid hips at the corners
+    s.set(bx, y, az, SLATE);
+    s.set(ax, y, bz, SLATE);
+    s.set(bx, y, bz, SLATE);
     ax++;
     az++;
     bx--;
@@ -431,6 +450,59 @@ function buildFortress(s: CitadelStamp, seed: WorldSeed): void {
   s.outline(b.x0, b.z0, b.x1, b.z1, b.topY + 1, CARVED_LIMESTONE);
   s.fill(b.x0 + 1, b.topY + 1, b.z0 + 1, b.x0 + 2, b.topY + 1, b.z0 + 2, GLOWSTONE);
 
+  // ── M5: the keep opens up ──────────────────────────────────────────────────────────────────
+  // Great hall carved into the lower body, an upper hall in the set-back storey, and a central
+  // spiral stair climbing hall → upper hall → roof hatch. Floors are the solid fill below each
+  // hollow, so nothing floats; lanterns light both halls.
+  s.fill(k.x0 + 2, 119, k.z0 + 2, k.x1 - 2, 127, k.z1 - 2, AIR); // great hall (stand on 119)
+  s.fill(u.x0 + 1, 135, u.z0 + 1, u.x1 - 1, 139, u.z1 - 1, AIR); // upper hall (stand on 135)
+  s.fill(-75, 119, 119, -73, 141, 121, AIR); // the stair shaft, up through the roof hatch
+  spiralStair(s, -74, 120, 119, 141, STONE, STONE);
+  s.set(k.x0 + 2, 123, k.z0 + 2, LANTERN);
+  s.set(k.x1 - 2, 123, k.z1 - 2, LANTERN);
+  s.set(u.x0 + 1, 138, u.z1 - 1, LANTERN);
+
+  // Entrance: a limestone-framed doorway in the east face, reached by a grand stone stair
+  // cut up the knoll from the ward court (one rise per column — walkable by construction).
+  s.fill(k.x1 - 1, 119, 119, k.x1, 122, 121, AIR); // door tunnel through the east wall
+  s.fill(k.x1, 119, 118, k.x1, 123, 118, CARVED_LIMESTONE); // jambs + lintel frame
+  s.fill(k.x1, 119, 122, k.x1, 123, 122, CARVED_LIMESTONE);
+  s.fill(k.x1, 123, 119, k.x1, 123, 121, CARVED_LIMESTONE);
+  for (let i = 0; i <= 9; i++) {
+    const sx = -59 - i;
+    const sy = 109 + i;
+    if (sx < s.wx0 || sx > s.wx1) continue;
+    for (let sz = 119; sz <= 121; sz++) {
+      if (sz < s.wz0 || sz > s.wz1) continue;
+      const hh = stonehavenSurfaceAt(seed, sx, sz);
+      if (sy - 1 >= hh - 1) s.fill(sx, hh - 1, sz, sx, sy - 1, sz, COBBLESTONE); // step support
+      for (let wy = sy + 1; wy <= sy + 3; wy++) s.set(sx, wy, sz, AIR); // cutting through the toe
+      s.set(sx, sy, sz, STAIRS_STONE, packState(FACING.E, 0)); // rises toward -x, to the door
+    }
+  }
+
+  // Wall-walk: an inner cobble lane along the east curtain (its top sits below the merlon line,
+  // so the parapet protects the walk), with a stone stair up from the ward level and lanterns.
+  // The lane runs the northern stretch only (to z 128); the access stair climbs z 134 → 129
+  // and lands on its end, so the approach from the ward stays open ground.
+  for (let wz = w.z0 + 2; wz <= 128; wz++) {
+    if (w.x1 - 1 < s.wx0 || w.x1 - 1 > s.wx1 || wz < s.wz0 || wz > s.wz1) continue;
+    const hh = stonehavenSurfaceAt(seed, w.x1 - 1, wz);
+    if (hh >= w.wallTopY - 1) continue;
+    s.fill(w.x1 - 1, hh - 1, wz, w.x1 - 1, w.wallTopY - 1, wz, COBBLESTONE);
+    // Lanterns sit on the parapet crest, not on the walk itself — a lamp on the lane blocks it.
+    if (wz % 8 === 2) s.set(w.x1, w.wallTopY + 1, wz, LANTERN);
+  }
+  for (let i = 0; i <= 5; i++) {
+    const sz = 134 - i;
+    const sy = 109 + i;
+    if (w.x1 - 1 < s.wx0 || w.x1 - 1 > s.wx1 || sz < s.wz0 || sz > s.wz1) continue;
+    const hh = stonehavenSurfaceAt(seed, w.x1 - 1, sz);
+    if (sy - 1 >= hh - 1) s.fill(w.x1 - 1, hh - 1, sz, w.x1 - 1, sy - 1, sz, COBBLESTONE); // support
+    for (let wy = sy + 1; wy <= sy + 3; wy++) s.set(w.x1 - 1, wy, sz, AIR); // headroom
+    s.set(w.x1 - 1, sy, sz, STAIRS_STONE, packState(FACING.N, 0)); // rises toward -z, up the lane
+  }
+
   // Ward court: the paved arrival circle at the road's end, with a lit waymark plinth — the
   // climb's payoff is a made place now, not an empty meadow.
   const court = { cx: -58, cz: 132, r: 8 };
@@ -495,6 +567,53 @@ function buildViewpoints(s: CitadelStamp, seed: WorldSeed): void {
   }
 }
 
+/**
+ * The falls (M5): the stream's final descent down the bench face becomes a real cascade —
+ * static source water laid flush into the groove bed over a stone seal (so the gravity ticker
+ * can't drop sand/gravel out from under it), ending in a stone-rimmed splash pool on the shore
+ * beside the lake. Authored like Cloudspire's contained falls: the fluid ticker is edit-driven,
+ * so undisturbed worldgen water holds its shape.
+ */
+function buildFalls(s: CitadelStamp, seed: WorldSeed): void {
+  if (!overlaps(s, 58, 88, 90, 106)) return;
+  // The cascade follows the stream's last segment, (84,104) → (66,96), 2 wide across the groove.
+  const A = { x: 84, z: 104 };
+  const B = { x: 66, z: 96 };
+  const steps = Math.ceil(Math.hypot(A.x - B.x, A.z - B.z));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const cx = Math.round(A.x + (B.x - A.x) * t);
+    const cz = Math.round(A.z + (B.z - A.z) * t);
+    for (const [ox, oz] of [
+      [0, 0],
+      [0, 1],
+    ] as const) {
+      const wx = cx + ox;
+      const wz = cz + oz;
+      if (!owned(s, wx, wz)) continue;
+      const h = stonehavenSurfaceAt(seed, wx, wz);
+      if (h <= 64 || h > 84) continue; // only the descent face; the pool takes over at the shore
+      s.set(wx, h - 1, wz, STONE); // seal the bed
+      s.set(wx, h, wz, WATER); // water flush with the ground line
+    }
+  }
+  // Splash pool: stone floor and rim one block above the lake, water at shore level.
+  const pool = { cx: 66, cz: 96, r: 3.5 };
+  for (let wz = pool.cz - 4; wz <= pool.cz + 4; wz++) {
+    for (let wx = pool.cx - 4; wx <= pool.cx + 4; wx++) {
+      if (!owned(s, wx, wz)) continue;
+      const d = Math.hypot(wx - pool.cx, wz - pool.cz);
+      if (d <= pool.r) {
+        s.set(wx, 62, wz, STONE);
+        s.set(wx, 63, wz, WATER);
+        s.set(wx, 64, wz, AIR);
+      } else if (d <= pool.r + 1.2) {
+        s.set(wx, 63, wz, STONE); // containing rim, flush with the water surface
+      }
+    }
+  }
+}
+
 /** The Stonehaven site overlay: everything authored on top of the terrain, clipped per chunk. */
 export function stonehavenSite(): Overlay {
   return (chunk, cx, cz, seed) => {
@@ -507,5 +626,6 @@ export function stonehavenSite(): Overlay {
     buildVillage(s);
     buildBridge(s, seed);
     buildFortress(s, seed);
+    buildFalls(s, seed);
   };
 }
