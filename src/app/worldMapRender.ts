@@ -4,7 +4,7 @@
 // column's top block and shaded by its height. No DOM, no three.js — WorldMapUi owns the
 // canvas and marker overlay; this module owns everything unit-testable.
 import { WORLD_HEIGHT } from '../core/constants';
-import { BLOCK_DEFS, WATER, Face, type BlockDef } from '../blocks/blocks';
+import { AIR, BLOCK_DEFS, LAVA, MAGMA, WATER, Face, type BlockDef } from '../blocks/blocks';
 import { expandFaces } from '../blocks/textures';
 
 export type MapRGB = readonly [number, number, number];
@@ -16,6 +16,8 @@ export interface MapSurface {
 
 /** Top-most non-air block at a world column; undefined = unloaded (painted transparent). */
 export type SurfaceSampler = (x: number, z: number) => MapSurface | undefined;
+/** Exact block at a world-space depth; undefined means its chunk is not loaded. */
+export type CaveSampler = (x: number, y: number, z: number) => number | undefined;
 
 const FALLBACK_RGB: MapRGB = [90, 90, 96];
 
@@ -71,6 +73,36 @@ export function renderMapPixels(
       data[i] = rgb[0] * shade;
       data[i + 1] = rgb[1] * shade;
       data[i + 2] = rgb[2] * shade;
+      data[i + 3] = 255;
+    }
+  }
+  return { size, data };
+}
+
+/**
+ * Renders a horizontal cave slice. Open passages are charcoal, solid geology uses a darkened
+ * block palette, and lava/magma stay bright enough to read as navigation landmarks.
+ */
+export function renderCaveMapPixels(
+  sample: CaveSampler,
+  palette: Map<number, MapRGB>,
+  centerX: number,
+  centerZ: number,
+  depthY: number,
+  radius: number,
+): MapImage {
+  const size = radius * 2 + 1;
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let dz = -radius; dz <= radius; dz++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const id = sample(centerX + dx, depthY, centerZ + dz);
+      if (id === undefined) continue;
+      const rgb = id === AIR ? ([34, 38, 47] as const) : (palette.get(id) ?? FALLBACK_RGB);
+      const shade = id === LAVA ? 1.18 : id === MAGMA ? 1.05 : id === AIR ? 1 : 0.42;
+      const i = ((dz + radius) * size + (dx + radius)) * 4;
+      data[i] = Math.min(255, rgb[0] * shade);
+      data[i + 1] = Math.min(255, rgb[1] * shade);
+      data[i + 2] = Math.min(255, rgb[2] * shade);
       data[i + 3] = 255;
     }
   }

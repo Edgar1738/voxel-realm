@@ -130,6 +130,10 @@ export const BLOSSOM_LEAVES: BlockId = 98;
 export const ICICLE: BlockId = 99;
 /** Hanging stone spikes (cross), scattered naturally from deep cave ceilings. */
 export const STALACTITE: BlockId = 100;
+/** Solid cracked volcanic rock with a warm internal glow. */
+export const MAGMA: BlockId = 101;
+/** Glassy stone found where magma chambers cool along their outer shelves. */
+export const OBSIDIAN: BlockId = 102;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -1337,6 +1341,26 @@ export const BLOCK_DEFS: BlockDef[] = [
       rotate: true,
       drift: 'foliage',
     },
+  },
+  {
+    id: MAGMA,
+    name: 'magma',
+    opaque: true,
+    transparent: false,
+    light: 9,
+    creative: true,
+    faces: {
+      pattern: 'ore',
+      colors: [[255, 102, 24]],
+    },
+  },
+  {
+    id: OBSIDIAN,
+    name: 'obsidian',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([42, 28, 58]),
   },
 ];
 

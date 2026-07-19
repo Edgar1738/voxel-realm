@@ -22,6 +22,8 @@ export interface WorldAtmosphere {
 export interface WorldMeta {
   seed: number;
   version: number;
+  /** Base-terrain algorithm. Absent means legacy v1 so old worlds never reshape silently. */
+  worldgenVersion?: number;
   /** Which world preset the saved edits belong to; a change discards them. */
   preset?: string;
   /** Optional curated-world fields. All are defensively parsed and may be absent on legacy saves. */

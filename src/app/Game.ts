@@ -49,6 +49,7 @@ import { MeshWorkerPool } from '../world/MeshWorkerPool';
 import { GenWorkerPool } from '../world/GenWorkerPool';
 import { setSharedChunkBuffers } from '../world/chunkBuffers';
 import { createGenerator, resolveBootPreset, type WorldPreset } from '../worldgen/Presets';
+import { CURRENT_WORLDGEN_VERSION, resolveWorldgenVersion } from '../worldgen/worldgenVersion';
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController, PLAYER_HALF } from '../player/PlayerController';
@@ -249,8 +250,19 @@ export class Game {
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
     const requested = searchParams.get('world');
     const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
-    const generatedMeta = curatedPresetMeta(preset, SEED, SAVE_VERSION);
-    const { generator, overlays } = createGenerator(preset);
+    const worldgenVersion = resolveWorldgenVersion(bootMeta.meta, SEED, SAVE_VERSION, preset);
+    const generatedMeta = curatedPresetMeta(
+      preset,
+      SEED,
+      SAVE_VERSION,
+      CURRENT_WORLDGEN_VERSION,
+    ) ?? {
+      seed: SEED,
+      version: SAVE_VERSION,
+      worldgenVersion: CURRENT_WORLDGEN_VERSION,
+      preset,
+    };
+    const { generator, overlays } = createGenerator(preset, worldgenVersion);
 
     const bootSave = await bootStats.span('load-deltas', () =>
       initializeBootSave(bootMeta, SEED, SAVE_VERSION, preset, undefined, generatedMeta),
@@ -285,7 +297,9 @@ export class Game {
     // P7: off-thread base-chunk generation (terrain + overlays). Needs only Worker support —
     // result buffers transfer (or share, when isolated) — so this stays on even on GitHub
     // Pages. Constructed AFTER setSharedChunkBuffers so its workers allocate matching buffers.
-    const genPool = GenWorkerPool.supported() ? new GenWorkerPool(preset, SEED) : undefined;
+    const genPool = GenWorkerPool.supported()
+      ? new GenWorkerPool(preset, SEED, worldgenVersion)
+      : undefined;
     const manager = new ChunkManager(
       generator,
       new GreedyMesher(registry),
@@ -358,6 +372,7 @@ export class Game {
     npcSystem.attach((object) => renderer.add(object));
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
+      isLava(x: number, y: number, z: number): boolean;
       isClimbable(x: number, y: number, z: number): boolean;
       isBarrier(x: number, y: number, z: number): boolean;
     } = {
@@ -366,6 +381,7 @@ export class Game {
         ...npcSystem.collisionBoxesAt(x, y, z),
       ],
       isWater: (x: number, y: number, z: number) => manager.isWater(x, y, z),
+      isLava: (x: number, y: number, z: number) => manager.isLava(x, y, z),
       isClimbable: (x: number, y: number, z: number) =>
         registry.isClimbable(manager.getBlock(x, y, z)),
       isBarrier: (x: number, y: number, z: number) => registry.isBarrier(manager.getBlock(x, y, z)),
@@ -678,7 +694,7 @@ export class Game {
       typeof atmo?.fogFar === 'number' &&
       atmo.fogFar > atmo.fogNear
     ) {
-      for (const m of [material, transparentMaterial, cutoutMaterial]) {
+      for (const m of chunkMaterials) {
         m.uniforms.uFogNear.value = atmo.fogNear;
         m.uniforms.uFogFar.value = atmo.fogFar;
       }
@@ -1127,11 +1143,22 @@ export class Game {
     const toggleWorldMap = (): void => {
       // A single overlay owns focus at a time. When the map is already open, M may still close it.
       if (!worldMap.isOpen() && (ui.isInventoryOpen() || ui.isDialogOpen())) return;
+      const centerX = Math.floor(player.position.x);
+      const centerZ = Math.floor(player.position.z);
+      const centerSurface = manager.surfaceAt(centerX, centerZ);
+      const underground = centerSurface
+        ? player.position.y < centerSurface.y - 6
+        : player.position.y < 48;
       const nowOpen = worldMap.toggle({
-        center: { x: Math.floor(player.position.x), z: Math.floor(player.position.z) },
+        center: { x: centerX, z: centerZ },
         yaw: rig.yaw,
         radius: manager.viewDistance * CHUNK_SIZE_X,
         sample: (x, z) => manager.surfaceAt(x, z),
+        cave: {
+          y: Math.floor(player.position.y),
+          sample: (x, y, z) => (manager.isLoaded(x, z) ? manager.getBlock(x, y, z) : undefined),
+        },
+        initialMode: underground ? 'cave' : 'surface',
         palette: mapPalette,
         title: activeMeta?.title?.trim() || `World: ${worldName}`,
         landmarks: (activeMeta?.landmarks ?? []).map((l) => ({
@@ -1777,10 +1804,11 @@ export class Game {
     // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
     let avatarPrevX = player.position.x;
     let avatarPrevZ = player.position.z;
+    const lavaHeat = document.getElementById('lava-heat');
 
     // Stable per-frame callbacks, hoisted so the render loop allocates no closures each frame.
-    const isSolidOrWater = (x: number, y: number, z: number): boolean =>
-      manager.isSolid(x, y, z) || manager.isWater(x, y, z);
+    const blocksWeatherParticle = (x: number, y: number, z: number): boolean =>
+      manager.isSolid(x, y, z) || manager.isWater(x, y, z) || manager.isLava(x, y, z);
     const getBlockAt = (x: number, y: number, z: number): number => manager.getBlock(x, y, z);
     const critterEnv = { getBlock: getBlockAt, player: player.position };
 
@@ -1855,6 +1883,8 @@ export class Game {
         renderer.camera.updateProjectionMatrix();
       }
       const eye = player.eye();
+      const cameraInLava = manager.isLava(Math.floor(eye.x), Math.floor(eye.y), Math.floor(eye.z));
+      lavaHeat?.classList.toggle('active', cameraInLava || player.inLava);
       // Ease the camera over small grounded steps in BOTH directions — up (stairs/ledges) and
       // down (stair descents, which otherwise jolt a full block per step). Jumps, real falls,
       // flying, and teleports still snap: mid-air frames take the else-branch every frame, so
@@ -1944,7 +1974,7 @@ export class Game {
       // and critters stay in frame far from the player), otherwise the player's eye.
       const ambienceEye = rig.photoMode ? renderer.camera.position : eye;
       // Drops die on solids *and* water surfaces — rain must not streak through lakes.
-      weather.update(cdt, ambienceEye, isSolidOrWater);
+      weather.update(cdt, ambienceEye, blocksWeatherParticle);
       const skyNow = skyState(daynight.time);
       ambientLife.update(cdt, ambienceEye, skyNow.daylight, getBlockAt);
       ticker.update(cdt);

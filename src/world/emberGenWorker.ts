@@ -19,7 +19,7 @@ self.onmessage = (event: MessageEvent<GenWorkerMessage>) => {
     setSharedChunkBuffers(msg.sharedBuffers);
     shared = msg.sharedBuffers && typeof SharedArrayBuffer !== 'undefined';
     seed = msg.seed;
-    ({ generator, overlays } = createEmberWorkerPreset());
+    ({ generator, overlays } = createEmberWorkerPreset(msg.worldgenVersion));
     return;
   }
   if (!generator) throw new Error('ember gen worker: job before init');

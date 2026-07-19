@@ -31,13 +31,14 @@ export class GenWorkerPool implements GenScheduler {
     return typeof Worker !== 'undefined';
   }
 
-  constructor(preset: string, seed: WorldSeed, size?: number) {
+  constructor(preset: string, seed: WorldSeed, worldgenVersion: number, size?: number) {
     const hw = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency ?? 2) : 2;
     const count = Math.max(1, Math.min(size ?? hw - 1, 4));
     const init: GenWorkerInit = {
       kind: 'init',
       preset,
       seed,
+      worldgenVersion,
       sharedBuffers: sharedChunkBuffersEnabled(),
     };
     for (let i = 0; i < count; i++) {

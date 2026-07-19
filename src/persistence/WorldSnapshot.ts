@@ -123,6 +123,9 @@ function parseMeta(value: unknown): WorldMeta | undefined {
   const m = value as Record<string, unknown>;
   if (!Number.isInteger(m.seed) || !Number.isInteger(m.version)) return undefined;
   const meta: WorldMeta = { seed: m.seed as number, version: m.version as number };
+  if (Number.isInteger(m.worldgenVersion) && (m.worldgenVersion as number) > 0) {
+    meta.worldgenVersion = m.worldgenVersion as number;
+  }
   if (typeof m.preset === 'string') meta.preset = m.preset;
 
   const spawn = parsePoint(m.spawn);

@@ -13,6 +13,7 @@ import {
   BASALT_SLAB,
   STAIRS_BASALT,
   BASALT_WALL,
+  OBSIDIAN,
   DIRT,
 } from '../src/blocks/blocks';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
@@ -26,7 +27,7 @@ describe('material families', () => {
     const ids = BLOCK_DEFS.filter((d) => d.id >= 49)
       .map((d) => d.id)
       .sort((a, b) => a - b);
-    expect(ids).toEqual(Array.from({ length: 52 }, (_, i) => i + 49));
+    expect(ids).toEqual(Array.from({ length: OBSIDIAN - 49 + 1 }, (_, i) => i + 49));
     for (const id of ids) {
       expect(CREATIVE_BLOCKS).toContain(id);
       expect(BLOCK_TEXTURES.faceLayers.get(id)).toHaveLength(6);

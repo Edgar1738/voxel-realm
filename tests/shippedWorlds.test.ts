@@ -12,6 +12,7 @@ import {
 import { decodeWorldBinary } from '../src/persistence/WorldBinary';
 import { SAVE_VERSION } from '../src/persistence/SaveTypes';
 import { isWorldPreset } from '../src/worldgen/Presets';
+import { CURRENT_WORLDGEN_VERSION } from '../src/worldgen/worldgenVersion';
 import { BlockRegistry } from '../src/blocks/BlockRegistry';
 
 const root = resolve(__dirname, '..');
@@ -29,6 +30,9 @@ describe('shipped world collection', () => {
   it('every entry targets the current engine (save version + known preset)', () => {
     for (const entry of manifest.worlds) {
       expect(entry.version, `"${entry.slug}" version`).toBe(SAVE_VERSION);
+      expect(entry.worldgenVersion, `"${entry.slug}" worldgen version`).toBe(
+        CURRENT_WORLDGEN_VERSION,
+      );
       expect(isWorldPreset(entry.preset), `"${entry.slug}" preset "${entry.preset}"`).toBe(true);
     }
   });

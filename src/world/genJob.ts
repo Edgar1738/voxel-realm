@@ -25,6 +25,7 @@ export interface GenWorkerInit {
   kind: 'init';
   preset: string;
   seed: WorldSeed;
+  worldgenVersion: number;
   /** Allocate chunks over SharedArrayBuffers (so mesh workers keep zero-copy reads). */
   sharedBuffers: boolean;
 }
