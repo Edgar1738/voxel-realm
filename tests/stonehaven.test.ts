@@ -5,6 +5,7 @@ import {
   STONEHAVEN_STREAM,
   stonehavenSurfaceAt,
   stonehavenCapAt,
+  stonehavenRoad,
 } from '../src/worldgen/StonehavenGenerator';
 import { applyOverlays } from '../src/worldgen/Generator';
 import { ChunkData } from '../src/world/ChunkData';
@@ -44,10 +45,10 @@ describe('stonehaven preset registration', () => {
     expect(WORLD_PRESETS).toContain('stonehaven');
   });
 
-  it('resolves to a generator with forest + decoration overlays', () => {
+  it('resolves to a generator with forest + site + decoration overlays', () => {
     const { generator, overlays } = createGenerator('stonehaven');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays.length).toBe(3); // broadleaf belt + conifer belt + decorations
+    expect(overlays.length).toBe(4); // broadleaf belt + conifer belt + site + decorations
   });
 });
 
@@ -99,11 +100,11 @@ describe('stonehaven terrain composition', () => {
     expect(
       Math.abs(stonehavenSurfaceAt(SEED, crag.cx, crag.cz) - crag.plateauY),
     ).toBeLessThanOrEqual(1);
-    // The plateau core is buildable-flat away from the knoll.
+    // The plateau core is buildable-flat away from the knoll and the road's gate notch (SW).
     for (const [dx, dz] of [
-      [10, -10],
-      [-12, 10],
-      [16, 8],
+      [12, -6],
+      [14, 6],
+      [0, -16],
     ] as const) {
       const h = stonehavenSurfaceAt(SEED, crag.cx + dx, crag.cz + dz);
       expect(Math.abs(h - crag.plateauY)).toBeLessThanOrEqual(1);
@@ -139,12 +140,15 @@ describe('stonehaven terrain composition', () => {
     expect(snow).toBeGreaterThan(5);
   });
 
-  it('incises a dry gorge along the stream mid-slope', () => {
-    const mid = STONEHAVEN_STREAM[2]; // (100, 110)
-    const bed = stonehavenSurfaceAt(SEED, mid.x, mid.z);
-    const rimA = stonehavenSurfaceAt(SEED, mid.x, mid.z + 13);
-    const rimB = stonehavenSurfaceAt(SEED, mid.x, mid.z - 13);
-    expect(bed).toBeLessThan(Math.min(rimA, rimB) - 3);
+  it('incises a dry stream groove on the upper slope (clear of road and bench)', () => {
+    // Midpoint of the uppermost stream segment: no road corridor or falls bench influence here.
+    const px = Math.round((STONEHAVEN_STREAM[0].x + STONEHAVEN_STREAM[1].x) / 2);
+    const pz = Math.round((STONEHAVEN_STREAM[0].z + STONEHAVEN_STREAM[1].z) / 2);
+    const bed = stonehavenSurfaceAt(SEED, px, pz);
+    const rimA = stonehavenSurfaceAt(SEED, px, pz + 13);
+    const rimB = stonehavenSurfaceAt(SEED, px, pz - 13);
+    // Compare against the interpolated hillside so the cross-slope tilt doesn't mask the notch.
+    expect(bed).toBeLessThan((rimA + rimB) / 2 - 3);
     expect(bed).toBeGreaterThan(SEA_LEVEL); // dry until the lake mouth
   });
 
@@ -165,6 +169,28 @@ describe('stonehaven terrain composition', () => {
       }
     }
     expect(shore).toBeGreaterThan(3);
+  });
+
+  it('grades a walkable, dry road from the square to the outer ward', () => {
+    const road = stonehavenRoad();
+    let prev: number | undefined;
+    for (let a = 0; a <= road.length; a += 1) {
+      const p = road.pointAt(a);
+      const h = stonehavenSurfaceAt(SEED, Math.round(p.x), Math.round(p.z));
+      expect(h).toBeGreaterThan(SEA_LEVEL); // never underwater
+      if (prev !== undefined) {
+        expect(Math.abs(h - prev)).toBeLessThanOrEqual(1); // single-block steps at worst
+      }
+      prev = h;
+    }
+    // The road actually climbs: it ends on the outer-ward plateau.
+    const end = STONEHAVEN_ROAD_END();
+    expect(end).toBeGreaterThanOrEqual(STONEHAVEN.crag.plateauY - 1);
+
+    function STONEHAVEN_ROAD_END(): number {
+      const p = road.pts[road.pts.length - 1];
+      return stonehavenSurfaceAt(SEED, p.x, p.z);
+    }
   });
 
   it('keeps trees out of the village square and off the lake', () => {

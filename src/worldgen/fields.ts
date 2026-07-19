@@ -133,3 +133,55 @@ export function polylineLength(pts: readonly PolylinePoint[]): number {
   }
   return len;
 }
+
+/** A polyline waypoint with an authored elevation. */
+export interface RoutePoint extends PolylinePoint {
+  y: number;
+}
+
+/**
+ * A route with an elevation profile: one polyline drives both the corridor mask (project) and
+ * the grade (yAt). Terrain lerps toward `yAt(along)` inside the corridor, so a road becomes a
+ * walkable cut-and-fill ledge through whatever it crosses; a site overlay then paves the same
+ * line. Waypoint elevations interpolate linearly by arc length.
+ */
+export class RouteSpline {
+  private readonly cum: number[];
+  readonly length: number;
+
+  constructor(readonly pts: readonly RoutePoint[]) {
+    this.cum = [0];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      this.cum.push(this.cum[i] + Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z));
+    }
+    this.length = this.cum[this.cum.length - 1];
+  }
+
+  /** Nearest-point query: distance to the route and arc-length of the foot. */
+  project(px: number, pz: number): PolylineHit {
+    return polylineProject(px, pz, this.pts);
+  }
+
+  /** The authored elevation at an arc-length position. */
+  yAt(along: number): number {
+    const a = Math.max(0, Math.min(this.length, along));
+    let i = 0;
+    while (i + 1 < this.cum.length - 1 && this.cum[i + 1] < a) i++;
+    const span = this.cum[i + 1] - this.cum[i];
+    const t = span > 0 ? (a - this.cum[i]) / span : 0;
+    return lerp(this.pts[i].y, this.pts[i + 1].y, t);
+  }
+
+  /** The (x, z) point at an arc-length position — for walking the route in tests/tours. */
+  pointAt(along: number): { x: number; z: number } {
+    const a = Math.max(0, Math.min(this.length, along));
+    let i = 0;
+    while (i + 1 < this.cum.length - 1 && this.cum[i + 1] < a) i++;
+    const span = this.cum[i + 1] - this.cum[i];
+    const t = span > 0 ? (a - this.cum[i]) / span : 0;
+    return {
+      x: lerp(this.pts[i].x, this.pts[i + 1].x, t),
+      z: lerp(this.pts[i].z, this.pts[i + 1].z, t),
+    };
+  }
+}

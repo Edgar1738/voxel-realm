@@ -15,6 +15,7 @@ import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
 import { createStonehavenGenerator, stonehavenForests } from './StonehavenGenerator';
+import { stonehavenSite } from './stonehavenSite';
 import {
   cottage,
   well,
@@ -316,7 +317,7 @@ export function createGenerator(preset: WorldPreset): {
     case 'stonehaven':
       return {
         generator: createStonehavenGenerator(),
-        overlays: [...stonehavenForests(), scatterDecorations()],
+        overlays: [...stonehavenForests(), stonehavenSite(), scatterDecorations()],
       };
     case 'harbor':
       return {

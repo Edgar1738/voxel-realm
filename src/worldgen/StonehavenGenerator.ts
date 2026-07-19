@@ -23,7 +23,9 @@ import {
   superellipseT,
   directionalLobe,
   polylineProject,
+  RouteSpline,
   type PolylinePoint,
+  type RoutePoint,
 } from './fields';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
@@ -83,6 +85,46 @@ export const STONEHAVEN_STREAM: readonly PolylinePoint[] = [
   { x: 84, z: 104 },
   { x: 66, z: 96 },
 ];
+
+/**
+ * The journey road: village square → east shore → up onto the falls bench (the stone bridge
+ * crosses the stream there) → down the southern seam → along the south shore with the fortress
+ * ahead across the water → switchbacks up the crag's tier ramps → the ancient gate notch → the
+ * outer ward. Elevations are authored; the terrain grades a walkable corridor toward them, so
+ * every step of the climb is single-block or gentler.
+ */
+export const STONEHAVEN_ROAD: readonly RoutePoint[] = [
+  { x: 16, z: 4, y: 65 },
+  { x: 36, z: 8, y: 65 },
+  { x: 56, z: 16, y: 66 },
+  { x: 72, z: 32, y: 67 },
+  { x: 83, z: 52, y: 68 },
+  { x: 90, z: 70, y: 70 },
+  { x: 95, z: 84, y: 76 },
+  { x: 99, z: 96, y: 88 },
+  { x: 100, z: 104, y: 92 },
+  { x: 104, z: 116, y: 92 },
+  { x: 107, z: 130, y: 84 },
+  { x: 98, z: 148, y: 76 },
+  { x: 74, z: 160, y: 71 },
+  { x: 42, z: 168, y: 68 },
+  { x: 8, z: 174, y: 67 },
+  { x: -24, z: 170, y: 69 },
+  { x: -44, z: 164, y: 72 },
+  { x: -58, z: 176, y: 76 },
+  { x: -80, z: 158, y: 82 },
+  { x: -86, z: 145, y: 88 },
+  { x: -76, z: 150, y: 94 },
+  { x: -68, z: 142, y: 102 },
+  { x: -58, z: 132, y: 108 },
+];
+
+const road = new RouteSpline(STONEHAVEN_ROAD);
+
+/** Exposed for the site overlay, tests, and later milestones (bridge/gate placement). */
+export function stonehavenRoad(): RouteSpline {
+  return road;
+}
 
 // Bearings from the valley center (+x east, +z south).
 const THETA_EAST = 0;
@@ -171,9 +213,9 @@ function stonehavenHeight(s: Samplers, wx: number, wz: number): number {
   }
   if (wx > 40 && wz > 60 && wx < 170 && wz < 150) {
     const hit = polylineProject(wx, wz, STONEHAVEN_STREAM);
-    if (hit.dist < 8) {
-      const w = 1 - smoothstep01(hit.dist / 8);
-      const depth = Math.min(6, Math.max(0, (h - (SEA_LEVEL + 2)) * 0.5));
+    if (hit.dist < 9) {
+      const w = 1 - smoothstep01(hit.dist / 9);
+      const depth = Math.min(9, Math.max(0, (h - (SEA_LEVEL + 2)) * 0.5));
       h -= w * depth;
     }
   }
@@ -226,6 +268,16 @@ function stonehavenHeight(s: Samplers, wx: number, wz: number): number {
     const dK = Math.hypot(wx - k.cx, wz - k.cz);
     const wk = 1 - smoothstep01((dK - k.r) / 7);
     if (wk > 0) h = lerp(h, k.y + detail * 0.5, wk);
+  }
+
+  // 7. The road corridor, graded last so it cuts and fills a walkable ledge through everything
+  //    it crosses — shore marge, the falls-bench climb, the crag's tier risers. The authored
+  //    profile never dips below the waterline, so the road stays dry the whole way.
+  const rHit = road.project(wx, wz);
+  if (rHit.dist < 10) {
+    const target = road.yAt(rHit.along);
+    const w = 1 - smoothstep01((rHit.dist - 3.5) / 6.5);
+    h = lerp(h, target, w);
   }
 
   return h;
@@ -333,6 +385,7 @@ function inClearing(wx: number, wz: number): boolean {
   if (wx > 40 && wz > 60 && wx < 170 && wz < 150) {
     if (polylineProject(wx, wz, STONEHAVEN_STREAM).dist < 11) return true;
   }
+  if (road.project(wx, wz).dist < 7) return true;
   return false;
 }
 
