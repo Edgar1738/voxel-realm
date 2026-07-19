@@ -21,6 +21,8 @@ import { grandKeepSite } from './grandKeepSite';
 import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
 import { cloudspireSite } from './cloudspireSite';
 import { sunmeadowSite } from './sunmeadowSite';
+import { createStonehavenGenerator, stonehavenForests } from './StonehavenGenerator';
+import { stonehavenSite } from './stonehavenSite';
 import {
   cottage,
   well,
@@ -64,7 +66,8 @@ export type WorldPreset =
   | 'harbor'
   | 'grand-keep'
   | 'cloudspire-citadel'
-  | 'sunmeadow-trials';
+  | 'sunmeadow-trials'
+  | 'stonehaven';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -83,6 +86,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'grand-keep',
   'cloudspire-citadel',
   'sunmeadow-trials',
+  'stonehaven',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -327,6 +331,11 @@ export function createGenerator(preset: WorldPreset): {
       };
     case 'ashen-reach':
       return { generator: createAshenReachGenerator(), overlays: [ashenReachSite()] };
+    case 'stonehaven':
+      return {
+        generator: createStonehavenGenerator(),
+        overlays: [...stonehavenForests(), stonehavenSite(), scatterDecorations()],
+      };
     case 'harbor':
       return {
         generator: createHarborGenerator(),
