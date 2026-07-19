@@ -643,3 +643,21 @@ export function npcDefinitionsForPreset(preset: WorldPreset): readonly NpcDefini
 }
 
 export const NPC_CATALOG = { aurelia: AURELIA, piper: PIPER } as const;
+
+export interface NpcCatalogEntry {
+  /** Stable catalog key written to spawned-NPC saves. */
+  type: string;
+  definition: NpcDefinition;
+}
+
+/** Enumerates the live registry so future catalog additions automatically reach creative tools. */
+export function npcCatalogEntries(): NpcCatalogEntry[] {
+  return Object.entries(NPC_CATALOG).map(([type, definition]) => ({ type, definition }));
+}
+
+/** Resolves either the canonical catalog key or the authored definition id (dev-friendly alias). */
+export function npcCatalogEntry(typeOrId: string): NpcCatalogEntry | undefined {
+  return npcCatalogEntries().find(
+    ({ type, definition }) => type === typeOrId || definition.id === typeOrId,
+  );
+}

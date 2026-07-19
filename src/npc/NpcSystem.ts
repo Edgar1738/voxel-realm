@@ -1,9 +1,16 @@
 import type { Object3D } from 'three';
 import type { AABB } from '../blocks/shapeBoxes';
 import type { Vec3 } from '../core/types';
-import type { EquipmentId, EquipmentLoadout, EquipmentSlot } from '../character/Equipment';
+import {
+  isEquipmentId,
+  type EquipmentId,
+  type EquipmentLoadout,
+  type EquipmentSlot,
+} from '../character/Equipment';
 import type { CharacterJointState, CharacterJointTransform } from '../character/CharacterRig';
+import type { SpawnedNpcSave } from '../persistence/SaveTypes';
 import { NpcActor } from './NpcActor';
+import { npcCatalogEntry } from './NpcCatalog';
 import { findNpcTarget } from './NpcTargeting';
 import type {
   NpcAnimationPlayback,
@@ -25,17 +32,51 @@ function collisionBox(npc: NpcDefinition): AABB | undefined {
   ];
 }
 
-/** Owns the small set of authored NPCs active in the current world. */
-export class NpcSystem {
-  readonly definitions: readonly NpcDefinition[];
-  private readonly actors: NpcActor[];
+export interface NpcSystemOptions {
+  spawned?: readonly SpawnedNpcSave[];
+  /** Injectable for deterministic tests; collisions still receive a numeric suffix. */
+  idFactory?: () => string;
+  onSpawnedChange?: () => void;
+}
 
-  constructor(definitions: readonly NpcDefinition[]) {
-    this.definitions = definitions;
-    this.actors = definitions.map((definition) => new NpcActor(definition));
+const defaultIdFactory = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
+/** Owns authored NPCs plus mutable, save-backed creative NPC instances. */
+export class NpcSystem {
+  private readonly activeDefinitions: NpcDefinition[] = [];
+  private readonly actors: NpcActor[] = [];
+  private readonly authoredIds = new Set<string>();
+  private readonly spawnedTypes = new Map<string, string>();
+  private readonly idFactory: () => string;
+  private onSpawnedChange: (() => void) | undefined;
+  private addToScene: ((object: Object3D) => void) | undefined;
+
+  constructor(definitions: readonly NpcDefinition[], options: NpcSystemOptions = {}) {
+    this.idFactory = options.idFactory ?? defaultIdFactory;
+    this.onSpawnedChange = options.onSpawnedChange;
+    for (const definition of definitions) {
+      if (this.authoredIds.has(definition.id)) continue;
+      this.authoredIds.add(definition.id);
+      this.addActor(definition);
+    }
+    for (const state of options.spawned ?? []) this.restore(state);
+  }
+
+  get definitions(): readonly NpcDefinition[] {
+    return this.activeDefinitions;
+  }
+
+  setOnSpawnedChange(callback: (() => void) | undefined): void {
+    this.onSpawnedChange = callback;
   }
 
   attach(add: (object: Object3D) => void): void {
+    this.addToScene = add;
     for (const actor of this.actors) actor.attach(add);
   }
 
@@ -52,23 +93,33 @@ export class NpcSystem {
   }
 
   playPose(npcId: string, poseId: string, playback: NpcPosePlayback = {}): boolean {
-    return this.actor(npcId)?.playPose(poseId, playback) ?? false;
+    const changed = this.actor(npcId)?.playPose(poseId, playback) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   cyclePose(npcId: string, direction: 1 | -1 = 1): { id: string; label: string } | undefined {
-    return this.actor(npcId)?.cyclePose(direction);
+    const changed = this.actor(npcId)?.cyclePose(direction);
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   playAnimation(npcId: string, animationId: string, playback: NpcAnimationPlayback = {}): boolean {
-    return this.actor(npcId)?.playAnimation(animationId, playback) ?? false;
+    const changed = this.actor(npcId)?.playAnimation(animationId, playback) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   cycleAnimation(npcId: string, direction: 1 | -1 = 1): { id: string; label: string } | undefined {
-    return this.actor(npcId)?.cycleAnimation(direction);
+    const changed = this.actor(npcId)?.cycleAnimation(direction);
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   stopAnimation(npcId: string, returnTo?: string): boolean {
-    return this.actor(npcId)?.stopAnimation(returnTo) ?? false;
+    const changed = this.actor(npcId)?.stopAnimation(returnTo) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   equipmentState(npcId: string): EquipmentLoadout | undefined {
@@ -76,11 +127,15 @@ export class NpcSystem {
   }
 
   equip(npcId: string, slot: EquipmentSlot, id: EquipmentId): boolean {
-    return this.actor(npcId)?.equip(slot, id) ?? false;
+    const changed = this.actor(npcId)?.equip(slot, id) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   unequip(npcId: string, slot: EquipmentSlot): boolean {
-    return this.actor(npcId)?.unequip(slot) ?? false;
+    const changed = this.actor(npcId)?.unequip(slot) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   jointState(npcId: string): CharacterJointState[] | undefined {
@@ -88,13 +143,16 @@ export class NpcSystem {
   }
 
   setJointTransform(npcId: string, jointId: string, transform: CharacterJointTransform): boolean {
-    return this.actor(npcId)?.setJointTransform(jointId, transform) ?? false;
+    const changed = this.actor(npcId)?.setJointTransform(jointId, transform) ?? false;
+    if (changed) this.notifySpawned(npcId);
+    return changed;
   }
 
   resetJoints(npcId: string): boolean {
     const actor = this.actor(npcId);
     if (!actor) return false;
     actor.resetJoints();
+    this.notifySpawned(npcId);
     return true;
   }
 
@@ -104,6 +162,68 @@ export class NpcSystem {
 
   target(origin: Vec3, direction: Vec3, obstacleDistance = Infinity): NpcDefinition | undefined {
     return findNpcTarget(this.definitions, origin, direction, undefined, obstacleDistance);
+  }
+
+  spawn(type: string, position: Vec3, yaw = 0): NpcDefinition {
+    const entry = npcCatalogEntry(type);
+    if (!entry) throw new Error(`unknown NPC type: ${type}`);
+    if (![position.x, position.y, position.z, yaw].every(Number.isFinite)) {
+      throw new Error('NPC position and rotation must be finite');
+    }
+    const base = `spawned-${entry.type}-${this.cleanIdPart(this.idFactory())}`;
+    let id = base;
+    let suffix = 2;
+    while (this.definition(id)) id = `${base}-${suffix++}`;
+    const definition: NpcDefinition = {
+      ...entry.definition,
+      id,
+      position: { ...position },
+      yaw,
+    };
+    this.spawnedTypes.set(id, entry.type);
+    this.addActor(definition);
+    this.onSpawnedChange?.();
+    return definition;
+  }
+
+  remove(npcId: string): boolean {
+    if (!this.spawnedTypes.has(npcId)) return false;
+    const index = this.activeDefinitions.findIndex(({ id }) => id === npcId);
+    if (index < 0) return false;
+    const [actor] = this.actors.splice(index, 1);
+    this.activeDefinitions.splice(index, 1);
+    this.spawnedTypes.delete(npcId);
+    actor.group.removeFromParent();
+    actor.dispose();
+    this.onSpawnedChange?.();
+    return true;
+  }
+
+  isSpawned(npcId: string): boolean {
+    return this.spawnedTypes.has(npcId);
+  }
+
+  spawnedStates(): SpawnedNpcSave[] {
+    const states: SpawnedNpcSave[] = [];
+    for (const [id, type] of this.spawnedTypes) {
+      const actor = this.actor(id);
+      if (!actor) continue;
+      const pose = actor.poseState();
+      states.push({
+        id,
+        type,
+        position: { ...actor.definition.position },
+        yaw: actor.definition.yaw,
+        ...(pose.pose ? { pose: pose.pose } : {}),
+        ...(pose.animation ? { animation: pose.animation } : {}),
+        equipment: actor.equipmentState(),
+      });
+    }
+    return states;
+  }
+
+  spawnedState(npcId: string): SpawnedNpcSave | undefined {
+    return this.spawnedStates().find(({ id }) => id === npcId);
   }
 
   /**
@@ -149,11 +269,104 @@ export class NpcSystem {
     return false;
   }
 
+  intersectsBox(center: Vec3, half: Vec3, ignoreId?: string): boolean {
+    const box: AABB = [
+      center.x - half.x,
+      center.y - half.y,
+      center.z - half.z,
+      center.x + half.x,
+      center.y + half.y,
+      center.z + half.z,
+    ];
+    for (const npc of this.definitions) {
+      if (npc.id === ignoreId) continue;
+      const other = collisionBox(npc);
+      if (!other) continue;
+      if (
+        box[0] < other[3] &&
+        box[3] > other[0] &&
+        box[1] < other[4] &&
+        box[4] > other[1] &&
+        box[2] < other[5] &&
+        box[5] > other[2]
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   dispose(): void {
-    for (const actor of this.actors) actor.dispose();
+    for (const actor of this.actors) {
+      actor.group.removeFromParent();
+      actor.dispose();
+    }
+    this.actors.length = 0;
+    this.activeDefinitions.length = 0;
+    this.spawnedTypes.clear();
   }
 
   private actor(npcId: string): NpcActor | undefined {
     return this.actors.find((actor) => actor.definition.id === npcId);
+  }
+
+  private definition(npcId: string): NpcDefinition | undefined {
+    return this.activeDefinitions.find(({ id }) => id === npcId);
+  }
+
+  private addActor(definition: NpcDefinition): NpcActor {
+    const actor = new NpcActor(definition);
+    this.activeDefinitions.push(definition);
+    this.actors.push(actor);
+    if (this.addToScene) actor.attach(this.addToScene);
+    return actor;
+  }
+
+  private restore(state: SpawnedNpcSave): void {
+    if (
+      !state ||
+      typeof state.id !== 'string' ||
+      !state.id ||
+      typeof state.type !== 'string' ||
+      this.definition(state.id) ||
+      !state.position ||
+      ![state.position.x, state.position.y, state.position.z, state.yaw].every(Number.isFinite)
+    ) {
+      return;
+    }
+    const entry = npcCatalogEntry(state.type);
+    if (!entry) return;
+    const definition: NpcDefinition = {
+      ...entry.definition,
+      id: state.id,
+      position: { ...state.position },
+      yaw: state.yaw,
+    };
+    this.spawnedTypes.set(state.id, entry.type);
+    const actor = this.addActor(definition);
+    if (state.pose) actor.playPose(state.pose, { transitionSeconds: 0 });
+    if (state.animation) actor.playAnimation(state.animation);
+    if (state.equipment) {
+      const equipment: EquipmentLoadout = {};
+      if (state.equipment.main && isEquipmentId(state.equipment.main)) {
+        equipment.main = state.equipment.main;
+      }
+      if (state.equipment.off && isEquipmentId(state.equipment.off)) {
+        equipment.off = state.equipment.off;
+      }
+      actor.setEquipment(equipment);
+    }
+  }
+
+  private notifySpawned(npcId: string): void {
+    if (this.spawnedTypes.has(npcId)) this.onSpawnedChange?.();
+  }
+
+  private cleanIdPart(value: string): string {
+    const clean = value
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return clean || Date.now().toString(36);
   }
 }
