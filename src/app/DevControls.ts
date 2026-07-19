@@ -52,7 +52,7 @@ import {
   readWorldMeta,
   writeWorldMeta,
 } from '../persistence/ServerWorldCatalog';
-import type { WorldMeta } from '../persistence/SaveTypes';
+import type { SpawnedNpcSave, WorldMeta } from '../persistence/SaveTypes';
 import { mergeMeta, appendLandmark, auditWorldMeta } from './worldMeta';
 import type { WorldPreset } from '../worldgen/Presets';
 import {
@@ -91,6 +91,9 @@ export interface DevControlsContext {
   worldName: string;
   profiler: FrameProfiler;
   roam: RoamDriver;
+  /** Catalog-driven safe NPC creation/removal. Coordinates identify the supporting ground block. */
+  spawnNpc: (type: string, x?: number, y?: number, z?: number, rotation?: number) => SpawnedNpcSave;
+  removeNpc: (id: string) => boolean;
   /** Toggles the headlamp shader glow (session-only; never touches localStorage). */
   headlamp: (on: boolean) => void;
   /** Gets (no arg) or sets the first-person hand mode; session-only, never persisted. */
@@ -463,6 +466,8 @@ export function installDevControls(ctx: DevControlsContext): void {
 
   const api = {
     npc: ctx.npc,
+    spawnNpc: ctx.spawnNpc,
+    removeNpc: ctx.removeNpc,
     playerAnimation: ctx.playerAnimation,
     character: ctx.character,
     equipment: ctx.equipment,

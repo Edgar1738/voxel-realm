@@ -30,6 +30,7 @@ export const DEFAULT_TUNNEL_CONFIG: TunnelConfig = { size: 3, length: 8, path: '
 export const SINGLE_REPEAT_MS = 100; // 10 digs/sec
 export const PLACE_REPEAT_MS = 100; // 10 places/sec
 export const TUNNEL_REPEAT_MS = 250; // 4 tunnel digs/sec — each dig moves many voxels
+export const SPHERE_REPEAT_MS = 250; // 4 sphere digs/sec — each dig moves many voxels
 
 /** Clamps a reach value to the valid range, snapping to the step grid from MIN_REACH. */
 export function clampReach(value: number): number {
@@ -100,6 +101,14 @@ export function saveHoldRepeat(storage: ReachStorage, enabled: boolean): void {
 
 export type Tool = 'single' | 'tunnel' | 'sphere' | 'box-clear' | 'fill' | 'replace';
 export const TOOLS: Tool[] = ['single', 'tunnel', 'sphere', 'box-clear', 'fill', 'replace'];
+
+/** Repeat cadence for direct LMB dig tools; selection tools intentionally return undefined. */
+export function digRepeatInterval(tool: Tool): number | undefined {
+  if (tool === 'single') return SINGLE_REPEAT_MS;
+  if (tool === 'tunnel') return TUNNEL_REPEAT_MS;
+  if (tool === 'sphere') return SPHERE_REPEAT_MS;
+  return undefined;
+}
 
 /**
  * Block-edits gate. Edits are blocked while the inventory modal is open even if pointer
@@ -227,6 +236,12 @@ export interface InputCallbacks {
   onCycleNpcPose: (direction: 1 | -1) => void;
   /** Invoked by O / Shift+O to cycle looping animations on the aimed NPC. */
   onCycleNpcAnimation: (direction: 1 | -1) => void;
+  /** Creative NPC placement owns LMB/RMB, wheel, Q/E, Delete, and Escape while active. */
+  getNpcPlacementActive: () => boolean;
+  onNpcPlacementRotate: (direction: 1 | -1) => void;
+  onNpcPlacementCancel: () => void;
+  onNpcPlacementPlace: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
+  onNpcPlacementRemove: () => void;
   /** Invoked after a Shift+wheel reach change, with the new reach value. */
   onReachChange: (reach: number) => void;
 }
@@ -323,6 +338,23 @@ export function registerInputListeners(ctx: InputContext): () => void {
         return;
       }
 
+      if (callbacks.getNpcPlacementActive()) {
+        if (e.code === 'KeyQ' || e.code === 'KeyE') {
+          e.preventDefault();
+          callbacks.onNpcPlacementRotate(e.code === 'KeyQ' ? -1 : 1);
+          return;
+        }
+        if (e.code === 'Delete' || e.code === 'Backspace') {
+          e.preventDefault();
+          callbacks.onNpcPlacementRemove();
+          return;
+        }
+        if (e.code === 'Escape') {
+          callbacks.onNpcPlacementCancel();
+          return;
+        }
+      }
+
       // Inventory / tool shortcuts
       const n = Number(e.key);
       if (n >= 1 && n <= inventory.hotbar.length) {
@@ -393,7 +425,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
   );
 
   // ---- Hold-to-repeat engine ----
-  // Holding LMB (Single/Tunnel) or RMB (place) re-fires at a capped, action-specific rate.
+  // Holding LMB (Single/Tunnel/Sphere) or RMB (place) re-fires at a capped, action-specific rate.
   // A held stroke groups its edits into one undo batch via EditService.beginGroup/endGroup,
   // and targets are deduped so holding still never re-edits the same voxel.
   let repeatTimer: number | undefined;
@@ -426,10 +458,15 @@ export function registerInputListeners(ctx: InputContext): () => void {
     );
   };
 
-  /** Digs with the active primary tool (single break or configured tunnel). */
+  /** Digs with the active direct tool (single break, configured tunnel, or sphere). */
   const performDig = (hit: VoxelRaycastHit): void => {
-    if (callbacks.getTool() === 'single') {
+    const tool = callbacks.getTool();
+    if (tool === 'single') {
       callbacks.onRun([{ ...hit.block, id: AIR }], 'Broke');
+      return;
+    }
+    if (tool === 'sphere') {
+      callbacks.onRun(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');
       return;
     }
     const dir = { x: -hit.normal.x, y: -hit.normal.y, z: -hit.normal.z };
@@ -478,7 +515,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
       return;
     }
     const tool = callbacks.getTool();
-    if (repeatButton === 0 && tool !== 'single' && tool !== 'tunnel') {
+    if (repeatButton === 0 && digRepeatInterval(tool) === undefined) {
       stopRepeat();
       return;
     }
@@ -527,6 +564,14 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (rig.photoMode) return; // photo mode owns the wheel (fly-speed control)
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+      if (callbacks.getNpcPlacementActive()) {
+        const direction = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
+        if (direction !== 0) {
+          e.preventDefault();
+          callbacks.onNpcPlacementRotate(direction);
+        }
+        return;
+      }
       if (e.shiftKey) {
         const delta = reachWheelDelta(e.deltaY);
         if (delta === 0) return;
@@ -539,7 +584,7 @@ export function registerInputListeners(ctx: InputContext): () => void {
       inventory.cycleSlot(delta);
       callbacks.onHotbarRender();
     },
-    { signal, passive: true },
+    { signal, passive: false },
   );
 
   // Mouse editing (placed on document so it fires while pointer is locked).
@@ -550,8 +595,18 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (rig.photoMode) return; // defense in depth; CameraRig already swallows canvas clicks
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+      if (callbacks.getNpcPlacementActive() && e.button === 2) {
+        stopRepeat();
+        callbacks.onNpcPlacementCancel();
+        return;
+      }
       const hit = raycastHit();
       if (!hit) return;
+
+      if (callbacks.getNpcPlacementActive()) {
+        if (e.button === 0) callbacks.onNpcPlacementPlace(hit);
+        return;
+      }
 
       if (callbacks.getBuildMode() !== 'off') {
         if (e.button === 0) callbacks.onBuilderClick(hit);
@@ -576,14 +631,13 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (e.button !== 0) return;
 
       const tool = callbacks.getTool();
-      if (tool === 'single' || tool === 'tunnel') {
+      const repeatInterval = digRepeatInterval(tool);
+      if (repeatInterval !== undefined) {
         if (getHoldRepeat()) {
-          startRepeat(0, tool === 'single' ? SINGLE_REPEAT_MS : TUNNEL_REPEAT_MS);
+          startRepeat(0, repeatInterval);
           lastTargetKey = targetKey(hit.block);
         }
         performDig(hit);
-      } else if (tool === 'sphere') {
-        callbacks.onRun(asAir(sphereVoxels(hit.block, SPHERE_RADIUS)), 'Dug');
       } else {
         handleSelection(hit.block, inventory.selectedBlock, tool, manager, registry, callbacks);
       }

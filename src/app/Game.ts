@@ -51,7 +51,7 @@ import { CURRENT_WORLDGEN_VERSION, resolveWorldgenVersion } from '../worldgen/wo
 import { GreedyMesher } from '../mesh/GreedyMesher';
 import { BlockRegistry } from '../blocks/BlockRegistry';
 import { PlayerController, PLAYER_HALF } from '../player/PlayerController';
-import type { SoliditySampler } from '../player/Collision';
+import { overlapsSolid, type SoliditySampler } from '../player/Collision';
 import { EditService } from '../edit/EditService';
 import { CreativeInventory } from './CreativeInventory';
 import { loadHotbar, saveHotbar } from './hotbarPrefs';
@@ -65,7 +65,12 @@ import { BootStats, type BootReport } from './bootStats';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
 import type { SaveStore } from '../persistence/SaveStore';
-import { SAVE_VERSION, type WorldDeltas } from '../persistence/SaveTypes';
+import {
+  SAVE_VERSION,
+  type SpawnedNpcSave,
+  type WorldDeltas,
+  type WorldMeta,
+} from '../persistence/SaveTypes';
 import { worldToChunkCoord } from '../core/coords';
 import {
   FRAME_WORK_MS,
@@ -142,6 +147,7 @@ import type { BuilderIntent } from './builderInput';
 import { dominantHorizontalAxis, nudgeDelta } from './builderInput';
 import { SelectionBox } from '../render/SelectionBox';
 import { PasteGhost } from '../render/PasteGhost';
+import { NpcPlacementGhost } from '../render/NpcPlacementGhost';
 import { TourMarker } from '../render/TourMarker';
 import { BlockParticles, particleColorOf } from '../render/BlockParticles';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -164,7 +170,13 @@ import {
 } from './BlueprintStore';
 import { CURATED_BLUEPRINTS, curatedCategory } from './curatedBlueprints';
 import { NpcSystem } from '../npc/NpcSystem';
-import { npcDefinitionsForPreset } from '../npc/NpcCatalog';
+import { npcCatalogEntries, npcCatalogEntry, npcDefinitionsForPreset } from '../npc/NpcCatalog';
+import {
+  boxesOverlap,
+  NpcPlacementState,
+  resolveNpcPlacement,
+  type NpcPlacementCandidate,
+} from '../npc/NpcPlacement';
 import { NPC_INTERACTION_RANGE } from '../npc/NpcTargeting';
 import { resolveNpcDialogue } from '../npc/NpcDialogue';
 import {
@@ -268,6 +280,7 @@ export class Game {
       generatedMeta,
       bootSave.discardedIncompatible,
     );
+    let liveMeta: WorldMeta = { ...(activeMeta ?? generatedMeta) };
     const curatedTitle = activeMeta?.title?.trim();
     if (curatedTitle) document.title = `${curatedTitle} — Voxel Realm`;
 
@@ -360,7 +373,9 @@ export class Game {
       spawnState.spawn,
       spawnState.flying ?? preset !== 'sunmeadow-trials',
     );
-    const npcSystem = new NpcSystem(npcDefinitionsForPreset(preset));
+    const npcSystem = new NpcSystem(npcDefinitionsForPreset(preset), {
+      ...(liveMeta.spawnedNpcs ? { spawned: liveMeta.spawnedNpcs } : {}),
+    });
     npcSystem.attach((object) => renderer.add(object));
     const sampler: SoliditySampler & {
       isWater(x: number, y: number, z: number): boolean;
@@ -410,6 +425,8 @@ export class Game {
     let underwaterFactor = 0;
     let animTime = 0;
     let tool: Tool = 'single';
+    const npcPlacement = new NpcPlacementState();
+    let npcCandidate: NpcPlacementCandidate | undefined;
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
     let tunnelConfig: TunnelConfig = { ...DEFAULT_TUNNEL_CONFIG };
     let playerSkinId = resolvePlayerSkin().id;
@@ -583,7 +600,29 @@ export class Game {
     const setStatus = (text: string): void => {
       ui.setStatus(text);
     };
+    let npcMetaWrite: Promise<void> = Promise.resolve();
+    const persistSpawnedNpcs = (): void => {
+      npcMetaWrite = npcMetaWrite
+        .catch(() => undefined)
+        .then(async () => {
+          // Merge with the latest durable meta so a dev setMeta call made after boot is not lost.
+          const stored = await store.loadMeta().catch(() => undefined);
+          const states = npcSystem.spawnedStates();
+          liveMeta = { ...(stored ?? liveMeta), spawnedNpcs: states };
+          await store.saveMeta(liveMeta);
+        })
+        .catch((err) => {
+          console.error('Voxel Realm: NPC save failed', err);
+          setStatus('NPC save failed');
+        });
+    };
+    npcSystem.setOnSpawnedChange(persistSpawnedNpcs);
+
     const setTool = (next: Tool): void => {
+      if (npcPlacement.cancel()) {
+        npcCandidate = undefined;
+        ui.setNpcPlacementHud(undefined);
+      }
       tool = next;
       anchorVoxel = undefined;
       ui.setActiveTool(next);
@@ -727,6 +766,9 @@ export class Game {
         try {
           await persistence.suppressAndClear();
           await store.clearDeltas();
+          await npcMetaWrite.catch(() => undefined);
+          liveMeta = { ...liveMeta, spawnedNpcs: [] };
+          await store.saveMeta(liveMeta);
           clearResume(localStorage, worldName); // don't resume into a world that no longer exists
           clearWaypoint(localStorage, worldName); // and don't point at a landmark that's now gone
           clearNpcProgress(localStorage, worldName);
@@ -789,6 +831,84 @@ export class Game {
     targetOverlay.attach((o) => renderer.add(o));
     const previewSampler = {
       getBlock: (x: number, y: number, z: number) => manager.getBlock(x, y, z),
+    };
+
+    const npcGhost = new NpcPlacementGhost();
+    npcGhost.attach((o) => renderer.add(o));
+    const terrainCollisionSampler: SoliditySampler = {
+      collisionBoxes: (x, y, z) => manager.collisionBoxesAt(x, y, z),
+    };
+    const npcPlacementChecks = {
+      isLoaded: (x: number, z: number) => manager.isLoaded(x, z),
+      supportTopAt: (x: number, y: number, z: number): number | undefined => {
+        let top: number | undefined;
+        for (const box of manager.collisionBoxesAt(x, y, z)) {
+          // Full/slab/stair surfaces are walkable; narrow fences, walls, and posts are not.
+          if (box[3] - box[0] < 0.5 || box[5] - box[2] < 0.5) continue;
+          if (top === undefined || box[4] > top) top = box[4];
+        }
+        return top;
+      },
+      bodyClear: (position: Vec3, half: Vec3) =>
+        !overlapsSolid(terrainCollisionSampler, position, half),
+      playerClear: (position: Vec3, half: Vec3) =>
+        !boxesOverlap(position, half, player.position, PLAYER_HALF),
+      npcClear: (position: Vec3, half: Vec3) => !npcSystem.intersectsBox(position, half),
+    };
+
+    const placementCandidateFor = (
+      hit: import('../edit/VoxelRaycast').VoxelRaycastHit,
+      type: string,
+      yaw: number,
+    ): NpcPlacementCandidate | undefined => {
+      const entry = npcCatalogEntry(type);
+      return entry
+        ? resolveNpcPlacement(hit, entry.definition, yaw, npcPlacementChecks)
+        : undefined;
+    };
+
+    const selectNpcForPlacement = (type: string): boolean => {
+      const entry = npcCatalogEntry(type);
+      if (!entry) return false;
+      if (builder.mode !== 'off') builder.toggleMode();
+      anchorVoxel = undefined;
+      npcPlacement.select(entry.type, entry.definition.name);
+      npcCandidate = undefined;
+      npcGhost.setDefinition(entry.type, entry.definition);
+      ui.setNpcPlacementHud({ name: entry.definition.name, yaw: 0 });
+      setStatus(`${entry.definition.name} selected — aim at ground and left-click to place`);
+      return true;
+    };
+
+    const cancelNpcPlacement = (message = 'NPC placement cancelled'): void => {
+      if (!npcPlacement.cancel()) return;
+      npcCandidate = undefined;
+      npcGhost.update(undefined, false);
+      ui.setNpcPlacementHud(undefined);
+      setStatus(message);
+    };
+
+    const rotateNpcPlacement = (direction: 1 | -1): void => {
+      const selection = npcPlacement.rotate(direction);
+      if (!selection) return;
+      ui.setNpcPlacementHud({
+        name: selection.name,
+        yaw: selection.yaw,
+        ...(npcCandidate ? { valid: npcCandidate.valid, reason: npcCandidate.reason } : {}),
+      });
+    };
+
+    const placeSelectedNpc = (hit: import('../edit/VoxelRaycast').VoxelRaycastHit): void => {
+      const selection = npcPlacement.selection;
+      if (!selection) return;
+      const candidate = placementCandidateFor(hit, selection.type, selection.yaw);
+      if (!candidate?.valid) {
+        setStatus(candidate?.reason ?? 'No valid NPC placement here');
+        return;
+      }
+      const spawned = npcSystem.spawn(selection.type, candidate.position, candidate.yaw);
+      heldBlock.punch();
+      setStatus(`Spawned ${spawned.name} (${spawned.id})`);
     };
 
     const builder = new BuilderState();
@@ -880,10 +1000,18 @@ export class Game {
     };
     ui.blueprintButton.addEventListener('click', () => void openBlueprints());
 
+    const openNpcPalette = async (): Promise<void> => {
+      if (experience !== 'build') return void setStatus('Switch to Build mode to place NPCs');
+      const type = await ui.showNpcDialog(npcCatalogEntries());
+      if (type) selectNpcForPlacement(type);
+    };
+    ui.npcButton.addEventListener('click', () => void openNpcPalette());
+
     const applyExperience = (mode: ExperienceMode): void => {
       experience = mode;
       heldBlock.setDisplayMode(mode);
       if (mode === 'play') {
+        cancelNpcPlacement();
         ui.setInventoryOpen(false);
         if (builder.mode !== 'off') builder.toggleMode(); // leave build tools; keep clipboard
         anchorVoxel = undefined;
@@ -1141,7 +1269,11 @@ export class Game {
             void (async () => {
               // Fresh meta (dev setMeta can change it after boot) + the live delta map, so
               // the export never waits on (or races) the debounced persistence flush.
-              const meta = (await store.loadMeta().catch(() => undefined)) ?? activeMeta;
+              const stored = await store.loadMeta().catch(() => undefined);
+              const meta = {
+                ...(stored ?? liveMeta),
+                spawnedNpcs: npcSystem.spawnedStates(),
+              };
               const json = exportWorldJson(meta, manager.allDeltas());
               const blob = new Blob([json], { type: 'application/json' });
               const link = document.createElement('a');
@@ -1173,6 +1305,8 @@ export class Game {
       'pointerlockchange',
       () => {
         if (document.pointerLockElement === canvas) return;
+        // Escape cancels active NPC placement before it opens the pause menu.
+        if (npcPlacement.selection) return void cancelNpcPlacement();
         // The map intentionally releases the lock so its canvas is clickable — that isn't a pause.
         if (pauseBusy || ui.isInventoryOpen() || ui.isDialogOpen() || worldMap.isOpen()) return;
         void openPauseMenu();
@@ -1232,6 +1366,15 @@ export class Game {
           )
         : Infinity;
       return npcSystem.target(origin, dir, obstacleDistance);
+    };
+
+    const removeAimedSpawnedNpc = (): void => {
+      const npc = aimedNpc();
+      if (!npc) return void setStatus('Aim at a spawned NPC to remove it');
+      if (!npcSystem.isSpawned(npc.id)) {
+        return void setStatus(`${npc.name} is authored into this world and cannot be removed here`);
+      }
+      if (npcSystem.remove(npc.id)) setStatus(`Removed ${npc.name} (${npc.id})`);
     };
 
     const npcDialogueContext = (): NpcDialogueContext => ({
@@ -1367,6 +1510,39 @@ export class Game {
       return raycastVoxels(previewSampler, origin, dir, getReach());
     };
 
+    const spawnNpcFromDev = (
+      type: string,
+      x?: number,
+      y?: number,
+      z?: number,
+      rotation = 0,
+    ): SpawnedNpcSave => {
+      let hit = builderAim();
+      if (x !== undefined || y !== undefined || z !== undefined) {
+        if (x === undefined || z === undefined) {
+          throw new Error('spawnNpc coordinates require x and z (y may be omitted)');
+        }
+        const bx = Math.floor(x);
+        const bz = Math.floor(z);
+        const surface = y === undefined ? manager.surfaceAt(bx, bz) : undefined;
+        const by = y === undefined ? surface?.y : Math.floor(y);
+        if (by === undefined) throw new Error('no loaded ground at those coordinates');
+        hit = {
+          block: { x: bx, y: by, z: bz },
+          adjacent: { x: bx, y: by + 1, z: bz },
+          normal: { x: 0, y: 1, z: 0 },
+          point: { x, y: by + 1, z },
+          id: manager.getBlock(bx, by, bz),
+        };
+      }
+      if (!hit) throw new Error('aim at walkable ground or provide coordinates');
+      const candidate = placementCandidateFor(hit, type, rotation);
+      if (!candidate) throw new Error(`unknown NPC type: ${type}`);
+      if (!candidate.valid) throw new Error(candidate.reason ?? 'invalid NPC placement');
+      const spawned = npcSystem.spawn(type, candidate.position, candidate.yaw);
+      return npcSystem.spawnedState(spawned.id)!;
+    };
+
     /** Paste origin (min corner) = the aim-adjacent empty cell, shifted by the dialed-in nudge. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
       const aim = builderAim();
@@ -1385,6 +1561,7 @@ export class Game {
     };
 
     const handleBuilderIntent = (intent: BuilderIntent): void => {
+      if (npcPlacement.selection) cancelNpcPlacement();
       const box = builder.selectionBox();
       switch (intent) {
         case 'toggleMode':
@@ -1545,6 +1722,11 @@ export class Game {
           npcSystem.intersectsVoxel(x, y, z),
         getBuildMode: () => builder.mode,
         getExperienceMode: () => experience,
+        getNpcPlacementActive: () => npcPlacement.selection !== undefined,
+        onNpcPlacementRotate: rotateNpcPlacement,
+        onNpcPlacementCancel: () => cancelNpcPlacement(),
+        onNpcPlacementPlace: placeSelectedNpc,
+        onNpcPlacementRemove: removeAimedSpawnedNpc,
         onEnterBuild: () => {
           applyExperience('build');
           setStatus('Build mode — I inventory, T tools, B build tools');
@@ -1925,7 +2107,28 @@ export class Game {
       if (import.meta.env.DEV) {
         devProfiler?.push({ frameMs: cdt * 1000, ...manager.lastFrameStats });
       }
-      if (builder.mode !== 'off' && rig.locked && !rig.photoMode && !ui.isInventoryOpen()) {
+      const editPreviewOn =
+        rig.locked && !rig.photoMode && !ui.isInventoryOpen() && experience === 'build';
+      const npcSelection = npcPlacement.selection;
+      if (npcSelection && editPreviewOn) {
+        selectionBox.update(undefined, false);
+        pasteGhost.update(undefined, undefined, false);
+        targetOverlay.update(undefined, false);
+        const aimHere = aimRay();
+        const hit = raycastVoxels(previewSampler, aimHere.origin, aimHere.dir, getReach());
+        npcCandidate = hit
+          ? placementCandidateFor(hit, npcSelection.type, npcSelection.yaw)
+          : undefined;
+        npcGhost.update(npcCandidate, true);
+        ui.setNpcPlacementHud({
+          name: npcSelection.name,
+          yaw: npcSelection.yaw,
+          valid: npcCandidate?.valid ?? false,
+          reason: npcCandidate?.reason ?? 'Aim at walkable ground',
+        });
+      } else if (builder.mode !== 'off' && editPreviewOn) {
+        npcGhost.update(undefined, false);
+        npcCandidate = undefined;
         targetOverlay.update(undefined, false);
         selectionBox.update(builder.selectionBox(), true);
         if (builder.mode === 'pasting') {
@@ -1939,12 +2142,12 @@ export class Game {
           pasteGhost.update(undefined, undefined, false);
         }
       } else {
+        npcGhost.update(undefined, false);
+        npcCandidate = undefined;
         selectionBox.update(undefined, false);
         pasteGhost.update(undefined, undefined, false);
         // Play mode: no targeting outline/ghost — the world reads as scenery, not edit targets.
-        const previewOn =
-          rig.locked && !rig.photoMode && !ui.isInventoryOpen() && experience === 'build';
-        if (previewOn) {
+        if (editPreviewOn && !npcSelection) {
           const aimHere = aimRay();
           const previewHit = raycastVoxels(previewSampler, aimHere.origin, aimHere.dir, getReach());
           targetOverlay.update(
@@ -1959,6 +2162,7 @@ export class Game {
         }
       }
       const npcPromptOn =
+        !npcPlacement.selection &&
         rig.locked &&
         !rig.photoMode &&
         !ui.isInventoryOpen() &&
@@ -2007,6 +2211,8 @@ export class Game {
         worldName,
         profiler,
         roam,
+        spawnNpc: spawnNpcFromDev,
+        removeNpc: (id: string) => npcSystem.remove(id),
         headlamp: (on: boolean) => setHeadlamp(on, false),
         hand: (mode?: string) => {
           if (mode !== undefined) applyHandMode(mode, false);
@@ -2216,6 +2422,7 @@ export class Game {
       hudTeardown?.();
       celestial.dispose();
       avatar.dispose();
+      npcGhost.dispose();
       npcSystem.dispose();
       weather.dispose();
       ambientLife.dispose();
