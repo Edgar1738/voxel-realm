@@ -93,8 +93,8 @@ describe('world presets', () => {
     expect(c.get(0, SEA_LEVEL, 0)).toBe(COBBLESTONE);
   });
 
-  it('default: has the oak, cactus, and decoration overlays', () => {
-    expect(createGenerator('default').overlays).toHaveLength(3);
+  it('default: has the oak, cactus, decoration, and fountain overlays', () => {
+    expect(createGenerator('default').overlays).toHaveLength(4);
   });
 
   it('isWorldPreset guards unknown values', () => {
@@ -110,7 +110,7 @@ describe('world presets', () => {
     expect(isWorldPreset('amplified')).toBe(true);
     const { generator, overlays } = createGenerator('amplified');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays).toHaveLength(1); // trees on the mountains
+    expect(overlays).toHaveLength(2); // trees on the mountains + fairy fountains
 
     const { surfaces } = sampleColumns('amplified');
     const maxSurface = Math.max(...surfaces);
@@ -152,7 +152,7 @@ describe('world presets', () => {
     expect(isWorldPreset('caverns')).toBe(true);
     const { generator, overlays } = createGenerator('caverns');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays).toHaveLength(2); // oaks + cacti
+    expect(overlays).toHaveLength(3); // oaks + cacti + fairy fountains
 
     // Must not throw and must return a ChunkData with some non-air content
     const c = generator.generateBaseChunk(SEED, 0, 0);
@@ -225,8 +225,8 @@ describe('frontier preset', () => {
 });
 
 describe('villages preset oaks', () => {
-  it('wires three overlays: oaks, buildings, decorations', () => {
-    expect(createGenerator('villages').overlays).toHaveLength(3);
+  it('wires four overlays: oaks, buildings, decorations, fountains', () => {
+    expect(createGenerator('villages').overlays).toHaveLength(4);
   });
 
   it('grows prefab oaks rooted on grass, none in desert, with cross-chunk canopies', () => {

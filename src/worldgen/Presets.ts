@@ -23,6 +23,7 @@ import { cloudspireSite } from './cloudspireSite';
 import { sunmeadowSite } from './sunmeadowSite';
 import { createStonehavenGenerator, stonehavenForests } from './StonehavenGenerator';
 import { stonehavenSite } from './stonehavenSite';
+import { scatterFairyFountains } from './fairyFountainPrefabs';
 import {
   cottage,
   well,
@@ -233,7 +234,7 @@ export function createGenerator(preset: WorldPreset): {
     case 'amplified':
       return {
         generator: new HeightGenerator(amplifiedHeight, SEA_LEVEL),
-        overlays: [scatterOaks(amplifiedHeight, SEA_LEVEL)],
+        overlays: [scatterOaks(amplifiedHeight, SEA_LEVEL), scatterFairyFountains(amplifiedHeight)],
       };
     case 'islands':
       return { generator: new HeightGenerator(islandsHeight, SEA_LEVEL), overlays: [] };
@@ -251,6 +252,7 @@ export function createGenerator(preset: WorldPreset): {
             minSurfaceY: SEA_LEVEL + 8, // ruins crown the plateaus, not the ravine floors
             surfaceAt: canyonHeight,
           }),
+          scatterFairyFountains(canyonHeight),
         ],
       };
     case 'villages':
@@ -270,6 +272,7 @@ export function createGenerator(preset: WorldPreset): {
             surfaceAt: plainsHeight,
           }),
           scatterDecorations(),
+          scatterFairyFountains(plainsHeight),
         ],
       };
     case 'frontier':
@@ -287,6 +290,7 @@ export function createGenerator(preset: WorldPreset): {
             surfaceAt: plainsHeight,
           }),
           scatterDecorations(),
+          scatterFairyFountains(plainsHeight),
         ],
       };
     case 'caverns':
@@ -295,6 +299,7 @@ export function createGenerator(preset: WorldPreset): {
         overlays: [
           scatterForest(layeredSurfaceAt, SEA_LEVEL),
           scatterCacti(layeredSurfaceAt, SEA_LEVEL),
+          scatterFairyFountains(layeredSurfaceAt),
         ],
       };
     case 'citadel':
@@ -416,6 +421,7 @@ export function createGenerator(preset: WorldPreset): {
           scatterForest(layeredSurfaceAt, SEA_LEVEL),
           scatterCacti(layeredSurfaceAt, SEA_LEVEL),
           scatterDecorations(),
+          scatterFairyFountains(layeredSurfaceAt),
         ],
       };
   }
