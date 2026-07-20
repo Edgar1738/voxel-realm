@@ -13,6 +13,9 @@ import {
   GLOWSTONE,
   STAIRS_STONE,
   GRAVEL,
+  AGED_MASONRY,
+  BASALT,
+  MOSSY_COBBLE,
   BLOCK_DEFS,
 } from '../src/blocks/blocks';
 import {
@@ -152,7 +155,7 @@ describe('grand-keep structure stamps', () => {
 
   it('has walkable courtyard paving south of the keep', () => {
     const id = at(CX, G, KZ0 - 10);
-    expect([STONE, COBBLESTONE].includes(id as 3 | 12)).toBe(true);
+    expect([STONE, COBBLESTONE, AGED_MASONRY, BASALT].includes(id)).toBe(true);
   });
 
   it('has a hollow Great Hall interior', () => {
@@ -217,7 +220,9 @@ describe('grand-keep structure stamps', () => {
 
   it('has approach road south of the gate', () => {
     const id = at(CX, G, Z0 - 30);
-    expect([STONE, COBBLESTONE].includes(id as 3 | 12) || id === 26 /* gravel */).toBe(true);
+    expect([STONE, COBBLESTONE, AGED_MASONRY, BASALT, MOSSY_COBBLE, GRAVEL].includes(id)).toBe(
+      true,
+    );
   });
 
   it('has M2 courtyard wayfinding (fountain / banners area lit)', () => {

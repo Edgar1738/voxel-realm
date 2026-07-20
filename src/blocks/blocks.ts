@@ -58,6 +58,36 @@ export const STAIRS_SLATE: BlockId = 46;
 export const CYAN_GLASS: BlockId = 47;
 /** Limited gold / luminous trim for spire and altar accents. */
 export const GOLD_TRIM: BlockId = 48;
+// Material-family expansion. These IDs are intentionally append-only: shipped saves persist the
+// byte value directly, so never reorder or reuse them.
+export const WARM_STONE: BlockId = 49;
+export const BLUE_STONE: BlockId = 50;
+export const GRANITE: BlockId = 51;
+export const BASALT: BlockId = 52;
+export const SANDSTONE: BlockId = 53;
+export const AGED_MASONRY: BlockId = 54;
+export const WARM_MASONRY: BlockId = 55;
+export const MOSSY_COBBLE: BlockId = 56;
+export const CLAY_ROOF: BlockId = 57;
+export const GREEN_SLATE: BlockId = 58;
+export const BROWN_SLATE: BlockId = 59;
+export const RED_DIRT: BlockId = 60;
+export const DARK_LOAM: BlockId = 61;
+export const OCHRE_EARTH: BlockId = 62;
+export const SCREE: BlockId = 63;
+export const DIRTY_SNOW: BlockId = 64;
+export const BLUE_ICE: BlockId = 65;
+export const WARM_MASONRY_SLAB: BlockId = 66;
+export const STAIRS_WARM_MASONRY: BlockId = 67;
+export const WARM_MASONRY_WALL: BlockId = 68;
+export const SANDSTONE_SLAB: BlockId = 69;
+export const STAIRS_SANDSTONE: BlockId = 70;
+export const SANDSTONE_WALL: BlockId = 71;
+export const BASALT_SLAB: BlockId = 72;
+export const STAIRS_BASALT: BlockId = 73;
+export const BASALT_WALL: BlockId = 74;
+export const CLAY_ROOF_SLAB: BlockId = 75;
+export const STAIRS_CLAY_ROOF: BlockId = 76;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -596,6 +626,295 @@ export const BLOCK_DEFS: BlockDef[] = [
     faces: {
       pattern: 'glow',
       colors: [[235, 200, 90]],
+    },
+  },
+  {
+    id: WARM_STONE,
+    name: 'warm stone',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([137, 124, 112]),
+  },
+  {
+    id: BLUE_STONE,
+    name: 'blue stone',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([105, 118, 132]),
+  },
+  {
+    id: GRANITE,
+    name: 'granite',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([151, 139, 136]),
+  },
+  {
+    id: BASALT,
+    name: 'basalt',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([55, 61, 64]),
+  },
+  {
+    id: SANDSTONE,
+    name: 'sandstone',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([194, 166, 112]),
+  },
+  {
+    id: AGED_MASONRY,
+    name: 'aged masonry',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [112, 116, 113],
+        [151, 148, 137],
+      ],
+    },
+  },
+  {
+    id: WARM_MASONRY,
+    name: 'warm masonry',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 130, 108],
+        [194, 177, 150],
+      ],
+    },
+  },
+  {
+    id: MOSSY_COBBLE,
+    name: 'mossy cobble',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'cobble',
+      colors: [
+        [103, 112, 91],
+        [61, 70, 57],
+      ],
+    },
+  },
+  {
+    id: CLAY_ROOF,
+    name: 'clay roof',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 67, 48],
+        [100, 48, 39],
+      ],
+    },
+  },
+  {
+    id: GREEN_SLATE,
+    name: 'green slate',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([55, 78, 70]),
+  },
+  {
+    id: BROWN_SLATE,
+    name: 'brown slate',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: stone([79, 64, 58]),
+  },
+  {
+    id: RED_DIRT,
+    name: 'red dirt',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: { pattern: 'dirt', colors: [[145, 79, 58]] },
+  },
+  {
+    id: DARK_LOAM,
+    name: 'dark loam',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: { pattern: 'dirt', colors: [[75, 61, 48]] },
+  },
+  {
+    id: OCHRE_EARTH,
+    name: 'ochre earth',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: { pattern: 'dirt', colors: [[174, 126, 60]] },
+  },
+  {
+    id: SCREE,
+    name: 'scree',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: { pattern: 'gravel', colors: [[103, 108, 112]] },
+  },
+  {
+    id: DIRTY_SNOW,
+    name: 'dirty snow',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([196, 199, 192], 9),
+  },
+  {
+    id: BLUE_ICE,
+    name: 'blue ice',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([146, 190, 211], 7),
+  },
+  {
+    id: WARM_MASONRY_SLAB,
+    name: 'warm masonry slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 130, 108],
+        [194, 177, 150],
+      ],
+    },
+  },
+  {
+    id: STAIRS_WARM_MASONRY,
+    name: 'warm masonry stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 130, 108],
+        [194, 177, 150],
+      ],
+    },
+  },
+  {
+    id: WARM_MASONRY_WALL,
+    name: 'warm masonry wall',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'wall',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 130, 108],
+        [194, 177, 150],
+      ],
+    },
+  },
+  {
+    id: SANDSTONE_SLAB,
+    name: 'sandstone slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: stone([194, 166, 112]),
+  },
+  {
+    id: STAIRS_SANDSTONE,
+    name: 'sandstone stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: stone([194, 166, 112]),
+  },
+  {
+    id: SANDSTONE_WALL,
+    name: 'sandstone wall',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'wall',
+    faces: stone([194, 166, 112]),
+  },
+  {
+    id: BASALT_SLAB,
+    name: 'basalt slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: stone([55, 61, 64]),
+  },
+  {
+    id: STAIRS_BASALT,
+    name: 'basalt stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: stone([55, 61, 64]),
+  },
+  {
+    id: BASALT_WALL,
+    name: 'basalt wall',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'wall',
+    faces: stone([55, 61, 64]),
+  },
+  {
+    id: CLAY_ROOF_SLAB,
+    name: 'clay roof slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 67, 48],
+        [100, 48, 39],
+      ],
+    },
+  },
+  {
+    id: STAIRS_CLAY_ROOF,
+    name: 'clay roof stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: {
+      pattern: 'brick',
+      colors: [
+        [151, 67, 48],
+        [100, 48, 39],
+      ],
     },
   },
 ];

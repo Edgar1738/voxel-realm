@@ -1,4 +1,4 @@
-import { CREATIVE_BLOCKS, type CreativeInventory } from './CreativeInventory';
+import { CREATIVE_BLOCKS, creativeGroupFor, type CreativeInventory } from './CreativeInventory';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
@@ -593,7 +593,18 @@ export function createCreativeUi(
 
   const picker = document.createElement('div');
   picker.className = 'inventory-grid';
-  for (const id of CREATIVE_BLOCKS) {
+  let previousGroup = '';
+  for (const id of [...CREATIVE_BLOCKS].sort((a, b) =>
+    creativeGroupFor(a).localeCompare(creativeGroupFor(b)),
+  )) {
+    const group = creativeGroupFor(id);
+    if (group !== previousGroup) {
+      const heading = document.createElement('h3');
+      heading.className = 'inventory-group-title';
+      heading.textContent = group;
+      picker.append(heading);
+      previousGroup = group;
+    }
     const tile = document.createElement('button');
     tile.type = 'button';
     tile.className = 'inventory-tile';

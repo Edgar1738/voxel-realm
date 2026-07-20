@@ -1,11 +1,8 @@
 import {
   AIR,
-  COBBLESTONE,
-  STONE,
   BRICK,
   PLANKS,
   GLASS,
-  GRAVEL,
   LANTERN,
   GLOWSTONE,
   OAK_FENCE,
@@ -40,6 +37,13 @@ import {
   MOAT_OUT,
 } from './grandKeepFrame';
 import { battlements, hollowTower, stairFlightZ } from './grandKeepPrimitives';
+import { CASTLE_PALETTES } from './MaterialPalettes';
+
+// Geometry consumes semantic material roles; switching themes no longer requires rewriting it.
+const KEEP_PALETTE = CASTLE_PALETTES.highlandKeep;
+const STONE = KEEP_PALETTE.primary;
+const COBBLESTONE = KEEP_PALETTE.foundation;
+const GRAVEL = KEEP_PALETTE.weathered;
 
 // ── Approach road + moat ───────────────────────────────────────────────────────────────────
 

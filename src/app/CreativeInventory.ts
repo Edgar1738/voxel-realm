@@ -4,6 +4,21 @@ import type { BlockId } from '../core/types';
 /** The blocks offered in the creative picker — derived from the `creative` flag in BLOCK_DEFS. */
 export const CREATIVE_BLOCKS: BlockId[] = BLOCK_DEFS.filter((d) => d.creative).map((d) => d.id);
 
+export type CreativeGroup = 'Terrain' | 'Masonry' | 'Architecture' | 'Nature' | 'Utility';
+
+/** Semantic inventory groups keep the expanded palette browsable without changing hotbar saves. */
+export function creativeGroupFor(id: BlockId): CreativeGroup {
+  const def = BLOCK_DEFS.find((d) => d.id === id);
+  const name = def?.name ?? '';
+  if (/masonry|brick|cobble|wall/.test(name)) return 'Masonry';
+  if (/stone|granite|basalt|sand|dirt|loam|earth|scree|snow|ice|gravel|mud|terracotta/.test(name)) {
+    return 'Terrain';
+  }
+  if (/slab|stairs|roof|plank|fence|door|ladder|glass|limestone/.test(name)) return 'Architecture';
+  if (/grass|leaves|wood|cactus|flower/.test(name)) return 'Nature';
+  return 'Utility';
+}
+
 /** A creative hotbar: a fixed list of slots, one selected, each holding a block id. */
 export class CreativeInventory {
   private readonly slots: BlockId[];
