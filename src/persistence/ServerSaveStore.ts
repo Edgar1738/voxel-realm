@@ -52,6 +52,12 @@ export class ServerSaveStore implements SaveStore {
     await this.post(this.url({ chunk: chunkKey }), { entries });
   }
 
+  async saveChunkDeltas(
+    chunks: ReadonlyArray<readonly [string, ChunkDeltaEntries]>,
+  ): Promise<void> {
+    await this.post(this.url({ chunks: '1' }), { chunks });
+  }
+
   async clearDeltas(): Promise<void> {
     await this.post(this.url({ clear: '1' }), undefined);
   }

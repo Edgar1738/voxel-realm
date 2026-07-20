@@ -1,6 +1,6 @@
 # Voxel Realm
 
-A browser voxel sandbox engine built from scratch in TypeScript + Three.js. Streamed chunks, greedy meshing with vertex ambient occlusion, day/night and weather cycles, flowing water, procedural audio, critters, and a full in-game builder with blueprints — in ~18k lines with two runtime dependencies.
+A browser voxel sandbox engine built from scratch in TypeScript + Three.js. Streamed chunks, greedy meshing with vertex ambient occlusion, day/night and weather cycles, flowing water, procedural audio, critters, and a full in-game builder with blueprints — with two runtime dependencies.
 
 **[▶ Play it in your browser](https://edgar1738.github.io/voxel-realm/)** — or jump straight into [Frostvale Valley](https://edgar1738.github.io/voxel-realm/?save=frostvale-valley), an alpine valley beneath a great waterfall, or a [ruined fortress kingdom](https://edgar1738.github.io/voxel-realm/?world=citadel).
 
@@ -144,8 +144,8 @@ is documented in **[docs/authoring-worlds.md](docs/authoring-worlds.md)**.
 
 The bare URL serves a world-select menu built from `world-manifest.json`: the curated showcase
 collection plus create-a-world presets. Shipped worlds are static assets — `npm run world:bundle`
-validates every manifest entry against its `.saves/<slug>.json` snapshot and writes a compact copy
-to `public/worlds/<slug>.json`, which the production app fetches read-only and overlays with the
+validates every manifest entry against its `.saves/<slug>.json` snapshot and writes a packed VRW1
+binary to `public/worlds/<slug>.vrw`, which the production app fetches read-only and overlays with the
 player's own edits (per-world IndexedDB). CI cross-checks the manifest against the bundled
 snapshots (`tests/shippedWorlds.test.ts`), so a stale or missing bundle fails the build.
 
@@ -162,3 +162,8 @@ automatically; a production host must send the same headers to unlock `SharedArr
 worker pool. Hosts that can't set custom headers (e.g. plain GitHub Pages) still work — the engine
 detects the missing isolation via `MeshWorkerPool.supported()` and falls back to main-thread
 meshing, so meshing runs on the render thread instead of workers.
+
+GitHub Pages remains the deliberate default while the shipped worlds meet their performance
+targets there. Move production hosting to a platform with configurable COOP/COEP headers when a
+repeatable production benchmark shows main-thread meshing missing the frame-time target; generation
+workers already operate on GitHub Pages without those headers.

@@ -76,6 +76,23 @@ export function createPersistence(
     dirty.clear(); // re-added below only for writes that fail, so new edits aren't dropped
     cycleErrored = false;
     setStatus('saving');
+    if (store.saveChunkDeltas) {
+      const chunks = keys.map((key) => [key, manager.getChunkDelta(key)] as const);
+      const pending = store
+        .saveChunkDeltas(chunks)
+        .catch((err) => {
+          console.error('Voxel Realm: save failed, will retry', err);
+          cycleErrored = true;
+          for (const key of keys) dirty.add(key);
+          scheduleInternal();
+        })
+        .finally(() => {
+          inFlight.delete(pending);
+          settle();
+        });
+      inFlight.add(pending);
+      return;
+    }
     for (const key of keys) {
       const pending = store
         .saveChunkDelta(key, manager.getChunkDelta(key))

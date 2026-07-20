@@ -13,6 +13,8 @@ export interface SaveStore {
    */
   loadDeltas(): Promise<WorldDeltas>;
   saveChunkDelta(chunkKey: string, entries: ChunkDeltaEntries): Promise<void>;
+  /** Optional batched fast path used when several dirty chunks flush together. */
+  saveChunkDeltas?(chunks: ReadonlyArray<readonly [string, ChunkDeltaEntries]>): Promise<void>;
   clearDeltas(): Promise<void>;
 }
 

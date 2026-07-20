@@ -235,7 +235,14 @@ export function installDevControls(ctx: DevControlsContext): void {
       longFrames33: summary.longFrames33,
     });
     try {
-      await navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
+      const write = navigator.clipboard?.writeText(JSON.stringify(summary, null, 2));
+      if (write) {
+        // Permissionless/headless browsers can leave clipboard promises pending forever.
+        await Promise.race([
+          write,
+          new Promise<void>((resolve) => window.setTimeout(resolve, 250)),
+        ]);
+      }
     } catch {
       /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
     }

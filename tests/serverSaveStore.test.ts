@@ -113,6 +113,26 @@ describe('ServerSaveStore', () => {
     expect(JSON.parse(init.body as string)).toEqual({ entries: [[7, 5]] });
   });
 
+  it('saveChunkDeltas POSTs one batch for a debounce cycle', async () => {
+    const fetchMock = vi.fn(async () => ok({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const store = new ServerSaveStore('settlement', isValidBlockId);
+
+    await store.saveChunkDeltas([
+      ['0,0', [[1, 5]]],
+      ['1,0', []],
+    ]);
+
+    const [[url, init]] = fetchMock.mock.calls as unknown as [[string, RequestInit]];
+    expect(url).toContain('chunks=1');
+    expect(JSON.parse(init.body as string)).toEqual({
+      chunks: [
+        ['0,0', [[1, 5]]],
+        ['1,0', []],
+      ],
+    });
+  });
+
   it('saveChunkDelta rejects on a non-OK response so the caller keeps the edit dirty', async () => {
     vi.stubGlobal(
       'fetch',

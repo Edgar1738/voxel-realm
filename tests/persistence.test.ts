@@ -110,6 +110,19 @@ describe('createPersistence', () => {
     expect(savedKeys).toEqual(['0,0', '1,0']);
   });
 
+  it('uses a store batch fast path when available', async () => {
+    const store = makeStore();
+    store.saveChunkDeltas = vi.fn(async () => undefined);
+    const persistence = createPersistence(store, makeManager());
+    persistence.scheduleFlush('0,0');
+    persistence.scheduleFlush('1,0');
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+
+    expect(store.saveChunkDeltas).toHaveBeenCalledOnce();
+    expect(store.saveChunkDelta).not.toHaveBeenCalled();
+  });
+
   it('re-adds a failed key to the dirty set and retries it on a later flush', async () => {
     let attempts = 0;
     const save = vi.fn(async (_key: string) => {

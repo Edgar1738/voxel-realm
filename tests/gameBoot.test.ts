@@ -13,6 +13,7 @@ type FakeStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'clear'>
 };
 
 type FakeUi = {
+  dispose: ReturnType<typeof vi.fn>;
   hotbar: { addEventListener: (...args: unknown[]) => void };
   picker: { addEventListener: (...args: unknown[]) => void };
   reset: { addEventListener: (...args: unknown[]) => void };
@@ -58,6 +59,7 @@ type FakeUi = {
 
 function makeUi(): FakeUi {
   const ui = {
+    dispose: vi.fn(() => boot.order.push('ui.dispose')),
     hotbar: { addEventListener: vi.fn() },
     picker: { addEventListener: vi.fn() },
     reset: { addEventListener: vi.fn() },
@@ -526,6 +528,17 @@ describe('Game.boot composition', () => {
     const rendererIndex = boot.order.indexOf('renderer.dispose');
     expect(boot.order.indexOf('celestial.dispose')).toBeLessThan(rendererIndex);
     expect(boot.order.indexOf('sink.disposeAll')).toBeLessThan(rendererIndex);
+    expect(boot.ui!.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('cleanup is idempotent', async () => {
+    const cleanup = await bootGame();
+
+    cleanup();
+    cleanup();
+
+    expect(boot.ui!.dispose).toHaveBeenCalledOnce();
+    expect(boot.rendererDispose).toHaveBeenCalledOnce();
   });
 
   it('shows a persistent notice when storage falls back to volatile memory', async () => {

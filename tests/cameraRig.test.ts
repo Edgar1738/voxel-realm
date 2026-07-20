@@ -18,8 +18,8 @@ class FakeEventTarget extends EventTarget {
   pointerLockElement: Element | null = null;
 }
 
-const fakeDocument = new FakeEventTarget();
-const fakeWindow = new FakeEventTarget();
+let fakeDocument: FakeEventTarget;
+let fakeWindow: FakeEventTarget;
 
 // KeyboardEvent is not available in node — provide a minimal stub
 class FakeKeyboardEvent extends Event {
@@ -32,12 +32,14 @@ class FakeKeyboardEvent extends Event {
   }
 }
 
-vi.stubGlobal('document', fakeDocument);
-vi.stubGlobal('window', fakeWindow);
 vi.stubGlobal('KeyboardEvent', FakeKeyboardEvent);
 
 beforeEach(() => {
-  fakeDocument.pointerLockElement = null;
+  // Isolate intentionally undisposed behavior-test rigs so listener warnings remain meaningful.
+  fakeDocument = new FakeEventTarget();
+  fakeWindow = new FakeEventTarget();
+  vi.stubGlobal('document', fakeDocument);
+  vi.stubGlobal('window', fakeWindow);
 });
 
 // ---------------------------------------------------------------------------

@@ -182,6 +182,8 @@ export interface PlayerSkinUiConfig {
 
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
+  /** Removes the mounted UI, active modal listeners, and pending status timers. */
+  dispose(): void;
   hotbar: HTMLDivElement;
   /** The grid container holding the block tiles; Game delegates tile clicks off this node. */
   picker: HTMLDivElement;
@@ -770,6 +772,8 @@ export function createCreativeUi(
   );
   document.body.append(root);
 
+  let activeDialogClose: (() => void) | undefined;
+
   const setExperienceMode = (mode: 'play' | 'build'): void => {
     const play = mode === 'play';
     playModeUi = play;
@@ -794,6 +798,7 @@ export function createCreativeUi(
    * close. Returns the close function.
    */
   const openDialogPanel = (panel: HTMLDivElement, onCancel: () => void): (() => void) => {
+    activeDialogClose?.();
     const previousFocus = document.activeElement as HTMLElement | null;
     dialogScrim.replaceChildren(panel);
     dialogScrim.classList.add('is-open');
@@ -808,14 +813,20 @@ export function createCreativeUi(
     window.addEventListener('keydown', onKey, true);
     dialogScrim.addEventListener('click', onScrimClick);
     panel.querySelector('button')?.focus();
-    return () => {
+    let closed = false;
+    const close = (): void => {
+      if (closed) return;
+      closed = true;
       window.removeEventListener('keydown', onKey, true);
       dialogScrim.removeEventListener('click', onScrimClick);
       dialogScrim.classList.remove('is-open');
       dialogScrim.setAttribute('aria-hidden', 'true');
       dialogScrim.replaceChildren();
       previousFocus?.focus();
+      if (activeDialogClose === close) activeDialogClose = undefined;
     };
+    activeDialogClose = close;
+    return close;
   };
 
   const dialogPanel = (label: string): HTMLDivElement => {
@@ -1435,7 +1446,18 @@ export function createCreativeUi(
   };
   renderHotbar();
 
+  let disposed = false;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    activeDialogClose?.();
+    if (statusTimer !== undefined) window.clearTimeout(statusTimer);
+    if (saveStatusTimer !== undefined) window.clearTimeout(saveStatusTimer);
+    root.remove();
+  };
+
   return {
+    dispose,
     hotbar,
     picker,
     reset,

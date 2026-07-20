@@ -12,6 +12,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   readWorld,
   writeChunk,
+  writeChunks,
   writeMeta,
   clearWorld,
   listWorlds,
@@ -207,6 +208,7 @@ function devDisk(): Plugin {
               const payload = JSON.parse(body || '{}') as {
                 meta?: DiskSnapshot['meta'];
                 entries?: Array<[number, number] | [number, number, number]>;
+                chunks?: Array<[string, Array<[number, number] | [number, number, number]>]>;
               };
               if (url.searchParams.has('meta')) {
                 writeMeta(root, name, payload.meta);
@@ -229,6 +231,29 @@ function devDisk(): Plugin {
                   res.statusCode = 400;
                   res.end(String(err));
                   return;
+                }
+                return sendJson(res, { ok: true });
+              }
+              if (url.searchParams.has('chunks')) {
+                const chunks = Array.isArray(payload.chunks) ? payload.chunks : [];
+                if (
+                  !chunks.every(
+                    (entry) =>
+                      Array.isArray(entry) &&
+                      entry.length === 2 &&
+                      typeof entry[0] === 'string' &&
+                      /^-?\d+,-?\d+$/.test(entry[0]) &&
+                      Array.isArray(entry[1]),
+                  )
+                ) {
+                  res.statusCode = 400;
+                  return res.end('invalid chunk batch');
+                }
+                try {
+                  writeChunks(root, name, chunks);
+                } catch (err) {
+                  res.statusCode = 400;
+                  return res.end(String(err));
                 }
                 return sendJson(res, { ok: true });
               }
@@ -256,7 +281,11 @@ function devDisk(): Plugin {
  * meshing; without them (e.g. GitHub Pages) the app falls back to synchronous main-thread meshing.
  */
 function crossOriginIsolation(): Plugin {
-  const setHeaders = (_req: unknown, res: { setHeader(k: string, v: string): void }, next: () => void) => {
+  const setHeaders = (
+    _req: unknown,
+    res: { setHeader(k: string, v: string): void },
+    next: () => void,
+  ) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     next();

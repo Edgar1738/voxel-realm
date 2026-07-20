@@ -528,6 +528,7 @@ export class Game {
     };
     const resumeAbort = new AbortController();
     window.addEventListener('pagehide', saveResumeNow, { signal: resumeAbort.signal });
+    const uiAbort = new AbortController();
     let resumeAccum = 0; // seconds since the last throttled resume snapshot
 
     // Dev world catalog (named server saves). `copyWorldFn` doubles as the reset dialog's
@@ -653,7 +654,7 @@ export class Game {
     };
     ui.timeSlider.addEventListener('pointerup', stopScrub);
     ui.timeSlider.addEventListener('blur', stopScrub);
-    window.addEventListener('pointerup', stopScrub);
+    window.addEventListener('pointerup', stopScrub, { signal: uiAbort.signal });
 
     ui.picker.addEventListener('click', (event) => {
       const btn = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-block]');
@@ -2164,13 +2165,18 @@ export class Game {
       });
     }
 
-    /** Releases all resources acquired during boot. */
+    let cleanedUp = false;
+    /** Releases all resources acquired during boot. Safe to call more than once. */
     function cleanup(): void {
+      if (cleanedUp) return;
+      cleanedUp = true;
       saveResumeNow(); // capture the final position before this world tears down
       resumeAbort.abort();
+      uiAbort.abort();
       abortInput();
       pauseListener.abort();
       worldMap.dispose();
+      ui.dispose();
       meshPool?.dispose();
       genPool?.dispose();
       audio.dispose();

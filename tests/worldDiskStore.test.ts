@@ -7,6 +7,7 @@ import { CHUNK_VOLUME } from '../src/core/constants';
 import {
   readWorld,
   writeChunk,
+  writeChunks,
   writeMeta,
   clearWorld,
   listWorlds,
@@ -40,6 +41,17 @@ describe('worldDiskStore', () => {
     snap = readWorld(root, 'w');
     expect(snap.chunks['0,0']).toBeUndefined();
     expect(snap.meta).toEqual({ seed: 1, version: 1, preset: 'default' });
+  });
+
+  it('writes a chunk batch into one compatible snapshot', () => {
+    writeChunks(root, 'w', [
+      ['0,0', [[5, 13]]],
+      ['1,0', [[7, 4, 2]]],
+    ]);
+    expect(readWorld(root, 'w').chunks).toEqual({
+      '0,0': [[5, 13]],
+      '1,0': [[7, 4, 2]],
+    });
   });
 
   it('clear keeps meta but drops chunks', () => {
