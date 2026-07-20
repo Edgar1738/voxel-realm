@@ -65,10 +65,10 @@ describe('harbor preset registration', () => {
     expect(WORLD_PRESETS).toContain('harbor');
   });
 
-  it('resolves to a generator with the tree + site overlays', () => {
+  it('resolves to a generator with the tree + site + fountain overlays', () => {
     const { generator, overlays } = createGenerator('harbor');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays.length).toBe(2);
+    expect(overlays.length).toBe(3);
   });
 });
 

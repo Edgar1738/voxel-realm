@@ -5,6 +5,7 @@ import {
   STONE,
   COBBLESTONE,
   SLATE,
+  DEEPSLATE,
   LIMESTONE,
   CARVED_LIMESTONE,
   GOLD_TRIM,
@@ -15,13 +16,17 @@ import {
   GLOWSTONE,
   LANTERN,
   WATER,
+  LAVA,
   MUD,
+  GRAVEL,
+  LEAVES,
   FLOWER,
   TALL_GRASS,
   STONE_SLAB,
 } from '../blocks/blocks';
 import type { Overlay } from './Generator';
 import type { Prefab } from '../core/Prefab';
+import type { ChunkData } from '../world/ChunkData';
 import type { BlockId, WorldSeed } from '../core/types';
 
 /**
@@ -47,12 +52,59 @@ export const FOUNTAIN_DEPTH = 20;
 /** Column the placement is anchored by: the tunnel mouth, so the arch seats on real ground. */
 export const FOUNTAIN_MOUTH: readonly [number, number] = [11, 44];
 
+/**
+ * Dressing variants sharing one skeleton: Verdant for green surface worlds, Crystal for stony and
+ * subterranean ones, Ember for volcanic realms (a lava pool lights the chamber instead of water).
+ */
+export type FountainTheme = 'crystal' | 'verdant' | 'ember';
+
+interface FountainPalette {
+  shell: BlockId;
+  pool: BlockId;
+  channel: BlockId;
+  fringe: BlockId;
+  masonry: BlockId;
+  plants: boolean;
+  garlands: boolean;
+}
+
+const PALETTES: Record<FountainTheme, FountainPalette> = {
+  crystal: {
+    shell: SLATE,
+    pool: WATER,
+    channel: CYAN_GLASS,
+    fringe: MUD,
+    masonry: STONE,
+    plants: true,
+    garlands: false,
+  },
+  verdant: {
+    shell: SLATE,
+    pool: WATER,
+    channel: CYAN_GLASS,
+    fringe: MUD,
+    masonry: STONE,
+    plants: true,
+    garlands: true,
+  },
+  ember: {
+    shell: DEEPSLATE,
+    pool: LAVA,
+    channel: GOLD_TRIM,
+    fringe: GRAVEL,
+    masonry: DEEPSLATE,
+    plants: false,
+    garlands: false,
+  },
+};
+
 /** Tunnel floor height per z row: flat at the chamber, then a 1:1 stair climb to the surface. */
 function tunnelFloorY(z: number): number {
   return Math.min(FOUNTAIN_DEPTH, FLOOR_Y + 1 + Math.max(0, z - 22));
 }
 
-export function fairyFountain(): Prefab {
+export function fairyFountain(theme: FountainTheme = 'crystal'): Prefab {
+  const P = PALETTES[theme];
   // Keyed voxel map so later features overwrite earlier shell/air cleanly.
   const cells = new Map<number, BlockId>();
   const key = (x: number, y: number, z: number): number => x + DIM_X * (z + DIM_Z * y);
@@ -83,7 +135,7 @@ export function fairyFountain(): Prefab {
         const inner = rr / (R * R) + (dy / DOME_H) ** 2;
         const outer = rr / ((R + 2) * (R + 2)) + (dy / (DOME_H + 2)) ** 2;
         if (inner < 1) put(x, y, z, AIR);
-        else if (outer < 1) put(x, y, z, SLATE);
+        else if (outer < 1) put(x, y, z, P.shell);
       }
     }
   }
@@ -96,7 +148,7 @@ export function fairyFountain(): Prefab {
       const z = CZ + dz;
       if (rr <= 3 * 3) {
         put(x, FLOOR_Y + 1, z, GLOWSTONE); // basin floor glows through the water
-        put(x, FLOOR_Y + 2, z, WATER);
+        put(x, FLOOR_Y + 2, z, P.pool);
       } else if (rr <= 4.5 * 4.5) {
         put(x, FLOOR_Y + 1, z, CARVED_LIMESTONE);
         put(x, FLOOR_Y + 2, z, dx === 0 || dz === 0 ? GOLD_TRIM : CARVED_LIMESTONE);
@@ -121,11 +173,16 @@ export function fairyFountain(): Prefab {
       const px = CX + sx * 6;
       const pz = CZ + sz * 6;
       for (let y = FLOOR_Y + 1; y <= FLOOR_Y + 6; y++) put(px, y, pz, LIMESTONE);
-      put(px, FLOOR_Y + 7, pz, SLATE); // capital, meeting the dome underside
+      put(px, FLOOR_Y + 7, pz, P.shell); // capital, meeting the dome underside
       put(px - sx, FLOOR_Y + 4, pz - sz, LANTERN);
+      if (P.garlands) {
+        // Verdant: leaf garlands wrap the capitals so the sanctum reads overgrown.
+        put(px + sx, FLOOR_Y + 6, pz, LEAVES);
+        put(px, FLOOR_Y + 6, pz + sz, LEAVES);
+      }
       for (let k = 2; k <= 5; k++) {
         put(CX + sx * k, 0, CZ + sz * k, GLOWSTONE);
-        put(CX + sx * k, FLOOR_Y, CZ + sz * k, CYAN_GLASS); // glowing floor sigil
+        put(CX + sx * k, FLOOR_Y, CZ + sz * k, P.channel); // glowing floor sigil
       }
     }
   }
@@ -139,7 +196,8 @@ export function fairyFountain(): Prefab {
       const x = CX + dx;
       const z = CZ + dz;
       const h = hash(dx, dz);
-      if (h % 3 === 0) put(x, FLOOR_Y, z, MUD);
+      if (h % 3 === 0) put(x, FLOOR_Y, z, P.fringe);
+      if (!P.plants) continue;
       if (h % 5 === 0) put(x, FLOOR_Y + 1, z, FLOWER);
       else if (h % 5 === 1) put(x, FLOOR_Y + 1, z, TALL_GRASS);
     }
@@ -170,15 +228,16 @@ export function fairyFountain(): Prefab {
     const fy = tunnelFloorY(z);
     const insideChamber = z <= 22;
     for (const x of [CX - 1, CX]) {
-      put(x, fy - 1, z, STONE);
+      put(x, fy - 1, z, P.masonry);
       put(x, fy, z, COBBLESTONE);
       for (let y = fy + 1; y <= fy + 3; y++) put(x, y, z, AIR);
-      if (!insideChamber && z < DIM_Z - 4) put(x, fy + 4, z, STONE); // ceiling, open near the mouth
+      // ceiling, open near the mouth
+      if (!insideChamber && z < DIM_Z - 4) put(x, fy + 4, z, P.masonry);
     }
     if (!insideChamber) {
       for (const wx of [CX - 2, CX + 1]) {
         for (let y = fy - 1; y <= fy + 4; y++) {
-          put(wx, y, z, y === fy + 2 && z % 6 === 3 && wx === CX - 2 ? LANTERN : STONE);
+          put(wx, y, z, y === fy + 2 && z % 6 === 3 && wx === CX - 2 ? LANTERN : P.masonry);
         }
       }
     }
@@ -193,17 +252,17 @@ export function fairyFountain(): Prefab {
     }
   }
   for (const ax of [CX - 2, CX + 1]) {
-    for (let y = my + 1; y <= my + 4; y++) put(ax, y, DIM_Z - 2, STONE);
+    for (let y = my + 1; y <= my + 4; y++) put(ax, y, DIM_Z - 2, P.masonry);
   }
-  for (let x = CX - 2; x <= CX + 1; x++) put(x, my + 5, DIM_Z - 2, STONE); // lintel
+  for (let x = CX - 2; x <= CX + 1; x++) put(x, my + 5, DIM_Z - 2, P.masonry); // lintel
   put(CX - 1, my + 4, DIM_Z - 2, LANTERN);
   put(CX, my + 4, DIM_Z - 2, LANTERN);
   for (const [mx, mz] of [
     [CX - 4, DIM_Z - 1],
     [CX + 3, DIM_Z - 1],
   ]) {
-    put(mx, my + 1, mz, STONE);
-    put(mx, my + 2, mz, STONE);
+    put(mx, my + 1, mz, P.masonry);
+    put(mx, my + 2, mz, P.masonry);
   }
 
   const blocks: Array<[number, number, number, BlockId]> = [];
@@ -254,6 +313,26 @@ export function fountainPlacement(
   return { ox, oy, oz };
 }
 
+/** Stamp every prefab voxel (AIR included — the carve) that lands inside this chunk. */
+function stampFountain(
+  chunk: ChunkData,
+  baseX: number,
+  baseZ: number,
+  prefab: Prefab,
+  ox: number,
+  oy: number,
+  oz: number,
+): void {
+  for (const [dx, dy, dz, id] of prefab.blocks) {
+    const wy = oy + dy;
+    if (wy < 0 || wy >= WORLD_HEIGHT) continue;
+    const lx = ox + dx - baseX;
+    const lz = oz + dz - baseZ;
+    if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) continue;
+    chunk.set(lx, wy, lz, id);
+  }
+}
+
 /**
  * An Overlay that buries rare Fairy's Fountains across a preset. Unlike `scatterStructures`, the
  * stamp writes AIR entries too — that's what carves the chamber and tunnel out of solid terrain.
@@ -261,11 +340,11 @@ export function fountainPlacement(
  */
 export function scatterFairyFountains(
   surfaceAt: (seed: WorldSeed, x: number, z: number) => number,
-  opts?: { cellSize?: number; density?: number },
+  opts?: { cellSize?: number; density?: number; theme?: FountainTheme },
 ): Overlay {
   const cellSize = opts?.cellSize ?? 320;
   const density = opts?.density ?? 0.4;
-  const prefab = fairyFountain();
+  const prefab = fairyFountain(opts?.theme ?? 'crystal');
   return (chunk, cx, cz, seed) => {
     const baseX = cx * CHUNK_SIZE_X;
     const baseZ = cz * CHUNK_SIZE_Z;
@@ -277,15 +356,34 @@ export function scatterFairyFountains(
       for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
         const p = fountainPlacement(seed, cellX, cellZ, cellSize, density, surfaceAt);
         if (!p) continue;
-        for (const [dx, dy, dz, id] of prefab.blocks) {
-          const wy = p.oy + dy;
-          if (wy < 0 || wy >= WORLD_HEIGHT) continue;
-          const lx = p.ox + dx - baseX;
-          const lz = p.oz + dz - baseZ;
-          if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) continue;
-          chunk.set(lx, wy, lz, id);
-        }
+        stampFountain(chunk, baseX, baseZ, prefab, p.ox, p.oy, p.oz);
       }
     }
+  };
+}
+
+/**
+ * An Overlay stamping one authored Fairy's Fountain with its tunnel mouth at (ox+11, oz+44),
+ * seated on the world's real surface at that column. For the showcase presets, whose hand-built
+ * sites leave no room for random scatter — the caller picks dry, well-covered ground (the
+ * fairyFountain tests assert both properties against each preset's real surface function).
+ */
+export function fairyFountainAt(
+  ox: number,
+  oz: number,
+  surfaceAt: (seed: WorldSeed, x: number, z: number) => number,
+  theme: FountainTheme,
+): Overlay {
+  const prefab = fairyFountain(theme);
+  const [mx, mz] = FOUNTAIN_MOUTH;
+  return (chunk, cx, cz, seed) => {
+    const baseX = cx * CHUNK_SIZE_X;
+    const baseZ = cz * CHUNK_SIZE_Z;
+    const [dimX, , dimZ] = prefab.dims;
+    if (ox + dimX <= baseX || ox >= baseX + CHUNK_SIZE_X) return;
+    if (oz + dimZ <= baseZ || oz >= baseZ + CHUNK_SIZE_Z) return;
+    const oy = Math.round(surfaceAt(seed, ox + mx, oz + mz)) - FOUNTAIN_DEPTH;
+    if (oy < 1) return;
+    stampFountain(chunk, baseX, baseZ, prefab, ox, oy, oz);
   };
 }

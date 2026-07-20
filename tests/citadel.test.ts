@@ -53,10 +53,10 @@ describe('citadel preset registration', () => {
     expect(WORLD_PRESETS).toContain('citadel');
   });
 
-  it('resolves to a generator with the site overlay + outlying scatter', () => {
+  it('resolves to a generator with the site overlay + outlying scatter + fountain', () => {
     const { generator, overlays } = createGenerator('citadel');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays.length).toBe(2);
+    expect(overlays.length).toBe(3);
   });
 });
 

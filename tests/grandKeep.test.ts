@@ -84,10 +84,10 @@ describe('grand-keep preset registration', () => {
     expect(WORLD_PRESETS).toContain('grand-keep');
   });
 
-  it('resolves to a generator with site overlay + plains scatter', () => {
+  it('resolves to a generator with site overlay + plains scatter + fountain', () => {
     const { generator, overlays } = createGenerator('grand-keep');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays.length).toBe(2);
+    expect(overlays.length).toBe(3);
   });
 });
 

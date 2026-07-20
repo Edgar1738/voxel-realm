@@ -5,10 +5,31 @@ import {
   scatterFairyFountains,
   FOUNTAIN_DEPTH,
   FOUNTAIN_MOUTH,
+  type FountainTheme,
 } from '../src/worldgen/fairyFountainPrefabs';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '../src/core/constants';
-import { AIR, WATER, GLOWSTONE, COBBLESTONE, CRYSTAL, STONE } from '../src/blocks/blocks';
+import {
+  AIR,
+  WATER,
+  LAVA,
+  GLOWSTONE,
+  COBBLESTONE,
+  CRYSTAL,
+  STONE,
+  LEAVES,
+  FLOWER,
+  TALL_GRASS,
+} from '../src/blocks/blocks';
+import { citadelSurfaceAt } from '../src/worldgen/CitadelGenerator';
+import { grandKeepSurfaceAt } from '../src/worldgen/GrandKeepGenerator';
+import { cloudspireSurfaceAt } from '../src/worldgen/CloudspireGenerator';
+import { ashenReachSurfaceAt } from '../src/worldgen/AshenReachGenerator';
+import { harborSurfaceAt } from '../src/worldgen/HarborGenerator';
+import { stonehavenSurfaceAt } from '../src/worldgen/StonehavenGenerator';
+
+const THEMES: FountainTheme[] = ['crystal', 'verdant', 'ember'];
+const POOL_BLOCK: Record<FountainTheme, number> = { crystal: WATER, verdant: WATER, ember: LAVA };
 
 const SURFACE = 64;
 const flatAt = (_seed: number, _x: number, _z: number): number => SURFACE;
@@ -36,17 +57,18 @@ function stampWorld(seed: number, minX: number, maxX: number, minZ: number, maxZ
   };
 }
 
-describe('fairyFountain prefab', () => {
-  const prefab = fairyFountain();
+describe.each(THEMES)('fairyFountain prefab (%s)', (theme) => {
+  const prefab = fairyFountain(theme);
+  const pool = POOL_BLOCK[theme];
+  const byKey = new Map<string, number>();
+  for (const [x, y, z, id] of prefab.blocks) byKey.set(`${x},${y},${z}`, id);
 
-  it('contains the pool: every water voxel is sealed on all sides and below', () => {
-    const byKey = new Map<string, number>();
-    for (const [x, y, z, id] of prefab.blocks) byKey.set(`${x},${y},${z}`, id);
+  it('contains the pool: every fluid voxel is sealed on all sides and below', () => {
     const at = (x: number, y: number, z: number): number => byKey.get(`${x},${y},${z}`) ?? -1;
-    let waterCount = 0;
+    let fluidCount = 0;
     for (const [x, y, z, id] of prefab.blocks) {
-      if (id !== WATER) continue;
-      waterCount++;
+      if (id !== pool) continue;
+      fluidCount++;
       for (const [nx, ny, nz] of [
         [x + 1, y, z],
         [x - 1, y, z],
@@ -55,16 +77,14 @@ describe('fairyFountain prefab', () => {
         [x, y - 1, z],
       ]) {
         const n = at(nx, ny, nz);
-        expect(n, `water at ${x},${y},${z} leaks toward ${nx},${ny},${nz}`).not.toBe(AIR);
-        expect(n, `water at ${x},${y},${z} borders unlisted terrain`).not.toBe(-1);
+        expect(n, `pool at ${x},${y},${z} leaks toward ${nx},${ny},${nz}`).not.toBe(AIR);
+        expect(n, `pool at ${x},${y},${z} borders unlisted terrain`).not.toBe(-1);
       }
     }
-    expect(waterCount).toBeGreaterThan(20);
+    expect(fluidCount).toBeGreaterThan(20);
   });
 
   it('keeps a walkable descent: solid floor, 3-high headroom, steps of at most 1', () => {
-    const byKey = new Map<string, number>();
-    for (const [x, y, z, id] of prefab.blocks) byKey.set(`${x},${y},${z}`, id);
     // Walk like the player: from each floor, the next column's floor is the highest solid at or
     // below one step up — never scanning above head height, so ceilings don't read as floors.
     const solidFloorBelow = (x: number, z: number, from: number): number => {
@@ -81,7 +101,7 @@ describe('fairyFountain prefab', () => {
       expect(fy, `no floor under x=${mx}, z=${z}`).toBeGreaterThanOrEqual(0);
       for (let y = fy + 1; y <= fy + 3; y++) {
         const id = byKey.get(`${mx},${y},${z}`) ?? AIR;
-        expect(id === AIR || id === WATER, `headroom blocked at ${mx},${y},${z} (id ${id})`).toBe(
+        expect(id === AIR || id === pool, `headroom blocked at ${mx},${y},${z} (id ${id})`).toBe(
           true,
         );
       }
@@ -89,6 +109,20 @@ describe('fairyFountain prefab', () => {
         expect(Math.abs(prev - fy), `step >1 between z=${z + 1} and z=${z}`).toBeLessThanOrEqual(1);
       prev = fy;
     }
+  });
+
+  it('dresses to its theme: plants only where alive, garlands only when verdant', () => {
+    const ids = new Set(prefab.blocks.map((b) => b[3]));
+    expect(ids.has(pool)).toBe(true);
+    if (theme === 'ember') {
+      expect(ids.has(FLOWER) || ids.has(TALL_GRASS)).toBe(false);
+      expect(ids.has(WATER)).toBe(false);
+    } else {
+      expect(ids.has(FLOWER)).toBe(true);
+      expect(ids.has(TALL_GRASS)).toBe(true);
+      expect(ids.has(LAVA)).toBe(false);
+    }
+    expect(ids.has(LEAVES)).toBe(theme === 'verdant');
   });
 });
 
@@ -150,5 +184,39 @@ describe('scatterFairyFountains', () => {
     expect(at(cx, p.oy + 8, cz)).toBe(CRYSTAL); // spire crown
     expect(at(cx + 7, p.oy + 4, cz)).toBe(AIR); // carved chamber air
     expect(at(cx, SURFACE - 1, cz)).toBe(STONE); // chamber stays buried under terrain
+  });
+});
+
+describe('authored showcase fountains', () => {
+  // Must mirror the fairyFountainAt calls in Presets.ts exactly.
+  const SITES: Array<[string, (seed: number, x: number, z: number) => number, number, number]> = [
+    ['citadel', citadelSurfaceAt, -161, -74],
+    ['grand-keep', grandKeepSurfaceAt, 232, -24],
+    ['cloudspire-citadel', cloudspireSurfaceAt, -11, 196],
+    ['ashen-reach', ashenReachSurfaceAt, -161, -54],
+    ['harbor', harborSurfaceAt, -131, -14],
+    ['stonehaven', stonehavenSurfaceAt, -95, -14],
+  ];
+  const GAME_SEED = 1337; // the fixed boot seed in Game.ts
+
+  it.each(SITES)('%s: mouth on dry land and chamber fully buried', (_name, surfaceAt, ox, oz) => {
+    const [mx, mz] = FOUNTAIN_MOUTH;
+    const mouthSurface = Math.round(surfaceAt(GAME_SEED, ox + mx, oz + mz));
+    expect(mouthSurface, 'mouth must sit above the waterline').toBeGreaterThan(SEA_LEVEL + 1);
+    const oy = mouthSurface - FOUNTAIN_DEPTH;
+    expect(oy).toBeGreaterThanOrEqual(1);
+    // Same cover rule the random scatter enforces: dome top (local 15) + 2 blocks of terrain.
+    for (const [dx, dz] of [
+      [11, 11],
+      [4, 4],
+      [18, 4],
+      [4, 18],
+      [18, 18],
+    ]) {
+      expect(
+        Math.round(surfaceAt(GAME_SEED, ox + dx, oz + dz)) - oy,
+        `thin cover over chamber column +${dx},+${dz}`,
+      ).toBeGreaterThanOrEqual(17);
+    }
   });
 });

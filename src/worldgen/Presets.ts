@@ -11,7 +11,7 @@ import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
 import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGenerator';
-import { createAshenReachGenerator } from './AshenReachGenerator';
+import { createAshenReachGenerator, ashenReachSurfaceAt } from './AshenReachGenerator';
 import { ashenReachSite } from './AshenReachSite';
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
@@ -21,9 +21,13 @@ import { grandKeepSite } from './grandKeepSite';
 import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
 import { cloudspireSite } from './cloudspireSite';
 import { sunmeadowSite } from './sunmeadowSite';
-import { createStonehavenGenerator, stonehavenForests } from './StonehavenGenerator';
+import {
+  createStonehavenGenerator,
+  stonehavenForests,
+  stonehavenSurfaceAt,
+} from './StonehavenGenerator';
 import { stonehavenSite } from './stonehavenSite';
-import { scatterFairyFountains } from './fairyFountainPrefabs';
+import { scatterFairyFountains, fairyFountainAt } from './fairyFountainPrefabs';
 import {
   cottage,
   well,
@@ -272,7 +276,7 @@ export function createGenerator(preset: WorldPreset): {
             surfaceAt: plainsHeight,
           }),
           scatterDecorations(),
-          scatterFairyFountains(plainsHeight),
+          scatterFairyFountains(plainsHeight, { theme: 'verdant' }),
         ],
       };
     case 'frontier':
@@ -290,7 +294,7 @@ export function createGenerator(preset: WorldPreset): {
             surfaceAt: plainsHeight,
           }),
           scatterDecorations(),
-          scatterFairyFountains(plainsHeight),
+          scatterFairyFountains(plainsHeight, { theme: 'verdant' }),
         ],
       };
     case 'caverns':
@@ -332,14 +336,29 @@ export function createGenerator(preset: WorldPreset): {
               anchor: 'min', // seat ruins on the lowest footprint column so they don't float on slopes
             },
           ),
+          // A lone sanctum hidden in the western plains, past the ruin fields.
+          fairyFountainAt(-161, -74, citadelSurfaceAt, 'crystal'),
         ],
       };
     case 'ashen-reach':
-      return { generator: createAshenReachGenerator(), overlays: [ashenReachSite()] };
+      return {
+        generator: createAshenReachGenerator(),
+        overlays: [
+          ashenReachSite(),
+          // The Ember Fount: a lava-lit sanctum in the northwestern ash flats.
+          fairyFountainAt(-161, -54, ashenReachSurfaceAt, 'ember'),
+        ],
+      };
     case 'stonehaven':
       return {
         generator: createStonehavenGenerator(),
-        overlays: [...stonehavenForests(), stonehavenSite(), scatterDecorations()],
+        overlays: [
+          ...stonehavenForests(),
+          stonehavenSite(),
+          scatterDecorations(),
+          // Beneath the western apron forest, off the journey road's first leg.
+          fairyFountainAt(-95, -14, stonehavenSurfaceAt, 'crystal'),
+        ],
       };
     case 'harbor':
       return {
@@ -349,6 +368,8 @@ export function createGenerator(preset: WorldPreset): {
           // the authored harbor stamps in — houses clear any tree that falls inside their footprint.
           scatterOaks(harborSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 11 }),
           harborSite(),
+          // Up on the hill crest behind the town, inland from the terraces.
+          fairyFountainAt(-131, -14, harborSurfaceAt, 'verdant'),
         ],
       };
     case 'grand-keep':
@@ -378,6 +399,8 @@ export function createGenerator(preset: WorldPreset): {
               anchor: 'min',
             },
           ),
+          // In the eastern plains beyond the mesa skirt.
+          fairyFountainAt(232, -24, grandKeepSurfaceAt, 'verdant'),
         ],
       };
     case 'cloudspire-citadel':
@@ -406,6 +429,8 @@ export function createGenerator(preset: WorldPreset): {
               anchor: 'min',
             },
           ),
+          // In the southern plains below the mountain skirt.
+          fairyFountainAt(-11, 196, cloudspireSurfaceAt, 'verdant'),
         ],
       };
     case 'sunmeadow-trials':
@@ -421,7 +446,7 @@ export function createGenerator(preset: WorldPreset): {
           scatterForest(layeredSurfaceAt, SEA_LEVEL),
           scatterCacti(layeredSurfaceAt, SEA_LEVEL),
           scatterDecorations(),
-          scatterFairyFountains(layeredSurfaceAt),
+          scatterFairyFountains(layeredSurfaceAt, { theme: 'verdant' }),
         ],
       };
   }

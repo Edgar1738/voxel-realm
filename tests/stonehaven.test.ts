@@ -96,7 +96,7 @@ describe('stonehaven preset registration', () => {
   it('resolves to a generator with forest + site + decoration overlays', () => {
     const { generator, overlays } = createGenerator('stonehaven');
     expect(typeof generator.generateBaseChunk).toBe('function');
-    expect(overlays.length).toBe(4); // broadleaf belt + conifer belt + site + decorations
+    expect(overlays.length).toBe(5); // broadleaf belt + conifer belt + site + decorations + fountain
   });
 });
 
