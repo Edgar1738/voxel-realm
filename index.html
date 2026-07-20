@@ -98,12 +98,34 @@
       .creative-tools {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        align-items: flex-end;
+        gap: 10px;
         padding: 8px;
         border-radius: 14px;
         background: rgba(18, 22, 28, 0.82);
         border: 1px solid rgba(255, 255, 255, 0.1);
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .tool-cluster {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .tool-cluster-label {
+        padding-left: 4px;
+        font-size: 9px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: rgba(238, 242, 246, 0.45);
+      }
+      .tool-cluster-options,
+      .tool-more-shapes {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .tool-more-shapes[hidden] {
+        display: none;
       }
       .tool-btn {
         display: inline-flex;
@@ -145,6 +167,9 @@
       .tool-btn.secondary {
         padding: 5px 8px;
         font-size: 12px;
+      }
+      .more-tools-btn {
+        color: rgba(238, 242, 246, 0.52);
       }
       .tool-divider {
         width: 1px;
@@ -226,21 +251,64 @@
         color: #fff;
         box-shadow: inset 0 0 0 1px rgba(255, 211, 77, 0.42);
       }
-      /* Tunnel settings strip: wraps onto its own dock row below the tool rail. */
-      .tunnel-settings {
+      /* Contextual power-brush settings: size, behavior, recipe, and Tunnel configuration. */
+      .brush-settings {
         flex-basis: 100%;
         display: flex;
+      }
+      .brush-settings-panel {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        min-height: 32px;
+        padding: 6px 10px;
+        border-radius: 12px;
+        background: rgba(18, 22, 28, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .brush-size-group {
+        display: grid;
+        gap: 2px;
+        width: 150px;
+      }
+      .brush-size-group[hidden] {
+        display: none;
+      }
+      .brush-size-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 10px;
+        color: rgba(238, 242, 246, 0.62);
+      }
+      .brush-size-slider {
+        width: 150px;
+        accent-color: #d6aa2f;
+      }
+      .brush-modifiers {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .brush-modifier-btn {
+        border-radius: 8px;
+      }
+      .brush-recipe {
+        padding-left: 2px;
+        color: rgba(238, 242, 246, 0.7);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .tunnel-settings {
+        display: block;
       }
       .tunnel-settings-panel {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 14px;
-        padding: 6px 12px;
-        border-radius: 12px;
-        background: rgba(18, 22, 28, 0.82);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
       }
       .tunnel-group {
         display: flex;
@@ -1347,12 +1415,12 @@
     <div id="crosshair"></div>
     <div id="overlay">
       Click to play — WASD move, mouse look, Space jump / fly up, Shift down, F toggle fly · LMB use
-      tool, RMB place, MMB pick · 1-9 hotbar slot, wheel cycle, I inventory, T cycle tool (box
-      tools: click two corners) · B build mode: click two corners, then X fill · G clear · R replace
-      · C copy, click to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · Shift+wheel adjust
-      reach · V placement ghost · K / Shift+K player animation · E talk to NPC · P / Shift+P NPC
-      pose · O / Shift+O NPC animation · L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use
-      the menus
+      brush, RMB place, MMB pick · Power brush: choose Gesture + Shape + Action; Line uses two
+      points · Hold+wheel brush size, Alt swaps Clear / Fill, Shift+wheel reach · 1-9 hotbar slot,
+      wheel cycle, I inventory, T cycle preset · B build mode: click two corners, then X fill · G
+      clear · R replace · C copy, click to paste ([ ] rotate, M mirror, +/− array, Esc cancel) · V
+      placement ghost · K / Shift+K player animation · E talk to NPC · P / Shift+P NPC pose · O /
+      Shift+O NPC animation · L headlamp · Ctrl+Z undo, Ctrl+Y redo · press Esc to use the menus
     </div>
     <script type="module" src="/src/app/main.ts"></script>
   </body>

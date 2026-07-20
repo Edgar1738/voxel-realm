@@ -25,39 +25,41 @@ Open the URL, click to lock the pointer, and you're in.
 - **Atmosphere** — day/night celestial sky, rain/snow/storms with lightning, plant sway, water shimmer, underwater fog and audio, headlamp for caves
 - **Simulation** — flowing water and falling sand on a budgeted block ticker; birds, fish, and rabbits
 - **Audio & feel** — procedural Minecraft-style sounds (no audio assets), break particles, movement sounds
-- **Builder tools** — hotbar + creative inventory with rendered block icons, fill/clear/replace/copy region tools, paste ghost with rotate/mirror/array, dig tools with hold-to-repeat, undo/redo
+- **Builder tools** — composable Stamp/Stroke/Line brushes with sphere, box, cylinder, disc, and ring shapes; Clear/Fill/Replace actions; Shell/Noise modifiers; hold-to-repeat; region tools; undo/redo
 - **Blueprints** — capture builds as reusable prefabs, categorized catalog with real thumbnails, curated set included
 - **Persistence** — worlds saved to IndexedDB, or to disk (`.saves/`) through the dev server so saves can be shared and version-controlled
 - **Play & build modes** — explore-first play mode with intro panel and guided tour, full creative build mode
 
 ## Controls
 
-| Input                       | Action                                             |
-| --------------------------- | -------------------------------------------------- |
-| `WASD` / mouse              | Move / look                                        |
-| Double-tap `W`              | Sprint                                             |
-| `Space` / `Shift`           | Up (jump) / down                                   |
-| `F`                         | Toggle fly                                         |
-| `B`                         | Toggle build / play mode                           |
-| `T`                         | Guided tour (play mode) / cycle tools (build mode) |
-| `M`                         | World map                                          |
-| `F1`                        | First / third person                               |
-| `K` / `Shift`+`K`           | Next / previous player looping animation           |
-| `L`                         | Headlamp                                           |
-| `H`                         | Build-mode hand preview                            |
-| `E`                         | Talk to a nearby NPC                               |
-| `P` / `Shift`+`P`           | Next / previous pose for the aimed NPC             |
-| `O` / `Shift`+`O`           | Next / previous NPC looping animation              |
-| Left / middle / right click | Break / pick / place                               |
-| `1–9`, mouse wheel          | Hotbar slot                                        |
-| `I`                         | Creative inventory                                 |
-| `V`                         | Placement ghost                                    |
-| `X` / `G` / `R` / `C`       | Fill / clear / replace / copy region               |
-| `[` `]`, `U`, `+`/`-`       | Rotate / mirror / array a paste                    |
-| Arrows, `PgUp`/`PgDn`, `N`  | Nudge a paste on X/Z, up/down, reset               |
-| `Ctrl`+`Z` / `Ctrl`+`Y`     | Undo / redo                                        |
-| `Shift` + wheel             | Adjust reach                                       |
-| `Esc`                       | Close / cancel                                     |
+| Input                       | Action                                               |
+| --------------------------- | ---------------------------------------------------- |
+| `WASD` / mouse              | Move / look                                          |
+| Double-tap `W`              | Sprint                                               |
+| `Space` / `Shift`           | Up (jump) / down                                     |
+| `F`                         | Toggle fly                                           |
+| `B`                         | Toggle build / play mode                             |
+| `T`                         | Guided tour (play mode) / cycle presets (build mode) |
+| `M`                         | World map                                            |
+| `F1`                        | First / third person                                 |
+| `K` / `Shift`+`K`           | Next / previous player looping animation             |
+| `L`                         | Headlamp                                             |
+| `H`                         | Build-mode hand preview                              |
+| `E`                         | Talk to a nearby NPC                                 |
+| `P` / `Shift`+`P`           | Next / previous pose for the aimed NPC               |
+| `O` / `Shift`+`O`           | Next / previous NPC looping animation                |
+| Left / middle / right click | Use brush / pick / place                             |
+| `1–9`, mouse wheel          | Hotbar slot                                          |
+| `I`                         | Creative inventory                                   |
+| `V`                         | Placement ghost                                      |
+| `X` / `G` / `R` / `C`       | Fill / clear / replace / copy region                 |
+| `[` `]`, `U`, `+`/`-`       | Rotate / mirror / array a paste                      |
+| Arrows, `PgUp`/`PgDn`, `N`  | Nudge a paste on X/Z, up/down, reset                 |
+| `Ctrl`+`Z` / `Ctrl`+`Y`     | Undo / redo                                          |
+| `Shift` + wheel             | Adjust reach                                         |
+| Hold left click + wheel     | Adjust brush size                                    |
+| `Alt` + brush               | Temporarily swap Clear / Fill                        |
+| `Esc`                       | Close / cancel                                       |
 
 ## Worlds
 

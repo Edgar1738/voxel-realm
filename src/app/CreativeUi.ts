@@ -3,7 +3,22 @@ import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
 import { renderBlockIcon } from './blockIcon';
-import { TUNNEL_SIZES, TUNNEL_LENGTHS, TUNNEL_PATHS, type TunnelConfig } from '../edit/Brushes';
+import {
+  BRUSH_ACTIONS,
+  BRUSH_GESTURES,
+  BRUSH_SHAPES,
+  MAX_BRUSH_SIZE,
+  MIN_BRUSH_SIZE,
+  TUNNEL_SIZES,
+  TUNNEL_LENGTHS,
+  TUNNEL_PATHS,
+  clampBrushSize,
+  type BrushAction,
+  type BrushConfig,
+  type BrushGesture,
+  type BrushShape,
+  type TunnelConfig,
+} from '../edit/Brushes';
 import {
   swatchFlatColor,
   buildIcon,
@@ -95,7 +110,7 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   },
   {
     heading: 'Modes',
-    lines: ['B build / play', 'T tour (play) / tools (build)', 'Esc close / cancel'],
+    lines: ['B build / play', 'T tour (play) / cycle preset (build)', 'Esc close / cancel'],
   },
   {
     heading: 'Blocks',
@@ -103,7 +118,17 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   },
   {
     heading: 'Build tools',
-    lines: ['X fill', 'G clear', 'R replace', 'C copy', 'Ctrl+Z / Ctrl+Y undo / redo'],
+    lines: [
+      'Choose Gesture + Shape + Action',
+      'Line: click two points',
+      'Hold + wheel brush size',
+      'Alt swaps Clear / Fill',
+      'X fill',
+      'G clear',
+      'R replace',
+      'C copy',
+      'Ctrl+Z / Ctrl+Y undo / redo',
+    ],
   },
   {
     heading: 'Blueprint paste',
@@ -180,6 +205,11 @@ export interface PlayerSkinUiConfig {
   onCycle: () => void;
 }
 
+export interface BrushUiConfig {
+  initial: BrushConfig;
+  onChange: (config: BrushConfig) => void;
+}
+
 /** DOM handles for the creative HUD; pure construction, no game logic. */
 export interface CreativeUi {
   /** Removes the mounted UI, active modal listeners, and pending status timers. */
@@ -222,6 +252,8 @@ export interface CreativeUi {
   setTimeUi(t: number): void;
   /** Highlights the button for `tool` and dims the rest. */
   setActiveTool(tool: string): void;
+  /** Reflects the active composable brush recipe without firing its change callback. */
+  setBrushConfig(config: BrushConfig): void;
   /** Updates the dock's reach readout (the +/- buttons report steps via onReachStep). */
   setReachValue(reach: number): void;
   /** Syncs the dock's hold-to-repeat toggle button to the current setting. */
@@ -313,6 +345,7 @@ export function createCreativeUi(
   onHoldRepeatToggle?: () => void,
   skinSelector?: PlayerSkinUiConfig,
   handSelector?: PlayerSkinUiConfig,
+  brushSelector?: BrushUiConfig,
 ): CreativeUi {
   const root = document.createElement('div');
   root.id = 'creative-ui';
@@ -325,24 +358,42 @@ export function createCreativeUi(
 
   const toolRow = document.createElement('div');
   toolRow.className = 'creative-tools';
-  toolRow.setAttribute('role', 'group');
-  toolRow.setAttribute('aria-label', 'Edit tool');
-  // Two-tier rail: Single + Tunnel are the primary dig controls; the rest are secondary.
-  const PRIMARY_TOOLS = new Set(['single', 'tunnel']);
+  toolRow.setAttribute('aria-label', 'Power brush');
+
+  let brushConfig: BrushConfig = {
+    ...(brushSelector?.initial ?? {
+      gesture: 'single',
+      shape: 'voxel',
+      action: 'clear',
+      size: 1,
+      shell: false,
+      noise: false,
+    }),
+  };
   const toolButtons = new Map<string, HTMLButtonElement>();
-  let dividerAdded = false;
-  for (const t of tools) {
-    const primary = PRIMARY_TOOLS.has(t);
-    if (!primary && !dividerAdded) {
-      const divider = document.createElement('span');
-      divider.className = 'tool-divider';
-      divider.setAttribute('aria-hidden', 'true');
-      toolRow.append(divider);
-      dividerAdded = true;
-    }
+  const gestureButtons = new Map<BrushGesture, HTMLButtonElement>();
+  const shapeButtons = new Map<BrushShape, HTMLButtonElement>();
+  const actionButtons = new Map<BrushAction, HTMLButtonElement>();
+
+  const toolCluster = (label: string): { root: HTMLDivElement; options: HTMLDivElement } => {
+    const cluster = document.createElement('div');
+    cluster.className = 'tool-cluster';
+    const caption = document.createElement('span');
+    caption.className = 'tool-cluster-label';
+    caption.textContent = label;
+    const options = document.createElement('div');
+    options.className = 'tool-cluster-options';
+    options.setAttribute('role', 'group');
+    options.setAttribute('aria-label', label);
+    cluster.append(caption, options);
+    return { root: cluster, options };
+  };
+
+  const quickCluster = toolCluster('Quick');
+  for (const t of tools.filter((candidate) => candidate === 'single' || candidate === 'tunnel')) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = primary ? 'tool-btn primary' : 'tool-btn secondary';
+    b.className = 'tool-btn primary';
     b.dataset.tool = t;
     const label = toolLabel(t);
     const text = document.createElement('span');
@@ -351,8 +402,79 @@ export function createCreativeUi(
     b.title = label;
     b.addEventListener('click', () => onSelectTool(t));
     toolButtons.set(t, b);
-    toolRow.append(b);
+    quickCluster.options.append(b);
   }
+
+  const selectBrushOption = <K extends 'gesture' | 'shape' | 'action'>(
+    key: K,
+    value: BrushConfig[K],
+  ): void => {
+    // Any composable choice exits the one-click Tunnel preset. Its dedicated settings remain
+    // available by clicking Quick: Tunnel again.
+    const gesture =
+      brushConfig.gesture === 'tunnel' && key !== 'gesture' ? 'stroke' : brushConfig.gesture;
+    const size =
+      key === 'shape' && brushConfig.shape === 'voxel' && value !== 'voxel' ? 4 : brushConfig.size;
+    brushSelector?.onChange({ ...brushConfig, gesture, size, [key]: value });
+  };
+
+  const brushOption = <K extends 'gesture' | 'shape' | 'action'>(
+    key: K,
+    value: BrushConfig[K],
+    label: string,
+  ): HTMLButtonElement => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tool-btn secondary';
+    b.append(buildToolIcon(String(value)), document.createTextNode(label));
+    b.title = label;
+    b.addEventListener('click', () => selectBrushOption(key, value));
+    return b;
+  };
+
+  const gestureCluster = toolCluster('Gesture');
+  for (const gesture of BRUSH_GESTURES) {
+    const label = gesture === 'single' ? 'Stamp' : toolLabel(gesture);
+    const b = brushOption('gesture', gesture, label);
+    gestureButtons.set(gesture, b);
+    gestureCluster.options.append(b);
+  }
+
+  const shapeCluster = toolCluster('Shape');
+  for (const shape of BRUSH_SHAPES.filter((candidate) =>
+    ['sphere', 'box', 'cylinder'].includes(candidate),
+  )) {
+    const b = brushOption('shape', shape, toolLabel(shape));
+    shapeButtons.set(shape, b);
+    shapeCluster.options.append(b);
+  }
+  const moreShapes = document.createElement('span');
+  moreShapes.className = 'tool-more-shapes';
+  moreShapes.hidden = true;
+  for (const shape of BRUSH_SHAPES.filter((candidate) =>
+    ['voxel', 'disc', 'ring'].includes(candidate),
+  )) {
+    const b = brushOption('shape', shape, toolLabel(shape));
+    shapeButtons.set(shape, b);
+    moreShapes.append(b);
+  }
+  const moreShapesButton = button('More');
+  moreShapesButton.className = 'tool-btn secondary more-tools-btn';
+  moreShapesButton.setAttribute('aria-expanded', 'false');
+  moreShapesButton.addEventListener('click', () => {
+    moreShapes.hidden = !moreShapes.hidden;
+    moreShapesButton.setAttribute('aria-expanded', String(!moreShapes.hidden));
+  });
+  shapeCluster.options.append(moreShapes, moreShapesButton);
+
+  const actionCluster = toolCluster('Action');
+  for (const action of BRUSH_ACTIONS) {
+    const b = brushOption('action', action, toolLabel(action));
+    actionButtons.set(action, b);
+    actionCluster.options.append(b);
+  }
+
+  toolRow.append(quickCluster.root, gestureCluster.root, shapeCluster.root, actionCluster.root);
 
   // Tunnel settings strip: Size / Length / Path segmented controls, on its own dock row.
   let tunnelConfig: TunnelConfig = {
@@ -409,10 +531,9 @@ export function createCreativeUi(
     tunnelGroup('Path', 'path', TUNNEL_PATHS, (v) => v[0].toUpperCase() + v.slice(1)),
   );
 
-  let activeToolId = '';
   let playModeUi = false;
   const refreshTunnelStrip = (): void => {
-    tunnelSettings.style.display = activeToolId === 'tunnel' && !playModeUi ? '' : 'none';
+    tunnelSettings.style.display = brushConfig.gesture === 'tunnel' && !playModeUi ? '' : 'none';
   };
   refreshTunnelStrip();
 
@@ -455,16 +576,123 @@ export function createCreativeUi(
   setReachValue(0); // placeholder; Game reports the real value right after boot
 
   // Hold-to-repeat toggle: when off, holding a mouse button only ever edits once.
+  let holdRepeatOn = true;
+  let refreshBrushRecipe = (): void => {};
   const holdButton = button('Hold');
   holdButton.className = 'hold-btn';
   holdButton.title = 'Hold-to-repeat: keep digging/placing while a mouse button is held';
   holdButton.addEventListener('click', () => onHoldRepeatToggle?.());
   const setHoldRepeatUi = (enabled: boolean): void => {
+    holdRepeatOn = enabled;
     holdButton.textContent = enabled ? 'Hold: On' : 'Hold: Off';
     holdButton.classList.toggle('active', enabled);
     holdButton.setAttribute('aria-pressed', String(enabled));
+    refreshBrushRecipe();
   };
   setHoldRepeatUi(true);
+
+  const brushSettings = document.createElement('div');
+  brushSettings.className = 'brush-settings';
+  const brushSettingsPanel = document.createElement('div');
+  brushSettingsPanel.className = 'brush-settings-panel';
+
+  const brushSizeGroup = document.createElement('label');
+  brushSizeGroup.className = 'brush-size-group';
+  const brushSizeHeading = document.createElement('span');
+  brushSizeHeading.className = 'brush-size-heading';
+  const brushSizeCaption = document.createElement('span');
+  brushSizeCaption.textContent = 'Size';
+  const brushSizeValue = document.createElement('span');
+  const brushSizeSlider = document.createElement('input');
+  brushSizeSlider.type = 'range';
+  brushSizeSlider.className = 'brush-size-slider';
+  brushSizeSlider.min = String(MIN_BRUSH_SIZE);
+  brushSizeSlider.max = String(MAX_BRUSH_SIZE);
+  brushSizeSlider.step = '1';
+  brushSizeSlider.setAttribute('aria-label', 'Brush size');
+  brushSizeHeading.append(brushSizeCaption, brushSizeValue);
+  brushSizeGroup.append(brushSizeHeading, brushSizeSlider);
+  brushSizeSlider.addEventListener('input', () => {
+    brushSelector?.onChange({
+      ...brushConfig,
+      size: clampBrushSize(Number(brushSizeSlider.value)),
+    });
+  });
+
+  const modifierGroup = document.createElement('div');
+  modifierGroup.className = 'brush-modifiers';
+  modifierGroup.setAttribute('role', 'group');
+  modifierGroup.setAttribute('aria-label', 'Brush behavior');
+  const shellButton = button('Shell');
+  shellButton.className = 'hold-btn brush-modifier-btn';
+  shellButton.title = 'Hollow shape: keep only the outer voxel layer';
+  shellButton.addEventListener('click', () =>
+    brushSelector?.onChange({ ...brushConfig, shell: !brushConfig.shell }),
+  );
+  const noiseButton = button('Noise');
+  noiseButton.className = 'hold-btn brush-modifier-btn';
+  noiseButton.title = 'Roughen the outer edge for more organic terrain';
+  noiseButton.addEventListener('click', () =>
+    brushSelector?.onChange({ ...brushConfig, noise: !brushConfig.noise }),
+  );
+  modifierGroup.append(holdButton, shellButton, noiseButton);
+
+  const brushRecipe = document.createElement('span');
+  brushRecipe.className = 'brush-recipe';
+  brushRecipe.setAttribute('role', 'status');
+  brushRecipe.setAttribute('aria-live', 'polite');
+
+  refreshBrushRecipe = (): void => {
+    const parts = [
+      brushConfig.gesture === 'single'
+        ? 'Stamp'
+        : brushConfig.gesture[0].toUpperCase() + brushConfig.gesture.slice(1),
+      toolLabel(brushConfig.shape),
+      toolLabel(brushConfig.action),
+      holdRepeatOn && brushConfig.gesture !== 'line' ? 'Hold' : '',
+      brushConfig.shell ? 'Shell' : '',
+      brushConfig.noise ? 'Noise' : '',
+    ].filter(Boolean);
+    brushRecipe.textContent = parts.join(' · ');
+    brushRecipe.title = 'Alt temporarily swaps Clear and Fill; wheel changes size while holding';
+  };
+
+  const setBrushConfig = (config: BrushConfig): void => {
+    brushConfig = { ...config, size: clampBrushSize(config.size) };
+    for (const [gesture, b] of gestureButtons) {
+      const active = brushConfig.gesture === gesture;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
+    for (const [shape, b] of shapeButtons) {
+      const active = brushConfig.shape === shape;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
+    for (const [action, b] of actionButtons) {
+      const active = brushConfig.action === action;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', String(active));
+    }
+    const extraShape = ['disc', 'ring'].includes(brushConfig.shape);
+    if (extraShape) {
+      moreShapes.hidden = false;
+      moreShapesButton.setAttribute('aria-expanded', 'true');
+    }
+    brushSizeSlider.value = String(brushConfig.size);
+    brushSizeValue.textContent = `${brushConfig.size} blocks`;
+    brushSizeGroup.hidden = brushConfig.shape === 'voxel' || brushConfig.gesture === 'tunnel';
+    shellButton.classList.toggle('active', brushConfig.shell);
+    shellButton.setAttribute('aria-pressed', String(brushConfig.shell));
+    noiseButton.classList.toggle('active', brushConfig.noise);
+    noiseButton.setAttribute('aria-pressed', String(brushConfig.noise));
+    refreshTunnelStrip();
+    refreshBrushRecipe();
+  };
+
+  brushSettingsPanel.append(brushSizeGroup, modifierGroup, tunnelSettings, brushRecipe);
+  brushSettings.append(brushSettingsPanel);
+  setBrushConfig(brushConfig);
 
   // Skin selector: built-in id/name only. Future custom skins should validate before reaching UI.
   const skinButton = button('');
@@ -559,11 +787,10 @@ export function createCreativeUi(
   setWeatherUi('auto');
   setTimeUi(0.5);
 
-  // tunnelSettings goes last with flex-basis 100% so it wraps onto its own dock row.
+  // Power-brush settings go last with flex-basis 100% so they wrap onto their own dock row.
   dock.append(
     toolRow,
     reachGroup,
-    holdButton,
     skinButton,
     handButton,
     soundGroup,
@@ -573,7 +800,7 @@ export function createCreativeUi(
     blueprintButton,
     worldButton,
     reset,
-    tunnelSettings,
+    brushSettings,
   );
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
@@ -791,7 +1018,7 @@ export function createCreativeUi(
     refreshTunnelStrip();
     toolRow.style.display = play ? 'none' : '';
     reachGroup.style.display = play ? 'none' : '';
-    holdButton.style.display = play ? 'none' : '';
+    brushSettings.style.display = play ? 'none' : '';
     hotbar.style.display = play ? 'none' : '';
     reset.style.display = play ? 'none' : '';
     blueprintButton.style.display = play ? 'none' : '';
@@ -1382,7 +1609,10 @@ export function createCreativeUi(
   });
 
   const setActiveTool = (tool: string): void => {
-    activeToolId = tool;
+    if (tool === 'single' || tool === 'tunnel') {
+      moreShapes.hidden = true;
+      moreShapesButton.setAttribute('aria-expanded', 'false');
+    }
     refreshTunnelStrip();
     for (const [id, btn] of toolButtons) {
       btn.classList.toggle('active', id === tool);
@@ -1491,6 +1721,7 @@ export function createCreativeUi(
     setWeatherUi,
     setTimeUi,
     setActiveTool,
+    setBrushConfig,
     setReachValue,
     setHoldRepeatUi,
     setStatus,

@@ -25,6 +25,7 @@ import {
   npcAnimationDirection,
   playerAnimationDirection,
   PLAY_MODE_BUILD_HINT,
+  brushConfigForTool,
   type ReachStorage,
 } from '../src/app/input';
 
@@ -210,6 +211,27 @@ describe('toolLabel', () => {
     expect(() => toolLabel('box--clear')).not.toThrow();
     expect(toolLabel('box--clear')).toBe('Box  Clear');
     expect(toolLabel('')).toBe('');
+  });
+});
+
+describe('legacy tool brush recipes', () => {
+  it('preserves the common Single, Tunnel, Sphere, and region workflows', () => {
+    expect(brushConfigForTool('single')).toMatchObject({
+      gesture: 'single',
+      shape: 'voxel',
+      action: 'clear',
+    });
+    expect(brushConfigForTool('tunnel')).toMatchObject({ gesture: 'tunnel', action: 'clear' });
+    expect(brushConfigForTool('sphere')).toMatchObject({
+      gesture: 'single',
+      shape: 'sphere',
+      size: 4,
+    });
+    expect(brushConfigForTool('fill')).toMatchObject({
+      gesture: 'line',
+      shape: 'box',
+      action: 'fill',
+    });
   });
 });
 
