@@ -14,7 +14,7 @@ import { CASTLE_PALETTES, castleWallMaterial } from '../src/worldgen/MaterialPal
 describe('material families', () => {
   it('keeps new ids append-only, creative, and texture-backed', () => {
     const ids = BLOCK_DEFS.filter((d) => d.id >= 49).map((d) => d.id);
-    expect(ids).toEqual(Array.from({ length: 35 }, (_, i) => i + 49));
+    expect(ids).toEqual(Array.from({ length: 40 }, (_, i) => i + 49));
     for (const id of ids) {
       expect(CREATIVE_BLOCKS).toContain(id);
       expect(BLOCK_TEXTURES.faceLayers.get(id)).toHaveLength(6);

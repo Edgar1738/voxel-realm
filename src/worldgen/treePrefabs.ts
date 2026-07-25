@@ -1,8 +1,22 @@
 import { mulberry32 } from '../core/math';
-import { WOOD, LEAVES, GRASS, SNOW, MUD, CACTUS, SAND } from '../blocks/blocks';
+import {
+  WOOD,
+  LEAVES,
+  GRASS,
+  SNOW,
+  MUD,
+  CACTUS,
+  SAND,
+  BIRCH_LOG,
+  BIRCH_LEAVES,
+  SPRUCE_LOG,
+  SPRUCE_NEEDLES,
+  DEADWOOD,
+  DRY_GRASS,
+} from '../blocks/blocks';
 import { scatterStructures } from './Structures';
 import { BiomeMap, Biome } from './BiomeMap';
-import { surfaceCap } from './SurfacePainter';
+import { surfaceCap, patchedCap } from './SurfacePainter';
 import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { ScatterOptions } from './Structures';
 import type { Overlay } from './Generator';
@@ -39,13 +53,13 @@ interface Canopy {
 }
 
 /** Build a broadleaf tree (oak/birch/swamp): a centered trunk under a layered, edge-noised blob. */
-function blob(variantSeed: number, c: Canopy): Prefab {
+function blob(variantSeed: number, c: Canopy, log: BlockId = WOOD, leaf: BlockId = LEAVES): Prefab {
   const rng = mulberry32(variantSeed >>> 0);
   const blocks: PrefabVoxel[] = [];
 
   const trunkHeight = c.trunk[0] + Math.floor(rng() * (c.trunk[1] - c.trunk[0] + 1));
   const trunkTop = trunkHeight - 1;
-  for (let y = 0; y <= trunkTop; y++) blocks.push([CENTER, y, CENTER, WOOD]);
+  for (let y = 0; y <= trunkTop; y++) blocks.push([CENTER, y, CENTER, log]);
 
   // Stacked discs whose radius swells then tapers -> a rounded blob rather than a box. The canopy
   // starts just below the trunk top so foliage hugs the crown.
@@ -65,24 +79,24 @@ function blob(variantSeed: number, c: Canopy): Prefab {
         const d2 = dx * dx + dz * dz;
         if (d2 > r2 + 1) continue; // circular mask trims the square corners
         if (d2 >= r2 && rng() < c.edgeNoise) continue; // edge noise thins the rim
-        blocks.push([CENTER + dx, cy, CENTER + dz, LEAVES]);
+        blocks.push([CENTER + dx, cy, CENTER + dz, leaf]);
       }
     }
   }
   const crownY = canopyBottom + layers;
-  blocks.push([CENTER, crownY, CENTER, LEAVES]);
+  blocks.push([CENTER, crownY, CENTER, leaf]);
 
   return { dims: [OAK_FOOTPRINT, crownY + 1, OAK_FOOTPRINT], blocks };
 }
 
 /** Build a conifer (pine/spruce): a tall trunk under stacked conical rings tapering to a tip. */
-function conifer(variantSeed: number): Prefab {
+function conifer(variantSeed: number, log: BlockId = WOOD, leaf: BlockId = LEAVES): Prefab {
   const rng = mulberry32(variantSeed >>> 0);
   const blocks: PrefabVoxel[] = [];
 
   const trunkHeight = 7 + Math.floor(rng() * 3); // 7..9, taller than the broadleaves
   const trunkTop = trunkHeight - 1;
-  for (let y = 0; y <= trunkTop; y++) blocks.push([CENTER, y, CENTER, WOOD]);
+  for (let y = 0; y <= trunkTop; y++) blocks.push([CENTER, y, CENTER, log]);
 
   const base = Math.max(1, Math.floor(trunkTop * 0.4)); // foliage starts partway up the trunk
   const tip = trunkTop + 2;
@@ -90,7 +104,7 @@ function conifer(variantSeed: number): Prefab {
   for (let cy = base; cy <= tip; cy++) {
     const radius = Math.round(MAX_CANOPY_RADIUS * ((tip - cy) / span)); // widest at base -> 0 at tip
     if (radius <= 0) {
-      if (cy > trunkTop) blocks.push([CENTER, cy, CENTER, LEAVES]);
+      if (cy > trunkTop) blocks.push([CENTER, cy, CENTER, leaf]);
       continue;
     }
     const r2 = radius * radius;
@@ -100,7 +114,7 @@ function conifer(variantSeed: number): Prefab {
         const d2 = dx * dx + dz * dz;
         if (d2 > r2 + 1) continue;
         if (d2 >= r2 && rng() < 0.25) continue; // light rim noise for a ragged conifer edge
-        blocks.push([CENTER + dx, cy, CENTER + dz, LEAVES]);
+        blocks.push([CENTER + dx, cy, CENTER + dz, leaf]);
       }
     }
   }
@@ -142,14 +156,33 @@ export function oakVariants(): Prefab[] {
   return variants(0x0000, (s) => blob(s, OAK_CANOPY));
 }
 
-/** Birch: a taller, slimmer trunk under a narrower crown. */
+/** Birch: a taller, slimmer trunk under a narrower crown, in its own pale wood + light leaves. */
 export function birchVariants(): Prefab[] {
-  return variants(0xb17c, (s) => blob(s, BIRCH_CANOPY));
+  return variants(0xb17c, (s) => blob(s, BIRCH_CANOPY, BIRCH_LOG, BIRCH_LEAVES));
 }
 
-/** Conifers (pine/spruce): tall trunks under tapering conical foliage, for snowy ground. */
+/** Conifers (pine/spruce): tall trunks under tapering conical foliage, in dark spruce materials. */
 export function coniferVariants(): Prefab[] {
-  return variants(0xc09f, conifer);
+  return variants(0xc09f, (s) => conifer(s, SPRUCE_LOG, SPRUCE_NEEDLES));
+}
+
+/** Bare weathered snags: a short deadwood trunk with one stub arm, for parched ground. */
+export function deadwoodVariants(): Prefab[] {
+  return variants(0xdeadb, (s) => {
+    const rng = mulberry32(s >>> 0);
+    const blocks: PrefabVoxel[] = [];
+    const h = 3 + Math.floor(rng() * 3); // 3..5
+    for (let y = 0; y < h; y++) blocks.push([CENTER, y, CENTER, DEADWOOD]);
+    const dirs: Array<[number, number]> = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ];
+    const [ax, az] = dirs[Math.floor(rng() * dirs.length)];
+    blocks.push([CENTER + ax, Math.max(1, h - 2), CENTER + az, DEADWOOD]);
+    return { dims: [OAK_FOOTPRINT, h + 1, OAK_FOOTPRINT], blocks };
+  });
 }
 
 /** Swamp oak: a short trunk under a wide, low, drooping canopy. */
@@ -282,10 +315,36 @@ export function scatterForest(
     seaLevel,
     { cellSize: 11, density: 0.7, salt: 0x5a3b, ...extra },
   );
+  // Sparse bare snags on the parched dry-grass patches — gated on the PATCHED cap, so
+  // they only ever stand where the SurfacePainter actually painted dry grass.
+  const [tdx, tdz] = OAK_TRUNK_OFFSET;
+  const seatAt: HeightAt = (s, x, z) => surfaceAt(s, x, z) + 1;
+  const emptyHeights = new Int16Array(0); // patchedCap never reads ctx.heights/cx/cz
+  const deadwood = scatterStructures(
+    deadwoodVariants(),
+    oakScatterOptions(seatAt, {
+      cellSize: 16,
+      density: 0.25,
+      salt: 0xdea0,
+      ...extra,
+      canPlace: (c) => {
+        const tx = c.ox + tdx;
+        const tz = c.oz + tdz;
+        const h = Math.round(surfaceAt(c.seed, tx, tz));
+        const biomes = biomesFor(c.seed);
+        const biome = biomes.biomeAt(tx, tz);
+        const cap = surfaceCap(h, biome, seaLevel);
+        if (cap !== GRASS) return false;
+        const ctx = { seed: c.seed, cx: 0, cz: 0, heights: emptyHeights, seaLevel, biomes };
+        return patchedCap(cap, tx, tz, h, biome, ctx) === DRY_GRASS;
+      },
+    }),
+  );
   return (chunk, cx, cz, seed) => {
     broadleaf(chunk, cx, cz, seed);
     conifers(chunk, cx, cz, seed);
     swampOaks(chunk, cx, cz, seed);
+    deadwood(chunk, cx, cz, seed);
   };
 }
 

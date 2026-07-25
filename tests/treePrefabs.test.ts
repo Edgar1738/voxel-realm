@@ -20,7 +20,17 @@ import { BiomeMap, Biome } from '../src/worldgen/BiomeMap';
 import { validatePrefab } from '../src/core/Prefab';
 import { ChunkData } from '../src/world/ChunkData';
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL, WORLD_HEIGHT } from '../src/core/constants';
-import { WOOD, LEAVES, CACTUS, SAND } from '../src/blocks/blocks';
+import {
+  WOOD,
+  LEAVES,
+  CACTUS,
+  SAND,
+  BIRCH_LOG,
+  BIRCH_LEAVES,
+  SPRUCE_LOG,
+  SPRUCE_NEEDLES,
+  DEADWOOD,
+} from '../src/blocks/blocks';
 
 const variants = oakVariants();
 
@@ -84,13 +94,14 @@ describe('oakVariants', () => {
 });
 
 describe('tree species libraries', () => {
-  const species: Array<{ name: string; make: () => Prefab[] }> = [
-    { name: 'birch', make: birchVariants },
-    { name: 'conifer', make: coniferVariants },
-    { name: 'swampOak', make: swampOakVariants },
+  // Birch and spruce use their own species materials; swamp oak keeps the shared WOOD/LEAVES.
+  const species: Array<{ name: string; make: () => Prefab[]; log: number; leaf: number }> = [
+    { name: 'birch', make: birchVariants, log: BIRCH_LOG, leaf: BIRCH_LEAVES },
+    { name: 'conifer', make: coniferVariants, log: SPRUCE_LOG, leaf: SPRUCE_NEEDLES },
+    { name: 'swampOak', make: swampOakVariants, log: WOOD, leaf: LEAVES },
   ];
 
-  for (const { name, make } of species) {
+  for (const { name, make, log, leaf } of species) {
     describe(name, () => {
       const variants = make();
 
@@ -109,7 +120,7 @@ describe('tree species libraries', () => {
           expect(v.dims[0]).toBe(OAK_FOOTPRINT);
           expect(v.dims[2]).toBe(OAK_FOOTPRINT);
           const ys = v.blocks
-            .filter(([x, , z, id]) => x === cx && z === cz && id === WOOD)
+            .filter(([x, , z, id]) => x === cx && z === cz && id === log)
             .map((b) => b[1])
             .sort((a, b) => a - b);
           expect(ys[0]).toBe(0);
@@ -120,7 +131,7 @@ describe('tree species libraries', () => {
 
       it('has a rounded leaf canopy, not a solid cube', () => {
         for (const v of variants) {
-          const leaves = v.blocks.filter((b) => b[3] === LEAVES);
+          const leaves = v.blocks.filter((b) => b[3] === leaf);
           expect(leaves.length).toBeGreaterThan(0);
           const xs = leaves.map((b) => b[0]);
           const ys = leaves.map((b) => b[1]);
@@ -288,6 +299,10 @@ describe('scatterForest (biome-accurate species dispatch)', () => {
   const grassy = (): number => 70; // temperate altitude -> mostly GRASS
   const beachy = (): number => SEA_LEVEL; // shoreline -> SAND
 
+  // Any species' trunk/foliage counts — birch and spruce plant their own materials now.
+  const LOGS = new Set<number>([WOOD, BIRCH_LOG, SPRUCE_LOG, DEADWOOD]);
+  const FOLIAGE = new Set<number>([LEAVES, BIRCH_LEAVES, SPRUCE_NEEDLES]);
+
   function counts(overlay: ReturnType<typeof scatterForest>): { wood: number; leaves: number } {
     let wood = 0;
     let leaves = 0;
@@ -296,8 +311,8 @@ describe('scatterForest (biome-accurate species dispatch)', () => {
         const c = new ChunkData(cx, cz);
         overlay(c, cx, cz, 1337);
         for (const v of c.data) {
-          if (v === WOOD) wood++;
-          else if (v === LEAVES) leaves++;
+          if (LOGS.has(v)) wood++;
+          else if (FOLIAGE.has(v)) leaves++;
         }
       }
     }

@@ -103,6 +103,14 @@ export const PEAT: BlockId = 81;
 export const MUSHROOM: BlockId = 82;
 /** Twiggy dry shrub (cross plant) for parched ground. */
 export const DRY_SHRUB: BlockId = 83;
+// Species vegetation: birch and spruce get their own materials so forests stop being
+// one wood + one leaf. Oak keeps WOOD/LEAVES for full save compatibility.
+export const BIRCH_LOG: BlockId = 84;
+export const BIRCH_LEAVES: BlockId = 85;
+export const SPRUCE_LOG: BlockId = 86;
+export const SPRUCE_NEEDLES: BlockId = 87;
+/** Weathered bare deadwood — snags, driftwood, and dry-country accents. */
+export const DEADWOOD: BlockId = 88;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -1080,6 +1088,73 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     shape: 'cross',
     faces: { pattern: 'tallGrass', colors: [[136, 106, 60]] },
+  },
+  {
+    id: BIRCH_LOG,
+    name: 'birch log',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: { pattern: 'rings', colors: [[196, 182, 152]] },
+      // Pale papery bark; the pattern's dark cracks read as birch's black scoring.
+      side: { pattern: 'bark', colors: [[206, 202, 188]], variants: 2 },
+      bottom: { pattern: 'rings', colors: [[196, 182, 152]] },
+    },
+  },
+  {
+    id: BIRCH_LEAVES,
+    name: 'birch leaves',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    tint: 'foliage',
+    faces: {
+      pattern: 'leaves',
+      colors: [[96, 138, 62]],
+      variants: 3,
+      rotate: true,
+      drift: 'foliage',
+    },
+  },
+  {
+    id: SPRUCE_LOG,
+    name: 'spruce log',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: { pattern: 'rings', colors: [[132, 100, 64]] },
+      side: { pattern: 'bark', colors: [[76, 56, 38]], variants: 2 },
+      bottom: { pattern: 'rings', colors: [[132, 100, 64]] },
+    },
+  },
+  {
+    id: SPRUCE_NEEDLES,
+    name: 'spruce needles',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    tint: 'foliage',
+    faces: {
+      pattern: 'leaves',
+      colors: [[40, 84, 58]],
+      variants: 3,
+      rotate: true,
+      drift: 'foliage',
+    },
+  },
+  {
+    id: DEADWOOD,
+    name: 'deadwood',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: { pattern: 'rings', colors: [[142, 134, 120]] },
+      side: { pattern: 'bark', colors: [[118, 110, 100]], variants: 2 },
+      bottom: { pattern: 'rings', colors: [[142, 134, 120]] },
+    },
   },
 ];
 
