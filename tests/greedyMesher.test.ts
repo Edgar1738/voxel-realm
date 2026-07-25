@@ -161,8 +161,9 @@ describe('GreedyMesher exact output (regression guard for pooling)', () => {
       0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 8, 9, 10, 8, 10, 11, 12, 14, 13, 12, 15, 14, 16, 17, 18,
       16, 18, 19, 20, 22, 21, 20, 23, 22,
     ]);
-    // All 6 faces × 4 vertices use the same stone layer (3).
-    expect(Array.from(mesh.layers)).toEqual(new Array(24).fill(3));
+    // All 6 faces × 4 vertices use the same stone layer (derived — variant groups shift indices).
+    const stoneLayer = reg.faceLayer(STONE, Face.PosX);
+    expect(Array.from(mesh.layers)).toEqual(new Array(24).fill(stoneLayer));
     // No AO occluders → all corners at full brightness (1.0).
     expect(Array.from(mesh.ao)).toEqual(new Array(24).fill(1));
     // No sky or block light → light = 0.
@@ -208,8 +209,9 @@ describe('GreedyMesher exact output – multi-voxel stale-buffer regression', ()
       49, 50, 48, 50, 51, 52, 53, 54, 52, 54, 55, 56, 57, 58, 56, 58, 59, 60, 62, 61, 60, 63, 62,
       64, 66, 65, 64, 67, 66, 68, 70, 69, 68, 71, 70,
     ]);
-    // All faces are STONE (layer 3).
-    expect(Array.from(mesh.layers)).toEqual(new Array(72).fill(3));
+    // All faces are STONE (layer derived — variant groups shift indices).
+    const stoneLayer = reg.faceLayer(STONE, Face.PosX);
+    expect(Array.from(mesh.layers)).toEqual(new Array(72).fill(stoneLayer));
     // No AO occluders → all corners at full brightness (1.0).
     expect(Array.from(mesh.ao)).toEqual(new Array(72).fill(1));
     // No sky or block light → light = 0.

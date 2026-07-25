@@ -1,6 +1,6 @@
 import { DirectionalLight, HemisphereLight } from 'three';
 import { Renderer } from '../render/Renderer';
-import { createTextureArray, mipmappedArray } from '../render/TextureArray';
+import { createTextureArray, mipmappedArray, createTextureMetaLUT } from '../render/TextureArray';
 import {
   createChunkMaterial,
   createTransparentMaterial,
@@ -204,8 +204,10 @@ export class Game {
     // Opaque/transparent block faces use a mipmapped sibling (less distant shimmer); the cutout
     // plant pass keeps the crisp base so mip alpha-averaging can't erode thin foliage at range.
     const mipTexture = mipmappedArray(texture);
-    const material = createChunkMaterial(mipTexture);
-    const transparentMaterial = createTransparentMaterial(mipTexture);
+    // Per-layer variant/drift metadata for the shader's world-space texture variation.
+    const metaLUT = createTextureMetaLUT();
+    const material = createChunkMaterial(mipTexture, metaLUT);
+    const transparentMaterial = createTransparentMaterial(mipTexture, metaLUT);
     const cutoutMaterial = createCutoutMaterial(texture);
     const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
     const daynight = new DayNight(renderer.scene, chunkMaterials);

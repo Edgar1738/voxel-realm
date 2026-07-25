@@ -1,5 +1,5 @@
 import type { BlockId } from '../core/types';
-import type { TextureSpec, FaceTextures } from './textures';
+import type { TextureSpec, FaceTextures, DriftClass } from './textures';
 import { expandFaces, specKey } from './textures';
 
 /** Stable, append-only block ids. NEVER reorder or reuse (saves store ids). */
@@ -134,19 +134,50 @@ export interface BlockDef {
   faces?: FaceTextures;
 }
 
-const stone = (c: [number, number, number]): TextureSpec => ({ pattern: 'stone', colors: [c] });
-const speck = (c: [number, number, number], amp: number): TextureSpec => ({
+// Natural rock: per-voxel variants + rotation + regional value drift so cliff faces and
+// cave walls stop repeating one tile. Architectural patterns (brick/cobble/planks) stay
+// deliberately un-varied — built structures should read as laid by hand.
+const stone = (c: [number, number, number], variants = 2): TextureSpec => ({
+  pattern: 'stone',
+  colors: [c],
+  variants,
+  rotate: true,
+  drift: 'stone',
+});
+const speck = (
+  c: [number, number, number],
+  amp: number,
+  extra: { variants?: number; rotate?: boolean; drift?: DriftClass } = {},
+): TextureSpec => ({
   pattern: 'speckle',
   colors: [c],
   amp,
+  ...extra,
 });
 const ore = (spot: [number, number, number]): TextureSpec => ({ pattern: 'ore', colors: [spot] });
 
 // Shared dirt spec: used for both DIRT's faces and grass's underside so they dedup
 // to a single texture layer (the mesher relies on grass-bottom == dirt-top).
-const DIRT_TEX: TextureSpec = { pattern: 'dirt', colors: [[134, 96, 62]] };
-const SAND_TEX: TextureSpec = { pattern: 'sand', colors: [[206, 190, 140]] };
-const GRAVEL_TEX: TextureSpec = { pattern: 'gravel', colors: [[120, 116, 112]] };
+const DIRT_TEX: TextureSpec = {
+  pattern: 'dirt',
+  colors: [[134, 96, 62]],
+  variants: 4,
+  rotate: true,
+  drift: 'soil',
+};
+const SAND_TEX: TextureSpec = {
+  pattern: 'sand',
+  colors: [[206, 190, 140]],
+  variants: 3,
+  drift: 'soil',
+};
+const GRAVEL_TEX: TextureSpec = {
+  pattern: 'gravel',
+  colors: [[120, 116, 112]],
+  variants: 3,
+  rotate: true,
+  drift: 'stone',
+};
 
 /** The block table — the single source of truth. Order here does NOT affect ids. */
 export const BLOCK_DEFS: BlockDef[] = [
@@ -160,13 +191,21 @@ export const BLOCK_DEFS: BlockDef[] = [
     tint: 'grass',
     tintTopOnly: true,
     faces: {
-      top: { pattern: 'grassTop', colors: [[86, 152, 60]] },
+      top: {
+        pattern: 'grassTop',
+        colors: [[86, 152, 60]],
+        variants: 4,
+        rotate: true,
+        drift: 'grass',
+      },
       side: {
         pattern: 'grassSide',
         colors: [
           [134, 96, 62],
           [86, 152, 60],
         ],
+        variants: 3,
+        drift: 'soil',
       },
       bottom: DIRT_TEX,
     },
@@ -185,7 +224,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 4),
   },
   {
     id: WOOD,
@@ -195,7 +234,8 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     faces: {
       top: { pattern: 'rings', colors: [[160, 130, 85]] },
-      side: { pattern: 'bark', colors: [[105, 78, 46]] },
+      // No rotation: bark furrows run vertically along the trunk.
+      side: { pattern: 'bark', colors: [[105, 78, 46]], variants: 3 },
       bottom: { pattern: 'rings', colors: [[160, 130, 85]] },
     },
   },
@@ -206,7 +246,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     tint: 'foliage',
-    faces: { pattern: 'leaves', colors: [[54, 120, 44]] },
+    faces: {
+      pattern: 'leaves',
+      colors: [[54, 120, 44]],
+      variants: 4,
+      rotate: true,
+      drift: 'foliage',
+    },
   },
   {
     id: SAND,
@@ -223,7 +269,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([236, 240, 245], 6),
+    faces: speck([236, 240, 245], 6, { variants: 2, rotate: true }),
   },
   {
     id: CACTUS,
@@ -363,7 +409,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([90, 74, 60], 14),
+    faces: speck([90, 74, 60], 14, { variants: 2, rotate: true, drift: 'soil' }),
   },
   {
     id: TERRACOTTA,
@@ -388,7 +434,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'slab',
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 4),
   },
   {
     id: PLANK_SLAB,
@@ -431,7 +477,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     shape: 'stair',
-    faces: stone([128, 128, 132]),
+    faces: stone([128, 128, 132], 4),
   },
   {
     id: STAIRS_PLANK,
@@ -746,7 +792,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: { pattern: 'dirt', colors: [[145, 79, 58]] },
+    faces: { pattern: 'dirt', colors: [[145, 79, 58]], variants: 2, rotate: true, drift: 'soil' },
   },
   {
     id: DARK_LOAM,
@@ -754,7 +800,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: { pattern: 'dirt', colors: [[75, 61, 48]] },
+    faces: { pattern: 'dirt', colors: [[75, 61, 48]], variants: 2, rotate: true, drift: 'soil' },
   },
   {
     id: OCHRE_EARTH,
@@ -762,7 +808,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: { pattern: 'dirt', colors: [[174, 126, 60]] },
+    faces: { pattern: 'dirt', colors: [[174, 126, 60]], variants: 2, rotate: true, drift: 'soil' },
   },
   {
     id: SCREE,
@@ -770,7 +816,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: { pattern: 'gravel', colors: [[103, 108, 112]] },
+    faces: {
+      pattern: 'gravel',
+      colors: [[103, 108, 112]],
+      variants: 2,
+      rotate: true,
+      drift: 'stone',
+    },
   },
   {
     id: DIRTY_SNOW,

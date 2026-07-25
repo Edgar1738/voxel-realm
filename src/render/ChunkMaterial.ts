@@ -1,4 +1,11 @@
-import { RawShaderMaterial, GLSL3, Vector3, DoubleSide, type DataArrayTexture } from 'three';
+import {
+  RawShaderMaterial,
+  GLSL3,
+  Vector3,
+  DoubleSide,
+  type DataArrayTexture,
+  type Texture,
+} from 'three';
 
 /** Headlamp reach in blocks; the glow fades to zero at this distance from the eye. */
 export const HEADLAMP_RADIUS = 13;
@@ -63,6 +70,8 @@ precision highp sampler2DArray;
 
 uniform mat4 viewMatrix;
 uniform sampler2DArray uTex;
+uniform sampler2D uTexMeta;
+uniform float uVariation;
 uniform vec3 uLightDir;
 uniform float uDirStrength;
 uniform vec3 uLightColor;
@@ -97,10 +106,87 @@ in vec3 vWorldNormal;
 
 out vec4 fragColor;
 
+// ---------------------------------------------------------------------------
+// Per-voxel texture variation + regional color drift (opaque/transparent passes
+// only; uVariation is 0 on the cutout pass, whose swayed vWorldPos is inexact).
+// All hashes work on integer world coordinates, so the result is deterministic
+// across chunks, remeshes, and reloads, and greedy merge quads stay untouched —
+// variation happens per FRAGMENT, never in the mesh.
+// ---------------------------------------------------------------------------
+uint hashU(uvec3 v, uint salt) {
+  uint h = v.x * 0x27d4eb2du ^ v.y * 0x165667b1u ^ v.z * 0x9e3779b1u ^ salt * 0x85ebca6bu;
+  h = (h ^ (h >> 15u)) * 0x85ebca6bu;
+  h = (h ^ (h >> 13u)) * 0xc2b2ae35u;
+  return h ^ (h >> 16u);
+}
+float hash2f(vec2 i, uint salt) {
+  uvec2 q = uvec2(ivec2(i));
+  return float(hashU(uvec3(q, 0u), salt)) * (1.0 / 4294967296.0);
+}
+// Smooth 2D value noise on world coordinates (regional drift; period-free).
+float vnoise(vec2 p, uint salt) {
+  vec2 i = floor(p);
+  vec2 f = p - i;
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash2f(i, salt);
+  float b = hash2f(i + vec2(1.0, 0.0), salt);
+  float c = hash2f(i + vec2(0.0, 1.0), salt);
+  float d = hash2f(i + vec2(1.0, 1.0), salt);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
 void main() {
-  vec4 texel = texture(uTex, vec3(vUv, vLayer));
+  float driftId = 0.0;
+  vec4 texel;
+  if (uVariation > 0.5) {
+    // Per-layer material metadata: R = variant count, G = drift class, B = rotate flag.
+    vec4 meta = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 0), 0) * 255.0;
+    driftId = meta.g;
+    float texLayer = vLayer;
+    vec2 texUv = vUv;
+    if (meta.r > 1.5 || meta.b > 0.5) {
+      // The owning voxel: a face fragment sits on an integer plane along its normal,
+      // so stepping half a block against the normal lands inside the solid block.
+      uvec3 voxel = uvec3(ivec3(floor(vWorldPos - vWorldNormal * 0.5 + 1e-4)));
+      if (meta.r > 1.5) {
+        // Variant layers are painted contiguously after their group base.
+        texLayer = vLayer + floor(min(float(hashU(voxel, 0x51u) & 255u) * (1.0 / 256.0) * meta.r, meta.r - 1.0));
+      }
+      if (meta.b > 0.5) {
+        // One of 8 orientations per voxel (transpose + mirrors), isotropic tiles only.
+        uint o = hashU(voxel, 0x9du) & 7u;
+        vec2 f = fract(vUv);
+        if ((o & 1u) != 0u) f = f.yx;
+        if ((o & 2u) != 0u) f.x = 1.0 - f.x;
+        if ((o & 4u) != 0u) f.y = 1.0 - f.y;
+        texUv = f;
+      }
+    }
+    // Explicit gradients from the ORIGINAL quad UVs: fract()/flips are discontinuous at
+    // voxel borders and would otherwise spike the implicit derivatives into a wrong mip.
+    texel = textureGrad(uTex, vec3(texUv, texLayer), dFdx(vUv), dFdy(vUv));
+  } else {
+    texel = texture(uTex, vec3(vUv, vLayer));
+  }
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
   vec3 base = texel.rgb * vTint;
+  // Regional color drift: two octaves of low-frequency world-space noise sweep broad
+  // warm/cool + light/dark patches across natural materials, so meadows, canopies and
+  // rock faces stop reading as one flat sheet. Deliberately gentle — palette identity
+  // stays with the textures and biome tints.
+  if (driftId > 0.5) {
+    float n = vnoise(vWorldPos.xz * (1.0 / 96.0), 0x2fu) * 0.6 +
+              vnoise(vWorldPos.xz * (1.0 / 384.0), 0xb1u) * 0.4;
+    float d = n - 0.5;
+    if (driftId < 2.5) {
+      // grass (1) / foliage (2): warm/cool hue drift plus gentle value drift.
+      base *= mix(vec3(0.93, 1.0, 1.03), vec3(1.06, 1.02, 0.9), n);
+      base *= 1.0 + d * 0.12;
+    } else {
+      // soil (3) / stone (4): value-only drift, slightly stronger on soil.
+      base *= 1.0 + d * (driftId < 3.5 ? 0.14 : 0.1);
+    }
+  }
   // Water surface treatment (transparent pass only; uWaveAmp is 0 on every other pass):
   // the two-sine shimmer, a deep-blue depth tint, and a sky-tinted grazing-angle rim.
   // fres (view-angle fresnel) is reused for the alpha and to gate the glint further down.
@@ -178,9 +264,18 @@ interface MaterialOpts {
   alphaTest?: number;
   swayAmp?: number;
   waveAmp?: number;
+  /**
+   * Enable per-voxel texture variation + regional color drift. Off for the cutout pass:
+   * its vWorldPos is displaced by plant sway, and thin alpha-tested blades don't benefit.
+   */
+  variation?: boolean;
 }
 
-function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShaderMaterial {
+function buildMaterial(
+  tex: DataArrayTexture,
+  metaTex: Texture | null,
+  opts: MaterialOpts = {},
+): RawShaderMaterial {
   const {
     alpha = 1.0,
     transparent = false,
@@ -188,11 +283,14 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
     alphaTest = 0,
     swayAmp = 0,
     waveAmp = 0,
+    variation = false,
   } = opts;
   const material = new RawShaderMaterial({
     glslVersion: GLSL3,
     uniforms: {
       uTex: { value: tex },
+      uTexMeta: { value: metaTex },
+      uVariation: { value: variation && metaTex ? 1.0 : 0.0 },
       uLightDir: { value: new Vector3(0.5, 1.0, 0.3).normalize() },
       // Sun-arc lighting: DayNight overwrites these live (dirStrength dips at twilight,
       // lightColor goes gold at low sun / cool blue under the moon).
@@ -229,23 +327,30 @@ function buildMaterial(tex: DataArrayTexture, opts: MaterialOpts = {}): RawShade
   return material;
 }
 
-export function createChunkMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex);
+export function createChunkMaterial(
+  tex: DataArrayTexture,
+  metaTex: Texture | null = null,
+): RawShaderMaterial {
+  return buildMaterial(tex, metaTex, { variation: true });
 }
 
 /** Translucent material for the transparent pass (water/glass; drawn after opaque, no depth write). */
-export function createTransparentMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, {
+export function createTransparentMaterial(
+  tex: DataArrayTexture,
+  metaTex: Texture | null = null,
+): RawShaderMaterial {
+  return buildMaterial(tex, metaTex, {
     alpha: 0.72,
     transparent: true,
     doubleSide: true,
     waveAmp: WATER_WAVE_AMP,
+    variation: true,
   });
 }
 
 /** Cutout material for plants: opaque + depth-writing, double-sided, with an alpha-test discard. */
 export function createCutoutMaterial(tex: DataArrayTexture): RawShaderMaterial {
-  return buildMaterial(tex, {
+  return buildMaterial(tex, null, {
     alpha: 1.0,
     doubleSide: true,
     alphaTest: 0.5,
