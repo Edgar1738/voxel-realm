@@ -920,14 +920,23 @@ export const BLOCK_DEFS: BlockDef[] = [
 ];
 
 export interface BlockTextures {
+  /** Per-LAYER paint spec. A spec with `variants: n` occupies n contiguous layers (same spec object). */
   uniqueSpecs: TextureSpec[];
+  /** Per-layer variant index within its spec's group (0 for the base layer / non-variant specs). */
+  layerVariant: number[];
+  /** Per-block face layers; always the GROUP BASE layer — the shader offsets into the group. */
   faceLayers: Map<BlockId, number[]>;
   layerCount: number;
 }
 
-/** Dedup all face specs into layers (first-appearance order) and resolve per-block face layers. */
+/**
+ * Dedup all face specs into layers (first-appearance order) and resolve per-block face layers.
+ * A spec that declares `variants: n` allocates n CONTIGUOUS layers (base + n-1 alternates) so
+ * the shader can select `base + hash % n` per voxel without any lookup indirection.
+ */
 export function buildBlockTextures(defs: BlockDef[]): BlockTextures {
   const uniqueSpecs: TextureSpec[] = [];
+  const layerVariant: number[] = [];
   const layerByKey = new Map<string, number>();
   const faceLayers = new Map<BlockId, number[]>();
   for (const def of defs) {
@@ -939,13 +948,17 @@ export function buildBlockTextures(defs: BlockDef[]): BlockTextures {
       if (layer === undefined) {
         layer = uniqueSpecs.length;
         layerByKey.set(key, layer);
-        uniqueSpecs.push(spec);
+        const count = 'pattern' in spec ? Math.max(1, spec.variants ?? 1) : 1;
+        for (let v = 0; v < count; v++) {
+          uniqueSpecs.push(spec);
+          layerVariant.push(v);
+        }
       }
       return layer;
     });
     faceLayers.set(def.id, layers);
   }
-  return { uniqueSpecs, faceLayers, layerCount: uniqueSpecs.length };
+  return { uniqueSpecs, layerVariant, faceLayers, layerCount: uniqueSpecs.length };
 }
 
 export const BLOCK_TEXTURES: BlockTextures = buildBlockTextures(BLOCK_DEFS);

@@ -91,6 +91,19 @@ export class BiomeMap implements BiomeSource {
     return biome;
   }
 
+  /**
+   * Continuous climate channels (each ~-1..1) at a column. Classification stays categorical;
+   * this exposes the underlying fields for gradual effects — surface-material patching,
+   * moisture-driven placement — without changing any terrain rules.
+   */
+  climateAt(worldX: number, worldZ: number): { t: number; h: number; m: number } {
+    return {
+      t: this.ch.temperature(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ),
+      h: this.ch.humidity(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ),
+      m: this.ch.mountain(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ),
+    };
+  }
+
   private classify(worldX: number, worldZ: number): Biome {
     const t = this.ch.temperature(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ);
     const h = this.ch.humidity(worldX * CLIMATE_FREQ, worldZ * CLIMATE_FREQ);

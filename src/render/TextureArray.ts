@@ -1,5 +1,6 @@
 import {
   DataArrayTexture,
+  DataTexture,
   RGBAFormat,
   UnsignedByteType,
   NearestFilter,
@@ -7,12 +8,14 @@ import {
   RepeatWrapping,
 } from 'three';
 import { BLOCK_TEXTURES, TEXTURE_LAYER_COUNT } from '../blocks/blocks';
-import { TILE, paintLayer } from '../blocks/textures';
+import { TILE, paintLayer, type DriftClass } from '../blocks/textures';
 
 /** Builds the procedural block-face texture array (one layer per derived texture spec). */
 export function createTextureArray(): DataArrayTexture {
   const data = new Uint8Array(TILE * TILE * 4 * TEXTURE_LAYER_COUNT);
-  BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) => paintLayer(data, layer, spec));
+  BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) =>
+    paintLayer(data, layer, spec, BLOCK_TEXTURES.layerVariant[layer]),
+  );
 
   const tex = new DataArrayTexture(data, TILE, TILE, TEXTURE_LAYER_COUNT);
   tex.format = RGBAFormat;
@@ -40,6 +43,35 @@ export function mipmappedArray(base: DataArrayTexture): DataArrayTexture {
   const tex = base.clone();
   tex.minFilter = LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Drift-class ids as the shader reads them from the meta LUT's green channel. */
+const DRIFT_ID: Record<DriftClass, number> = { grass: 1, foliage: 2, soil: 3, stone: 4 };
+
+/**
+ * Per-layer material metadata for the chunk shader, as a 256×1 RGBA8 LUT indexed by
+ * texture-array layer (texelFetch — never filtered):
+ *   R = variant count of the layer's group (1 = no variants)
+ *   G = drift class (0 none, 1 grass, 2 foliage, 3 soil, 4 stone)
+ *   B = 1 when per-voxel rotation/mirroring is allowed
+ *   A = reserved
+ * Only GROUP BASE layers are ever addressed by vertex data, but every member layer
+ * carries its group's values (they share the spec), so the table has no holes.
+ */
+export function createTextureMetaLUT(): DataTexture {
+  const data = new Uint8Array(256 * 4);
+  BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) => {
+    if (!('pattern' in spec)) return;
+    const p = layer * 4;
+    data[p] = Math.max(1, spec.variants ?? 1);
+    data[p + 1] = spec.drift ? DRIFT_ID[spec.drift] : 0;
+    data[p + 2] = spec.rotate ? 1 : 0;
+  });
+  const tex = new DataTexture(data, 256, 1, RGBAFormat, UnsignedByteType);
+  tex.magFilter = NearestFilter;
+  tex.minFilter = NearestFilter;
   tex.needsUpdate = true;
   return tex;
 }

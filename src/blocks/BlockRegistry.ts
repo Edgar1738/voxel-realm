@@ -41,6 +41,14 @@ export class BlockRegistry {
 
   /** Fail loudly at boot if the declarative table is internally inconsistent. */
   private selfCheck(): void {
+    // The greedy-mesh merge key packs the texture layer into 8 bits ((layer << 16) in
+    // GreedyMesher); at 256+ layers it would silently corrupt the tint field. Fail at boot
+    // instead — trim texture variants if this ever trips.
+    if (this.textures.layerCount > 256) {
+      throw new Error(
+        `Texture layer count ${this.textures.layerCount} exceeds the 256-layer mesher limit`,
+      );
+    }
     for (const def of this.defs) {
       if (!Number.isInteger(def.id) || def.id < 0 || def.id > 255) {
         throw new Error(`Block "${def.name}" id ${def.id} out of 0..255`);

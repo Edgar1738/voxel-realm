@@ -8,7 +8,12 @@ function texturesFor(defs: BlockDef[]): BlockTextures {
   // minimal: every non-air def resolves to 6 layer-0 faces
   const faceLayers = new Map<number, number[]>();
   for (const d of defs) if (d.faces) faceLayers.set(d.id, [0, 0, 0, 0, 0, 0]);
-  return { uniqueSpecs: [{ pattern: 'stone', colors: [[1, 2, 3]] }], faceLayers, layerCount: 1 };
+  return {
+    uniqueSpecs: [{ pattern: 'stone', colors: [[1, 2, 3]] }],
+    layerVariant: [0],
+    faceLayers,
+    layerCount: 1,
+  };
 }
 
 describe('BlockRegistry self-check (injected defs)', () => {

@@ -32,7 +32,29 @@ export type PatternName =
   | 'ladder'
   | 'door';
 
-export type TextureSpec = { pattern: PatternName; colors: RGB[]; amp?: number } | { custom: Pixel };
+/**
+ * Regional color-drift class for the renderer's low-frequency world-space tinting.
+ * Grass/foliage drift in hue AND value; soil/stone drift in value only.
+ */
+export type DriftClass = 'grass' | 'foliage' | 'soil' | 'stone';
+
+export type TextureSpec =
+  | {
+      pattern: PatternName;
+      colors: RGB[];
+      amp?: number;
+      /**
+       * Number of texture variants painted into CONTIGUOUS array layers (default 1).
+       * The shader picks one per voxel from a world-position hash, so natural
+       * surfaces stop repeating one tile without fragmenting greedy meshing.
+       */
+      variants?: number;
+      /** Allow the shader to rotate/mirror this tile per voxel (isotropic materials only). */
+      rotate?: boolean;
+      /** Regional color drift class (omitted = no drift). */
+      drift?: DriftClass;
+    }
+  | { custom: Pixel };
 
 export type FaceTextures =
   | TextureSpec
@@ -68,12 +90,21 @@ function lum(c: RGB): number {
 // natural" work the detail pass is after.
 // ---------------------------------------------------------------------------
 
+/**
+ * Extra salt mixed into every position hash while painting a texture VARIANT.
+ * 0 (the default) leaves every existing texture byte-identical; a non-zero value
+ * re-rolls all structural detail (worley cells, veins, clumps) so each variant of
+ * a material reads as different ground, not just different grain. Set/reset by
+ * {@link paintLayer}.
+ */
+let variantSalt = 0;
+
 /** 2D integer hash → uint32 with good avalanche. The salt lets one pattern draw many independent fields. */
 function hashi(x: number, y: number, salt: number): number {
   let h =
     (Math.imul(x | 0, 0x27d4eb2d) ^
       Math.imul(y | 0, 0x165667b1) ^
-      Math.imul(salt | 0, 0x9e3779b1)) |
+      Math.imul((salt ^ variantSalt) | 0, 0x9e3779b1)) |
     0;
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
@@ -899,8 +930,9 @@ export function resolvePixel(spec: TextureSpec): Pixel {
   return 'custom' in spec ? spec.custom : buildPattern(spec.pattern, spec.colors, spec.amp);
 }
 
-/** Stable key for deduping specs into texture layers. Customs are always unique. */
-export function specKey(spec: TextureSpec): string {
+/** Paint identity of a spec: pattern + colors + amp. Deliberately EXCLUDES the variant/rotate/
+ * drift metadata so adding those fields never re-seeds (and so never repaints) variant 0. */
+function paintKey(spec: TextureSpec): string {
   if ('custom' in spec) {
     let k = customKeys.get(spec.custom);
     if (!k) {
@@ -912,9 +944,19 @@ export function specKey(spec: TextureSpec): string {
   return `${spec.pattern}|${spec.colors.map((c) => c.join(',')).join(';')}|${spec.amp ?? ''}`;
 }
 
+/** Stable key for deduping specs into texture layers. Customs are always unique. */
+export function specKey(spec: TextureSpec): string {
+  const base = paintKey(spec);
+  if ('custom' in spec) return base;
+  if (spec.variants === undefined && spec.rotate === undefined && spec.drift === undefined) {
+    return base;
+  }
+  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}`;
+}
+
 /** A stable, key-derived seed so a spec's pixels do not depend on its layer index. */
 function specSeed(spec: TextureSpec): number {
-  const key = specKey(spec);
+  const key = paintKey(spec);
   let h = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193);
   return h >>> 0;
@@ -932,19 +974,28 @@ export function expandFaces(
   return [faces, faces, faces, faces, faces, faces];
 }
 
-/** Paint one TILE*TILE RGBA layer from a spec (seeded by the spec's stable key). */
-export function paintLayer(out: Uint8Array, layer: number, spec: TextureSpec): void {
+/**
+ * Paint one TILE*TILE RGBA layer from a spec (seeded by the spec's stable key).
+ * `variant` 0 is byte-identical to the pre-variant behavior; higher indices salt
+ * both the structural position hashes and the grain RNG for a distinct tile.
+ */
+export function paintLayer(out: Uint8Array, layer: number, spec: TextureSpec, variant = 0): void {
   const fn = resolvePixel(spec);
-  const rng = mulberry32(specSeed(spec));
-  const offset = layer * TILE * TILE * 4;
-  for (let py = 0; py < TILE; py++) {
-    for (let px = 0; px < TILE; px++) {
-      const c = fn(px, py, rng);
-      const p = offset + (py * TILE + px) * 4;
-      out[p] = clamp(c[0]);
-      out[p + 1] = clamp(c[1]);
-      out[p + 2] = clamp(c[2]);
-      out[p + 3] = c.length > 3 ? clamp((c as RGBA)[3]) : 255;
+  const rng = mulberry32((specSeed(spec) ^ Math.imul(variant, 0x9e3779b1)) >>> 0);
+  variantSalt = variant === 0 ? 0 : Math.imul(variant, 0x85ebca6b) | 0;
+  try {
+    const offset = layer * TILE * TILE * 4;
+    for (let py = 0; py < TILE; py++) {
+      for (let px = 0; px < TILE; px++) {
+        const c = fn(px, py, rng);
+        const p = offset + (py * TILE + px) * 4;
+        out[p] = clamp(c[0]);
+        out[p + 1] = clamp(c[1]);
+        out[p + 2] = clamp(c[2]);
+        out[p + 3] = c.length > 3 ? clamp((c as RGBA)[3]) : 255;
+      }
     }
+  } finally {
+    variantSalt = 0;
   }
 }
