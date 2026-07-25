@@ -191,9 +191,11 @@ export const BLOCK_DEFS: BlockDef[] = [
     tint: 'grass',
     tintTopOnly: true,
     faces: {
+      // Sage-leaning base green: desaturated from the old near-primary [86,152,60] so
+      // regional drift, flowers, and accent materials have room to register against it.
       top: {
         pattern: 'grassTop',
-        colors: [[86, 152, 60]],
+        colors: [[94, 146, 72]],
         variants: 4,
         rotate: true,
         drift: 'grass',
@@ -202,7 +204,7 @@ export const BLOCK_DEFS: BlockDef[] = [
         pattern: 'grassSide',
         colors: [
           [134, 96, 62],
-          [86, 152, 60],
+          [94, 146, 72],
         ],
         variants: 3,
         drift: 'soil',
@@ -246,9 +248,11 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     creative: true,
     tint: 'foliage',
+    // Deeper, slightly cooler canopy green than the grass base so trees separate from
+    // terrain by value instead of dissolving into the hillside at range.
     faces: {
       pattern: 'leaves',
-      colors: [[54, 120, 44]],
+      colors: [[48, 104, 52]],
       variants: 4,
       rotate: true,
       drift: 'foliage',
@@ -468,7 +472,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     shape: 'cross',
     tint: 'foliage',
-    faces: { pattern: 'tallGrass', colors: [[70, 150, 64]] },
+    faces: { pattern: 'tallGrass', colors: [[78, 140, 74]] },
   },
   {
     id: STAIRS_STONE,

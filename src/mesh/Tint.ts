@@ -9,19 +9,19 @@ export const WHITE: RGB = [1, 1, 1];
 // (Plains, Forest, Desert, Mountains, Tundra, Swamp). Plains = identity so
 // existing worlds' plains/forest grass renders unchanged.
 const GRASS_TINTS: readonly RGB[] = [
-  [1.0, 1.0, 1.0], // Plains
-  [0.92, 1.0, 0.85], // Forest — lush
+  [1.0, 1.0, 1.0], // Plains — identity (sage base texture carries the meadow look)
+  [0.82, 0.94, 0.72], // Forest — deeper fern/moss
   [0.86, 0.78, 0.45], // Desert — dry tan
-  [0.8, 0.85, 0.7], // Mountains
-  [0.78, 0.86, 0.82], // Tundra — pale cold
-  [0.62, 0.7, 0.42], // Swamp — murky
+  [0.78, 0.82, 0.72], // Mountains — grey-green
+  [0.76, 0.84, 0.86], // Tundra — pale blue-cold
+  [0.62, 0.7, 0.42], // Swamp — murky olive
 ];
 const FOLIAGE_TINTS: readonly RGB[] = [
   [1.0, 1.0, 1.0], // Plains
-  [0.85, 0.98, 0.78], // Forest
+  [0.74, 0.9, 0.64], // Forest — deep olive canopy
   [0.8, 0.74, 0.42], // Desert
-  [0.74, 0.82, 0.66], // Mountains
-  [0.74, 0.84, 0.8], // Tundra
+  [0.7, 0.78, 0.64], // Mountains
+  [0.68, 0.8, 0.78], // Tundra — pine teal
   [0.55, 0.66, 0.4], // Swamp
 ];
 

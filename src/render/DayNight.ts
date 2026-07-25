@@ -50,7 +50,16 @@ export class DayNight {
         s.lightColor[1],
         s.lightColor[2],
       );
-      (m.uniforms.uFogColor.value as Vector3).set(r, g, b);
+      // Fog sits slightly below the sky in value and a touch desaturated: with fog
+      // EXACTLY the sky color, distant terrain dissolves into the horizon and carries
+      // zero silhouette information. A ~7% darker haze keeps far ridges readable.
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      const fogMul = 0.93;
+      (m.uniforms.uFogColor.value as Vector3).set(
+        (r + (luma - r) * 0.15) * fogMul,
+        (g + (luma - g) * 0.15) * fogMul,
+        (b + (luma - b) * 0.15) * fogMul,
+      );
       // Sky-tint ambient reads its own uniform, deliberately separate from uFogColor so the
       // underwater fog override (applyUnderwater) can't corrupt the surface lighting hue.
       (m.uniforms.uSkyColor.value as Vector3).set(r, g, b);
