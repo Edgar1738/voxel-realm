@@ -1,5 +1,14 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../core/constants';
-import { AIR, GRASS, FLOWER, TALL_GRASS } from '../blocks/blocks';
+import {
+  AIR,
+  GRASS,
+  FLOWER,
+  TALL_GRASS,
+  DRY_GRASS,
+  FOREST_FLOOR,
+  MUSHROOM,
+  DRY_SHRUB,
+} from '../blocks/blocks';
 import type { ChunkData } from '../world/ChunkData';
 import type { Overlay } from './Generator';
 import type { WorldSeed } from '../core/types';
@@ -39,7 +48,8 @@ export function scatterDecorations(opts: DecorationOptions = {}): Overlay {
       for (let lx = 0; lx < CHUNK_SIZE_X; lx++) {
         const sy = surfaceY(chunk, lx, lz);
         if (sy < 0 || sy + 1 >= WORLD_HEIGHT) continue;
-        if (chunk.get(lx, sy, lz) !== GRASS) continue;
+        const ground = chunk.get(lx, sy, lz);
+        if (ground !== GRASS && ground !== DRY_GRASS && ground !== FOREST_FLOOR) continue;
         if (chunk.get(lx, sy + 1, lz) !== AIR) continue;
         const wx = cx * CHUNK_SIZE_X + lx;
         const wz = cz * CHUNK_SIZE_Z + lz;
@@ -50,10 +60,20 @@ export function scatterDecorations(opts: DecorationOptions = {}): Overlay {
             SALT) >>>
           0;
         const r = hashToFloat(hash);
-        if (r >= density) continue;
-        // Second hash bit chooses the plant so flowers/grass interleave deterministically.
+        // Second hash bit chooses the plant so species interleave deterministically.
         const pick = hashToFloat((hash ^ 0x9e3779b1) >>> 0);
-        chunk.set(lx, sy + 1, lz, pick < 0.35 ? FLOWER : TALL_GRASS);
+        if (ground === GRASS) {
+          if (r >= density) continue;
+          chunk.set(lx, sy + 1, lz, pick < 0.35 ? FLOWER : TALL_GRASS);
+        } else if (ground === DRY_GRASS) {
+          // Parched patches carry sparse twiggy shrubs instead of flowers.
+          if (r >= density * 0.5) continue;
+          chunk.set(lx, sy + 1, lz, DRY_SHRUB);
+        } else {
+          // Forest floor: the occasional red-capped mushroom in the litter.
+          if (r >= density * 0.35) continue;
+          chunk.set(lx, sy + 1, lz, MUSHROOM);
+        }
       }
     }
   };

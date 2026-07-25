@@ -88,6 +88,21 @@ export const STAIRS_BASALT: BlockId = 73;
 export const BASALT_WALL: BlockId = 74;
 export const CLAY_ROOF_SLAB: BlockId = 75;
 export const STAIRS_CLAY_ROOF: BlockId = 76;
+// Natural ground-cover expansion (meso-scale terrain patches). Append-only, as always.
+/** Sun-parched wheat-toned grass — hot/dry plains patches. */
+export const DRY_GRASS: BlockId = 77;
+/** Dark humus strewn with leaf litter — under forest canopy. */
+export const FOREST_FLOOR: BlockId = 78;
+/** Dense green moss — damp ground near water and in humid biomes. */
+export const MOSS: BlockId = 79;
+/** Grey-blue waterline clay deposits. */
+export const CLAY: BlockId = 80;
+/** Near-black compacted bog soil — swamp patches. */
+export const PEAT: BlockId = 81;
+/** Red-capped forest mushroom (cross plant). */
+export const MUSHROOM: BlockId = 82;
+/** Twiggy dry shrub (cross plant) for parched ground. */
+export const DRY_SHRUB: BlockId = 83;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -972,6 +987,99 @@ export const BLOCK_DEFS: BlockDef[] = [
         [100, 48, 39],
       ],
     },
+  },
+  {
+    id: DRY_GRASS,
+    name: 'dry grass',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      top: {
+        pattern: 'grassTop',
+        colors: [[152, 134, 70]],
+        variants: 3,
+        rotate: true,
+        drift: 'grass',
+      },
+      side: {
+        pattern: 'grassSide',
+        colors: [
+          [134, 96, 62],
+          [152, 134, 70],
+        ],
+        variants: 2,
+        drift: 'soil',
+      },
+      bottom: DIRT_TEX,
+    },
+  },
+  {
+    id: FOREST_FLOOR,
+    name: 'forest floor',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      // The leaves pattern in humus browns reads as clumpy leaf litter.
+      top: { pattern: 'leaves', colors: [[104, 80, 50]], variants: 2, rotate: true, drift: 'soil' },
+      side: DIRT_TEX,
+      bottom: DIRT_TEX,
+    },
+  },
+  {
+    id: MOSS,
+    name: 'moss',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: {
+      pattern: 'grassTop',
+      colors: [[70, 112, 62]],
+      variants: 2,
+      rotate: true,
+      drift: 'foliage',
+    },
+  },
+  {
+    id: CLAY,
+    name: 'clay',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: speck([146, 148, 158], 10, { variants: 2, rotate: true, drift: 'soil' }),
+  },
+  {
+    id: PEAT,
+    name: 'peat',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: { pattern: 'dirt', colors: [[64, 52, 40]], variants: 2, rotate: true, drift: 'soil' },
+  },
+  {
+    id: MUSHROOM,
+    name: 'mushroom',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: {
+      pattern: 'mushroom',
+      colors: [
+        [188, 74, 58],
+        [214, 202, 180],
+      ],
+    },
+  },
+  {
+    id: DRY_SHRUB,
+    name: 'dry shrub',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: { pattern: 'tallGrass', colors: [[136, 106, 60]] },
   },
 ];
 

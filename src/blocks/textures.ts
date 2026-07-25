@@ -29,6 +29,7 @@ export type PatternName =
   | 'furnace'
   | 'flower'
   | 'tallGrass'
+  | 'mushroom'
   | 'ladder'
   | 'door';
 
@@ -831,6 +832,26 @@ const flowerP =
   };
 
 /**
+ * Mushroom: a pale stalk under a domed cap with lighter spots and a shadowed rim, on a
+ * transparent background (cutout pass). colors: [cap, stem].
+ */
+const mushroomP =
+  (cap: RGB, stem: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const onStem = (px === 7 || px === 8) && py >= 8 && py <= 14;
+    const dx = px - 7.5;
+    const dy = (py - 7) * 1.5;
+    const r2 = dx * dx + dy * dy;
+    const onCap = py >= 2 && py <= 8 && r2 <= 30;
+    if (!onStem && !onCap) return TRANSPARENT;
+    let base: RGB = onCap ? cap : stem;
+    if (onCap && hashf(px, py, 2401) > 0.82) base = [232, 226, 210]; // pale spots
+    if (onCap && r2 > 22) base = shade(base, -20); // shadowed cap rim
+    const c = shade(base, (rng() - 0.5) * 14);
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
+/**
  * Ladder: two vertical side rails plus evenly spaced rungs, on a transparent background
  * (rendered in the cutout pass, so the wall shows through the gaps).
  */
@@ -916,6 +937,8 @@ function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
       return flowerP(c0, c1);
     case 'tallGrass':
       return tallGrassP(c0);
+    case 'mushroom':
+      return mushroomP(c0, c1);
     case 'ladder':
       return ladderP(c0);
     case 'door':

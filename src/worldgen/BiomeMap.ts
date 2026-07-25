@@ -22,6 +22,8 @@ export interface BiomeDef {
 export interface BiomeSource {
   biomeAt(worldX: number, worldZ: number): Biome;
   blendedTerrain(worldX: number, worldZ: number): { amplitude: number; baseOffset: number };
+  /** Continuous climate channels (~-1..1); optional — custom preset fields may not provide it. */
+  climateAt?(worldX: number, worldZ: number): { t: number; h: number; m: number };
 }
 
 const DEFS: Record<Biome, BiomeDef> = {

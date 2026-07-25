@@ -11,11 +11,16 @@ export function creativeGroupFor(id: BlockId): CreativeGroup {
   const def = BLOCK_DEFS.find((d) => d.id === id);
   const name = def?.name ?? '';
   if (/masonry|brick|cobble|wall/.test(name)) return 'Masonry';
-  if (/stone|granite|basalt|sand|dirt|loam|earth|scree|snow|ice|gravel|mud|terracotta/.test(name)) {
+  // `clay$` keeps plain clay in Terrain without stealing 'clay roof *' from Architecture.
+  if (
+    /stone|granite|basalt|sand|dirt|loam|earth|scree|snow|ice|gravel|mud|terracotta|peat|clay$/.test(
+      name,
+    )
+  ) {
     return 'Terrain';
   }
   if (/slab|stairs|roof|plank|fence|door|ladder|glass|limestone/.test(name)) return 'Architecture';
-  if (/grass|leaves|wood|cactus|flower/.test(name)) return 'Nature';
+  if (/grass|leaves|wood|cactus|flower|moss|floor|mushroom|shrub/.test(name)) return 'Nature';
   return 'Utility';
 }
 
