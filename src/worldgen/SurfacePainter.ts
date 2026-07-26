@@ -123,7 +123,9 @@ export function patchedCap(
     return cap;
   }
   if (cap === SAND && height <= ctx.seaLevel + 1) {
-    if (patchNoise(worldX, worldZ, 9, seedSalt(0xc1a7)) > 0.7) return CLAY;
+    // 0.73: beaches are broad and flat, so even a small threshold drop reads as
+    // sprawling grey sheets — keep clay an accent, not a second shoreline.
+    if (patchNoise(worldX, worldZ, 9, seedSalt(0xc1a7)) > 0.73) return CLAY;
     return cap;
   }
   if (cap === MUD && patchNoise(worldX, worldZ, 12, seedSalt(0x9ea7)) > 0.62) return PEAT;

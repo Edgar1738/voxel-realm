@@ -1055,7 +1055,9 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([146, 148, 158], 10, { variants: 2, rotate: true, drift: 'soil' }),
+    // Near-neutral grey with only a whisper of blue: strongly blue clay reads as
+    // water pools from a distance on wide tidal flats.
+    faces: speck([148, 148, 153], 10, { variants: 2, rotate: true, drift: 'soil' }),
   },
   {
     id: PEAT,
