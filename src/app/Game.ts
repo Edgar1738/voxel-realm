@@ -145,11 +145,12 @@ import { BlockParticles, particleColorOf } from '../render/BlockParticles';
 import { AudioEngine } from '../audio/AudioEngine';
 import { MovementSoundTracker } from '../audio/MovementSounds';
 import { batchSound, familyOf } from '../audio/sounds';
-import { AIR } from '../blocks/blocks';
+import { AIR, MATERIAL_FAMILIES } from '../blocks/blocks';
 import {
   fillBox,
   clearBox,
   replaceVoxels,
+  swapFamilyVoxels,
   captureRegion,
   prefabToVoxels,
   orientedStateReader,
@@ -856,6 +857,45 @@ export class Game {
       void openBlueprints(); // reopen with the refreshed list
     };
     ui.blueprintButton.addEventListener('click', () => void openBlueprints());
+
+    // Material brush: swap a selection's material family, shape-aware (slab->slab,
+    // stair->stair, wall->wall) with state preserved — one undo via the run() funnel.
+    const openMaterialBrush = async (): Promise<void> => {
+      const box = builder.selectionBox();
+      const families = Object.entries(MATERIAL_FAMILIES).map(([name, roles]) => ({
+        name,
+        icon: roles.cube ?? roles.slab ?? roles.stair ?? roles.wall ?? AIR,
+      }));
+      const choice = await ui.showMaterialBrushDialog({
+        families,
+        hasSelection: box !== undefined,
+        ...(box ? { selectionSummary: boxDims(box).join('×') } : {}),
+      });
+      if (!choice || !box) return;
+      if (
+        !preloadOrWarn(
+          Math.min(box.x1, box.x2),
+          Math.min(box.z1, box.z2),
+          Math.max(box.x1, box.x2),
+          Math.max(box.z1, box.z2),
+        )
+      ) {
+        return;
+      }
+      const voxels = swapFamilyVoxels(
+        (x, y, z) => manager.getBlock(x, y, z),
+        (x, y, z) => manager.getState(x, y, z),
+        box,
+        choice.from,
+        choice.to,
+      );
+      if (voxels.length === 0) {
+        setStatus(`No ${choice.from} blocks in the selection`);
+        return;
+      }
+      run(voxels, 'Swapped');
+    };
+    ui.materialBrushButton.addEventListener('click', () => void openMaterialBrush());
 
     const applyExperience = (mode: ExperienceMode): void => {
       experience = mode;

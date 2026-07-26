@@ -23,6 +23,8 @@ type FakeUi = {
     textContent: string;
   };
   blueprintButton: { addEventListener: (...args: unknown[]) => void };
+  materialBrushButton: { addEventListener: (...args: unknown[]) => void };
+  showMaterialBrushDialog: ReturnType<typeof vi.fn>;
   infoButton: { addEventListener: (...args: unknown[]) => void };
   modeButton: {
     addEventListener: (...args: unknown[]) => void;
@@ -65,6 +67,8 @@ function makeUi(): FakeUi {
     reset: { addEventListener: vi.fn() },
     worldButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
     blueprintButton: { addEventListener: vi.fn() },
+    materialBrushButton: { addEventListener: vi.fn() },
+    showMaterialBrushDialog: vi.fn(async () => undefined),
     infoButton: { addEventListener: vi.fn() },
     modeButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
     tourPrev: { addEventListener: vi.fn() },

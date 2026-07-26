@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  defaultBrushTarget,
   activeStatusRailSlot,
   summarizeWorldInfo,
   wrapFocusIndex,
@@ -104,5 +105,19 @@ describe('wrapFocusIndex', () => {
   it('chooses the edge element when focus starts outside the trap', () => {
     expect(wrapFocusIndex(-1, 4, 1)).toBe(0);
     expect(wrapFocusIndex(-1, 4, -1)).toBe(3);
+  });
+});
+
+describe('defaultBrushTarget', () => {
+  const families = ['stone', 'basalt', 'brick'];
+
+  it('picks the first family that differs from the source', () => {
+    expect(defaultBrushTarget(families, 'stone')).toBe('basalt');
+    expect(defaultBrushTarget(families, 'basalt')).toBe('stone');
+  });
+
+  it('falls back to the source when no alternative exists', () => {
+    expect(defaultBrushTarget(['stone'], 'stone')).toBe('stone');
+    expect(defaultBrushTarget([], 'stone')).toBe('stone');
   });
 });

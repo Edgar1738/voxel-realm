@@ -34,6 +34,18 @@ export interface WorldChoice {
   name: string;
 }
 
+/** One material family the brush can pick, with a representative block for the swatch. */
+export interface MaterialFamilyOption {
+  name: string;
+  icon: number;
+}
+
+/** Outcome of the material-brush dialog: swap `from`-family blocks to `to`-family siblings. */
+export interface MaterialBrushChoice {
+  from: string;
+  to: string;
+}
+
 /** Outcome of the blueprint dialog: load one into paste mode, save the clipboard, or delete. */
 export type BlueprintChoice =
   | { kind: 'load'; name: string; curated: boolean }
@@ -196,6 +208,8 @@ export interface CreativeUi {
   worldButton: HTMLButtonElement;
   /** Blueprint library button (click handled by Game). */
   blueprintButton: HTMLButtonElement;
+  /** Material brush button — shape-aware family swap over the selection (click handled by Game). */
+  materialBrushButton: HTMLButtonElement;
   /** Menu trigger — world info + grouped hotkey reference (click handled by Game). */
   infoButton: HTMLButtonElement;
   /** Play↔build switch (click handled by Game; Game hides it for uncurated worlds). */
@@ -255,6 +269,16 @@ export interface CreativeUi {
     entries: readonly BlueprintEntry[];
     canSave: boolean;
   }): Promise<BlueprintChoice | undefined>;
+  /**
+   * Material-brush picker: choose a source and target family, Apply swaps the selection.
+   * Apply stays disabled without a selection (the hint says how to make one) or when
+   * from === to. Resolves undefined on cancel.
+   */
+  showMaterialBrushDialog(opts: {
+    families: readonly MaterialFamilyOption[];
+    hasSelection: boolean;
+    selectionSummary?: string;
+  }): Promise<MaterialBrushChoice | undefined>;
   /**
    * Play mode hides the creative chrome (tools, hotbar, world/blueprint/reset); build mode
    * restores it. Purely visual — input gating lives in input.ts, not here.
@@ -337,6 +361,14 @@ export function wrapFocusIndex(index: number, count: number, direction: 1 | -1):
   if (count <= 0) return -1;
   if (index < 0 || index >= count) return direction === 1 ? 0 : count - 1;
   return (index + direction + count) % count;
+}
+
+/**
+ * The brush's auto-picked target: the first family other than `from` (so the dialog never
+ * opens as a no-op from === to pair). Exported so node-only tests can cover it.
+ */
+export function defaultBrushTarget(families: readonly string[], from: string): string {
+  return families.find((f) => f !== from) ?? from;
 }
 
 function button(text: string): HTMLButtonElement {
@@ -493,6 +525,11 @@ export function createCreativeUi(
   const blueprintButton = button('Blueprints');
   blueprintButton.className = 'world-btn';
 
+  const materialBrushButton = button('Materials');
+  materialBrushButton.className = 'world-btn';
+  materialBrushButton.title =
+    "Material brush — swap a selection's material family (slabs/stairs/walls follow)";
+
   const infoButton = button('Menu');
   infoButton.className = 'world-btn';
   infoButton.title = 'Menu — world info and controls';
@@ -642,7 +679,7 @@ export function createCreativeUi(
   utilityRail.className = 'creative-utilities';
   utilityRail.setAttribute('role', 'group');
   utilityRail.setAttribute('aria-label', 'Utilities');
-  utilityRail.append(infoButton, modeButton, blueprintButton);
+  utilityRail.append(infoButton, modeButton, blueprintButton, materialBrushButton);
 
   const sessionDetails = document.createElement('details');
   sessionDetails.className = 'creative-session-details';
@@ -942,6 +979,7 @@ export function createCreativeUi(
     hotbar.style.display = play ? 'none' : '';
     reset.style.display = play ? 'none' : '';
     blueprintButton.style.display = play ? 'none' : '';
+    materialBrushButton.style.display = play ? 'none' : '';
     // worldButton visibility stays owned by Game (dev-only button); Game re-applies it on
     // every mode change so play hides it and build restores the dev-only state.
     modeButton.textContent = play ? 'Build (B)' : 'Play mode';
@@ -1246,6 +1284,112 @@ export function createCreativeUi(
       panel.append(title, tabRow, body);
       if (opts.canSave || opts.entries.some((e) => !e.curated)) panel.append(saveRow);
       renderCategory('Saved');
+      const close = openDialogPanel(panel, () => finish(undefined));
+    });
+
+  const showMaterialBrushDialog = (opts: {
+    families: readonly MaterialFamilyOption[];
+    hasSelection: boolean;
+    selectionSummary?: string;
+  }): Promise<MaterialBrushChoice | undefined> =>
+    new Promise((resolve) => {
+      const panel = dialogPanel('Material brush');
+      panel.classList.add('brush-panel');
+      const title = document.createElement('div');
+      title.className = 'dialog-title';
+      title.textContent = 'Material brush';
+
+      const finish = (choice: MaterialBrushChoice | undefined): void => {
+        close();
+        resolve(choice);
+      };
+
+      const hint = document.createElement('p');
+      hint.className = 'dialog-message';
+      hint.textContent = opts.hasSelection
+        ? `Swap one material for another inside the ${opts.selectionSummary ?? ''} selection — slabs, stairs and walls follow their material.`
+        : 'Select two corners first (B, then click two blocks), then reopen this dialog.';
+
+      const names = opts.families.map((f) => f.name);
+      let from = names[0] ?? '';
+      let to = defaultBrushTarget(names, from);
+
+      const applyBtn = button('Apply');
+      applyBtn.className = 'dialog-btn';
+      applyBtn.addEventListener('click', () => finish({ from, to }));
+      const cancelBtn = button('Cancel');
+      cancelBtn.className = 'dialog-btn';
+      cancelBtn.addEventListener('click', () => finish(undefined));
+
+      // From/To pickers: a swatch of the family's representative block beside a select.
+      const makePicker = (
+        labelText: string,
+        get: () => string,
+        set: (v: string) => void,
+      ): { row: HTMLLabelElement; refresh: () => void } => {
+        const row = document.createElement('label');
+        row.className = 'brush-row';
+        const caption = document.createElement('span');
+        caption.className = 'brush-label';
+        caption.textContent = labelText;
+        const swatch = document.createElement('canvas');
+        swatch.className = 'brush-swatch';
+        swatch.setAttribute('aria-hidden', 'true');
+        const select = document.createElement('select');
+        select.className = 'brush-select';
+        select.setAttribute('aria-label', `${labelText} material family`);
+        for (const f of opts.families) {
+          const opt = document.createElement('option');
+          opt.value = f.name;
+          opt.textContent = f.name;
+          select.append(opt);
+        }
+        const refresh = (): void => {
+          select.value = get();
+          const fam = opts.families.find((f) => f.name === get());
+          if (fam) {
+            renderBlockIcon(swatch, fam.icon, registry.shape(fam.icon), swatchFlatColor(fam.icon));
+          }
+        };
+        select.addEventListener('change', () => {
+          set(select.value);
+          refreshAll();
+        });
+        row.append(caption, swatch, select);
+        return { row, refresh };
+      };
+
+      const fromPicker = makePicker(
+        'From',
+        () => from,
+        (v) => {
+          from = v;
+          // Keep the pair meaningful: picking the current target as source re-aims the target.
+          if (to === from) to = defaultBrushTarget(names, from);
+        },
+      );
+      const toPicker = makePicker(
+        'To',
+        () => to,
+        (v) => {
+          to = v;
+        },
+      );
+      const refreshAll = (): void => {
+        fromPicker.refresh();
+        toPicker.refresh();
+        applyBtn.disabled = !opts.hasSelection || from === to;
+        applyBtn.title = opts.hasSelection
+          ? 'Swap materials in the selection (one undo)'
+          : 'Select two corners first (B, then click two blocks)';
+      };
+
+      const actions = document.createElement('div');
+      actions.className = 'dialog-actions';
+      actions.append(applyBtn, cancelBtn);
+
+      panel.append(title, hint, fromPicker.row, toPicker.row, actions);
+      refreshAll();
       const close = openDialogPanel(panel, () => finish(undefined));
     });
 
@@ -1665,6 +1809,7 @@ export function createCreativeUi(
     reset,
     worldButton,
     blueprintButton,
+    materialBrushButton,
     infoButton,
     modeButton,
     tourPrev,
@@ -1694,6 +1839,7 @@ export function createCreativeUi(
     showDialog,
     showWorldDialog,
     showBlueprintDialog,
+    showMaterialBrushDialog,
     setExperienceMode,
     setTourHud,
     setInteractionPrompt,

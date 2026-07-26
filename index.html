@@ -763,6 +763,39 @@
         justify-content: flex-end;
         gap: 8px;
       }
+      /* ---- Material brush dialog ---- */
+      .brush-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 10px;
+      }
+      .brush-label {
+        width: 42px;
+        flex: none;
+        color: rgba(238, 242, 246, 0.78);
+        font-size: 13px;
+      }
+      .brush-swatch {
+        width: 32px;
+        height: 32px;
+        flex: none;
+        image-rendering: pixelated;
+      }
+      .brush-select {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 7px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        color: #eef2f6;
+        font: inherit;
+      }
+      .brush-select option {
+        background: #1c2026;
+        color: #eef2f6;
+      }
       .dialog-btn {
         padding: 7px 12px;
         border: 1px solid rgba(255, 255, 255, 0.28);

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   replaceVoxels,
+  swapFamilyVoxels,
   prefabToVoxels,
   unloadedChunksInBox,
   captureRegion,
@@ -9,11 +10,54 @@ import {
 } from '../src/app/RegionOps';
 import { rotateY, type Prefab } from '../src/core/Prefab';
 import { packState, setOpen, FACING } from '../src/world/VoxelState';
+import {
+  STONE,
+  STONE_SLAB,
+  STAIRS_STONE,
+  BASALT,
+  BASALT_SLAB,
+  STAIRS_BASALT,
+  DIRT,
+} from '../src/blocks/blocks';
 
 describe('boxDims', () => {
   it('returns inclusive dimensions regardless of corner order', () => {
     expect(boxDims({ x1: 0, y1: 0, z1: 0, x2: 2, y2: 0, z2: 4 })).toEqual([3, 1, 5]);
     expect(boxDims({ x1: 2, y1: 5, z1: 4, x2: 0, y2: 5, z2: 0 })).toEqual([3, 1, 5]);
+  });
+});
+
+describe('swapFamilyVoxels', () => {
+  const stairState = packState(FACING.E, 0);
+  const world: Record<string, { id: number; state: number }> = {
+    '0,0,0': { id: STONE, state: 0 },
+    '1,0,0': { id: STONE_SLAB, state: 1 }, // top slab
+    '2,0,0': { id: STAIRS_STONE, state: stairState },
+    '3,0,0': { id: DIRT, state: 0 }, // not in any family
+    '4,0,0': { id: BASALT, state: 0 }, // already the target family
+  };
+  const readBlock = (x: number, y: number, z: number): number => world[`${x},${y},${z}`]?.id ?? 0;
+  const readState = (x: number, y: number, z: number): number =>
+    world[`${x},${y},${z}`]?.state ?? 0;
+  const box = { x1: 0, y1: 0, z1: 0, x2: 4, y2: 0, z2: 0 };
+
+  it('maps each shape role to its target-family sibling with state preserved', () => {
+    const out = swapFamilyVoxels(readBlock, readState, box, 'stone', 'basalt');
+    expect(out).toEqual([
+      { x: 0, y: 0, z: 0, id: BASALT, state: 0 },
+      { x: 1, y: 0, z: 0, id: BASALT_SLAB, state: 1 },
+      { x: 2, y: 0, z: 0, id: STAIRS_BASALT, state: stairState },
+    ]);
+  });
+
+  it('skips roles the target family lacks (brick has no slab)', () => {
+    const out = swapFamilyVoxels(readBlock, readState, box, 'stone', 'brick');
+    // Cube and stairs map; the slab has no brick sibling and dirt/basalt never match.
+    expect(out.map((v) => v.x)).toEqual([0, 2]);
+  });
+
+  it('touches nothing when the source family is absent', () => {
+    expect(swapFamilyVoxels(readBlock, readState, box, 'sandstone', 'basalt')).toEqual([]);
   });
 });
 

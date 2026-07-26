@@ -36,7 +36,7 @@ import {
 } from './DevShapes';
 import { stairState, stairFacingToward, type StairFacing } from './stairFacing';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
-import { AIR, MATERIAL_FAMILIES, familyRoleOf, familyCounterpart } from '../blocks/blocks';
+import { AIR, MATERIAL_FAMILIES, familyRoleOf } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
@@ -65,6 +65,7 @@ import {
 import { toggleOpen } from '../world/VoxelState';
 import {
   replaceVoxels,
+  swapFamilyVoxels,
   prefabToVoxels,
   unloadedChunksInBox,
   captureRegion,
@@ -829,26 +830,18 @@ export function installDevControls(ctx: DevControlsContext): void {
       };
       const fromFamily = resolve(from);
       const toFamily = resolve(to);
-      const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
-      const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
-      const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
       try {
-        manager.preloadBox(ax, az, bx, bz);
+        manager.preloadBox(Math.min(x1, x2), Math.min(z1, z2), Math.max(x1, x2), Math.max(z1, z2));
       } catch {
         /* region too large to auto-preload */
       }
-      const voxels: Array<{ x: number; y: number; z: number; id: BlockId; state?: number }> = [];
-      for (let y = ay; y <= by; y++) {
-        for (let z = az; z <= bz; z++) {
-          for (let x = ax; x <= bx; x++) {
-            const id = manager.getBlock(x, y, z);
-            if (familyRoleOf(id)?.family !== fromFamily) continue;
-            const target = familyCounterpart(id, toFamily);
-            if (target === undefined || target === id) continue;
-            voxels.push({ x, y, z, id: target, state: manager.getState(x, y, z) });
-          }
-        }
-      }
+      const voxels = swapFamilyVoxels(
+        (x, y, z) => manager.getBlock(x, y, z),
+        (x, y, z) => manager.getState(x, y, z),
+        { x1, y1, z1, x2, y2, z2 },
+        fromFamily,
+        toFamily,
+      );
       return applyAny(voxels, { label: 'swapFamily' });
     },
 

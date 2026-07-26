@@ -2,7 +2,7 @@ import { type Prefab, type PrefabVoxel } from '../core/Prefab';
 import type { BlockId } from '../core/types';
 import type { SetVoxel } from '../edit/EditTypes';
 import { worldToChunkCoord, chunkKey } from '../core/coords';
-import { AIR } from '../blocks/blocks';
+import { AIR, familyRoleOf, familyCounterpart } from '../blocks/blocks';
 
 export interface Box {
   x1: number;
@@ -53,6 +53,37 @@ export function replaceVoxels(
   for (let x = ax; x <= bx; x++)
     for (let y = ay; y <= by; y++)
       for (let z = az; z <= bz; z++) if (read(x, y, z) === fromId) out.push({ x, y, z, id: toId });
+  return out;
+}
+
+/**
+ * Voxels inside `box` whose block belongs to `fromFamily`, retargeted to the SAME-SHAPE
+ * member of `toFamily` (stone slab -> basalt slab). Block state (facing/half/open) is
+ * carried through unchanged. Blocks outside the source family, and shape roles the target
+ * family lacks, are skipped. Shared by the material-brush UI and __vr.swapFamily.
+ */
+export function swapFamilyVoxels(
+  readBlock: (x: number, y: number, z: number) => BlockId,
+  readState: (x: number, y: number, z: number) => number,
+  box: Box,
+  fromFamily: string,
+  toFamily: string,
+): SetVoxel[] {
+  const [ax, bx] = [Math.min(box.x1, box.x2), Math.max(box.x1, box.x2)];
+  const [ay, by] = [Math.min(box.y1, box.y2), Math.max(box.y1, box.y2)];
+  const [az, bz] = [Math.min(box.z1, box.z2), Math.max(box.z1, box.z2)];
+  if ((bx - ax + 1) * (by - ay + 1) * (bz - az + 1) > 200000)
+    throw new Error('swap box too large (>200000)');
+  const out: SetVoxel[] = [];
+  for (let y = ay; y <= by; y++)
+    for (let z = az; z <= bz; z++)
+      for (let x = ax; x <= bx; x++) {
+        const id = readBlock(x, y, z);
+        if (familyRoleOf(id)?.family !== fromFamily) continue;
+        const target = familyCounterpart(id, toFamily);
+        if (target === undefined || target === id) continue;
+        out.push({ x, y, z, id: target, state: readState(x, y, z) });
+      }
   return out;
 }
 
