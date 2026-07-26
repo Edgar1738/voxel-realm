@@ -12,8 +12,24 @@ export function shouldShowMenu(search: string): boolean {
 }
 
 /** URL for a shipped world: `?save=<slug>` works in dev (disk store) and prod (static+overlay). */
-export function shippedWorldUrl(slug: string): string {
+export function saveWorldUrl(slug: string): string {
   return `?save=${encodeURIComponent(slug)}`;
+}
+
+/** URL for a shipped world: opt into the packaged store when opened from the front door. */
+export function shippedWorldUrl(slug: string): string {
+  return `${saveWorldUrl(slug)}&source=shipped`;
+}
+
+/**
+ * Navigates to a writable dev world without carrying the front-door packaged-world override.
+ * Other query parameters are preserved because they may be intentional debug or spawn settings.
+ */
+export function authoringWorldUrl(currentHref: string, worldName: string): string {
+  const url = new URL(currentHref);
+  url.searchParams.set('save', worldName);
+  url.searchParams.delete('source');
+  return url.toString();
 }
 
 /** The pre-menu default world — existing players' builds live here. */
@@ -65,6 +81,26 @@ export function worldCards(manifest: WorldManifest): WorldCard[] {
     url: shippedWorldUrl(w.slug),
     hue: cardHue(w.slug),
   }));
+}
+
+const FEATURED_WORLD_SLUG = 'frostvale-valley';
+const FEATURED_WORLD_TITLE = 'frostvale valley';
+
+/** Frostvale Valley is the featured world when shipped; otherwise use the first manifest world. */
+export function featuredWorldCard(cards: readonly WorldCard[]): WorldCard | undefined {
+  return (
+    cards.find(
+      (card) =>
+        card.slug === FEATURED_WORLD_SLUG ||
+        card.title.trim().toLowerCase() === FEATURED_WORLD_TITLE,
+    ) ?? cards[0]
+  );
+}
+
+/** Remaining curated worlds after the featured card is pulled out. */
+export function curatedWorldCards(cards: readonly WorldCard[]): WorldCard[] {
+  const featured = featuredWorldCard(cards);
+  return featured ? cards.filter((card) => card !== featured) : [];
 }
 
 export interface CreateCard {

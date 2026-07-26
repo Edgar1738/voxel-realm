@@ -145,6 +145,9 @@ const boot = vi.hoisted(() => {
     avatarAttach: vi.fn(),
     avatarDispose: vi.fn(() => order.push('avatar.dispose')),
     avatarUpdate: vi.fn(),
+    worldMapToggle: vi.fn(() => true),
+    worldMapClose: vi.fn(),
+    worldMapIsOpen: vi.fn(() => false),
     rigInstance: undefined as { yaw: number; pitch: number } | undefined,
     ui: undefined as FakeUi | undefined,
     abortInput: vi.fn(() => order.push('abortInput')),
@@ -262,9 +265,9 @@ vi.mock('../src/render/HeldBlock', () => ({
 
 vi.mock('../src/app/WorldMapUi', () => ({
   createWorldMapUi: vi.fn(() => ({
-    toggle: vi.fn(() => true),
-    close: vi.fn(),
-    isOpen: vi.fn(() => false),
+    toggle: boot.worldMapToggle,
+    close: boot.worldMapClose,
+    isOpen: boot.worldMapIsOpen,
     dispose: vi.fn(),
   })),
 }));
@@ -482,6 +485,8 @@ describe('Game.boot composition', () => {
     boot.playerConstructorArgs = [];
     boot.playerAvatarConstructorArgs = [];
     boot.rigInstance = undefined;
+    boot.worldMapToggle.mockReturnValue(true);
+    boot.worldMapIsOpen.mockReturnValue(false);
     boot.ui = makeUi();
     vi.stubGlobal('localStorage', makeStorage());
     vi.stubGlobal('window', {
@@ -517,6 +522,23 @@ describe('Game.boot composition', () => {
     expect(inputBlocked()).toBe(false);
     boot.ui!.setInventoryOpen(true);
     expect(inputBlocked()).toBe(true);
+
+    cleanup();
+  });
+
+  it('keeps the inventory and world map from becoming stacked modal owners', async () => {
+    const cleanup = await bootGame();
+    const callbacks = inputCtx();
+
+    boot.ui!.setInventoryOpen(true);
+    callbacks.onToggleMap();
+    expect(boot.worldMapToggle).not.toHaveBeenCalled();
+
+    boot.ui!.setInventoryOpen(false);
+    boot.worldMapIsOpen.mockReturnValue(true);
+    callbacks.onInventoryToggle(true);
+    expect(boot.worldMapClose).toHaveBeenCalledOnce();
+    expect(boot.ui!.isInventoryOpen()).toBe(true);
 
     cleanup();
   });
@@ -769,6 +791,8 @@ describe('Game.boot composition', () => {
     getExperienceMode: () => 'play' | 'build';
     onEnterBuild: () => void;
     onRun: (voxels: unknown[], verb: string) => void;
+    onInventoryToggle: (open: boolean) => void;
+    onToggleMap: () => void;
   } {
     const call = vi.mocked(registerInputListeners).mock.calls[0][0] as {
       callbacks: ReturnType<typeof inputCtx>;

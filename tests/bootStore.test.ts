@@ -25,9 +25,18 @@ const prod = { dev: false, baseUrl: '/' };
 const valid = (): boolean => true;
 
 describe('createBootStore', () => {
-  it('uses the disk-backed server store in dev, regardless of the manifest', () => {
+  it('uses the disk-backed server store for direct dev authoring URLs', () => {
     const store = createBootStore('test-cove', valid, manifest, { dev: true, baseUrl: '/' });
     expect(store).toBeInstanceOf(ServerSaveStore);
+  });
+
+  it('serves a packaged shipped world when a dev collection link opts in', () => {
+    const store = createBootStore('test-cove', valid, manifest, {
+      dev: true,
+      baseUrl: '/',
+      preferShipped: true,
+    });
+    expect(store).toBeInstanceOf(ShippedWorldStore);
   });
 
   it('serves a shipped slug from the static base + overlay store in prod', () => {

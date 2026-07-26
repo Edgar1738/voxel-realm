@@ -58,6 +58,7 @@ import { buildMapPalette } from './worldMapRender';
 import { LandmarkDiscovery } from './landmarkDiscovery';
 import { exportWorldJson, exportFileName } from '../persistence/worldShare';
 import { createBootStore } from './bootStore';
+import { authoringWorldUrl } from './menu';
 import { BootStats, type BootReport } from './bootStats';
 import { SHIPPED_MANIFEST } from './shippedManifest';
 import { worldNameFromSearch } from '../persistence/worldName';
@@ -214,13 +215,16 @@ export class Game {
     const celestial = new CelestialSky(renderer.scene);
     bootStats.end('renderer+materials');
 
-    // Load the durable save (or start fresh / discard an incompatible one). Dev uses the
-    // server-owned disk store; production serves shipped worlds from static hosting with a
+    // Load the durable save (or start fresh / discard an incompatible one). Curated collection
+    // links opt into the packaged base even in dev; direct dev authoring URLs keep using the
+    // server-owned disk store. Production serves shipped worlds from static hosting with a
     // per-slug IndexedDB overlay, and everything else from per-name IndexedDB.
+    const searchParams = new URLSearchParams(window.location.search);
     const worldName = worldNameFromSearch(window.location.search);
     let store: SaveStore = createBootStore(worldName, (id) => registry.has(id), SHIPPED_MANIFEST, {
       dev: import.meta.env.DEV,
       baseUrl: import.meta.env.BASE_URL,
+      preferShipped: searchParams.get('source') === 'shipped',
     });
     const bootMeta = await bootStats.span('load-meta', () => loadBootMeta(store));
     store = bootMeta.store;
@@ -229,7 +233,7 @@ export class Game {
 
     // Pick the world environment. An explicit `?world=` wins; otherwise an existing save keeps its
     // own stored preset, so a bare `?save=<name>` can't mismatch the generator and wipe the world.
-    const requested = new URLSearchParams(window.location.search).get('world');
+    const requested = searchParams.get('world');
     const preset: WorldPreset = resolveBootPreset(requested, bootMeta.meta);
     const generatedMeta = curatedPresetMeta(preset, SEED, SAVE_VERSION);
     const { generator, overlays } = createGenerator(preset);
@@ -546,9 +550,7 @@ export class Game {
           const choice = await ui.showWorldDialog(worldName, worlds);
           if (!choice) return;
           if (choice.kind === 'duplicate') await copyWorld(worldName, choice.name);
-          const u = new URL(window.location.href);
-          u.searchParams.set('save', choice.name);
-          window.location.href = u.toString();
+          window.location.href = authoringWorldUrl(window.location.href, choice.name);
         })();
       });
     } else {
@@ -927,7 +929,7 @@ export class Game {
     };
 
     // Landmark discovery medals: walking near a landmark marks it found, persisted per save.
-    // The map and info dialog hide undiscovered names behind "???" so exploring reveals them.
+    // The map and info dialog keep undiscovered names hidden so exploring reveals them.
     const npcProgress = loadNpcProgress(localStorage, worldName);
     const discovery = new LandmarkDiscovery(
       activeMeta?.landmarks ?? [],
@@ -990,10 +992,12 @@ export class Game {
         },
         worldName,
       );
-      try {
-        localStorage.setItem(introKey, '1');
-      } catch {
-        /* ignore persistence failure */
+      if (action !== undefined) {
+        try {
+          localStorage.setItem(introKey, '1');
+        } catch {
+          /* ignore persistence failure */
+        }
       }
       if (action === 'build') {
         applyExperience('build');
@@ -1007,7 +1011,12 @@ export class Game {
     };
     ui.infoButton.addEventListener('click', () => void openWorldInfo());
     applyExperience(experience);
-    if (curated && !introSeen()) void openWorldInfo();
+    if (curated && !introSeen()) {
+      // Register a spawn-area landmark before composing the first-visit dialog so its progress
+      // matches the discovery toast that would otherwise appear one frame later.
+      tickDiscovery(0);
+      void openWorldInfo();
+    }
 
     // Re-acquire pointer lock from a user gesture (map close / backdrop). Chrome only enforces a
     // cooldown after an Esc-exit; our map open exits programmatically, so this is immediate.
@@ -1032,6 +1041,8 @@ export class Game {
     });
     const mapPalette = buildMapPalette();
     const toggleWorldMap = (): void => {
+      // A single overlay owns focus at a time. When the map is already open, M may still close it.
+      if (!worldMap.isOpen() && (ui.isInventoryOpen() || ui.isDialogOpen())) return;
       const nowOpen = worldMap.toggle({
         center: { x: Math.floor(player.position.x), z: Math.floor(player.position.z) },
         yaw: rig.yaw,
@@ -1495,7 +1506,10 @@ export class Game {
         onStatusChange: setStatus,
         onToolChange: setTool,
         onHotbarRender: () => renderHotbar(),
-        onInventoryToggle: (open) => ui.setInventoryOpen(open),
+        onInventoryToggle: (open) => {
+          if (open && worldMap.isOpen()) worldMap.close();
+          ui.setInventoryOpen(open);
+        },
         isInventoryOpen: () => ui.isInventoryOpen(),
         onRun: run,
         getAnchor: () => anchorVoxel,

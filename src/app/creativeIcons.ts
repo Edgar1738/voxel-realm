@@ -237,6 +237,68 @@ export const WEATHER_ICON_SHAPES: Record<string, IconShapes> = {
   ],
 };
 
+/** Compass-style arrow used by the waypoint chip. */
+export const WAYPOINT_ARROW_SHAPES: IconShapes = [
+  ['path', { d: 'M7 1.2 L11.7 12 H7.9 L7 9.8 L6.1 12 H2.3 Z', fill: 'currentColor' }],
+];
+
+/** Compact chevrons used for previous/next controls. */
+export const CHEVRON_LEFT_SHAPES: IconShapes = [
+  [
+    'path',
+    {
+      d: 'M8.8 2.5 L4.2 7 L8.8 11.5',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.8',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+    },
+  ],
+];
+
+export const CHEVRON_RIGHT_SHAPES: IconShapes = [
+  [
+    'path',
+    {
+      d: 'M5.2 2.5 L9.8 7 L5.2 11.5',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': '1.8',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+    },
+  ],
+];
+
+/** Shared close/remove icon for destructive dismiss/delete buttons. */
+export const CLOSE_X_SHAPES: IconShapes = [
+  [
+    'line',
+    {
+      x1: '3.2',
+      y1: '3.2',
+      x2: '10.8',
+      y2: '10.8',
+      stroke: 'currentColor',
+      'stroke-width': '1.6',
+      'stroke-linecap': 'round',
+    },
+  ],
+  [
+    'line',
+    {
+      x1: '10.8',
+      y1: '3.2',
+      x2: '3.2',
+      y2: '10.8',
+      stroke: 'currentColor',
+      'stroke-width': '1.6',
+      'stroke-linecap': 'round',
+    },
+  ],
+];
+
 /** Builds a 14px inline-SVG icon from typed shape specs (no innerHTML — trusted nodes). */
 export function buildIcon(shapes: ReadonlyArray<[string, Record<string, string>]>): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');

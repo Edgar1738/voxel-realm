@@ -8,6 +8,10 @@ import {
   swatchFlatColor,
   buildIcon,
   buildToolIcon,
+  CHEVRON_LEFT_SHAPES,
+  CHEVRON_RIGHT_SHAPES,
+  CLOSE_X_SHAPES,
+  WAYPOINT_ARROW_SHAPES,
   SPEAKER_SHAPES,
   SUN_SHAPES,
   MOON_SHAPES,
@@ -283,12 +287,76 @@ export interface CreativeUi {
 
 const STATUS_VISIBLE_MS = 1600;
 const SAVE_STATUS_SAVED_MS = 1400; // how long the "Saved" confirmation lingers before fading
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'summary',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+export type StatusRailSlot = 'loading' | 'challenge' | 'tour' | 'waypoint';
+
+/** Small pure helper for the HUD rail: only the highest-priority active item should be visible. */
+export function activeStatusRailSlot(state: {
+  loadingText: string | undefined;
+  challenge: ChallengeHudStatus | undefined;
+  tour: TourHudStatus | undefined;
+  waypoint: { angleRad: number; distance: number } | null;
+}): StatusRailSlot | undefined {
+  if (state.loadingText !== undefined) return 'loading';
+  if (state.challenge) return 'challenge';
+  if (state.tour) return 'tour';
+  if (state.waypoint) return 'waypoint';
+  return undefined;
+}
+
+/** Concise copy for the menu/world-info dialog; exported so node-only tests can cover it. */
+export function summarizeWorldInfo(info: WorldInfo): {
+  progress: string;
+  tour: string;
+  primaryAction: 'tour' | 'explore';
+} {
+  const foundCount = info.landmarks.filter((landmark) => landmark.found).length;
+  return {
+    progress:
+      info.landmarks.length > 0
+        ? `${foundCount} of ${info.landmarks.length} landmarks discovered.`
+        : 'No landmarks tracked yet.',
+    tour:
+      info.tourCount >= 2
+        ? `${info.tourCount}-stop guided tour available.`
+        : 'No guided tour available.',
+    primaryAction: info.tourCount >= 2 ? 'tour' : 'explore',
+  };
+}
+
+/** Wraps focus forward/backward within a list size; exported for node-only focus-trap tests. */
+export function wrapFocusIndex(index: number, count: number, direction: 1 | -1): number {
+  if (count <= 0) return -1;
+  if (index < 0 || index >= count) return direction === 1 ? 0 : count - 1;
+  return (index + direction + count) % count;
+}
 
 function button(text: string): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = text;
   return b;
+}
+
+function focusableElementsWithin(container: HTMLElement): HTMLElement[] {
+  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter((node) => {
+    if (node.hasAttribute('hidden') || node.getAttribute('aria-hidden') === 'true') return false;
+    const closedDetails = node.closest('details:not([open])');
+    if (!closedDetails) return true;
+    return node.tagName === 'SUMMARY' && node.parentElement === closedDetails;
+  });
+}
+
+function setElementInert(element: HTMLElement, inert: boolean): void {
+  (element as HTMLElement & { inert?: boolean }).inert = inert;
 }
 
 /**
@@ -559,22 +627,36 @@ export function createCreativeUi(
   setWeatherUi('auto');
   setTimeUi(0.5);
 
-  // tunnelSettings goes last with flex-basis 100% so it wraps onto its own dock row.
-  dock.append(
-    toolRow,
-    reachGroup,
-    holdButton,
-    skinButton,
-    handButton,
-    soundGroup,
-    climateGroup,
-    infoButton,
-    modeButton,
-    blueprintButton,
-    worldButton,
-    reset,
-    tunnelSettings,
-  );
+  const primaryControls = document.createElement('div');
+  primaryControls.className = 'creative-primary-controls';
+  primaryControls.setAttribute('role', 'group');
+  primaryControls.setAttribute('aria-label', 'Primary build controls');
+
+  const quickControls = document.createElement('div');
+  quickControls.className = 'creative-quick-controls';
+  quickControls.append(reachGroup, holdButton);
+
+  primaryControls.append(toolRow, quickControls, tunnelSettings);
+
+  const utilityRail = document.createElement('div');
+  utilityRail.className = 'creative-utilities';
+  utilityRail.setAttribute('role', 'group');
+  utilityRail.setAttribute('aria-label', 'Utilities');
+  utilityRail.append(infoButton, modeButton, blueprintButton);
+
+  const sessionDetails = document.createElement('details');
+  sessionDetails.className = 'creative-session-details';
+  const sessionSummary = document.createElement('summary');
+  sessionSummary.className = 'creative-session-summary';
+  sessionSummary.textContent = 'Session';
+  sessionSummary.setAttribute('aria-label', 'Session and advanced controls');
+  const sessionBody = document.createElement('div');
+  sessionBody.className = 'creative-session-body';
+  sessionBody.append(soundGroup, climateGroup, skinButton, handButton, worldButton, reset);
+  sessionDetails.append(sessionSummary, sessionBody);
+  utilityRail.append(sessionDetails);
+
+  dock.append(primaryControls, utilityRail);
 
   // Inventory modal: a dimming scrim (absorbs backdrop clicks) over a centered "Blocks" panel.
   const scrim = document.createElement('div');
@@ -586,10 +668,22 @@ export function createCreativeUi(
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'Blocks');
+  panel.tabIndex = -1;
 
   const title = document.createElement('div');
   title.className = 'inventory-title';
+  title.id = 'inventory-title';
   title.textContent = 'Blocks';
+  panel.removeAttribute('aria-label');
+  panel.setAttribute('aria-labelledby', title.id);
+
+  const inventoryClose = button('Close');
+  inventoryClose.className = 'inventory-close';
+  inventoryClose.setAttribute('aria-label', 'Close block inventory');
+
+  const inventoryHeader = document.createElement('div');
+  inventoryHeader.className = 'inventory-header';
+  inventoryHeader.append(title, inventoryClose);
 
   const picker = document.createElement('div');
   picker.className = 'inventory-grid';
@@ -626,7 +720,7 @@ export function createCreativeUi(
     picker.append(tile);
   }
 
-  panel.append(title, picker);
+  panel.append(inventoryHeader, picker);
   scrim.append(panel);
 
   const hotbar = document.createElement('div');
@@ -644,45 +738,51 @@ export function createCreativeUi(
   saveStatus.setAttribute('role', 'status');
   saveStatus.setAttribute('aria-live', 'polite');
 
-  // Persistent top-center banner for sticky warnings (e.g. storage unavailable). Distinct from the
-  // transient status toast so a data-loss warning can't fade away before the player notices it.
+  // Persistent banner for sticky warnings (e.g. storage unavailable). Distinct from the transient
+  // status toast so a data-loss warning can't fade away before the player notices it.
   const notice = document.createElement('div');
   notice.className = 'creative-notice';
   notice.setAttribute('role', 'alert');
-  notice.style.cssText =
-    'position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:72vw;' +
-    'padding:8px 14px;border-radius:10px;background:rgba(74,34,12,0.92);' +
-    'border:1px solid rgba(255,180,90,0.55);color:#ffe6c2;font-weight:500;text-align:center;' +
-    'box-shadow:0 4px 14px rgba(0,0,0,0.45);z-index:6;display:none;';
 
   // Dialog scrim: shared host for the confirm and world dialogs (one dialog at a time).
   const dialogScrim = document.createElement('div');
   dialogScrim.className = 'dialog-scrim';
   dialogScrim.setAttribute('aria-hidden', 'true');
 
+  const statusRail = document.createElement('div');
+  statusRail.className = 'status-rail';
+
   // Tour HUD: a top-center strip naming the active waypoint with its distance and skip controls.
   const tourHud = document.createElement('div');
-  tourHud.className = 'tour-hud';
+  tourHud.className = 'tour-hud status-rail-item';
+  tourHud.dataset.railItem = 'tour';
   tourHud.setAttribute('role', 'status');
   tourHud.style.display = 'none';
   const tourLabel = document.createElement('span');
   tourLabel.className = 'tour-label';
-  const tourPrev = button('◀');
+  const tourPrev = document.createElement('button');
+  tourPrev.type = 'button';
   tourPrev.className = 'tour-btn';
+  tourPrev.append(buildIcon(CHEVRON_LEFT_SHAPES));
   tourPrev.title = 'Previous waypoint';
   tourPrev.setAttribute('aria-label', 'Previous waypoint');
-  const tourNext = button('▶');
+  const tourNext = document.createElement('button');
+  tourNext.type = 'button';
   tourNext.className = 'tour-btn';
+  tourNext.append(buildIcon(CHEVRON_RIGHT_SHAPES));
   tourNext.title = 'Next waypoint';
   tourNext.setAttribute('aria-label', 'Next waypoint');
-  const tourEnd = button('✕');
+  const tourEnd = document.createElement('button');
+  tourEnd.type = 'button';
   tourEnd.className = 'tour-btn';
+  tourEnd.append(buildIcon(CLOSE_X_SHAPES));
   tourEnd.title = 'End tour';
   tourEnd.setAttribute('aria-label', 'End tour');
   tourHud.append(tourPrev, tourLabel, tourNext, tourEnd);
 
   const challengeHud = document.createElement('div');
-  challengeHud.className = 'challenge-hud';
+  challengeHud.className = 'challenge-hud status-rail-item';
+  challengeHud.dataset.railItem = 'challenge';
   challengeHud.setAttribute('role', 'status');
   challengeHud.style.display = 'none';
   const challengeLabel = document.createElement('span');
@@ -702,70 +802,81 @@ export function createCreativeUi(
     interactionPrompt.textContent = text ?? '';
   };
 
+  let loadingHudText: string | undefined;
+  let challengeHudState: ChallengeHudStatus | undefined;
+  let tourHudState: TourHudStatus | undefined;
+  let waypointChipState: { angleRad: number; distance: number } | null = null;
+  const syncStatusRail = (): void => {
+    const active = activeStatusRailSlot({
+      loadingText: loadingHudText,
+      challenge: challengeHudState,
+      tour: tourHudState,
+      waypoint: waypointChipState,
+    });
+    loadingHud.style.display = active === 'loading' ? 'block' : 'none';
+    challengeHud.style.display = active === 'challenge' ? 'flex' : 'none';
+    tourHud.style.display = active === 'tour' ? 'flex' : 'none';
+    waypointChip.classList.toggle('is-visible', active === 'waypoint');
+  };
+
   const setChallengeHud = (status: ChallengeHudStatus | undefined): void => {
-    if (!status) {
-      challengeHud.style.display = 'none';
-      return;
+    challengeHudState = status;
+    if (status) {
+      const best = status.best ? ` · Best ${status.best}` : '';
+      challengeLabel.textContent =
+        `${status.index + 1}/${status.total} ${status.name} · ${Math.round(status.distance)}m` +
+        ` · ${status.elapsed}${best}`;
     }
-    challengeHud.style.display = 'flex';
-    const best = status.best ? ` · Best ${status.best}` : '';
-    challengeLabel.textContent =
-      `${status.index + 1}/${status.total} ${status.name} · ${Math.round(status.distance)}m` +
-      ` · ${status.elapsed}${best}`;
+    syncStatusRail();
   };
 
   // Waypoint compass: a top-center chip with an arrow (rotated toward the waypoint, relative to
   // the look direction) and the remaining distance. Shares the tour HUD's spot; the host hides it
   // while a tour runs so the two never overlap.
   const waypointChip = document.createElement('div');
-  waypointChip.className = 'waypoint-chip';
+  waypointChip.className = 'waypoint-chip status-rail-item';
+  waypointChip.dataset.railItem = 'waypoint';
   waypointChip.setAttribute('role', 'status');
   const waypointArrow = document.createElement('span');
   waypointArrow.className = 'waypoint-arrow';
-  waypointArrow.textContent = '▲';
+  waypointArrow.append(buildIcon(WAYPOINT_ARROW_SHAPES));
   waypointArrow.setAttribute('aria-hidden', 'true');
   const waypointDistance = document.createElement('span');
   waypointDistance.className = 'waypoint-distance';
   waypointChip.append(waypointArrow, waypointDistance);
-  let waypointChipShown = false;
   const setWaypointChip = (state: { angleRad: number; distance: number } | null): void => {
-    if (state === null) {
-      if (!waypointChipShown) return;
-      waypointChipShown = false;
-      waypointChip.classList.remove('is-visible');
-      return;
+    waypointChipState = state;
+    if (state) {
+      waypointArrow.style.transform = `rotate(${state.angleRad}rad)`;
+      waypointDistance.textContent = `${state.distance} blocks`;
     }
-    waypointChipShown = true;
-    waypointArrow.style.transform = `rotate(${state.angleRad}rad)`;
-    waypointDistance.textContent = `${state.distance} blocks`;
-    waypointChip.classList.add('is-visible');
+    syncStatusRail();
   };
 
   // Cold-start streaming banner: honest feedback while the first chunk ring generates and
   // meshes, so a slow machine sees progress instead of empty sky ("is it broken?").
   const loadingHud = document.createElement('div');
-  loadingHud.className = 'loading-hud';
+  loadingHud.className = 'loading-hud status-rail-item';
+  loadingHud.dataset.railItem = 'loading';
   loadingHud.style.display = 'none';
   loadingHud.setAttribute('role', 'status');
   const setLoadingHud = (text: string | undefined): void => {
-    if (text === undefined) {
-      loadingHud.style.display = 'none';
-      return;
-    }
-    loadingHud.style.display = 'block';
-    loadingHud.textContent = text;
+    loadingHudText = text;
+    loadingHud.textContent = text ?? '';
+    syncStatusRail();
   };
 
   const setTourHud = (s: TourHudStatus | undefined): void => {
-    if (!s) {
-      tourHud.style.display = 'none';
-      return;
+    tourHudState = s;
+    if (s) {
+      tourLabel.textContent = s.done
+        ? `Tour complete — ${s.name}`
+        : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
     }
-    tourHud.style.display = 'flex';
-    tourLabel.textContent = s.done
-      ? `Tour complete — ${s.name}`
-      : `${s.index + 1}/${s.total} ${s.name} · ${Math.round(s.distance)}m`;
+    syncStatusRail();
   };
+
+  statusRail.append(loadingHud, challengeHud, tourHud, waypointChip);
 
   root.append(
     dock,
@@ -774,20 +885,56 @@ export function createCreativeUi(
     saveStatus,
     notice,
     hotbar,
-    tourHud,
-    challengeHud,
+    statusRail,
     interactionPrompt,
-    waypointChip,
-    loadingHud,
     dialogScrim,
   );
   document.body.append(root);
 
   let activeDialogClose: (() => void) | undefined;
+  let inventoryOpen = false;
+  let inventoryFocusReturn: HTMLElement | null = null;
+  let inventoryKeyListener: ((e: KeyboardEvent) => void) | undefined;
+
+  const activeOverlayHost = (): HTMLElement | null => {
+    if (dialogScrim.classList.contains('is-open')) return dialogScrim;
+    if (inventoryOpen) return scrim;
+    return null;
+  };
+
+  const syncOverlayInert = (): void => {
+    const activeHost = activeOverlayHost();
+    for (const child of [...document.body.children] as HTMLElement[]) {
+      setElementInert(child, activeHost !== null && child !== root);
+    }
+    for (const child of [...root.children] as HTMLElement[]) {
+      setElementInert(child, activeHost !== null && child !== activeHost);
+    }
+  };
+
+  const moveFocusWithin = (container: HTMLElement, direction: 1 | -1): void => {
+    const focusables = focusableElementsWithin(container);
+    const index = focusables.indexOf(document.activeElement as HTMLElement);
+    const next = wrapFocusIndex(index, focusables.length, direction);
+    if (next >= 0) focusables[next]?.focus();
+    else container.focus();
+  };
+
+  const focusInitialElement = (container: HTMLElement, preferred?: HTMLElement | null): void => {
+    if (preferred) {
+      preferred.focus();
+      return;
+    }
+    const first = focusableElementsWithin(container)[0];
+    if (first) first.focus();
+    else container.focus();
+  };
 
   const setExperienceMode = (mode: 'play' | 'build'): void => {
     const play = mode === 'play';
     playModeUi = play;
+    root.classList.toggle('is-play-mode', play);
+    root.classList.toggle('is-build-mode', !play);
     refreshTunnelStrip();
     toolRow.style.display = play ? 'none' : '';
     reachGroup.style.display = play ? 'none' : '';
@@ -804,26 +951,38 @@ export function createCreativeUi(
   };
 
   /**
-   * Mounts `panel` in the dialog scrim: focuses its first button, swallows game keyboard
-   * shortcuts while open (capture-phase), closes on Escape/backdrop, and restores focus on
-   * close. Returns the close function.
+   * Mounts `panel` in the dialog scrim: traps focus, swallows game keyboard shortcuts while open
+   * (capture-phase), closes on Escape/backdrop, and restores focus on close. Returns the closer.
    */
-  const openDialogPanel = (panel: HTMLDivElement, onCancel: () => void): (() => void) => {
+  const openDialogPanel = (
+    panel: HTMLDivElement,
+    onCancel: () => void,
+    preferredFocus?: HTMLElement | null,
+  ): (() => void) => {
     activeDialogClose?.();
     const previousFocus = document.activeElement as HTMLElement | null;
     dialogScrim.replaceChildren(panel);
     dialogScrim.classList.add('is-open');
     dialogScrim.setAttribute('aria-hidden', 'false');
+    syncOverlayInert();
     const onKey = (e: KeyboardEvent): void => {
       e.stopPropagation(); // keep game shortcuts (I inventory, B build, tools) inert
-      if (e.code === 'Escape') onCancel();
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        moveFocusWithin(panel, e.shiftKey ? -1 : 1);
+        return;
+      }
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        onCancel();
+      }
     };
     const onScrimClick = (e: MouseEvent): void => {
       if (e.target === dialogScrim) onCancel();
     };
     window.addEventListener('keydown', onKey, true);
     dialogScrim.addEventListener('click', onScrimClick);
-    panel.querySelector('button')?.focus();
+    focusInitialElement(panel, preferredFocus);
     let closed = false;
     const close = (): void => {
       if (closed) return;
@@ -833,6 +992,7 @@ export function createCreativeUi(
       dialogScrim.classList.remove('is-open');
       dialogScrim.setAttribute('aria-hidden', 'true');
       dialogScrim.replaceChildren();
+      syncOverlayInert();
       previousFocus?.focus();
       if (activeDialogClose === close) activeDialogClose = undefined;
     };
@@ -846,6 +1006,7 @@ export function createCreativeUi(
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', label);
+    panel.tabIndex = -1;
     return panel;
   };
 
@@ -920,7 +1081,7 @@ export function createCreativeUi(
       switchBtn.addEventListener('click', () => {
         if (typedName()) finish({ kind: 'switch', name: typedName() });
       });
-      const duplicateBtn = button('Duplicate current →');
+      const duplicateBtn = button('Duplicate current');
       duplicateBtn.className = 'dialog-btn';
       duplicateBtn.title = `Copy "${current}" to the typed name, then open it`;
       duplicateBtn.addEventListener('click', () => {
@@ -1048,7 +1209,7 @@ export function createCreativeUi(
             const deleteBtn = document.createElement('button');
             deleteBtn.type = 'button';
             deleteBtn.className = 'blueprint-delete';
-            deleteBtn.textContent = '✕';
+            deleteBtn.append(buildIcon(CLOSE_X_SHAPES));
             deleteBtn.title = `Delete blueprint "${entry.name}"`;
             deleteBtn.setAttribute('aria-label', `Delete blueprint ${entry.name}`);
             deleteBtn.addEventListener('click', (e) => {
@@ -1090,7 +1251,7 @@ export function createCreativeUi(
 
   const showWorldInfoDialog = (
     info: WorldInfo,
-    worldName: string,
+    _worldName: string,
   ): Promise<'explore' | 'tour' | 'build' | undefined> =>
     new Promise((resolve) => {
       const panel = dialogPanel(info.title);
@@ -1098,43 +1259,46 @@ export function createCreativeUi(
       const title = document.createElement('div');
       title.className = 'dialog-title';
       title.textContent = info.title;
-      const worldLine = document.createElement('p');
-      worldLine.className = 'dialog-message menu-world-line';
-      worldLine.textContent = `Current world: ${worldName}`;
+      const summary = summarizeWorldInfo(info);
       const message = document.createElement('p');
       message.className = 'dialog-message';
       message.textContent = info.description?.trim() || 'No description yet.';
-      panel.append(title, worldLine, message);
+      const progress = document.createElement('p');
+      progress.className = 'dialog-message';
+      progress.textContent = summary.progress;
+      const tourLine = document.createElement('p');
+      tourLine.className = 'dialog-message';
+      tourLine.textContent = summary.tour;
+      panel.append(title, message, progress, tourLine);
 
       if (info.landmarks.length > 0) {
+        const landmarksDetails = document.createElement('details');
+        landmarksDetails.className = 'menu-section menu-landmarks';
+        const landmarksSummary = document.createElement('summary');
+        landmarksSummary.textContent = 'Landmarks';
         const foundCount = info.landmarks.filter((l) => l.found).length;
-        const heading = document.createElement('div');
-        heading.className = 'info-heading';
-        heading.textContent = `Landmarks (${foundCount}/${info.landmarks.length} discovered)`;
+        landmarksSummary.setAttribute(
+          'aria-label',
+          `Landmarks, ${foundCount} of ${info.landmarks.length} discovered`,
+        );
         const list = document.createElement('ul');
         list.className = 'info-landmarks';
         for (const landmark of info.landmarks) {
           const li = document.createElement('li');
-          li.textContent = landmark.found ? landmark.name : '???';
+          li.textContent = landmark.found ? landmark.name : 'Undiscovered landmark';
           if (!landmark.found) li.classList.add('is-undiscovered');
           list.append(li);
         }
-        panel.append(heading, list);
+        landmarksDetails.append(landmarksSummary, list);
+        panel.append(landmarksDetails);
       }
 
-      const tourLine = document.createElement('p');
-      tourLine.className = 'dialog-message';
-      tourLine.textContent =
-        info.tourCount >= 2
-          ? `A guided tour with ${info.tourCount} stops is available.`
-          : 'No guided tour for this world.';
-      panel.append(tourLine);
-
       // Grouped hotkey reference — the renamed "Menu" button's second job (Section 6).
-      const controlsHeading = document.createElement('div');
-      controlsHeading.className = 'info-heading';
-      controlsHeading.textContent = 'Controls';
-      panel.append(controlsHeading);
+      const controlsDetails = document.createElement('details');
+      controlsDetails.className = 'menu-section menu-controls';
+      const controlsSummary = document.createElement('summary');
+      controlsSummary.textContent = 'Full controls';
+      controlsDetails.append(controlsSummary);
       const controlsGrid = document.createElement('div');
       controlsGrid.className = 'menu-controls-grid';
       for (const group of MENU_HOTKEY_GROUPS) {
@@ -1154,7 +1318,8 @@ export function createCreativeUi(
         box.append(list);
         controlsGrid.append(box);
       }
-      panel.append(controlsGrid);
+      controlsDetails.append(controlsGrid);
+      panel.append(controlsDetails);
 
       const finish = (action: 'explore' | 'tour' | 'build' | undefined): void => {
         close();
@@ -1162,15 +1327,15 @@ export function createCreativeUi(
       };
       const actions = document.createElement('div');
       actions.className = 'dialog-actions';
-      const explore = button('Explore');
-      explore.className = 'dialog-btn';
-      explore.addEventListener('click', () => finish('explore'));
-      actions.append(explore);
-      if (info.tourCount >= 2) {
-        const tourBtn = button('Start Tour');
-        tourBtn.className = 'dialog-btn';
-        tourBtn.addEventListener('click', () => finish('tour'));
-        actions.append(tourBtn);
+      const primary = button(summary.primaryAction === 'tour' ? 'Start tour' : 'Explore');
+      primary.className = 'dialog-btn primary';
+      primary.addEventListener('click', () => finish(summary.primaryAction));
+      actions.append(primary);
+      if (summary.primaryAction !== 'explore') {
+        const explore = button('Explore');
+        explore.className = 'dialog-btn';
+        explore.addEventListener('click', () => finish('explore'));
+        actions.append(explore);
       }
       const buildBtn = button('Build');
       buildBtn.className = 'dialog-btn';
@@ -1178,7 +1343,7 @@ export function createCreativeUi(
       actions.append(buildBtn);
       panel.append(actions);
 
-      const close = openDialogPanel(panel, () => finish(undefined));
+      const close = openDialogPanel(panel, () => finish(undefined), primary);
     });
 
   const isDialogOpen = (): boolean => dialogScrim.classList.contains('is-open');
@@ -1369,13 +1534,39 @@ export function createCreativeUi(
       const close = openDialogPanel(panel, () => finish('resume'));
     });
 
-  let inventoryOpen = false;
   const isInventoryOpen = (): boolean => inventoryOpen;
   const setInventoryOpen = (open: boolean): void => {
+    if (inventoryOpen === open) return;
+    if (open) inventoryFocusReturn = document.activeElement as HTMLElement | null;
     inventoryOpen = open;
     scrim.classList.toggle('is-open', open);
     scrim.setAttribute('aria-hidden', String(!open));
+    if (inventoryKeyListener) {
+      window.removeEventListener('keydown', inventoryKeyListener, true);
+      inventoryKeyListener = undefined;
+    }
+    if (open) {
+      inventoryKeyListener = (e: KeyboardEvent): void => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          moveFocusWithin(panel, e.shiftKey ? -1 : 1);
+          return;
+        }
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          setInventoryOpen(false);
+        }
+      };
+      window.addEventListener('keydown', inventoryKeyListener, true);
+      syncOverlayInert();
+      focusInitialElement(panel);
+      return;
+    }
+    syncOverlayInert();
+    inventoryFocusReturn?.focus();
+    inventoryFocusReturn = null;
   };
+  inventoryClose.addEventListener('click', () => setInventoryOpen(false));
   // Clicking the backdrop (but not the panel) closes the modal.
   scrim.addEventListener('click', (e) => {
     if (e.target === scrim) setInventoryOpen(false);
