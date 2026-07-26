@@ -60,6 +60,8 @@ export const DEV_HELP: Record<string, string> = {
   hollowBox: 'hollowBox(x1,y1,z1, x2,y2,z2, id) — box shell',
   line: 'line(x1,y1,z1, x2,y2,z2, id)',
   replace: 'replace(box, fromId, toId)',
+  swapFamily:
+    "swapFamily(box, from, to) — shape-aware material swap ('stone'->'basalt' maps slab/stair/wall too); from/to are family names or member ids",
   undo: 'undo()  /  redo: redo()',
   preloadArea: 'preloadArea(x,z, radius=2) -> {generated,meshed} — load chunks before build/scan',
   // perceive

@@ -5,6 +5,7 @@ import { SurfacePainter } from './SurfacePainter';
 import { CaveCarver } from './CaveCarver';
 import { WaterFiller } from './WaterFiller';
 import { OreScatterer } from './OreScatterer';
+import { CaveThemeStage } from './CaveThemes';
 import { CaveTorcher } from './CaveTorcher';
 import { BiomeMap } from './BiomeMap';
 import type { Generator } from './Generator';
@@ -49,6 +50,7 @@ export function createWorldGenerator(): LayeredGenerator {
       new CaveCarver(),
       new WaterFiller(),
       new OreScatterer(),
+      new CaveThemeStage(),
       new CaveTorcher(),
     ],
     SEA_LEVEL,
@@ -64,6 +66,7 @@ export function createCavernsGenerator(): LayeredGenerator {
       new CaveCarver({ threshold: 0.14, frequency: 1 / 30 }),
       new WaterFiller(),
       new OreScatterer({ densityScale: 1.6 }),
+      new CaveThemeStage(),
       new CaveTorcher({ density: 0.05 }),
     ],
     SEA_LEVEL,

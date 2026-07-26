@@ -36,7 +36,7 @@ import {
 } from './DevShapes';
 import { stairState, stairFacingToward, type StairFacing } from './stairFacing';
 import { boxVoxels, sphereVoxels, tunnelVoxels } from '../edit/Brushes';
-import { AIR } from '../blocks/blocks';
+import { AIR, MATERIAL_FAMILIES, familyRoleOf, familyCounterpart } from '../blocks/blocks';
 import { WORLD_HEIGHT } from '../core/constants';
 import { chunkKey, worldToChunkCoord } from '../core/coords';
 import type { BlockId, Vec3 } from '../core/types';
@@ -799,6 +799,57 @@ export function installDevControls(ctx: DevControlsContext): void {
         ),
         { label: 'replace' },
       );
+    },
+
+    /**
+     * Swap every block of one material family in the box to another family, shape-aware:
+     * stone -> basalt maps slab->slab, stair->stair, wall->wall, preserving block state
+     * (facing/half/open). Families are named ('stone', 'basalt', ...) or identified by any
+     * member block id. Blocks outside the source family are untouched; roles the target
+     * family lacks are skipped. One undo.
+     */
+    swapFamily: (
+      x1: number,
+      y1: number,
+      z1: number,
+      x2: number,
+      y2: number,
+      z2: number,
+      from: string | BlockId,
+      to: string | BlockId,
+    ): BatchedEditResult => {
+      const resolve = (f: string | BlockId): string => {
+        const name = typeof f === 'number' ? familyRoleOf(f)?.family : f;
+        if (!name || !MATERIAL_FAMILIES[name]) {
+          throw new Error(
+            `unknown material family "${String(f)}" — one of: ${Object.keys(MATERIAL_FAMILIES).join(', ')}`,
+          );
+        }
+        return name;
+      };
+      const fromFamily = resolve(from);
+      const toFamily = resolve(to);
+      const [ax, bx] = [Math.min(x1, x2), Math.max(x1, x2)];
+      const [ay, by] = [Math.min(y1, y2), Math.max(y1, y2)];
+      const [az, bz] = [Math.min(z1, z2), Math.max(z1, z2)];
+      try {
+        manager.preloadBox(ax, az, bx, bz);
+      } catch {
+        /* region too large to auto-preload */
+      }
+      const voxels: Array<{ x: number; y: number; z: number; id: BlockId; state?: number }> = [];
+      for (let y = ay; y <= by; y++) {
+        for (let z = az; z <= bz; z++) {
+          for (let x = ax; x <= bx; x++) {
+            const id = manager.getBlock(x, y, z);
+            if (familyRoleOf(id)?.family !== fromFamily) continue;
+            const target = familyCounterpart(id, toFamily);
+            if (target === undefined || target === id) continue;
+            voxels.push({ x, y, z, id: target, state: manager.getState(x, y, z) });
+          }
+        }
+      }
+      return applyAny(voxels, { label: 'swapFamily' });
     },
 
     /** Move a box by (dx,dy,dz): copy, clear the source, paste at the offset — one undo. */

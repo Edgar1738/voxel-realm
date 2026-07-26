@@ -111,6 +111,15 @@ export const SPRUCE_LOG: BlockId = 86;
 export const SPRUCE_NEEDLES: BlockId = 87;
 /** Weathered bare deadwood — snags, driftwood, and dry-country accents. */
 export const DEADWOOD: BlockId = 88;
+// Species plank families so builders can carry the birch/spruce look indoors.
+export const BIRCH_PLANKS: BlockId = 89;
+export const BIRCH_PLANK_SLAB: BlockId = 90;
+export const STAIRS_BIRCH_PLANK: BlockId = 91;
+export const SPRUCE_PLANKS: BlockId = 92;
+export const SPRUCE_PLANK_SLAB: BlockId = 93;
+export const STAIRS_SPRUCE_PLANK: BlockId = 94;
+/** Warm orange-red autumn canopy for rare fall forest pockets. Untinted on purpose. */
+export const AUTUMN_LEAVES: BlockId = 95;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -167,11 +176,16 @@ const stone = (c: [number, number, number], variants = 2): TextureSpec => ({
   rotate: true,
   drift: 'stone',
 });
-const speck = (
-  c: [number, number, number],
-  amp: number,
-  extra: { variants?: number; rotate?: boolean; drift?: DriftClass } = {},
-): TextureSpec => ({
+/** Optional variation/material-response fields shared by the spec helpers below. */
+type SpecExtras = {
+  variants?: number;
+  rotate?: boolean;
+  drift?: DriftClass;
+  emissive?: number;
+  gloss?: number;
+};
+
+const speck = (c: [number, number, number], amp: number, extra: SpecExtras = {}): TextureSpec => ({
   pattern: 'speckle',
   colors: [c],
   amp,
@@ -201,6 +215,9 @@ const GRAVEL_TEX: TextureSpec = {
   rotate: true,
   drift: 'stone',
 };
+// Shared per-species plank specs so cube/slab/stair siblings dedup to one layer each.
+const BIRCH_PLANK_TEX: TextureSpec = { pattern: 'planks', colors: [[196, 178, 138]] };
+const SPRUCE_PLANK_TEX: TextureSpec = { pattern: 'planks', colors: [[116, 86, 52]] };
 
 /** The block table — the single source of truth. Order here does NOT affect ids. */
 export const BLOCK_DEFS: BlockDef[] = [
@@ -359,6 +376,8 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     faces: {
       pattern: 'lantern',
+      // 0.9, not 1: the metal frame shares the tile, so a touch of shading survives.
+      emissive: 0.9,
       colors: [
         [60, 52, 40],
         [255, 226, 140],
@@ -374,7 +393,8 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     light: 7,
-    faces: ore([120, 220, 235]),
+    // Partial self-glow: crystal facets stay luminous in the dark, the stone matrix dims.
+    faces: { pattern: 'ore', colors: [[120, 220, 235]], emissive: 0.45 },
   },
   {
     id: DEEPSLATE,
@@ -398,7 +418,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     light: 15,
     creative: true,
-    faces: { pattern: 'glow', colors: [[230, 200, 110]] },
+    faces: { pattern: 'glow', colors: [[230, 200, 110]], emissive: 1 },
   },
   {
     id: BOOKSHELF,
@@ -626,6 +646,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     faces: {
       pattern: 'speckle',
+      emissive: 1,
       colors: [
         [232, 74, 20],
         [255, 178, 48],
@@ -865,7 +886,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([146, 190, 211], 7),
+    faces: speck([146, 190, 211], 7, { gloss: 0.55 }),
   },
   {
     id: WARM_MASONRY_SLAB,
@@ -1158,7 +1179,128 @@ export const BLOCK_DEFS: BlockDef[] = [
       bottom: { pattern: 'rings', colors: [[142, 134, 120]] },
     },
   },
+  {
+    id: BIRCH_PLANKS,
+    name: 'birch planks',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: BIRCH_PLANK_TEX,
+  },
+  {
+    id: BIRCH_PLANK_SLAB,
+    name: 'birch plank slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: BIRCH_PLANK_TEX,
+  },
+  {
+    id: STAIRS_BIRCH_PLANK,
+    name: 'birch plank stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: BIRCH_PLANK_TEX,
+  },
+  {
+    id: SPRUCE_PLANKS,
+    name: 'spruce planks',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    faces: SPRUCE_PLANK_TEX,
+  },
+  {
+    id: SPRUCE_PLANK_SLAB,
+    name: 'spruce plank slab',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    faces: SPRUCE_PLANK_TEX,
+  },
+  {
+    id: STAIRS_SPRUCE_PLANK,
+    name: 'spruce plank stairs',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'stair',
+    faces: SPRUCE_PLANK_TEX,
+  },
+  {
+    id: AUTUMN_LEAVES,
+    name: 'autumn leaves',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    // No biome tint: autumn pockets keep their warm identity in every climate.
+    faces: {
+      pattern: 'leaves',
+      colors: [[188, 108, 44]],
+      variants: 3,
+      rotate: true,
+      drift: 'foliage',
+    },
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// Material families: shape siblings of one material, so tools can swap a build's
+// material while preserving every slab/stair/wall shape (stone slab -> basalt slab).
+// ---------------------------------------------------------------------------
+
+export type FamilyRole = 'cube' | 'slab' | 'stair' | 'wall';
+
+/** Shape siblings per material family. Roles a family lacks are simply not swapped. */
+export const MATERIAL_FAMILIES: Record<string, Partial<Record<FamilyRole, BlockId>>> = {
+  stone: { cube: STONE, slab: STONE_SLAB, stair: STAIRS_STONE },
+  cobblestone: { cube: COBBLESTONE, stair: STAIRS_COBBLE, wall: COBBLE_WALL },
+  brick: { cube: BRICK, stair: STAIRS_BRICK },
+  plank: { cube: PLANKS, slab: PLANK_SLAB, stair: STAIRS_PLANK },
+  'birch plank': { cube: BIRCH_PLANKS, slab: BIRCH_PLANK_SLAB, stair: STAIRS_BIRCH_PLANK },
+  'spruce plank': { cube: SPRUCE_PLANKS, slab: SPRUCE_PLANK_SLAB, stair: STAIRS_SPRUCE_PLANK },
+  slate: { cube: SLATE, slab: SLATE_SLAB, stair: STAIRS_SLATE },
+  'warm masonry': {
+    cube: WARM_MASONRY,
+    slab: WARM_MASONRY_SLAB,
+    stair: STAIRS_WARM_MASONRY,
+    wall: WARM_MASONRY_WALL,
+  },
+  sandstone: {
+    cube: SANDSTONE,
+    slab: SANDSTONE_SLAB,
+    stair: STAIRS_SANDSTONE,
+    wall: SANDSTONE_WALL,
+  },
+  basalt: { cube: BASALT, slab: BASALT_SLAB, stair: STAIRS_BASALT, wall: BASALT_WALL },
+  'clay roof': { cube: CLAY_ROOF, slab: CLAY_ROOF_SLAB, stair: STAIRS_CLAY_ROOF },
+};
+
+const FAMILY_MEMBERS = new Map<BlockId, { family: string; role: FamilyRole }>();
+for (const [family, roles] of Object.entries(MATERIAL_FAMILIES)) {
+  for (const [role, id] of Object.entries(roles) as Array<[FamilyRole, BlockId]>) {
+    FAMILY_MEMBERS.set(id, { family, role });
+  }
+}
+
+/** The family + shape role a block belongs to, or undefined for non-family blocks. */
+export function familyRoleOf(id: BlockId): { family: string; role: FamilyRole } | undefined {
+  return FAMILY_MEMBERS.get(id);
+}
+
+/**
+ * The same-role member of another family (stone stairs -> basalt stairs), or undefined
+ * when the block has no family or the target family lacks that shape.
+ */
+export function familyCounterpart(id: BlockId, toFamily: string): BlockId | undefined {
+  const member = FAMILY_MEMBERS.get(id);
+  if (!member) return undefined;
+  return MATERIAL_FAMILIES[toFamily]?.[member.role];
+}
 
 export interface BlockTextures {
   /** Per-LAYER paint spec. A spec with `variants: n` occupies n contiguous layers (same spec object). */

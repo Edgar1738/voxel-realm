@@ -69,7 +69,7 @@ export function surfaceCap(height: number, biome: Biome, seaLevel: number): Bloc
  * meso-scale patches (roughly one feature per `scale` blocks) instead of the
  * blocky squares a raw region hash would give. Deterministic in world coords.
  */
-function patchNoise(worldX: number, worldZ: number, scale: number, salt: number): number {
+export function patchNoise(worldX: number, worldZ: number, scale: number, salt: number): number {
   const fx = worldX / scale;
   const fz = worldZ / scale;
   const x0 = Math.floor(fx);

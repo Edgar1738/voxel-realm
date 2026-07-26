@@ -55,8 +55,8 @@ const DRIFT_ID: Record<DriftClass, number> = { grass: 1, foliage: 2, soil: 3, st
  * texture-array layer (texelFetch — never filtered):
  *   R = variant count of the layer's group (1 = no variants)
  *   G = drift class (0 none, 1 grass, 2 foliage, 3 soil, 4 stone)
- *   B = 1 when per-voxel rotation/mirroring is allowed
- *   A = reserved
+ *   B = bit 0: per-voxel rotation allowed; bits 1-7: gloss strength (0..127)
+ *   A = emissive strength (0..255 -> 0..1 self-illumination)
  * Only GROUP BASE layers are ever addressed by vertex data, but every member layer
  * carries its group's values (they share the spec), so the table has no holes.
  */
@@ -67,7 +67,9 @@ export function createTextureMetaLUT(): DataTexture {
     const p = layer * 4;
     data[p] = Math.max(1, spec.variants ?? 1);
     data[p + 1] = spec.drift ? DRIFT_ID[spec.drift] : 0;
-    data[p + 2] = spec.rotate ? 1 : 0;
+    const gloss7 = Math.round(Math.min(1, Math.max(0, spec.gloss ?? 0)) * 127);
+    data[p + 2] = (spec.rotate ? 1 : 0) | (gloss7 << 1);
+    data[p + 3] = Math.round(Math.min(1, Math.max(0, spec.emissive ?? 0)) * 255);
   });
   const tex = new DataTexture(data, 256, 1, RGBAFormat, UnsignedByteType);
   tex.magFilter = NearestFilter;

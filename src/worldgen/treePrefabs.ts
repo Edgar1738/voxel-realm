@@ -13,10 +13,11 @@ import {
   SPRUCE_NEEDLES,
   DEADWOOD,
   DRY_GRASS,
+  AUTUMN_LEAVES,
 } from '../blocks/blocks';
 import { scatterStructures } from './Structures';
 import { BiomeMap, Biome } from './BiomeMap';
-import { surfaceCap, patchedCap } from './SurfacePainter';
+import { surfaceCap, patchedCap, patchNoise } from './SurfacePainter';
 import type { Prefab, PrefabVoxel } from '../core/Prefab';
 import type { ScatterOptions } from './Structures';
 import type { Overlay } from './Generator';
@@ -190,6 +191,22 @@ export function swampOakVariants(): Prefab[] {
   return variants(0x5a3b, (s) => blob(s, SWAMP_CANOPY));
 }
 
+/** Autumn oaks: the oak silhouette in warm orange-red canopy, for rare fall pockets. */
+export function autumnOakVariants(): Prefab[] {
+  return variants(0xa0a1, (s) => blob(s, OAK_CANOPY, WOOD, AUTUMN_LEAVES));
+}
+
+/**
+ * Rare, large fall pockets: a coarse deterministic region field (one feature per ~160
+ * blocks) with a high threshold, so most forests stay green and the occasional grove
+ * turns. Shared by the green-broadleaf gate (which skips these cells) and the autumn
+ * scatter (which fills them), so the two libraries never double-plant.
+ */
+export function isAutumnPocket(seed: WorldSeed, worldX: number, worldZ: number): boolean {
+  const salt = (0xa07f ^ Math.imul(seed, 0x9e3779b1)) | 0;
+  return patchNoise(worldX, worldZ, 160, salt) > 0.74;
+}
+
 /** Temperate broadleaf mix (oak + birch) for grassy ground. */
 function broadleafVariants(): Prefab[] {
   return [...oakVariants(), ...birchVariants()];
@@ -234,7 +251,7 @@ function biomesFor(seed: WorldSeed): BiomeMap {
  */
 function scatterTreesOnCap(
   library: Prefab[],
-  plantOn: (cap: BlockId) => boolean,
+  plantOn: (cap: BlockId, tx: number, tz: number, seed: WorldSeed) => boolean,
   surfaceAt: HeightAt,
   seaLevel: number,
   extra?: Partial<ScatterOptions>,
@@ -256,7 +273,7 @@ function scatterTreesOnCap(
           biomesFor(c.seed).biomeAt(tx, tz),
           seaLevel,
         );
-        return plantOn(cap);
+        return plantOn(cap, tx, tz, c.seed);
       },
     }),
   );
@@ -291,10 +308,19 @@ export function scatterForest(
 ): Overlay {
   const broadleaf = scatterTreesOnCap(
     broadleafVariants(),
-    (cap) => cap === GRASS,
+    (cap, tx, tz, seed) => cap === GRASS && !isAutumnPocket(seed, tx, tz),
     surfaceAt,
     seaLevel,
     { salt: 0x0a4d, ...extra },
+  );
+  // Rare fall groves: oak silhouettes in autumn canopy, filling the cells the green
+  // broadleaf gate skips (slightly denser — turned groves read as a destination).
+  const autumnOaks = scatterTreesOnCap(
+    autumnOakVariants(),
+    (cap, tx, tz, seed) => cap === GRASS && isAutumnPocket(seed, tx, tz),
+    surfaceAt,
+    seaLevel,
+    { density: 0.8, salt: 0xfa11, ...extra },
   );
   const conifers = scatterTreesOnCap(
     coniferVariants(),
@@ -342,6 +368,7 @@ export function scatterForest(
   );
   return (chunk, cx, cz, seed) => {
     broadleaf(chunk, cx, cz, seed);
+    autumnOaks(chunk, cx, cz, seed);
     conifers(chunk, cx, cz, seed);
     swampOaks(chunk, cx, cz, seed);
     deadwood(chunk, cx, cz, seed);

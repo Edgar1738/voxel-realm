@@ -54,6 +54,13 @@ export type TextureSpec =
       rotate?: boolean;
       /** Regional color drift class (omitted = no drift). */
       drift?: DriftClass;
+      /**
+       * Self-illumination 0..1: the face renders at least this bright regardless of
+       * baked light, and directional shading flattens out (lava, glowstone, lanterns).
+       */
+      emissive?: number;
+      /** Specular glint strength 0..1 for hard shiny surfaces (ice). Daylight-gated. */
+      gloss?: number;
     }
   | { custom: Pixel };
 
@@ -971,10 +978,16 @@ function paintKey(spec: TextureSpec): string {
 export function specKey(spec: TextureSpec): string {
   const base = paintKey(spec);
   if ('custom' in spec) return base;
-  if (spec.variants === undefined && spec.rotate === undefined && spec.drift === undefined) {
+  if (
+    spec.variants === undefined &&
+    spec.rotate === undefined &&
+    spec.drift === undefined &&
+    spec.emissive === undefined &&
+    spec.gloss === undefined
+  ) {
     return base;
   }
-  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}`;
+  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}`;
 }
 
 /** A stable, key-derived seed so a spec's pixels do not depend on its layer index. */

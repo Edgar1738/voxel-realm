@@ -137,14 +137,20 @@ float vnoise(vec2 p, uint salt) {
 
 void main() {
   float driftId = 0.0;
+  float emissive = 0.0;
+  float gloss = 0.0;
   vec4 texel;
   if (uVariation > 0.5) {
-    // Per-layer material metadata: R = variant count, G = drift class, B = rotate flag.
+    // Per-layer material metadata: R = variant count, G = drift class,
+    // B = rotate flag (bit 0) + gloss (bits 1-7), A = emissive strength.
     vec4 meta = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 0), 0) * 255.0;
     driftId = meta.g;
+    emissive = meta.a / 255.0;
+    float rotateFlag = mod(meta.b, 2.0);
+    gloss = floor(meta.b / 2.0) / 127.0;
     float texLayer = vLayer;
     vec2 texUv = vUv;
-    if (meta.r > 1.5 || meta.b > 0.5) {
+    if (meta.r > 1.5 || rotateFlag > 0.5) {
       // The owning voxel: a face fragment sits on an integer plane along its normal,
       // so stepping half a block against the normal lands inside the solid block.
       uvec3 voxel = uvec3(ivec3(floor(vWorldPos - vWorldNormal * 0.5 + 1e-4)));
@@ -152,7 +158,7 @@ void main() {
         // Variant layers are painted contiguously after their group base.
         texLayer = vLayer + floor(min(float(hashU(voxel, 0x51u) & 255u) * (1.0 / 256.0) * meta.r, meta.r - 1.0));
       }
-      if (meta.b > 0.5) {
+      if (rotateFlag > 0.5) {
         // One of 8 orientations per voxel (transpose + mirrors), isotropic tiles only.
         uint o = hashU(voxel, 0x9du) & 7u;
         vec2 f = fract(vUv);
@@ -214,6 +220,9 @@ void main() {
   float torch = uTorch * clamp(1.0 - dist / uTorchRadius, 0.0, 1.0);
   torch = floor(torch * 15.0) / 15.0;
   float level = max(max(sky * uDayLight, max(block, torch)), 0.06);
+  // Self-illuminated materials (lava, glowstone, lanterns) hold their own brightness
+  // even in pitch-black caves and at night.
+  level = max(level, emissive);
   // uAoStrength: dev-tunable AO intensity (0 = off, 1 = baked value, >1 exaggerated).
   float aoFactor = clamp(mix(1.0, vAo, uAoStrength), 0.0, 1.0);
   // uDirStrength fades the directional term to a flat mid-value (0.6 ~ hemisphere-average
@@ -221,6 +230,8 @@ void main() {
   // into caves or lantern light. Brightness stays driven solely by the baked light level.
   float dir = mix(0.6, diff, uDirStrength);
   vec3 shade = (vec3(0.45) + 0.55 * dir * uLightColor) * aoFactor;
+  // Emissive faces flatten directional/AO shading — a glowing surface lights itself.
+  shade = mix(shade, vec3(1.0), emissive);
   // Hemispheric ambient: sky hue on up-faces, warmer/darker below, keyed by WORLD up.
   // Luminance-normalized (divide by hemi's luma) so it only RECOLORS and never adds
   // brightness -- baked light level stays the sole brightness driver, so caves stay dark
@@ -241,6 +252,15 @@ void main() {
     float spec = pow(max(dot(Nv, H), 0.0), 48.0);
     float topMask = smoothstep(0.5, 0.9, vWorldNormal.y);
     color += uSpecStrength * spec * topMask * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
+  }
+  // Glossy hard surfaces (ice): a tight sun glint, daylight-gated so caves stay matte.
+  if (gloss > 0.001) {
+    vec3 Ng = normalize(vNormal);
+    vec3 Vg = normalize(-vViewPos);
+    vec3 Lg = normalize((viewMatrix * vec4(normalize(uLightDir), 0.0)).xyz);
+    vec3 Hg = normalize(Vg + Lg);
+    float glint = pow(max(dot(Ng, Hg), 0.0), 32.0);
+    color += gloss * glint * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
   }
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
