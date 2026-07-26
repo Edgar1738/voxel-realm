@@ -139,11 +139,14 @@ void main() {
   float driftId = 0.0;
   float emissive = 0.0;
   float gloss = 0.0;
+  float fxId = 0.0;
   vec4 texel;
   if (uVariation > 0.5) {
-    // Per-layer material metadata: R = variant count, G = drift class,
+    // Per-layer material metadata row 0: R = variant count, G = drift class,
     // B = rotate flag (bit 0) + gloss (bits 1-7), A = emissive strength.
+    // Row 1: R = fluid FX id (0 none, 1 water, 2 lava).
     vec4 meta = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 0), 0) * 255.0;
+    fxId = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 1), 0).r * 255.0;
     driftId = meta.g;
     emissive = meta.a / 255.0;
     float rotateFlag = mod(meta.b, 2.0);
@@ -193,19 +196,83 @@ void main() {
       base *= 1.0 + d * (driftId < 3.5 ? 0.14 : 0.1);
     }
   }
-  // Water surface treatment (transparent pass only; uWaveAmp is 0 on every other pass):
-  // the two-sine shimmer, a deep-blue depth tint, and a sky-tinted grazing-angle rim.
-  // fres (view-angle fresnel) is reused for the alpha and to gate the glint further down.
+  float dist = length(vViewPos);
+  // Fluid FX are keyed per MATERIAL by the LUT (fxId), not per pass — glass shares the
+  // transparent pass and must stay plain glass.
+  bool isWater = fxId > 0.5 && fxId < 1.5;
+  bool isLava = fxId > 1.5;
   float fres = 0.0;
-  if (uWaveAmp > 0.0) {
-    float wave = sin(vWorldPos.x * 1.6 + vWorldPos.z * 0.7 + uTime * 1.4) *
-                 sin(vWorldPos.z * 1.9 - vWorldPos.x * 0.5 + uTime * 1.1);
-    base *= 1.0 + uWaveAmp * wave;
-    vec3 Nv = normalize(vNormal);
+  // The (possibly perturbed) view-space normal fluid highlights use further down.
+  vec3 fluidNv = normalize(vNormal);
+  if (isWater) {
+    // Animated surface normals: two crossed, counter-scrolling noise-gradient layers in
+    // world space (seamless across greedy quads). Strength fades with distance — high-
+    // frequency normals alias into shimmer at range — and rises with uWaveAmp (weather).
+    float distFade = 1.0 - smoothstep(30.0, 110.0, dist);
+    float e = 0.35;
+    vec2 p1 = vWorldPos.xz * 0.35 + uTime * vec2(0.050, 0.034);
+    vec2 p2 = vWorldPos.xz * 0.83 - uTime * vec2(0.041, -0.057);
+    vec2 g1 = vec2(vnoise(p1 + vec2(e, 0.0), 0x77u) - vnoise(p1 - vec2(e, 0.0), 0x77u),
+                   vnoise(p1 + vec2(0.0, e), 0x77u) - vnoise(p1 - vec2(0.0, e), 0x77u));
+    vec2 g2 = vec2(vnoise(p2 + vec2(e, 0.0), 0xabu) - vnoise(p2 - vec2(e, 0.0), 0xabu),
+                   vnoise(p2 + vec2(0.0, e), 0xabu) - vnoise(p2 - vec2(0.0, e), 0xabu));
+    vec2 grad = (g1 * 0.65 + g2 * 0.35) * (uWaveAmp * 16.0) * distFade;
+    if (vWorldNormal.y > 0.5) {
+      vec3 waterN = normalize(vec3(-grad.x, 1.0, -grad.y));
+      fluidNv = normalize(mat3(viewMatrix) * waterN);
+    }
+    // Gentle brightness swell riding the same field (replaces the old two-sine shimmer).
+    base *= 1.0 + (grad.x + grad.y) * 0.6;
     vec3 V = normalize(-vViewPos);
-    fres = pow(1.0 - clamp(dot(Nv, V), 0.0, 1.0), uFresnelPower);
+    fres = pow(1.0 - clamp(dot(fluidNv, V), 0.0, 1.0), uFresnelPower);
     base = mix(base, uWaterDeep, uWaterDepthTint);
     base = mix(base, uSkyColor, fres * uFresnelTint);
+  } else if (isLava) {
+    // ------------------------------------------------------------------
+    // Procedural molten surface, replacing the static tile entirely:
+    // pixel-quantized domain-warp churn + slowly morphing crust plates with
+    // glowing seams, through a blackbody-style ramp. The pattern time is
+    // floored to ~10 fps so it reads as stop-motion pixel art, and feature
+    // drift stays slow — churn-in-place is what separates lava from orange
+    // water. Emissive=1 (LUT) already flattens shading and holds brightness.
+    // ------------------------------------------------------------------
+    vec3 an = abs(vWorldNormal);
+    vec2 lpw = an.y > 0.5 ? vWorldPos.xz : (an.x > 0.5 ? vWorldPos.zy : vWorldPos.xy);
+    vec2 lp = floor(lpw * 16.0) / 16.0;   // snap to the 16px texel grid
+    float lt = floor(uTime * 10.0) / 10.0;
+    // Churn: two counter-phased low-frequency noises warp the heat field's domain.
+    vec2 warp = vec2(vnoise(lp * 0.33 + lt * 0.021, 0x11u),
+                     vnoise(lp * 0.33 - lt * 0.017 + 3.7, 0x22u)) - 0.5;
+    float churn = vnoise(lp * 0.5 + warp * 2.2, 0x33u) * 0.7 +
+                  vnoise(lp * 1.1 + warp * 1.4, 0x44u) * 0.3;
+    // Crust plates: cellular field with slowly orbiting feature points; the seams
+    // between the two nearest plates (f2-f1 small) run molten-bright.
+    vec2 cp = lp * 0.45;
+    vec2 ci = floor(cp);
+    vec2 cf = cp - ci;
+    float f1 = 8.0;
+    float f2 = 8.0;
+    for (int j = -1; j <= 1; j++) {
+      for (int i = -1; i <= 1; i++) {
+        vec2 g = vec2(float(i), float(j));
+        vec2 h = vec2(hash2f(ci + g, 0x55u), hash2f(ci + g, 0x66u));
+        vec2 o = g + 0.5 + 0.35 * sin(lt * 0.12 + h * 6.2831) - cf;
+        float d = dot(o, o);
+        if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
+      }
+    }
+    float crack = 1.0 - smoothstep(0.015, 0.14, f2 - f1);
+    float heat = clamp(max(crack, churn * 0.72) + (churn - 0.5) * 0.3, 0.0, 1.0);
+    heat = floor(heat * 6.0) / 6.0;       // banded heat = pixel-art friendly
+    // Blackbody-ish ramp: most of the range lives in red/orange; near-white is
+    // reserved for the very hottest seam cores so it reads as rock, not sauce.
+    vec3 lava = mix(vec3(0.10, 0.04, 0.03), vec3(0.62, 0.10, 0.02), smoothstep(0.0, 0.35, heat));
+    lava = mix(lava, vec3(0.91, 0.34, 0.10), smoothstep(0.35, 0.70, heat));
+    lava = mix(lava, vec3(1.00, 0.83, 0.22), smoothstep(0.70, 0.95, heat));
+    lava = mix(lava, vec3(1.00, 0.95, 0.75), smoothstep(0.96, 1.0, heat));
+    // Spatially-phased glow pulse: pools breathe without strobing in unison.
+    float pulse = 1.0 + 0.12 * sin(uTime * 0.7 + vnoise(lpw * 0.06, 0x99u) * 6.2831);
+    base = lava * pulse;
   }
   // Diffuse sun/moon term in world space: uLightDir is world-space, so it must pair with
   // vWorldNormal (vNormal is view-space and would make shading swim as the camera turns).
@@ -213,7 +280,6 @@ void main() {
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
   float block = mod(vLight, 16.0) / 15.0;
-  float dist = length(vViewPos);
   // headlamp: camera-centered glow, quantized to the 15 baked-light steps so it
   // reads as voxel light. The camera is the emitter, so every visible fragment
   // has line-of-sight to it — no shadowing needed.
@@ -242,16 +308,19 @@ void main() {
   vec3 ambient = hueTint * mix(0.72, 1.0, up);
   vec3 tintMul = mix(vec3(1.0), ambient, uAmbientStrength);
   vec3 color = base * tintMul * shade * level;
-  // Water sun glint: a Blinn-Phong highlight confined to top faces in daylight, so night
-  // and underwater water stay calm. Sky-tinted so the sparkle matches the time of day.
-  if (uWaveAmp > 0.0) {
-    vec3 Nv = normalize(vNormal);
+  // Water sun glint: a Blinn-Phong highlight on the ANIMATED normal, so the sun breaks
+  // into moving sparkles instead of one static streak. Confined to top faces in daylight.
+  if (isWater) {
     vec3 V = normalize(-vViewPos);
     vec3 Lv = normalize((viewMatrix * vec4(normalize(uLightDir), 0.0)).xyz);
     vec3 H = normalize(V + Lv);
-    float spec = pow(max(dot(Nv, H), 0.0), 48.0);
+    float spec = pow(max(dot(fluidNv, H), 0.0), 64.0);
+    // Sparkle: rare high-frequency animated glitter, only inside the glint lobe.
+    float sp = vnoise(vWorldPos.xz * 3.1 + uTime * 0.35, 0xdeu);
+    float sparkle = smoothstep(0.9, 0.99, sp) * pow(max(dot(fluidNv, H), 0.0), 8.0);
     float topMask = smoothstep(0.5, 0.9, vWorldNormal.y);
-    color += uSpecStrength * spec * topMask * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
+    color += uSpecStrength * (spec + sparkle * 1.2) * topMask * uDayLight *
+             mix(vec3(1.0), uSkyColor, 0.3);
   }
   // Glossy hard surfaces (ice): a tight sun glint, daylight-gated so caves stay matte.
   if (gloss > 0.001) {
@@ -265,9 +334,10 @@ void main() {
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
   // Water alpha varies with view angle: near-transparent looking straight down (fres≈0
-  // keeps uAlpha), opaque/reflective at grazing angles (fres→1).
+  // keeps uAlpha), opaque/reflective at grazing angles (fres→1). Molten rock is opaque.
   float outAlpha = uAlpha;
-  if (uWaveAmp > 0.0) outAlpha = mix(uAlpha, 1.0, fres);
+  if (isWater) outAlpha = mix(uAlpha, 1.0, fres);
+  if (isLava) outAlpha = 1.0;
   fragColor = vec4(color, outAlpha);
 }
 `;

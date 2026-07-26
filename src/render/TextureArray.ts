@@ -8,7 +8,7 @@ import {
   RepeatWrapping,
 } from 'three';
 import { BLOCK_TEXTURES, TEXTURE_LAYER_COUNT } from '../blocks/blocks';
-import { TILE, paintLayer, type DriftClass } from '../blocks/textures';
+import { TILE, paintLayer, type DriftClass, type TextureSpec } from '../blocks/textures';
 
 /** Builds the procedural block-face texture array (one layer per derived texture spec). */
 export function createTextureArray(): DataArrayTexture {
@@ -50,18 +50,26 @@ export function mipmappedArray(base: DataArrayTexture): DataArrayTexture {
 /** Drift-class ids as the shader reads them from the meta LUT's green channel. */
 const DRIFT_ID: Record<DriftClass, number> = { grass: 1, foliage: 2, soil: 3, stone: 4 };
 
+/** Fluid-effect ids as the shader reads them from LUT row 1's red channel. */
+const FX_ID: Record<NonNullable<Extract<TextureSpec, { pattern: unknown }>['fx']>, number> = {
+  water: 1,
+  lava: 2,
+};
+
 /**
- * Per-layer material metadata for the chunk shader, as a 256×1 RGBA8 LUT indexed by
- * texture-array layer (texelFetch — never filtered):
+ * Per-layer material metadata for the chunk shader, as a 256×2 RGBA8 LUT indexed by
+ * texture-array layer (texelFetch — never filtered). Row 0:
  *   R = variant count of the layer's group (1 = no variants)
  *   G = drift class (0 none, 1 grass, 2 foliage, 3 soil, 4 stone)
  *   B = bit 0: per-voxel rotation allowed; bits 1-7: gloss strength (0..127)
  *   A = emissive strength (0..255 -> 0..1 self-illumination)
+ * Row 1:
+ *   R = fluid FX id (0 none, 1 water, 2 lava); G/B/A reserved
  * Only GROUP BASE layers are ever addressed by vertex data, but every member layer
  * carries its group's values (they share the spec), so the table has no holes.
  */
 export function createTextureMetaLUT(): DataTexture {
-  const data = new Uint8Array(256 * 4);
+  const data = new Uint8Array(256 * 2 * 4);
   BLOCK_TEXTURES.uniqueSpecs.forEach((spec, layer) => {
     if (!('pattern' in spec)) return;
     const p = layer * 4;
@@ -70,8 +78,9 @@ export function createTextureMetaLUT(): DataTexture {
     const gloss7 = Math.round(Math.min(1, Math.max(0, spec.gloss ?? 0)) * 127);
     data[p + 2] = (spec.rotate ? 1 : 0) | (gloss7 << 1);
     data[p + 3] = Math.round(Math.min(1, Math.max(0, spec.emissive ?? 0)) * 255);
+    data[256 * 4 + p] = spec.fx ? FX_ID[spec.fx] : 0;
   });
-  const tex = new DataTexture(data, 256, 1, RGBAFormat, UnsignedByteType);
+  const tex = new DataTexture(data, 256, 2, RGBAFormat, UnsignedByteType);
   tex.magFilter = NearestFilter;
   tex.minFilter = NearestFilter;
   tex.needsUpdate = true;

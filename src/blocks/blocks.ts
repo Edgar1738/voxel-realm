@@ -183,6 +183,7 @@ type SpecExtras = {
   drift?: DriftClass;
   emissive?: number;
   gloss?: number;
+  fx?: 'water' | 'lava';
 };
 
 const speck = (c: [number, number, number], amp: number, extra: SpecExtras = {}): TextureSpec => ({
@@ -306,7 +307,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     faces: SAND_TEX,
   },
-  { id: WATER, name: 'water', opaque: false, transparent: true, faces: speck([50, 110, 200], 10) },
+  {
+    id: WATER,
+    name: 'water',
+    opaque: false,
+    transparent: true,
+    faces: speck([50, 110, 200], 10, { fx: 'water' }),
+  },
   {
     id: SNOW,
     name: 'snow',
@@ -647,6 +654,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     faces: {
       pattern: 'speckle',
       emissive: 1,
+      fx: 'lava',
       colors: [
         [232, 74, 20],
         [255, 178, 48],

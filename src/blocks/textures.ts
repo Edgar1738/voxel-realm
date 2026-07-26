@@ -61,6 +61,13 @@ export type TextureSpec =
       emissive?: number;
       /** Specular glint strength 0..1 for hard shiny surfaces (ice). Daylight-gated. */
       gloss?: number;
+      /**
+       * Animated fluid effect rendered per fragment: 'water' gets animated surface
+       * normals + fresnel/glint/depth tint, 'lava' replaces the tile with a procedural
+       * molten surface. Only these materials receive their fluid treatment — glass and
+       * everything else in the transparent pass stay plain.
+       */
+      fx?: 'water' | 'lava';
     }
   | { custom: Pixel };
 
@@ -983,11 +990,12 @@ export function specKey(spec: TextureSpec): string {
     spec.rotate === undefined &&
     spec.drift === undefined &&
     spec.emissive === undefined &&
-    spec.gloss === undefined
+    spec.gloss === undefined &&
+    spec.fx === undefined
   ) {
     return base;
   }
-  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}`;
+  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}|f${spec.fx ?? ''}`;
 }
 
 /** A stable, key-derived seed so a spec's pixels do not depend on its layer index. */

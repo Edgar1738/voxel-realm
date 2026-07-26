@@ -6,6 +6,7 @@ import {
   createTransparentMaterial,
   createCutoutMaterial,
   applyTime,
+  WATER_WAVE_AMP,
 } from '../render/ChunkMaterial';
 import { applyUnderwater, stepUnderwaterFactor, type FogParams } from '../render/underwater';
 import { Weather } from '../render/Weather';
@@ -1853,6 +1854,14 @@ export class Game {
       ticker.update(cdt);
       critters.update(cdt, ambienceEye, critterEnv);
       audio.setRainLevel(RAIN_LEVEL[weather.kind]);
+      // Weather-coupled water agitation: calm glassy water in clear skies, choppier
+      // normals + brighter swell under rain, rough water in a storm.
+      transparentMaterial.uniforms.uWaveAmp.value =
+        weather.kind === 'storm'
+          ? WATER_WAVE_AMP * 2.4
+          : weather.kind === 'rain'
+            ? WATER_WAVE_AMP * 1.6
+            : WATER_WAVE_AMP;
       // Underwater fog/audio track the rendering viewpoint too: a photo camera dipped into a
       // lake reads as underwater even while the frozen player stands dry on shore.
       const submerged = manager.isWater(

@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { NearestFilter, LinearMipmapLinearFilter } from 'three';
-import { createTextureArray, mipmappedArray } from '../src/render/TextureArray';
-import { TEXTURE_LAYER_COUNT } from '../src/blocks/blocks';
+import {
+  createTextureArray,
+  mipmappedArray,
+  createTextureMetaLUT,
+} from '../src/render/TextureArray';
+import {
+  TEXTURE_LAYER_COUNT,
+  BLOCK_TEXTURES,
+  WATER,
+  LAVA,
+  GLASS,
+  Face,
+} from '../src/blocks/blocks';
+import { BlockRegistry } from '../src/blocks/BlockRegistry';
 import { TILE } from '../src/blocks/textures';
 
 describe('createTextureArray', () => {
@@ -38,5 +50,34 @@ describe('createTextureArray', () => {
     expect(mip.magFilter).toBe(NearestFilter); // crisp up close on both
     // clone() shares the source image, so the mipmapped sibling is a second GPU upload, not a re-paint
     expect(mip.image.data).toBe(base.image.data);
+  });
+});
+
+describe('createTextureMetaLUT — fluid FX row', () => {
+  const reg = new BlockRegistry();
+  const lut = createTextureMetaLUT();
+  const data = lut.image.data as Uint8Array;
+  const fxOf = (id: number): number => {
+    const layer = reg.faceLayer(id, Face.PosY);
+    return data[256 * 4 + layer * 4]; // row 1, red channel
+  };
+
+  it('is a 256x2 table with water=1 and lava=2 in row 1', () => {
+    expect(lut.image.width).toBe(256);
+    expect(lut.image.height).toBe(2);
+    expect(fxOf(WATER)).toBe(1);
+    expect(fxOf(LAVA)).toBe(2);
+  });
+
+  it('leaves glass (same transparent pass) with no fluid FX', () => {
+    expect(fxOf(GLASS)).toBe(0);
+  });
+
+  it('marks no other layer as a fluid', () => {
+    let fluids = 0;
+    for (let layer = 0; layer < BLOCK_TEXTURES.layerCount; layer++) {
+      if (data[256 * 4 + layer * 4] !== 0) fluids++;
+    }
+    expect(fluids).toBe(2); // exactly the water layer and the lava layer
   });
 });
