@@ -1,5 +1,5 @@
 import { CHUNK_SIZE_X, CHUNK_SIZE_Z, WORLD_HEIGHT } from '../core/constants';
-import { Face } from '../blocks/blocks';
+import { Face, WATER, AIR } from '../blocks/blocks';
 import { vertexAO, aoBrightness } from './Ao';
 import type { BlockRegistry } from '../blocks/BlockRegistry';
 import type { VoxelView } from '../world/VoxelView';
@@ -20,6 +20,60 @@ function faceFor(axis: number, sign: number): Face {
   if (axis === 1) return sign > 0 ? Face.PosY : Face.NegY;
   return sign > 0 ? Face.PosZ : Face.NegZ;
 }
+
+/** Water surface data caps: depth saturates at 7 blocks, shore distance at 3 (Chebyshev). */
+const WATER_DEPTH_MAX = 7;
+const WATER_SHORE_MAX = 3;
+/**
+ * Merge-key marker bit for water-data tint indices. Water is untinted (palette index 0),
+ * so its key's tint byte is free to carry `0x40 | depth | shore<<3` instead — faces with
+ * equal depth+shore still merge (deep lake interiors collapse to big quads), and the bit
+ * keeps the values clear of real palette indices (0..12).
+ */
+const WATER_KEY_MARKER = 0x40;
+
+/**
+ * Depth + shore distance for a water TOP face, read straight from the voxel field — the
+ * voxel-native substitute for a scene depth texture. The result rides the tint channel
+ * (r = depth/7, g = shore/3), which water never uses for color; the shader turns it into
+ * an absorption depth ramp, shoreline foam, and shallow-water caustics.
+ */
+function waterSurfaceData(
+  view: VoxelView,
+  x: number,
+  y: number,
+  z: number,
+): { bits: number; tint: RGB } {
+  let depth = 1;
+  while (depth < WATER_DEPTH_MAX && y - depth >= 0 && view.get(x, y - depth, z) === WATER) {
+    depth++;
+  }
+  // Nearest non-water, non-air column at surface level within a Chebyshev ring scan:
+  // 0 = land touches this block (foam core), WATER_SHORE_MAX = open water.
+  let shore = WATER_SHORE_MAX;
+  ring: for (let r = 1; r <= WATER_SHORE_MAX; r++) {
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const nid = view.get(x + dx, y, z + dz);
+        if (nid !== WATER && nid !== AIR) {
+          shore = r - 1;
+          break ring;
+        }
+      }
+    }
+  }
+  return {
+    bits: WATER_KEY_MARKER | depth | (shore << 3),
+    tint: [depth / WATER_DEPTH_MAX, shore / WATER_SHORE_MAX, 1],
+  };
+}
+
+/** Non-top water faces carry deep/far defaults so sides keep the plain deep-water look. */
+const WATER_SIDE_DATA: { bits: number; tint: RGB } = {
+  bits: WATER_KEY_MARKER | WATER_DEPTH_MAX | (WATER_SHORE_MAX << 3),
+  tint: [1, 1, 1],
+};
 
 interface MaskCell {
   layer: number;
@@ -221,10 +275,20 @@ export class GreedyMesher {
           const light = sky * 16 + block;
 
           const category = this.registry.tintCategory(id, faceFor(axis, sign));
-          const tintIndex = category
+          let tintIndex = category
             ? tintIndexFor(view.biomeAt(this._solid[0], this._solid[2]), category)
             : 0;
-          const tint = TINT_PALETTE[tintIndex] ?? WHITE;
+          let tint = TINT_PALETTE[tintIndex] ?? WHITE;
+          if (id === WATER) {
+            // Water repurposes the (otherwise white) tint channel + key byte for surface
+            // data: depth + shore distance on top faces, deep/far defaults elsewhere.
+            const data =
+              axis === 1 && sign > 0
+                ? waterSurfaceData(view, this._solid[0], this._solid[1], this._solid[2])
+                : WATER_SIDE_DATA;
+            tintIndex = data.bits;
+            tint = data.tint;
+          }
 
           // Integer merge key (no string allocation):
           //   bits 31-24  tintIndex  (8 bits, 0 = untinted → key unchanged vs. pre-tint)

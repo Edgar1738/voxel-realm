@@ -178,7 +178,9 @@ void main() {
     texel = texture(uTex, vec3(vUv, vLayer));
   }
   if (uAlphaTest > 0.0 && texel.a < uAlphaTest) discard;
-  vec3 base = texel.rgb * vTint;
+  // Fluid materials repurpose the tint channel as surface DATA (water: depth + shore
+  // distance), so they must not multiply it into the color.
+  vec3 base = texel.rgb * (fxId > 0.5 ? vec3(1.0) : vTint);
   // Regional color drift: two octaves of low-frequency world-space noise sweep broad
   // warm/cool + light/dark patches across natural materials, so meadows, canopies and
   // rock faces stop reading as one flat sheet. Deliberately gentle — palette identity
@@ -225,8 +227,28 @@ void main() {
     base *= 1.0 + (grad.x + grad.y) * 0.6;
     vec3 V = normalize(-vViewPos);
     fres = pow(1.0 - clamp(dot(fluidNv, V), 0.0, 1.0), uFresnelPower);
-    base = mix(base, uWaterDeep, uWaterDepthTint);
+    // Voxel depth ramp: the mesher bakes water-column depth (r, 1..7 blocks) and shore
+    // distance (g, 0..3) into the tint channel. Exponential absorption makes shallows
+    // glow bright over the bed while lakes settle toward uWaterDeep — no scene depth
+    // texture needed; the voxels already know.
+    float wDepth = vTint.r * 7.0;
+    float wShore = vTint.g * 3.0;
+    float absorb = exp2(-0.55 * wDepth);
+    vec3 shallowCol = base * 1.3 + vec3(0.02, 0.09, 0.08);
+    base = mix(mix(base, uWaterDeep, uWaterDepthTint), shallowCol, absorb);
     base = mix(base, uSkyColor, fres * uFresnelTint);
+    if (vWorldNormal.y > 0.5 && wShore < 2.5) {
+      // Shore foam: a noise-jittered shoreline mask (softens the per-block quantization)
+      // with faint bands marching inward toward land and noisy breakup so it reads as
+      // churned scum rather than a painted ring.
+      float shoreF = wShore + (vnoise(vWorldPos.xz * 0.9, 0x5au) - 0.5) * 1.4;
+      float edge = 1.0 - smoothstep(-0.2, 2.4, shoreF);
+      float bands = 0.5 + 0.5 * sin(shoreF * 4.5 - uTime * 1.1);
+      float fn = vnoise(vWorldPos.xz * 2.3 + uTime * vec2(0.11, -0.07), 0x6bu);
+      float foam = smoothstep(0.58, 0.78, fn * 0.55 + bands * 0.25 + edge * 0.45) * edge;
+      base = mix(base, vec3(0.93, 0.97, 0.98), foam * 0.9);
+      fres = max(fres, foam * 0.6); // foam is opaque scum, not see-through
+    }
   } else if (isLava) {
     // ------------------------------------------------------------------
     // Procedural molten surface, replacing the static tile entirely:
@@ -321,6 +343,34 @@ void main() {
     float topMask = smoothstep(0.5, 0.9, vWorldNormal.y);
     color += uSpecStrength * (spec + sparkle * 1.2) * topMask * uDayLight *
              mix(vec3(1.0), uSkyColor, 0.3);
+  }
+  // Caustics: a dancing bright cellular web on shallow sunlit water, drawn on the surface
+  // plane (the classic cheap fake — the pattern visually lands on the bed showing through).
+  // Gated to shallow tops in real skylight so caves and deep lakes stay calm.
+  if (isWater && vWorldNormal.y > 0.5) {
+    float cDepth = vTint.r * 7.0;
+    float shallow = 1.0 - smoothstep(1.0, 3.5, cDepth);
+    float sunlit = sky * uDayLight;
+    if (shallow * sunlit > 0.02) {
+      vec2 cwp = vWorldPos.xz * 0.55 +
+                 vec2(vnoise(vWorldPos.xz * 0.2 + uTime * 0.05, 0xc1u),
+                      vnoise(vWorldPos.xz * 0.2 - uTime * 0.04, 0xc2u)) * 0.8;
+      vec2 cwi = floor(cwp);
+      vec2 cwf = cwp - cwi;
+      float cw1 = 8.0;
+      float cw2 = 8.0;
+      for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+          vec2 g = vec2(float(i), float(j));
+          vec2 h = vec2(hash2f(cwi + g, 0xc3u), hash2f(cwi + g, 0xc4u));
+          vec2 o = g + 0.5 + 0.4 * sin(uTime * 0.5 + h * 6.2831) - cwf;
+          float d2 = dot(o, o);
+          if (d2 < cw1) { cw2 = cw1; cw1 = d2; } else if (d2 < cw2) { cw2 = d2; }
+        }
+      }
+      float web = pow(1.0 - smoothstep(0.0, 0.28, cw2 - cw1), 2.0);
+      color += web * shallow * sunlit * 0.24 * vec3(0.65, 0.85, 0.95);
+    }
   }
   // Glossy hard surfaces (ice): a tight sun glint, daylight-gated so caves stay matte.
   if (gloss > 0.001) {
