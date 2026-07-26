@@ -11,13 +11,13 @@ import {
   Vector3,
   type Object3D,
 } from 'three';
-import { AIR, FLOWER, GRASS, LEAVES, TALL_GRASS, WATER } from '../blocks/blocks';
+import { AIR, FLOWER, GRASS, LAVA, LEAVES, TALL_GRASS, WATER } from '../blocks/blocks';
 
-export type LifeKindName = 'butterfly' | 'firefly' | 'leaf';
+export type LifeKindName = 'butterfly' | 'firefly' | 'leaf' | 'ember' | 'haze';
 
 export type GetBlock = (x: number, y: number, z: number) => number;
 
-const MAX_AGENTS = 72;
+const MAX_AGENTS = 100;
 /** Anchors and agents live inside this radius around the camera. */
 const RANGE = 20;
 const DESPAWN_RANGE = 28;
@@ -39,6 +39,10 @@ const KINDS: Record<LifeKindName, KindDef> = {
   },
   firefly: { count: 26, palette: [0xd8ff6e], scale: [0.09, 0.09, 0.09] },
   leaf: { count: 14, palette: [0x4d8f3a, 0x6aa84f, 0x8fbc5a], scale: [0.11, 0.02, 0.11] },
+  // Sparks rising off molten rock: bright cores with warm additive halos, day and night.
+  ember: { count: 14, palette: [0xffd93b, 0xff9a3b, 0xff6a2a], scale: [0.09, 0.09, 0.09] },
+  // Heat wisps: no visible core — just a faint, tall additive shimmer drifting upward.
+  haze: { count: 10, palette: [0xffcf9a], scale: [0.001, 0.001, 0.001] },
 };
 
 /** The kind names, hoisted once so the per-sample scan loop doesn't rebuild the key array. */
@@ -48,7 +52,7 @@ const LIFE_KINDS = Object.keys(KINDS) as LifeKindName[];
 export function kindActive(kind: LifeKindName, daylight: number): boolean {
   if (kind === 'butterfly') return daylight > 0.55;
   if (kind === 'firefly') return daylight < 0.35;
-  return true; // leaves fall day and night
+  return true; // leaves fall — and lava spits embers and heat — day and night
 }
 
 /**
@@ -67,6 +71,9 @@ export function isAnchor(
   if (kind === 'butterfly') return id === FLOWER || id === TALL_GRASS;
   if (kind === 'firefly') {
     return (id === GRASS || id === WATER) && getBlock(x, y + 1, z) === AIR;
+  }
+  if (kind === 'ember' || kind === 'haze') {
+    return id === LAVA && getBlock(x, y + 1, z) === AIR;
   }
   return id === LEAVES && getBlock(x, y - 1, z) === AIR;
 }
@@ -91,6 +98,16 @@ interface Agent {
 const GLOW_RADIUS = 0.34;
 /** Warm green halo tint; additive blending turns intensity into brightness. */
 const GLOW_COLOR = new Color(0x9fd542).multiplyScalar(0.55);
+/** Ember halo: warm orange, tighter than the firefly glow. */
+const EMBER_GLOW_RADIUS = 0.3;
+const EMBER_GLOW_COLOR = new Color(0xff7a26).multiplyScalar(0.65);
+/** Heat wisp: a tall, very dim additive shimmer column — read as haze, not an object. */
+const HAZE_COLOR = new Color(0xffcf9a).multiplyScalar(0.05);
+
+/** Ember brightness in (0,1]: a fast warm flicker that never fully dies. Exported for tests. */
+export function emberFlicker(age: number, phase: number): number {
+  return 0.55 + 0.45 * Math.sin(age * 7 + phase);
+}
 
 /**
  * Smooth firefly blink in [0,1]: slow fade-in/out with real off periods, instead of the old
@@ -110,6 +127,8 @@ export class AmbientLife {
     butterfly: [],
     firefly: [],
     leaf: [],
+    ember: [],
+    haze: [],
   };
   private scanTimer = 0;
   private readonly scratchMatrix = new Matrix4();
@@ -149,7 +168,13 @@ export class AmbientLife {
 
   /** Agents currently alive per kind (for dev inspection and tests). */
   census(): Record<LifeKindName, number> {
-    const out: Record<LifeKindName, number> = { butterfly: 0, firefly: 0, leaf: 0 };
+    const out: Record<LifeKindName, number> = {
+      butterfly: 0,
+      firefly: 0,
+      leaf: 0,
+      ember: 0,
+      haze: 0,
+    };
     for (const a of this.agents) out[a.kind]++;
     return out;
   }
@@ -197,6 +222,33 @@ export class AmbientLife {
           this.glowMesh.setColorAt(glowWrite, this.scratchColor);
           glowWrite++;
         }
+      } else if (agent.kind === 'ember') {
+        // Sparks flicker fast and shrink as they cool on the way up.
+        const flick = emberFlicker(agent.age, agent.phase);
+        const cool = Math.max(0.15, 1 - (agent.pos.y - agent.home.y) / 6);
+        const s = Math.max(0.001, flick * cool);
+        sx *= s;
+        sy *= s;
+        sz *= s;
+        const r = EMBER_GLOW_RADIUS * flick * cool;
+        this.scratchScale.set(r, r, r);
+        this.scratchMatrix.compose(agent.pos, this.scratchQuat, this.scratchScale);
+        this.glowMesh.setMatrixAt(glowWrite, this.scratchMatrix);
+        this.scratchColor.copy(EMBER_GLOW_COLOR).multiplyScalar(flick * cool);
+        this.glowMesh.setColorAt(glowWrite, this.scratchColor);
+        glowWrite++;
+      } else if (agent.kind === 'haze') {
+        // The wisp lives entirely in the glow mesh: tall, faint, swelling and fading
+        // as it rises — the local stand-in for screen-space heat distortion.
+        const rise = (agent.pos.y - agent.home.y) / 4;
+        const fade = Math.max(0, 1 - rise);
+        const r = 0.28 + Math.max(0, rise) * 0.5;
+        this.scratchScale.set(r, r * 2.4, r);
+        this.scratchMatrix.compose(agent.pos, this.scratchQuat, this.scratchScale);
+        this.glowMesh.setMatrixAt(glowWrite, this.scratchMatrix);
+        this.scratchColor.copy(HAZE_COLOR).multiplyScalar(fade);
+        this.glowMesh.setColorAt(glowWrite, this.scratchColor);
+        glowWrite++;
       } else if (agent.kind === 'butterfly') {
         // Wing flap: pinch the span, widen slightly along the body, at a fast beat.
         const flap = 0.25 + 0.75 * Math.abs(Math.sin(agent.age * 9 + agent.phase));
@@ -240,6 +292,26 @@ export class AmbientLife {
       agent.pos.x = agent.home.x + Math.sin(t * 0.5 + agent.phase) * 1.6;
       agent.pos.z = agent.home.z + Math.cos(t * 0.4 + agent.phase * 2.1) * 1.6;
       agent.pos.y = agent.home.y + 1.4 + Math.sin(t * 0.6 + agent.phase * 0.7) * 0.8;
+    } else if (agent.kind === 'ember') {
+      // Pop up off the crust with a nervous wander; respawn at the surface when spent.
+      agent.pos.y += (0.9 + 0.5 * Math.sin(agent.phase)) * dt;
+      agent.pos.x += Math.sin(t * 3.1 + agent.phase) * 0.6 * dt;
+      agent.pos.z += Math.cos(t * 2.7 + agent.phase * 1.4) * 0.6 * dt;
+      if (agent.pos.y > agent.home.y + 5.5) {
+        agent.pos.copy(agent.home);
+        agent.pos.y += 1.1;
+        agent.age = 0;
+      }
+    } else if (agent.kind === 'haze') {
+      // Steady slow rise with a gentle sway; recycle low so the column never breaks.
+      agent.pos.y += 0.8 * dt;
+      agent.pos.x = agent.home.x + Math.sin(t * 1.9 + agent.phase) * 0.3;
+      agent.pos.z = agent.home.z + Math.cos(t * 1.6 + agent.phase) * 0.3;
+      if (agent.pos.y > agent.home.y + 4.2) {
+        agent.pos.copy(agent.home);
+        agent.pos.y += 1.0;
+        agent.age = 0;
+      }
     } else {
       // Leaf: flutter downward; respawn at the canopy when it lands.
       agent.pos.y -= 0.55 * dt;
@@ -282,10 +354,17 @@ export class AmbientLife {
       let alive = 0;
       for (const a of this.agents) if (a.kind === kind) alive++;
       while (alive < def.count && this.agents.length < MAX_AGENTS) {
-        const home = anchors[Math.floor(this.rng() * anchors.length)];
+        const home = anchors[Math.floor(this.rng() * anchors.length)].clone();
+        if (kind === 'ember' || kind === 'haze') {
+          // Spread lava agents across the pool so shared anchors don't stack into a pillar.
+          home.x += (this.rng() - 0.5) * 2.5;
+          home.z += (this.rng() - 0.5) * 2.5;
+        }
         const color = new Color(def.palette[Math.floor(this.rng() * def.palette.length)]);
         const pos = home.clone();
         pos.y += kind === 'leaf' ? -0.3 : 1;
+        // Stagger rising agents through their cycle so columns never pulse in lockstep.
+        if (kind === 'ember' || kind === 'haze') pos.y += this.rng() * 3;
         this.agents.push({
           kind,
           home: home.clone(),

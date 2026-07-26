@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { AmbientLife, fireflyGlow, isAnchor, kindActive } from '../src/render/AmbientLife';
-import { AIR, FLOWER, GRASS, LEAVES, TALL_GRASS, WATER, STONE } from '../src/blocks/blocks';
+import {
+  AmbientLife,
+  fireflyGlow,
+  emberFlicker,
+  isAnchor,
+  kindActive,
+} from '../src/render/AmbientLife';
+import { AIR, FLOWER, GRASS, LAVA, LEAVES, TALL_GRASS, WATER, STONE } from '../src/blocks/blocks';
 
 const CAM = { x: 0, y: 64, z: 0 };
 
@@ -71,6 +77,46 @@ describe('isAnchor', () => {
     expect(isAnchor('leaf', canopy, 0, 5, 0)).toBe(true); // air below
     expect(isAnchor('leaf', canopy, 0, 6, 0)).toBe(false); // leaves below
   });
+
+  it('embers and heat wisps rise only from exposed lava surfaces', () => {
+    const openLava = (_x: number, y: number, _z: number): number => (y === 0 ? LAVA : AIR);
+    const cappedLava = (_x: number, y: number, _z: number): number => (y === 0 ? LAVA : STONE);
+    for (const kind of ['ember', 'haze'] as const) {
+      expect(isAnchor(kind, openLava, 0, 0, 0)).toBe(true);
+      expect(isAnchor(kind, cappedLava, 0, 0, 0)).toBe(false);
+      expect(isAnchor(kind, (_x, y, _z) => (y === 0 ? WATER : AIR), 0, 0, 0)).toBe(false);
+    }
+  });
+});
+
+describe('emberFlicker', () => {
+  it('flickers fast but never fully dies (a spark is always lit)', () => {
+    let min = 1;
+    let max = 0;
+    for (let age = 0; age < 5; age += 0.01) {
+      const f = emberFlicker(age, 1.3);
+      min = Math.min(min, f);
+      max = Math.max(max, f);
+    }
+    expect(min).toBeGreaterThan(0.05);
+    expect(max).toBeLessThanOrEqual(1);
+    expect(max - min).toBeGreaterThan(0.5); // a real flicker range, not a constant
+  });
+});
+
+describe('lava ambience population', () => {
+  /** A lava pool at y=63 under open air. */
+  const pool = (_x: number, y: number, _z: number): number => (y === 63 ? LAVA : AIR);
+
+  it('spawns embers and haze over lava, day and night', () => {
+    for (const daylight of [1, 0.1]) {
+      const life = new AmbientLife(mulberry(11));
+      for (let i = 0; i < 4; i++) life.update(1.3, CAM, daylight, pool);
+      const census = life.census();
+      expect(census.ember).toBeGreaterThan(0);
+      expect(census.haze).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('AmbientLife population', () => {
@@ -98,7 +144,7 @@ describe('AmbientLife population', () => {
     const life = new AmbientLife(mulberry(5));
     life.update(0.016, CAM, 1, () => AIR);
     life.update(1.5, CAM, 1, () => AIR);
-    expect(life.census()).toEqual({ butterfly: 0, firefly: 0, leaf: 0 });
+    expect(life.census()).toEqual({ butterfly: 0, firefly: 0, leaf: 0, ember: 0, haze: 0 });
   });
 
   it('agents despawn when the camera leaves them behind', () => {
