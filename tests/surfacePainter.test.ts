@@ -15,6 +15,7 @@ import {
   DRY_GRASS,
   FOREST_FLOOR,
   MOSS,
+  BLUE_ICE,
 } from '../src/blocks/blocks';
 import { Biome, type BiomeSource } from '../src/worldgen/BiomeMap';
 import type { GenContext } from '../src/worldgen/TerrainStage';
@@ -76,9 +77,19 @@ describe('SurfacePainter biome caps', () => {
   it('caps columns at/below sea level with sand (beaches win over biome)', () => {
     const top = SEA_LEVEL;
     const chunk = new ChunkData(0, 0);
-    stage.apply(chunk, ctx(top, Biome.Tundra)); // even in tundra, the shoreline is sand
+    stage.apply(chunk, ctx(top, Biome.Plains));
     expect(chunk.get(0, top, 0)).toBe(SAND);
     expect(chunk.get(0, 0, 0)).toBe(STONE);
+  });
+
+  it('freezes tundra shorelines into blue-ice rims (with sand gaps)', () => {
+    const top = SEA_LEVEL;
+    const chunk = new ChunkData(0, 0);
+    stage.apply(chunk, ctx(top, Biome.Tundra));
+    const caps = new Set<number>();
+    for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) caps.add(chunk.get(x, top, z));
+    expect(caps.has(BLUE_ICE)).toBe(true);
+    for (const id of caps) expect([SAND, BLUE_ICE]).toContain(id);
   });
 
   it('caps a non-beach swamp column with mud (or a deterministic peat patch)', () => {

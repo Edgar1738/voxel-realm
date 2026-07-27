@@ -14,6 +14,7 @@ import {
   DEADWOOD,
   DRY_GRASS,
   AUTUMN_LEAVES,
+  BLOSSOM_LEAVES,
 } from '../blocks/blocks';
 import { scatterStructures } from './Structures';
 import { BiomeMap, Biome } from './BiomeMap';
@@ -207,6 +208,20 @@ export function isAutumnPocket(seed: WorldSeed, worldX: number, worldZ: number):
   return patchNoise(worldX, worldZ, 160, salt) > 0.74;
 }
 
+/** Blossom oaks: the oak silhouette under soft pink canopy, for rare spring groves. */
+export function blossomOakVariants(): Prefab[] {
+  return variants(0xb105, (s) => blob(s, OAK_CANOPY, WOOD, BLOSSOM_LEAVES));
+}
+
+/**
+ * Rare spring groves on an independent coarse field. Where a cell would be BOTH autumn
+ * and blossom, autumn wins (the gates below stay disjoint), so no grove double-plants.
+ */
+export function isBlossomPocket(seed: WorldSeed, worldX: number, worldZ: number): boolean {
+  const salt = (0x5b10 ^ Math.imul(seed, 0x85ebca6b)) | 0;
+  return patchNoise(worldX, worldZ, 160, salt) > 0.76;
+}
+
 /** Temperate broadleaf mix (oak + birch) for grassy ground. */
 function broadleafVariants(): Prefab[] {
   return [...oakVariants(), ...birchVariants()];
@@ -308,7 +323,8 @@ export function scatterForest(
 ): Overlay {
   const broadleaf = scatterTreesOnCap(
     broadleafVariants(),
-    (cap, tx, tz, seed) => cap === GRASS && !isAutumnPocket(seed, tx, tz),
+    (cap, tx, tz, seed) =>
+      cap === GRASS && !isAutumnPocket(seed, tx, tz) && !isBlossomPocket(seed, tx, tz),
     surfaceAt,
     seaLevel,
     { salt: 0x0a4d, ...extra },
@@ -321,6 +337,15 @@ export function scatterForest(
     surfaceAt,
     seaLevel,
     { density: 0.8, salt: 0xfa11, ...extra },
+  );
+  // Rare spring groves: pink blossom canopy wherever the blossom field fires alone.
+  const blossomOaks = scatterTreesOnCap(
+    blossomOakVariants(),
+    (cap, tx, tz, seed) =>
+      cap === GRASS && isBlossomPocket(seed, tx, tz) && !isAutumnPocket(seed, tx, tz),
+    surfaceAt,
+    seaLevel,
+    { density: 0.8, salt: 0x5b1a, ...extra },
   );
   const conifers = scatterTreesOnCap(
     coniferVariants(),
@@ -369,6 +394,7 @@ export function scatterForest(
   return (chunk, cx, cz, seed) => {
     broadleaf(chunk, cx, cz, seed);
     autumnOaks(chunk, cx, cz, seed);
+    blossomOaks(chunk, cx, cz, seed);
     conifers(chunk, cx, cz, seed);
     swampOaks(chunk, cx, cz, seed);
     deadwood(chunk, cx, cz, seed);

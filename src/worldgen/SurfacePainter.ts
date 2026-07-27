@@ -16,6 +16,7 @@ import {
   MOSS,
   CLAY,
   PEAT,
+  BLUE_ICE,
 } from '../blocks/blocks';
 import { Biome } from './BiomeMap';
 import type { TerrainStage, GenContext } from './TerrainStage';
@@ -123,6 +124,11 @@ export function patchedCap(
     return cap;
   }
   if (cap === SAND && height <= ctx.seaLevel + 1) {
+    // Tundra shores freeze over: broad blue-ice rims with sand gaps, so cold coasts
+    // read frozen instead of beach-like. Checked before clay — ice owns the cold.
+    if (biome === Biome.Tundra) {
+      return patchNoise(worldX, worldZ, 10, seedSalt(0x1ced)) > 0.3 ? BLUE_ICE : cap;
+    }
     // 0.73: beaches are broad and flat, so even a small threshold drop reads as
     // sprawling grey sheets — keep clay an accent, not a second shoreline.
     if (patchNoise(worldX, worldZ, 9, seedSalt(0xc1a7)) > 0.73) return CLAY;

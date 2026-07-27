@@ -10,6 +10,7 @@ import {
   MOSS,
   MUSHROOM,
   DARK_LOAM,
+  STALACTITE,
 } from '../blocks/blocks';
 import type { TerrainStage, GenContext } from './TerrainStage';
 import type { ChunkData } from '../world/ChunkData';
@@ -56,11 +57,21 @@ export class CaveThemeStage implements TerrainStage {
         const worldX = ctx.cx * CHUNK_SIZE_X + x;
         const worldZ = ctx.cz * CHUNK_SIZE_Z + z;
         const theme = caveThemeAt(ctx.seed, worldX, worldZ);
-        if (theme === 'none') continue;
         const height = ctx.heights[x + CHUNK_SIZE_X * z];
         const top = Math.min(THEME_CEILING_Y, height - MIN_COVER);
         for (let y = 2; y <= top; y++) {
           if (chunk.get(x, y, z) !== AIR) continue;
+          // Stalactites hang from any deep stone ceiling, themed or not — sparse
+          // enough (~1.2% of ceiling cells) that finding a cluster feels geological.
+          if (
+            y + 1 <= top + MIN_COVER &&
+            FLOOR_STONES.has(chunk.get(x, y + 1, z)) &&
+            hash01(worldX ^ 0x7a11, worldZ ^ Math.imul(y, 0x27d4eb2d), salt) > 0.988
+          ) {
+            chunk.set(x, y, z, STALACTITE);
+            continue;
+          }
+          if (theme === 'none') continue;
           if (!FLOOR_STONES.has(chunk.get(x, y - 1, z))) continue;
           // Rates are deliberately strong: background ore already sprinkles these depths,
           // so a themed gallery must repaint its FLOOR to read as a distinct place.

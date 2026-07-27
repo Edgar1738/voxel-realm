@@ -12,6 +12,7 @@ import { applyUnderwater, stepUnderwaterFactor, type FogParams } from '../render
 import { Weather } from '../render/Weather';
 import { AmbientLife } from '../render/AmbientLife';
 import { Clouds } from '../render/Clouds';
+import { Aurora, auroraGround } from '../render/Aurora';
 import { wetnessTarget, stepWetness } from '../render/wetness';
 import { Critters } from '../render/Critters';
 import { skyState } from '../render/Sky';
@@ -218,6 +219,7 @@ export class Game {
     const daynight = new DayNight(renderer.scene, chunkMaterials);
     const celestial = new CelestialSky(renderer.scene);
     const clouds = new Clouds(renderer.scene);
+    const aurora = new Aurora(renderer.scene);
     bootStats.end('renderer+materials');
 
     // Load the durable save (or start fresh / discard an incompatible one). Curated collection
@@ -1725,6 +1727,17 @@ export class Game {
       if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
       celestial.update(daynight.time, renderer.camera.position, cdt);
       clouds.update(cdt, renderer.camera.position, daynight.time, weather.kind, animTime);
+      // Aurora country = the first solid block under the camera is snow/ice.
+      const camP = renderer.camera.position;
+      let groundId = AIR;
+      for (let yy = Math.floor(camP.y); yy > Math.floor(camP.y) - 48 && yy >= 0; yy--) {
+        const id = manager.getBlock(Math.floor(camP.x), yy, Math.floor(camP.z));
+        if (id !== AIR) {
+          groundId = id;
+          break;
+        }
+      }
+      aurora.update(cdt, camP, daynight.time, auroraGround(groundId), animTime);
       // Rain wetness: exposed surfaces soak fast and dry slowly after the weather clears.
       wetness = stepWetness(wetness, wetnessTarget(weather.kind), cdt);
       for (const m of chunkMaterials) m.uniforms.uWetness.value = wetness;
@@ -2257,6 +2270,7 @@ export class Game {
       hudTeardown?.();
       celestial.dispose();
       clouds.dispose();
+      aurora.dispose();
       avatar.dispose();
       npcSystem.dispose();
       weather.dispose();

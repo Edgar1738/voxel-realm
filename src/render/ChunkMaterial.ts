@@ -53,7 +53,10 @@ void main() {
   vec3 worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
   // Wind sway for cutout plants: tops (uv.y=1) lean, roots stay planted. World-position
   // phase keeps neighboring plants out of lockstep. uSwayAmp is 0 on non-plant passes.
-  float sway = uSwayAmp * uv.y;
+  // A slow diagonal gust wave sweeps the meadow so blades surge together in passing
+  // waves instead of every plant metronoming at a constant amplitude.
+  float gust = 0.55 + 0.45 * sin(uTime * 0.8 + (worldPos.x + worldPos.z * 0.7) * 0.07);
+  float sway = uSwayAmp * uv.y * gust;
   worldPos.x += sway * sin(uTime * 1.7 + worldPos.x * 0.9 + worldPos.z * 1.3);
   worldPos.z += sway * cos(uTime * 1.3 + worldPos.z * 0.8 + worldPos.x * 1.1);
   vWorldPos = worldPos;
@@ -143,6 +146,7 @@ void main() {
   float fxId = 0.0;
   float sparkleFlag = 0.0;
   float flickerFlag = 0.0;
+  float gemFlag = 0.0;
   vec4 texel;
   if (uVariation > 0.5) {
     // Per-layer material metadata row 0: R = variant count, G = drift class,
@@ -153,6 +157,7 @@ void main() {
     fxId = meta2.r;
     sparkleFlag = meta2.g;
     flickerFlag = meta2.b;
+    gemFlag = meta2.a;
     driftId = meta.g;
     emissive = meta.a / 255.0;
     if (flickerFlag > 0.5 && emissive > 0.0) {
@@ -222,22 +227,32 @@ void main() {
     // world space (seamless across greedy quads). Strength fades with distance — high-
     // frequency normals alias into shimmer at range — and rises with uWaveAmp (weather).
     float distFade = 1.0 - smoothstep(30.0, 110.0, dist);
-    float e = 0.35;
-    vec2 p1 = vWorldPos.xz * 0.35 + uTime * vec2(0.050, 0.034);
-    vec2 p2 = vWorldPos.xz * 0.83 - uTime * vec2(0.041, -0.057);
-    vec2 g1 = vec2(vnoise(p1 + vec2(e, 0.0), 0x77u) - vnoise(p1 - vec2(e, 0.0), 0x77u),
-                   vnoise(p1 + vec2(0.0, e), 0x77u) - vnoise(p1 - vec2(0.0, e), 0x77u));
-    vec2 g2 = vec2(vnoise(p2 + vec2(e, 0.0), 0xabu) - vnoise(p2 - vec2(e, 0.0), 0xabu),
-                   vnoise(p2 + vec2(0.0, e), 0xabu) - vnoise(p2 - vec2(0.0, e), 0xabu));
-    vec2 grad = (g1 * 0.65 + g2 * 0.35) * (uWaveAmp * 16.0) * distFade;
+    float fallStreak = -1.0;
     if (vWorldNormal.y > 0.5) {
+      float e = 0.35;
+      vec2 p1 = vWorldPos.xz * 0.35 + uTime * vec2(0.050, 0.034);
+      vec2 p2 = vWorldPos.xz * 0.83 - uTime * vec2(0.041, -0.057);
+      vec2 g1 = vec2(vnoise(p1 + vec2(e, 0.0), 0x77u) - vnoise(p1 - vec2(e, 0.0), 0x77u),
+                     vnoise(p1 + vec2(0.0, e), 0x77u) - vnoise(p1 - vec2(0.0, e), 0x77u));
+      vec2 g2 = vec2(vnoise(p2 + vec2(e, 0.0), 0xabu) - vnoise(p2 - vec2(e, 0.0), 0xabu),
+                     vnoise(p2 + vec2(0.0, e), 0xabu) - vnoise(p2 - vec2(0.0, e), 0xabu));
+      vec2 grad = (g1 * 0.65 + g2 * 0.35) * (uWaveAmp * 16.0) * distFade;
       vec3 waterN = normalize(vec3(-grad.x, 1.0, -grad.y));
       fluidNv = normalize(mat3(viewMatrix) * waterN);
+      // Gentle brightness swell riding the same field (replaces the old two-sine shimmer).
+      base *= 1.0 + (grad.x + grad.y) * 0.6;
+    } else {
+      // Waterfall faces: downward-scrolling streaks so vertical water reads as FALLING
+      // instead of a standing glass wall. Two crossed frequencies avoid conveyor-belting.
+      float u = abs(vWorldNormal.x) > 0.5 ? vWorldPos.z : vWorldPos.x;
+      fallStreak = vnoise(vec2(u * 1.7, vWorldPos.y * 0.35 + uTime * 1.6), 0x3fu) * 0.5 +
+                   vnoise(vec2(u * 3.1 + 7.0, vWorldPos.y * 0.6 + uTime * 2.4), 0x40u) * 0.5;
+      base *= 0.88 + 0.4 * fallStreak;
     }
-    // Gentle brightness swell riding the same field (replaces the old two-sine shimmer).
-    base *= 1.0 + (grad.x + grad.y) * 0.6;
     vec3 V = normalize(-vViewPos);
     fres = pow(1.0 - clamp(dot(fluidNv, V), 0.0, 1.0), uFresnelPower);
+    // Falling water froths: more opaque and foam-bright than the calm surface.
+    if (fallStreak >= 0.0) fres = max(fres, 0.2 + fallStreak * 0.3);
     // Voxel depth ramp: the mesher bakes water-column depth (r, 1..7 blocks) and shore
     // distance (g, 0..3) into the tint channel. Exponential absorption makes shallows
     // glow bright over the bed while lakes settle toward uWaterDeep — no scene depth
@@ -398,6 +413,17 @@ void main() {
     vec3 Hg = normalize(Vg + Lg);
     float glint = pow(max(dot(Ng, Hg), 0.0), 32.0);
     color += gloss * glint * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
+  }
+  // Gem twinkle: view-dependent inner glints on every face, independent of sunlight so
+  // crystal caves shimmer in the dark. Cells flash as the view angle sweeps past them.
+  if (gemFlag > 0.5) {
+    vec3 an2 = abs(vWorldNormal);
+    vec2 gp = an2.y > 0.5 ? vWorldPos.xz : (an2.x > 0.5 ? vWorldPos.zy : vWorldPos.xy);
+    vec2 gcell = floor(gp * 5.0);
+    float gh = hash2f(gcell, 0x9e11u);
+    float ang = dot(normalize(-vViewPos), normalize(vNormal));
+    float tw = smoothstep(0.9, 1.0, sin(ang * 14.0 + gh * 6.2831 + uTime * 0.6) * 0.5 + 0.5);
+    color += tw * smoothstep(0.55, 1.0, gh) * (0.25 + level * 0.35) * vec3(0.7, 0.95, 1.0);
   }
   // Snow/ice sparkle: rare fixed glitter cells that flash as the view crosses the sun's
   // half-vector — the way real snow fields prickle with light. Daylit tops only.

@@ -30,6 +30,9 @@ export type PatternName =
   | 'flower'
   | 'tallGrass'
   | 'mushroom'
+  | 'torch'
+  | 'campfire'
+  | 'icicle'
   | 'ladder'
   | 'door';
 
@@ -72,6 +75,8 @@ export type TextureSpec =
       sparkle?: boolean;
       /** Emissive strength wavers per voxel like a live flame (lanterns). */
       flicker?: boolean;
+      /** View-dependent inner twinkle on every face, cave-safe (crystal, stained glass). */
+      gem?: boolean;
     }
   | { custom: Pixel };
 
@@ -870,6 +875,69 @@ const mushroomP =
   };
 
 /**
+ * Torch: a slim wooden stick under a teardrop flame with a hot near-white core, on a
+ * transparent background (cutout pass). colors: [wood, flame].
+ */
+const torchP =
+  (wood: RGB, flame: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const onStick = (px === 7 || px === 8) && py >= 6;
+    const dx = px - 7.5;
+    const dy = py - 4;
+    const r2 = dx * dx + dy * dy * 1.3;
+    const onFlame = r2 <= 6.5 && py <= 7;
+    if (!onStick && !onFlame) return TRANSPARENT;
+    const base: RGB = onFlame ? (r2 < 2.2 ? [255, 236, 150] : flame) : wood;
+    const c = shade(base, (rng() - 0.5) * (onFlame ? 22 : 14));
+    return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+  };
+
+/**
+ * Campfire top: two crossed logs over an ash bed with a flame heart at the crossing —
+ * hot near-white center cooling to the flame color outward. colors: [wood, flame].
+ */
+const campfireP =
+  (wood: RGB, flame: RGB): Pixel =>
+  (px, py, rng) => {
+    const dx = px - 7.5;
+    const dy = py - 7.5;
+    const r2 = dx * dx + dy * dy;
+    if (r2 < 7.0) {
+      return shade(mix([255, 238, 160], flame, r2 / 7.0), (rng() - 0.5) * 24);
+    }
+    const onLogH = py >= 6 && py <= 9;
+    const onLogV = px >= 6 && px <= 9;
+    if (onLogH || onLogV) {
+      const grain = (onLogH ? py : px) % 2 === 0 ? 6 : -8;
+      return shade(wood, grain + (rng() - 0.5) * 10);
+    }
+    return shade([52, 48, 46], (rng() - 0.5) * 10); // charred ash bed
+  };
+
+/**
+ * Icicle: three downward-tapering hanging spikes of differing lengths with occasional
+ * bright glints, on a transparent background. Also serves stone stalactites via colors.
+ */
+const icicleP =
+  (ice: RGB): Pixel =>
+  (px, py, rng): RGBA => {
+    const spikes: ReadonlyArray<readonly [number, number]> = [
+      [3, 12],
+      [8, 15],
+      [12, 9],
+    ];
+    for (const [cx, len] of spikes) {
+      const w = Math.max(0, Math.round(2 * (1 - py / len)));
+      if (py <= len && Math.abs(px - cx) <= w) {
+        const glint = hashf(px, py, 3101) > 0.85 ? 26 : 0;
+        const c = shade(ice, glint + (rng() - 0.5) * 14);
+        return [clamp(c[0]), clamp(c[1]), clamp(c[2]), 255];
+      }
+    }
+    return TRANSPARENT;
+  };
+
+/**
  * Ladder: two vertical side rails plus evenly spaced rungs, on a transparent background
  * (rendered in the cutout pass, so the wall shows through the gaps).
  */
@@ -957,6 +1025,12 @@ function buildPattern(name: PatternName, colors: RGB[], amp?: number): Pixel {
       return tallGrassP(c0);
     case 'mushroom':
       return mushroomP(c0, c1);
+    case 'torch':
+      return torchP(c0, c1);
+    case 'campfire':
+      return campfireP(c0, c1);
+    case 'icicle':
+      return icicleP(c0);
     case 'ladder':
       return ladderP(c0);
     case 'door':
@@ -997,11 +1071,12 @@ export function specKey(spec: TextureSpec): string {
     spec.gloss === undefined &&
     spec.fx === undefined &&
     spec.sparkle === undefined &&
-    spec.flicker === undefined
+    spec.flicker === undefined &&
+    spec.gem === undefined
   ) {
     return base;
   }
-  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}|f${spec.fx ?? ''}|s${spec.sparkle ? 1 : 0}|k${spec.flicker ? 1 : 0}`;
+  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}|f${spec.fx ?? ''}|s${spec.sparkle ? 1 : 0}|k${spec.flicker ? 1 : 0}|j${spec.gem ? 1 : 0}`;
 }
 
 /** A stable, key-derived seed so a spec's pixels do not depend on its layer index. */

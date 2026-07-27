@@ -120,6 +120,16 @@ export const SPRUCE_PLANK_SLAB: BlockId = 93;
 export const STAIRS_SPRUCE_PLANK: BlockId = 94;
 /** Warm orange-red autumn canopy for rare fall forest pockets. Untinted on purpose. */
 export const AUTUMN_LEAVES: BlockId = 95;
+/** Wall/ground torch (cross): warm handheld-scale light for paths and interiors. */
+export const TORCH: BlockId = 96;
+/** Campfire (half-height): crossed logs with a live flame heart; spits embers + heat. */
+export const CAMPFIRE: BlockId = 97;
+/** Soft pink blossom canopy for rare spring groves. Untinted on purpose. */
+export const BLOSSOM_LEAVES: BlockId = 98;
+/** Hanging ice spikes (cross) for eaves, overhangs, and cold caves. */
+export const ICICLE: BlockId = 99;
+/** Hanging stone spikes (cross), scattered naturally from deep cave ceilings. */
+export const STALACTITE: BlockId = 100;
 
 /** Render/collision shape of a block. The block id implies the shape (no save state). */
 export type Shape =
@@ -404,7 +414,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     transparent: false,
     light: 7,
     // Partial self-glow: crystal facets stay luminous in the dark, the stone matrix dims.
-    faces: { pattern: 'ore', colors: [[120, 220, 235]], emissive: 0.45 },
+    faces: { pattern: 'ore', colors: [[120, 220, 235]], emissive: 0.45, gem: true },
   },
   {
     id: DEEPSLATE,
@@ -719,7 +729,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: false,
     transparent: true,
     creative: true,
-    faces: { pattern: 'glass', colors: [[120, 210, 230]] },
+    faces: { pattern: 'glass', colors: [[120, 210, 230]], gem: true },
   },
   {
     id: GOLD_TRIM,
@@ -1241,6 +1251,77 @@ export const BLOCK_DEFS: BlockDef[] = [
     creative: true,
     shape: 'stair',
     faces: SPRUCE_PLANK_TEX,
+  },
+  {
+    id: TORCH,
+    name: 'torch',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    light: 13,
+    faces: {
+      pattern: 'torch',
+      colors: [
+        [122, 92, 56],
+        [255, 168, 64],
+      ],
+    },
+  },
+  {
+    id: CAMPFIRE,
+    name: 'campfire',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    shape: 'slab',
+    light: 14,
+    faces: {
+      top: {
+        pattern: 'campfire',
+        emissive: 0.85,
+        flicker: true,
+        colors: [
+          [110, 82, 50],
+          [244, 120, 32],
+        ],
+      },
+      side: { pattern: 'bark', colors: [[96, 72, 46]] },
+      bottom: { pattern: 'speckle', colors: [[58, 54, 52]], amp: 10 },
+    },
+  },
+  {
+    id: BLOSSOM_LEAVES,
+    name: 'blossom leaves',
+    opaque: true,
+    transparent: false,
+    creative: true,
+    // No biome tint: spring groves keep their pink identity in every climate.
+    faces: {
+      pattern: 'leaves',
+      colors: [[224, 158, 178]],
+      variants: 3,
+      rotate: true,
+      drift: 'foliage',
+    },
+  },
+  {
+    id: ICICLE,
+    name: 'icicle',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: { pattern: 'icicle', colors: [[190, 220, 240]] },
+  },
+  {
+    id: STALACTITE,
+    name: 'stalactite',
+    opaque: false,
+    transparent: false,
+    creative: true,
+    shape: 'cross',
+    faces: { pattern: 'icicle', colors: [[116, 116, 122]] },
   },
   {
     id: AUTUMN_LEAVES,

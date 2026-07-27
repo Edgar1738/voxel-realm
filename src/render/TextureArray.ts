@@ -66,7 +66,8 @@ const FX_ID: Record<NonNullable<Extract<TextureSpec, { pattern: unknown }>['fx']
  * Row 1:
  *   R = fluid FX id (0 none, 1 water, 2 lava)
  *   G = 1 when sunlit tops glitter (snow/ice sparkle)
- *   B = 1 when emissive flickers like flame (lanterns); A reserved
+ *   B = 1 when emissive flickers like flame (lanterns)
+ *   A = 1 for gem materials (view-dependent inner twinkle, cave-safe)
  * Only GROUP BASE layers are ever addressed by vertex data, but every member layer
  * carries its group's values (they share the spec), so the table has no holes.
  */
@@ -83,6 +84,7 @@ export function createTextureMetaLUT(): DataTexture {
     data[256 * 4 + p] = spec.fx ? FX_ID[spec.fx] : 0;
     data[256 * 4 + p + 1] = spec.sparkle ? 1 : 0;
     data[256 * 4 + p + 2] = spec.flicker ? 1 : 0;
+    data[256 * 4 + p + 3] = spec.gem ? 1 : 0;
   });
   const tex = new DataTexture(data, 256, 2, RGBAFormat, UnsignedByteType);
   tex.magFilter = NearestFilter;

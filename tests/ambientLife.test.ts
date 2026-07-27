@@ -6,7 +6,18 @@ import {
   isAnchor,
   kindActive,
 } from '../src/render/AmbientLife';
-import { AIR, FLOWER, GRASS, LAVA, LEAVES, TALL_GRASS, WATER, STONE } from '../src/blocks/blocks';
+import {
+  AIR,
+  CAMPFIRE,
+  FLOWER,
+  GRASS,
+  LAVA,
+  LEAVES,
+  TALL_GRASS,
+  TORCH,
+  WATER,
+  STONE,
+} from '../src/blocks/blocks';
 
 const CAM = { x: 0, y: 64, z: 0 };
 
@@ -87,6 +98,22 @@ describe('isAnchor', () => {
       expect(isAnchor(kind, (_x, y, _z) => (y === 0 ? WATER : AIR), 0, 0, 0)).toBe(false);
     }
   });
+
+  it('campfires spit embers and shimmer; torches spark but do not shimmer', () => {
+    const fire = (_x: number, y: number, _z: number): number => (y === 0 ? CAMPFIRE : AIR);
+    const torch = (_x: number, y: number, _z: number): number => (y === 0 ? TORCH : AIR);
+    expect(isAnchor('ember', fire, 0, 0, 0)).toBe(true);
+    expect(isAnchor('haze', fire, 0, 0, 0)).toBe(true);
+    expect(isAnchor('ember', torch, 0, 0, 0)).toBe(true);
+    expect(isAnchor('haze', torch, 0, 0, 0)).toBe(false);
+  });
+
+  it('bubbles rise only through submerged water (water above water)', () => {
+    const deep = (_x: number, _y: number, _z: number): number => WATER;
+    const surface = (_x: number, y: number, _z: number): number => (y === 0 ? WATER : AIR);
+    expect(isAnchor('bubble', deep, 0, 0, 0)).toBe(true);
+    expect(isAnchor('bubble', surface, 0, 0, 0)).toBe(false);
+  });
 });
 
 describe('emberFlicker', () => {
@@ -144,7 +171,14 @@ describe('AmbientLife population', () => {
     const life = new AmbientLife(mulberry(5));
     life.update(0.016, CAM, 1, () => AIR);
     life.update(1.5, CAM, 1, () => AIR);
-    expect(life.census()).toEqual({ butterfly: 0, firefly: 0, leaf: 0, ember: 0, haze: 0 });
+    expect(life.census()).toEqual({
+      butterfly: 0,
+      firefly: 0,
+      leaf: 0,
+      ember: 0,
+      haze: 0,
+      bubble: 0,
+    });
   });
 
   it('agents despawn when the camera leaves them behind', () => {

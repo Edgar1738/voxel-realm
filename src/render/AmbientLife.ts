@@ -11,13 +11,23 @@ import {
   Vector3,
   type Object3D,
 } from 'three';
-import { AIR, FLOWER, GRASS, LAVA, LEAVES, TALL_GRASS, WATER } from '../blocks/blocks';
+import {
+  AIR,
+  CAMPFIRE,
+  FLOWER,
+  GRASS,
+  LAVA,
+  LEAVES,
+  TALL_GRASS,
+  TORCH,
+  WATER,
+} from '../blocks/blocks';
 
-export type LifeKindName = 'butterfly' | 'firefly' | 'leaf' | 'ember' | 'haze';
+export type LifeKindName = 'butterfly' | 'firefly' | 'leaf' | 'ember' | 'haze' | 'bubble';
 
 export type GetBlock = (x: number, y: number, z: number) => number;
 
-const MAX_AGENTS = 100;
+const MAX_AGENTS = 112;
 /** Anchors and agents live inside this radius around the camera. */
 const RANGE = 20;
 const DESPAWN_RANGE = 28;
@@ -43,6 +53,8 @@ const KINDS: Record<LifeKindName, KindDef> = {
   ember: { count: 14, palette: [0xffd93b, 0xff9a3b, 0xff6a2a], scale: [0.09, 0.09, 0.09] },
   // Heat wisps: no visible core — just a faint, tall additive shimmer drifting upward.
   haze: { count: 10, palette: [0xffcf9a], scale: [0.001, 0.001, 0.001] },
+  // Tiny pale spheres rising through submerged water; seen mostly while diving.
+  bubble: { count: 12, palette: [0xd6ecff], scale: [0.055, 0.055, 0.055] },
 };
 
 /** The kind names, hoisted once so the per-sample scan loop doesn't rebuild the key array. */
@@ -72,8 +84,14 @@ export function isAnchor(
   if (kind === 'firefly') {
     return (id === GRASS || id === WATER) && getBlock(x, y + 1, z) === AIR;
   }
-  if (kind === 'ember' || kind === 'haze') {
-    return id === LAVA && getBlock(x, y + 1, z) === AIR;
+  if (kind === 'ember') {
+    return (id === LAVA || id === CAMPFIRE || id === TORCH) && getBlock(x, y + 1, z) === AIR;
+  }
+  if (kind === 'haze') {
+    return (id === LAVA || id === CAMPFIRE) && getBlock(x, y + 1, z) === AIR;
+  }
+  if (kind === 'bubble') {
+    return id === WATER && getBlock(x, y + 1, z) === WATER; // submerged interior water
   }
   return id === LEAVES && getBlock(x, y - 1, z) === AIR;
 }
@@ -129,6 +147,7 @@ export class AmbientLife {
     leaf: [],
     ember: [],
     haze: [],
+    bubble: [],
   };
   private scanTimer = 0;
   private readonly scratchMatrix = new Matrix4();
@@ -174,6 +193,7 @@ export class AmbientLife {
       leaf: 0,
       ember: 0,
       haze: 0,
+      bubble: 0,
     };
     for (const a of this.agents) out[a.kind]++;
     return out;
@@ -310,6 +330,17 @@ export class AmbientLife {
       if (agent.pos.y > agent.home.y + 4.2) {
         agent.pos.copy(agent.home);
         agent.pos.y += 1.0;
+        agent.age = 0;
+      }
+    } else if (agent.kind === 'bubble') {
+      // Wobbling rise through the water column; recycle before breaking the surface
+      // guess (the anchor cell had water above, so ~2.5 blocks is always submerged-ish).
+      agent.pos.y += 0.5 * dt;
+      agent.pos.x = agent.home.x + Math.sin(t * 2.6 + agent.phase) * 0.12;
+      agent.pos.z = agent.home.z + Math.cos(t * 2.2 + agent.phase) * 0.12;
+      if (agent.pos.y > agent.home.y + 2.5) {
+        agent.pos.copy(agent.home);
+        agent.pos.y += 0.4;
         agent.age = 0;
       }
     } else {
