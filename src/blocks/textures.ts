@@ -68,6 +68,10 @@ export type TextureSpec =
        * everything else in the transparent pass stay plain.
        */
       fx?: 'water' | 'lava';
+      /** Sunlit top faces glitter with rare view-dependent glints (snow, ice). */
+      sparkle?: boolean;
+      /** Emissive strength wavers per voxel like a live flame (lanterns). */
+      flicker?: boolean;
     }
   | { custom: Pixel };
 
@@ -991,11 +995,13 @@ export function specKey(spec: TextureSpec): string {
     spec.drift === undefined &&
     spec.emissive === undefined &&
     spec.gloss === undefined &&
-    spec.fx === undefined
+    spec.fx === undefined &&
+    spec.sparkle === undefined &&
+    spec.flicker === undefined
   ) {
     return base;
   }
-  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}|f${spec.fx ?? ''}`;
+  return `${base}|v${spec.variants ?? 1}|r${spec.rotate ? 1 : 0}|d${spec.drift ?? ''}|e${spec.emissive ?? 0}|g${spec.gloss ?? 0}|f${spec.fx ?? ''}|s${spec.sparkle ? 1 : 0}|k${spec.flicker ? 1 : 0}`;
 }
 
 /** A stable, key-derived seed so a spec's pixels do not depend on its layer index. */

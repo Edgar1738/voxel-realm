@@ -11,6 +11,8 @@ import {
 import { applyUnderwater, stepUnderwaterFactor, type FogParams } from '../render/underwater';
 import { Weather } from '../render/Weather';
 import { AmbientLife } from '../render/AmbientLife';
+import { Clouds } from '../render/Clouds';
+import { wetnessTarget, stepWetness } from '../render/wetness';
 import { Critters } from '../render/Critters';
 import { skyState } from '../render/Sky';
 import { WeatherClock, type WeatherKind } from './weatherSchedule';
@@ -215,6 +217,7 @@ export class Game {
     const chunkMaterials = [material, transparentMaterial, cutoutMaterial];
     const daynight = new DayNight(renderer.scene, chunkMaterials);
     const celestial = new CelestialSky(renderer.scene);
+    const clouds = new Clouds(renderer.scene);
     bootStats.end('renderer+materials');
 
     // Load the durable save (or start fresh / discard an incompatible one). Curated collection
@@ -389,6 +392,7 @@ export class Game {
     const RAIN_LEVEL: Record<WeatherKind, number> = { clear: 0, rain: 0.6, storm: 1, snow: 0 };
     let underwaterFactor = 0;
     let animTime = 0;
+    let wetness = 0;
     let tool: Tool = 'single';
     let anchorVoxel: { x: number; y: number; z: number } | undefined;
     let tunnelConfig: TunnelConfig = { ...DEFAULT_TUNNEL_CONFIG };
@@ -1719,7 +1723,11 @@ export class Game {
       if (import.meta.env.DEV) devRoam?.step(cdt);
       daynight.advance(cdt);
       if (!scrubbingTime) ui.setTimeUi(daynight.time); // keep the slider tracking the day cycle
-      celestial.update(daynight.time, renderer.camera.position);
+      celestial.update(daynight.time, renderer.camera.position, cdt);
+      clouds.update(cdt, renderer.camera.position, daynight.time, weather.kind, animTime);
+      // Rain wetness: exposed surfaces soak fast and dry slowly after the weather clears.
+      wetness = stepWetness(wetness, wetnessTarget(weather.kind), cdt);
+      for (const m of chunkMaterials) m.uniforms.uWetness.value = wetness;
       // Photo mode freezes the player completely — no gravity, water drift, or collisions —
       // so the subject holds its pose exactly where F2 was pressed. Physics resumes on exit.
       if (!rig.photoMode) player.update(cdt, rig.getInput(), rig.yaw, sampler);
@@ -2248,6 +2256,7 @@ export class Game {
       persistence.dispose();
       hudTeardown?.();
       celestial.dispose();
+      clouds.dispose();
       avatar.dispose();
       npcSystem.dispose();
       weather.dispose();

@@ -184,6 +184,8 @@ type SpecExtras = {
   emissive?: number;
   gloss?: number;
   fx?: 'water' | 'lava';
+  sparkle?: boolean;
+  flicker?: boolean;
 };
 
 const speck = (c: [number, number, number], amp: number, extra: SpecExtras = {}): TextureSpec => ({
@@ -320,7 +322,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([236, 240, 245], 6, { variants: 2, rotate: true }),
+    faces: speck([236, 240, 245], 6, { variants: 2, rotate: true, sparkle: true }),
   },
   {
     id: CACTUS,
@@ -385,6 +387,7 @@ export const BLOCK_DEFS: BlockDef[] = [
       pattern: 'lantern',
       // 0.9, not 1: the metal frame shares the tile, so a touch of shading survives.
       emissive: 0.9,
+      flicker: true,
       colors: [
         [60, 52, 40],
         [255, 226, 140],
@@ -894,7 +897,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     opaque: true,
     transparent: false,
     creative: true,
-    faces: speck([146, 190, 211], 7, { gloss: 0.55 }),
+    faces: speck([146, 190, 211], 7, { gloss: 0.55, sparkle: true }),
   },
   {
     id: WARM_MASONRY_SLAB,

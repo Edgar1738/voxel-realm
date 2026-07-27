@@ -82,6 +82,13 @@ export class CelestialSky {
   private readonly moonMat: SpriteMaterial;
   private readonly starMat: PointsMaterial;
   private readonly sunDir = new Vector3();
+  private readonly meteor: Sprite;
+  private readonly meteorMat: SpriteMaterial;
+  private readonly meteorFrom = new Vector3();
+  private readonly meteorVel = new Vector3();
+  /** Seconds until the next streak; refreshed to 12..50s each time one finishes. */
+  private meteorWait = 8;
+  private meteorAge = -1; // <0 = idle
 
   private readonly scene: Scene;
 
@@ -127,7 +134,22 @@ export class CelestialSky {
     this.stars = new Points(geometry, this.starMat);
     this.stars.renderOrder = -10;
 
-    scene.add(this.sun, this.moon, this.stars);
+    // Shooting star: one small additive spark that occasionally streaks the night sky.
+    this.meteorMat = new SpriteMaterial({
+      map: discTexture('rgba(255,255,255,1)', 'rgba(200,220,255,0)'),
+      color: new Color(0xeaf2ff),
+      depthTest: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      transparent: true,
+      opacity: 0,
+    });
+    this.meteor = new Sprite(this.meteorMat);
+    this.meteor.scale.setScalar(7);
+    this.meteor.renderOrder = -10;
+    this.meteor.visible = false;
+
+    scene.add(this.sun, this.moon, this.stars, this.meteor);
   }
 
   /**
@@ -135,12 +157,14 @@ export class CelestialSky {
    * The sun/moon textures live on their materials; the star geometry is held directly.
    */
   dispose(): void {
-    this.scene.remove(this.sun, this.moon, this.stars);
+    this.scene.remove(this.sun, this.moon, this.stars, this.meteor);
     // SpriteMaterial.map is the CanvasTexture we allocated — dispose both.
     this.sunMat.map?.dispose();
     this.sunMat.dispose();
     this.moonMat.map?.dispose();
     this.moonMat.dispose();
+    this.meteorMat.map?.dispose();
+    this.meteorMat.dispose();
     this.stars.geometry.dispose();
     this.starMat.dispose();
   }
@@ -149,8 +173,9 @@ export class CelestialSky {
    * Positions sun/moon on a big circle around the camera using the time-of-day sun direction, and
    * fades the star field in as night falls. Call once per frame after the day/night clock advances.
    */
-  update(time: number, cameraPos: Vector3): void {
+  update(time: number, cameraPos: Vector3, dt = 0.016): void {
     const state = skyState(time);
+    this.updateMeteor(dt, cameraPos, starOpacity(state.daylight));
     this.sunDir.set(state.sun[0], state.sun[1], state.sun[2]).normalize();
 
     this.sun.position.copy(this.sunDir).multiplyScalar(SKY_RADIUS).add(cameraPos);
@@ -170,6 +195,48 @@ export class CelestialSky {
     this.starMat.opacity = stars;
     this.stars.visible = stars > 0.001;
     this.stars.position.copy(cameraPos);
+  }
+
+  private static readonly METEOR_LIFE = 0.8;
+
+  /**
+   * Rare night-only shooting stars: while the star field is out, a spark occasionally
+   * streaks across a random chord of the upper sky over ~0.8s. Purely decorative and
+   * frame-driven — no scheduling survives a reload, which is exactly right for a meteor.
+   */
+  private updateMeteor(dt: number, cameraPos: Vector3, starVisibility: number): void {
+    if (this.meteorAge < 0) {
+      this.meteor.visible = false;
+      if (starVisibility < 0.5) return; // only under a proper night sky
+      this.meteorWait -= dt;
+      if (this.meteorWait > 0) return;
+      // Launch: a random start point high on the sphere, sliding along a random tangent.
+      const az = Math.random() * Math.PI * 2;
+      const el = 0.45 + Math.random() * 0.4; // upper sky only
+      this.meteorFrom.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));
+      const taz = az + Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+      this.meteorVel
+        .set(Math.cos(taz), -0.25 - Math.random() * 0.3, Math.sin(taz))
+        .multiplyScalar(0.55);
+      this.meteorAge = 0;
+    }
+    this.meteorAge += dt;
+    const t = this.meteorAge / CelestialSky.METEOR_LIFE;
+    if (t >= 1 || starVisibility < 0.5) {
+      this.meteorAge = -1;
+      this.meteorWait = 12 + Math.random() * 38;
+      this.meteor.visible = false;
+      return;
+    }
+    this.meteor.position
+      .copy(this.meteorFrom)
+      .addScaledVector(this.meteorVel, t)
+      .normalize()
+      .multiplyScalar(STAR_RADIUS * 0.98)
+      .add(cameraPos);
+    // Quick flare-in, long fade-out — the classic streak envelope.
+    this.meteorMat.opacity = Math.min(1, t * 6) * (1 - t) * starVisibility;
+    this.meteor.visible = true;
   }
 }
 

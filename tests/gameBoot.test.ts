@@ -206,6 +206,13 @@ vi.mock('../src/render/CelestialSky', () => ({
   }),
 }));
 
+vi.mock('../src/render/Clouds', () => ({
+  Clouds: vi.fn(function Clouds() {
+    return { update: vi.fn(), dispose: vi.fn() };
+  }),
+  cloudCoverFor: vi.fn(() => 0.32),
+}));
+
 vi.mock('../src/render/ChunkMeshRegistry', () => ({
   ChunkMeshRegistry: vi.fn(function ChunkMeshRegistry(...args: unknown[]) {
     boot.registryConstructorArgs = args;

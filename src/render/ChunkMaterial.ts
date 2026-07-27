@@ -72,6 +72,7 @@ uniform mat4 viewMatrix;
 uniform sampler2DArray uTex;
 uniform sampler2D uTexMeta;
 uniform float uVariation;
+uniform float uWetness;
 uniform vec3 uLightDir;
 uniform float uDirStrength;
 uniform vec3 uLightColor;
@@ -140,15 +141,25 @@ void main() {
   float emissive = 0.0;
   float gloss = 0.0;
   float fxId = 0.0;
+  float sparkleFlag = 0.0;
+  float flickerFlag = 0.0;
   vec4 texel;
   if (uVariation > 0.5) {
     // Per-layer material metadata row 0: R = variant count, G = drift class,
     // B = rotate flag (bit 0) + gloss (bits 1-7), A = emissive strength.
-    // Row 1: R = fluid FX id (0 none, 1 water, 2 lava).
+    // Row 1: R = fluid FX id (0 none, 1 water, 2 lava), G = sparkle, B = flicker.
     vec4 meta = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 0), 0) * 255.0;
-    fxId = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 1), 0).r * 255.0;
+    vec4 meta2 = texelFetch(uTexMeta, ivec2(int(vLayer + 0.5), 1), 0) * 255.0;
+    fxId = meta2.r;
+    sparkleFlag = meta2.g;
+    flickerFlag = meta2.b;
     driftId = meta.g;
     emissive = meta.a / 255.0;
+    if (flickerFlag > 0.5 && emissive > 0.0) {
+      // Live-flame waver, phase-hashed per voxel so a row of lanterns never syncs.
+      float ph = float(hashU(uvec3(ivec3(floor(vWorldPos - vWorldNormal * 0.5 + 1e-4))), 0xf1au) & 255u) * (1.0 / 255.0);
+      emissive *= 0.86 + 0.14 * sin(uTime * 8.0 + ph * 6.2831);
+    }
     float rotateFlag = mod(meta.b, 2.0);
     gloss = floor(meta.b / 2.0) / 127.0;
     float texLayer = vLayer;
@@ -302,6 +313,13 @@ void main() {
   // unpack baked light: sky dims with day/night, block (lanterns) stays bright
   float sky = floor(vLight / 16.0) / 15.0;
   float block = mod(vLight, 16.0) / 15.0;
+  // Rain wetness: exposed upward faces darken and turn glossy while it rains, keyed
+  // off baked SKYLIGHT so overhangs, interiors, and caves stay dry. Fluids excluded.
+  if (uWetness > 0.003 && uVariation > 0.5 && fxId < 0.5) {
+    float wet = uWetness * sky * smoothstep(0.3, 0.9, vWorldNormal.y);
+    base *= 1.0 - 0.13 * wet;
+    gloss = max(gloss, wet * 0.4);
+  }
   // headlamp: camera-centered glow, quantized to the 15 baked-light steps so it
   // reads as voxel light. The camera is the emitter, so every visible fragment
   // has line-of-sight to it — no shadowing needed.
@@ -381,6 +399,19 @@ void main() {
     float glint = pow(max(dot(Ng, Hg), 0.0), 32.0);
     color += gloss * glint * uDayLight * mix(vec3(1.0), uSkyColor, 0.3);
   }
+  // Snow/ice sparkle: rare fixed glitter cells that flash as the view crosses the sun's
+  // half-vector — the way real snow fields prickle with light. Daylit tops only.
+  if (sparkleFlag > 0.5 && vWorldNormal.y > 0.5 && uDayLight > 0.3) {
+    vec2 cell = floor(vWorldPos.xz * 6.0);
+    float g = hash2f(cell + floor(vWorldPos.y) * 7.0, 0x51ceu);
+    if (g > 0.975) {
+      vec3 Vs = normalize(-vViewPos);
+      vec3 Ls = normalize((viewMatrix * vec4(normalize(uLightDir), 0.0)).xyz);
+      vec3 Hs = normalize(Vs + Ls);
+      float flash = pow(max(dot(normalize(vNormal), Hs), 0.0), 24.0);
+      color += flash * uDayLight * sky * ((g - 0.975) / 0.025) * 1.6 * vec3(1.0, 0.98, 0.9);
+    }
+  }
   float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   color = mix(color, uFogColor, fog);
   // Water alpha varies with view angle: near-transparent looking straight down (fres≈0
@@ -431,6 +462,7 @@ function buildMaterial(
       uTex: { value: tex },
       uTexMeta: { value: metaTex },
       uVariation: { value: variation && metaTex ? 1.0 : 0.0 },
+      uWetness: { value: 0.0 },
       uLightDir: { value: new Vector3(0.5, 1.0, 0.3).normalize() },
       // Sun-arc lighting: DayNight overwrites these live (dirStrength dips at twilight,
       // lightColor goes gold at low sun / cool blue under the moon).

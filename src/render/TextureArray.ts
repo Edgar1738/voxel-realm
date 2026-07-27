@@ -64,7 +64,9 @@ const FX_ID: Record<NonNullable<Extract<TextureSpec, { pattern: unknown }>['fx']
  *   B = bit 0: per-voxel rotation allowed; bits 1-7: gloss strength (0..127)
  *   A = emissive strength (0..255 -> 0..1 self-illumination)
  * Row 1:
- *   R = fluid FX id (0 none, 1 water, 2 lava); G/B/A reserved
+ *   R = fluid FX id (0 none, 1 water, 2 lava)
+ *   G = 1 when sunlit tops glitter (snow/ice sparkle)
+ *   B = 1 when emissive flickers like flame (lanterns); A reserved
  * Only GROUP BASE layers are ever addressed by vertex data, but every member layer
  * carries its group's values (they share the spec), so the table has no holes.
  */
@@ -79,6 +81,8 @@ export function createTextureMetaLUT(): DataTexture {
     data[p + 2] = (spec.rotate ? 1 : 0) | (gloss7 << 1);
     data[p + 3] = Math.round(Math.min(1, Math.max(0, spec.emissive ?? 0)) * 255);
     data[256 * 4 + p] = spec.fx ? FX_ID[spec.fx] : 0;
+    data[256 * 4 + p + 1] = spec.sparkle ? 1 : 0;
+    data[256 * 4 + p + 2] = spec.flicker ? 1 : 0;
   });
   const tex = new DataTexture(data, 256, 2, RGBAFormat, UnsignedByteType);
   tex.magFilter = NearestFilter;
