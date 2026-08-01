@@ -303,6 +303,7 @@ function crossOriginIsolation(): Plugin {
 
 export default defineConfig({
   root: '.',
-  build: { outDir: 'dist' },
+  // The post-build budget script provides stricter raw + gzip gates than Vite's generic warning.
+  build: { outDir: 'dist', chunkSizeWarningLimit: 1100 },
   plugins: [crossOriginIsolation(), devDisk()],
 });
