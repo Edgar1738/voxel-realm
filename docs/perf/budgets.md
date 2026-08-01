@@ -7,15 +7,20 @@ do not raise them merely to make CI green.
 
 `npm run build` runs `scripts/checkBundleBudget.ts` after Vite and fails when an artifact exceeds:
 
-| Artifact | Raw | Gzip |
-| --- | ---: | ---: |
-| Application JavaScript | 1100 KiB | 320 KiB |
-| Generation worker | 180 KiB | 55 KiB |
-| Mesh worker | 40 KiB | 15 KiB |
+| Artifact                |      Raw |    Gzip |
+| ----------------------- | -------: | ------: |
+| Application JavaScript  | 1100 KiB | 320 KiB |
+| Generation worker       |  180 KiB |  55 KiB |
+| Ember generation worker |  120 KiB |  40 KiB |
+| Mesh worker             |   40 KiB |  15 KiB |
 
 The limits leave roughly 8–15% headroom over the August 2026 build. Optional dev tooling is
 already excluded from production; future large optional play/build systems should use dynamic
 imports rather than consuming this headroom.
+
+Ember Spire uses a dedicated generation-worker entry so its landmark modules do not consume the
+shared worker's gzip budget or load for unrelated worlds. Worker/main preset parity is covered by
+`tests/workerPresets.test.ts` for the presets whose kit composition differs between entries.
 
 ## Runtime budgets
 

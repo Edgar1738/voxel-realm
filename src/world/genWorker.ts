@@ -1,4 +1,4 @@
-import { createGenerator, isWorldPreset } from '../worldgen/Presets';
+import { createGenerator, isWorldPreset } from '../worldgen/WorkerPresets';
 import { setSharedChunkBuffers } from './chunkBuffers';
 import { runGenJob } from './genJob';
 import type { GenJobResult, GenWorkerMessage } from './genJob';

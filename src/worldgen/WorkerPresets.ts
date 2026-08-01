@@ -10,15 +10,12 @@ import { createWorldGenerator, createCavernsGenerator } from './LayeredGenerator
 import { HeightGenerator } from './HeightGenerator';
 import { fbm2D, type FbmOptions } from './fbm';
 import { scatterStructures } from './Structures';
-import { FORTIFICATION_KIT, SETTLEMENT_KIT, kitPrefabs } from './PrefabKits';
 import { createCitadelGenerator, citadelSurfaceAt, CITADEL } from './CitadelGenerator';
 import { createAshenReachGenerator, ashenReachSurfaceAt } from './AshenReachGenerator';
 import { ashenReachSite } from './AshenReachSite';
 import { citadelSite } from './citadelSite';
 import { createHarborGenerator, harborSurfaceAt } from './HarborGenerator';
 import { harborSite } from './harborSite';
-import { createEmberSpireGenerator, ashenSurfaceAt } from './EmberSpireGenerator';
-import { emberSpireSite } from './emberSpireSite';
 import { createGrandKeepGenerator, grandKeepSurfaceAt, GRAND_KEEP } from './GrandKeepGenerator';
 import { grandKeepSite } from './grandKeepSite';
 import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
@@ -31,6 +28,18 @@ import {
 } from './StonehavenGenerator';
 import { stonehavenSite } from './stonehavenSite';
 import { scatterFairyFountains, fairyFountainAt } from './fairyFountainPrefabs';
+import {
+  cottage,
+  well,
+  ruinedTower,
+  brokenWall,
+  lampPost,
+  barn,
+  watchtower,
+  marketStall,
+  bridge,
+  farmPlot,
+} from './prefabs';
 import {
   ruinedWatchtower,
   standingStones,
@@ -63,8 +72,7 @@ export type WorldPreset =
   | 'grand-keep'
   | 'cloudspire-citadel'
   | 'sunmeadow-trials'
-  | 'stonehaven'
-  | 'ember-spire';
+  | 'stonehaven';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -84,7 +92,6 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'cloudspire-citadel',
   'sunmeadow-trials',
   'stonehaven',
-  'ember-spire',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -242,7 +249,7 @@ export function createGenerator(preset: WorldPreset): {
           // Oaks crown the mesa; ravine floors sit below sea level, so the grass gate keeps trees
           // off the canyon bottoms automatically.
           scatterOaks(canyonHeight, SEA_LEVEL),
-          scatterStructures(kitPrefabs(FORTIFICATION_KIT, ['ruin-tower', 'ruin-wall']), {
+          scatterStructures([ruinedTower(), brokenWall(), brokenWall()], {
             cellSize: 48,
             density: 0.5,
             clearFootprint: true,
@@ -259,7 +266,7 @@ export function createGenerator(preset: WorldPreset): {
           // Richer prefab oaks whose canopies span chunk borders, rooted only on grass. Runs before
           // the building scatter so cottages still clear any trees inside their footprint.
           scatterOaks(plainsHeight, SEA_LEVEL),
-          scatterStructures(kitPrefabs(SETTLEMENT_KIT, ['dwelling', 'civic', 'light']), {
+          scatterStructures([cottage(), cottage(), well(), lampPost()], {
             cellSize: 80,
             density: 0.6,
             clusterCount: 5,
@@ -277,24 +284,15 @@ export function createGenerator(preset: WorldPreset): {
         generator: new HeightGenerator(plainsHeight, SEA_LEVEL),
         overlays: [
           scatterOaks(plainsHeight, SEA_LEVEL),
-          scatterStructures(
-            kitPrefabs(SETTLEMENT_KIT, [
-              'outbuilding',
-              'defense',
-              'commerce',
-              'agriculture',
-              'crossing',
-            ]),
-            {
-              cellSize: 72,
-              density: 0.6,
-              clusterCount: 3,
-              clusterRadius: 12,
-              clearFootprint: true,
-              streetBlock: GRAVEL,
-              surfaceAt: plainsHeight,
-            },
-          ),
+          scatterStructures([barn(), watchtower(), marketStall(), farmPlot(), bridge()], {
+            cellSize: 72,
+            density: 0.6,
+            clusterCount: 3,
+            clusterRadius: 12,
+            clearFootprint: true,
+            streetBlock: GRAVEL,
+            surfaceAt: plainsHeight,
+          }),
           scatterDecorations(),
           scatterFairyFountains(plainsHeight, { theme: 'verdant' }),
         ],
@@ -372,15 +370,6 @@ export function createGenerator(preset: WorldPreset): {
           harborSite(),
           // Up on the hill crest behind the town, inland from the terraces.
           fairyFountainAt(-131, -14, harborSurfaceAt, 'verdant'),
-        ],
-      };
-    case 'ember-spire':
-      return {
-        generator: createEmberSpireGenerator(),
-        overlays: [
-          scatterOaks(ashenSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 8 }),
-          emberSpireSite(),
-          scatterDecorations(),
         ],
       };
     case 'grand-keep':
