@@ -4,6 +4,7 @@ import {
   rotateY,
   mirror,
   repeat,
+  connectPrefabs,
   validatePrefab,
   type Prefab,
 } from '../src/core/Prefab';
@@ -102,6 +103,90 @@ describe('validatePrefab', () => {
   });
   it('rejects a block id outside 0..255', () => {
     expect(validatePrefab({ dims: [1, 1, 1], blocks: [[0, 0, 0, 999]] })).toMatch(/id/i);
+  });
+
+  it('validates named anchors and sockets', () => {
+    expect(
+      validatePrefab({
+        dims: [2, 1, 2],
+        blocks: [[0, 0, 0, 1]],
+        anchors: [{ id: 'origin', pos: [0, 0, 0] }],
+        sockets: [{ id: 'road', pos: [1, 0, 1], facing: FACING.E }],
+      }),
+    ).toBeNull();
+    expect(
+      validatePrefab({
+        dims: [1, 1, 1],
+        blocks: [[0, 0, 0, 1]],
+        sockets: [{ id: 'bad', pos: [1, 0, 0] }],
+      }),
+    ).toMatch(/position/i);
+    expect(
+      validatePrefab({
+        dims: [1, 1, 1],
+        blocks: [[0, 0, 0, 1]],
+        anchors: [
+          { id: 'same', pos: [0, 0, 0] },
+          { id: 'same', pos: [0, 0, 0] },
+        ],
+      }),
+    ).toMatch(/duplicated/i);
+  });
+});
+
+describe('prefab composition points', () => {
+  const CONNECTABLE: Prefab = {
+    ...L,
+    anchors: [{ id: 'origin', pos: [1, 0, 0], facing: FACING.S }],
+    sockets: [{ id: 'exit', pos: [0, 0, 1], facing: FACING.N }],
+  };
+
+  it('rotates positions and facings with prefab geometry', () => {
+    const rotated = rotateY(CONNECTABLE, 1);
+    expect(rotated.anchors).toEqual([{ id: 'origin', pos: [0, 0, 0], facing: FACING.E }]);
+    expect(rotated.sockets).toEqual([{ id: 'exit', pos: [1, 0, 1], facing: FACING.W }]);
+  });
+
+  it('mirrors positions and facings with prefab geometry', () => {
+    const mirrored = mirror(CONNECTABLE, 'x');
+    expect(mirrored.anchors).toEqual([{ id: 'origin', pos: [0, 0, 0], facing: FACING.S }]);
+    expect(mirrored.sockets).toEqual([{ id: 'exit', pos: [1, 0, 1], facing: FACING.N }]);
+  });
+
+  it('duplicates and uniquely qualifies points when tiled', () => {
+    const tiled = repeat(CONNECTABLE, 2, 1, 1, [2, 0, 0]);
+    expect(tiled.anchors?.map((point) => point.id)).toEqual(['origin@0,0,0', 'origin@1,0,0']);
+    expect(tiled.anchors?.map((point) => point.pos)).toEqual([
+      [1, 0, 0],
+      [3, 0, 0],
+    ]);
+  });
+
+  it('attaches an anchor to a socket, auto-rotates facing, and consumes the joined points', () => {
+    const base: Prefab = {
+      dims: [2, 1, 1],
+      blocks: [[0, 0, 0, 1]],
+      sockets: [{ id: 'east-road', pos: [1, 0, 0], facing: FACING.E }],
+    };
+    const piece: Prefab = {
+      dims: [2, 1, 1],
+      blocks: [
+        [0, 0, 0, 2],
+        [1, 0, 0, 3],
+      ],
+      anchors: [{ id: 'join', pos: [0, 0, 0], facing: FACING.N }],
+      sockets: [{ id: 'next', pos: [1, 0, 0], facing: FACING.S }],
+    };
+    const joined = connectPrefabs(base, 'east-road', piece, 'join');
+    expect(joined.blocks).toHaveLength(3);
+    expect(joined.anchors).toEqual([]);
+    expect(joined.sockets?.map((point) => point.id)).toEqual(['next']);
+    expect(joined.sockets?.[0].facing).toBe(FACING.E);
+    expect(validatePrefab(joined)).toBeNull();
+  });
+
+  it('fails loudly for unknown connection points', () => {
+    expect(() => connectPrefabs(L, 'missing', L, 'missing')).toThrow(/socket/i);
   });
 });
 

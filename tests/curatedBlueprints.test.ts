@@ -6,6 +6,8 @@ import {
   PREFAB_CATALOG,
   catalogEntry,
   catalogByCategory,
+  catalogVariantFamily,
+  catalogVariantFamilies,
   searchCatalog,
   catalogEntrySize,
   validatePrefabCatalog,
@@ -55,6 +57,12 @@ describe('curatedBlueprints — categorization', () => {
       'wall-segment',
       'stairs-ramp',
       'dock',
+      'alpine-bed',
+      'alpine-counter',
+      'crate-stack',
+      'alpine-hearth',
+      'alpine-lantern-post',
+      'alpine-table-set',
     ]) {
       expect(curatedCategory(name)).toBe('Utility');
     }
@@ -145,6 +153,16 @@ describe('prefab catalog — metadata & queries', () => {
     }
   });
 
+  it('exposes explicit interchangeable variant families', () => {
+    expect(catalogVariantFamily('pond').map((entry) => entry.variant)).toEqual(['Small', 'Large']);
+    expect(
+      catalogVariantFamilies()
+        .get('pond')
+        ?.map((entry) => entry.id),
+    ).toEqual(['pond-small', 'pond-large']);
+    expect(catalogVariantFamily('unknown')).toEqual([]);
+  });
+
   it('searches across id, name, tags and description', () => {
     const ruins = searchCatalog('ruin').map((e) => e.id);
     expect(ruins).toContain('ruined-tower');
@@ -152,6 +170,7 @@ describe('prefab catalog — metadata & queries', () => {
     expect(ruins).not.toContain('cottage');
     // A tag hit that isn't in the name/id.
     expect(searchCatalog('water').map((e) => e.id)).toContain('dock');
+    expect(searchCatalog('large').map((e) => e.id)).toContain('pond-large');
     // Empty query returns the whole catalog.
     expect(searchCatalog('  ')).toHaveLength(PREFAB_CATALOG.length);
   });
