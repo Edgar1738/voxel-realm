@@ -10,14 +10,16 @@ re-merge something that's already in `main` or drag a stale branch across it.
 
 ---
 
-## 1. Stonehaven — route/road spline work
+## 1. Stonehaven — route/road spline work (RESOLVED)
 
 - **Originating world:** `stonehaven` (`experiment/project-stonehaven`)
-- **Files / areas touched:** Route/road spline generation; site layout. Exact files UNKNOWN — confirm in the worktree before touching.
-- **Reusable vs world-specific:** Mixed. Spline/road tooling is potentially reusable; the specific Stonehaven road/site layout is world-specific.
-- **Main status:** Not merged. Lives in the dirty `experiment+project-stonehaven` worktree.
-- **Recommended action:** Do not touch the dirty worktree. If the spline tooling is wanted, extract it as a standalone engine change on a fresh branch, separate from Stonehaven content, and review independently.
-- **Merge risk:** medium (entangled with dirty world content).
+- **Files / areas:** Reusable `RouteSpline` lives in `src/worldgen/fields.ts`; Stonehaven consumes it
+  from `src/worldgen/StonehavenGenerator.ts` and `src/worldgen/stonehavenSite.ts`.
+- **Main status:** **Resolved in `main`.** Terrain grading and paving share the same route projection;
+  tests cover road grade, dryness, bridge approaches, and paving.
+- **Recommended action:** Do not extract the older worktree copy. Future road features should build
+  on the mainline `RouteSpline` API.
+- **Merge risk:** none (mainline implementation exists).
 
 ## 2. Stonehaven — render/fog duplication (already resolved in main)
 
@@ -37,22 +39,23 @@ re-merge something that's already in `main` or drag a stale branch across it.
 - **Recommended action:** None. Shipped via PR #60.
 - **Merge risk:** none (merged).
 
-## 4. Hogwarts — camera step-up smoothing
+## 4. Hogwarts — camera step-up smoothing (RESOLVED)
 
 - **Originating world:** `hogwarts` (`world/hogwarts-save`)
-- **Files / areas touched:** Camera step-up / eye-smoothing (camera movement code). Exact files UNKNOWN — confirm on branch.
-- **Reusable vs world-specific:** Reusable engine change (camera smoothing benefits all worlds). Note: related eye-smoothing work already landed in main via PR #48 per project memory — confirm overlap before extracting.
-- **Main status:** Not merged from this branch (world archived/stale).
-- **Recommended action:** If wanted, extract camera step-up smoothing as an isolated engine change on a fresh branch; verify it isn't already covered by main's PR #48 eye-smoothing before merging.
-- **Merge risk:** medium (possible overlap with existing main smoothing; branch otherwise stale).
+- **Main status:** **Resolved in `main`.** Grounded step ascent/descent eye smoothing is active in
+  `Game.ts`; `CameraRig.ts` also provides obstruction-safe third-person recovery.
+- **Recommended action:** Do not extract camera code from the archived Hogwarts branch.
+- **Merge risk:** none (current behavior and tests supersede the stale branch).
 
-## 5. Ashen Reach — no broad engine change found
+## 5. Ember Spire (formerly Grok Ashen Reach) — no broad engine change found
 
-- **Originating world:** `ashen-reach` (`grok/ashen-reach`, commit `5b300c9`)
+- **Originating world:** `ember-spire` (`grok/ember-spire`, commit `6034734`)
 - **Files / areas touched:** None identified as a broad engine change. It is a generator/source world; save metadata is not a full chunk bundle.
 - **Reusable vs world-specific:** World-specific (generator/source content).
-- **Main status:** Not merged (approved M2 world, awaiting merge decision).
-- **Recommended action:** Review as a world, not as an engine change. No engine extraction appears necessary.
+- **Main status:** Integrated in the current shipping branch with its preset conflict reconciled,
+  production VRW1 package created, and a dedicated generation worker.
+- **Recommended action:** Review as a world, not as a broad engine extraction. Keep its dedicated
+  worker isolated unless future measurements justify sharing more generation code.
 - **Merge risk:** low (from an engine-change standpoint).
 
 ## 6. Harbor preset — already merged into main

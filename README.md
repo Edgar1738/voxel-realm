@@ -52,8 +52,10 @@ Open the URL, click to lock the pointer, and you're in.
 | `1–9`, mouse wheel          | Hotbar slot                                        |
 | `I`                         | Creative inventory                                 |
 | `V`                         | Placement ghost                                    |
+| `Q` / `J`                   | Cycle shaped-block facing / vertical half          |
 | `X` / `G` / `R` / `C`       | Fill / clear / replace / copy region               |
 | `[` `]`, `U`, `+`/`-`       | Rotate / mirror / array a paste                    |
+| `J`                          | Cycle paste grid snap (1 / 2 / 4 / 8 blocks)       |
 | Arrows, `PgUp`/`PgDn`, `N`  | Nudge a paste on X/Z, up/down, reset               |
 | `Ctrl`+`Z` / `Ctrl`+`Y`     | Undo / redo                                        |
 | `Shift` + wheel             | Adjust reach                                       |
@@ -111,7 +113,8 @@ format, silhouette rules, and live pose workflow.
 ## Development
 
 ```bash
-npm test           # vitest — 1200+ tests, headless (fake-indexeddb, no GPU needed)
+npm test           # vitest — 1700+ tests, headless (fake-indexeddb, no GPU needed)
+npm run test:fast  # focused builder/core/UI feedback loop; full suite still gates completion
 npm run lint       # eslint + prettier
 npm run build      # tsc --noEmit && vite build
 ```
