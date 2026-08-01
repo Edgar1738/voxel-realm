@@ -24,6 +24,7 @@ import { DEV_HELP } from './devHelp';
 import type { FrameProfiler, ProfilerSummary } from './FrameProfiler';
 import { routeDistance, type RoamDriver } from './RoamBench';
 import { frameBox } from './studioFraming';
+import { createDevCapture } from './DevCapture';
 import {
   lineVoxels,
   cylinderVoxels,
@@ -153,11 +154,6 @@ export interface DevControlsContext {
 /** A portable structure: per-voxel [dx,dy,dz,id] offsets from the min corner (non-air only). */
 export type Blueprint = Prefab;
 
-type Html2Canvas = (
-  el: HTMLElement,
-  opts?: { backgroundColor?: string | null; scale?: number; logging?: boolean },
-) => Promise<HTMLCanvasElement>;
-
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const clampPitch = (p: number): number => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
 const round = (v: number, decimals: number): number => Number(v.toFixed(decimals));
@@ -207,12 +203,8 @@ export function installDevControls(ctx: DevControlsContext): void {
     return next;
   };
 
-  // Push the current player eye + look into the camera so a teleport/aim is reflected
-  // immediately on the next capture, independent of the rAF render loop's timing.
-  const syncCamera = (): void => {
-    const eye = player.eye();
-    rig.applyEye(eye.x, eye.y, eye.z);
-  };
+  const capture = createDevCapture(renderer, player, rig, daynight, celestial);
+  const { syncCamera, view, shot, save } = capture;
 
   // Shared bench reporting: a headline (with portable totals) plus the full percentile table,
   // then best-effort copy the raw JSON to the clipboard. Used by both bench and benchRoute.
@@ -247,80 +239,6 @@ export function installDevControls(ctx: DevControlsContext): void {
     } catch {
       /* clipboard needs focus/permission; the returned + logged summary is the source of truth */
     }
-  };
-
-  const downscale = (src: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement => {
-    const scale = Math.min(1, maxWidth / src.width);
-    const off = document.createElement('canvas');
-    off.width = Math.max(1, Math.round(src.width * scale));
-    off.height = Math.max(1, Math.round(src.height * scale));
-    off.getContext('2d')?.drawImage(src, 0, 0, off.width, off.height);
-    return off;
-  };
-
-  const renderToCanvas = (maxWidth: number): HTMLCanvasElement => {
-    syncCamera();
-    // Re-place the sun/moon/stars for the (possibly just-moved) camera before this one-off render,
-    // since the rAF loop's update may be throttled in a headless/background tab.
-    celestial.update(daynight.time, renderer.camera.position);
-    // Headless preview tabs can report a 0×0 viewport, which yields a 0-sized canvas and an opaque
-    // drawImage error downstream. Fall back to a sane size so capture still works.
-    const el = renderer.domElement;
-    if (!el.width || !el.height) {
-      renderer.resize(
-        Math.max(window.innerWidth || 0, 960),
-        Math.max(window.innerHeight || 0, 540),
-      );
-    }
-    renderer.renderOnce();
-    if (!renderer.domElement.width || !renderer.domElement.height)
-      throw new Error(
-        'render canvas is 0×0 — resize the preview viewport (e.g. 1200×800) and retry',
-      );
-    return downscale(renderer.domElement, maxWidth);
-  };
-
-  const view = (maxWidth = 720, quality = 0.6): string =>
-    renderToCanvas(maxWidth).toDataURL('image/jpeg', quality);
-
-  let html2canvas: Html2Canvas | undefined;
-  const shot = async (maxWidth = 720, quality = 0.65): Promise<string> => {
-    const frame = renderToCanvas(maxWidth);
-    try {
-      if (!html2canvas) {
-        const mod = await import(/* @vite-ignore */ 'https://esm.sh/html2canvas@1.4.1');
-        html2canvas = mod.default;
-      }
-      const hud = document.getElementById('creative-ui');
-      if (hud) {
-        const rendered = await html2canvas(hud, { backgroundColor: null, logging: false });
-        frame.getContext('2d')?.drawImage(rendered, 0, 0, frame.width, frame.height);
-      }
-    } catch (err) {
-      console.warn('Voxel Realm: HUD composite failed, returning world-only frame', err);
-    }
-    return frame.toDataURL('image/jpeg', quality);
-  };
-
-  let lastSavedPath = '';
-  /** Capture and write the JPEG to .captures/<name>.jpg via the dev server; returns the path. */
-  const save = async (
-    name = 'frame',
-    opts: { hud?: boolean; maxWidth?: number; quality?: number } = {},
-  ): Promise<string> => {
-    const dataUrl = opts.hud
-      ? await shot(opts.maxWidth ?? 960, opts.quality ?? 0.7)
-      : view(opts.maxWidth ?? 960, opts.quality ?? 0.7);
-    const res = await fetch('/__capture', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, dataUrl }),
-    });
-    if (!res.ok)
-      throw new Error(`Voxel Realm: capture save failed (${res.status} ${res.statusText})`);
-    const { path } = (await res.json()) as { path: string };
-    lastSavedPath = path;
-    return path;
   };
 
   const lookAt = (tx: number, ty: number, tz: number): void => {
@@ -634,7 +552,7 @@ export function installDevControls(ctx: DevControlsContext): void {
     shot,
     save,
     /** Path of the most recent save()/capture write (synchronous; '' before the first capture). */
-    lastCapturePath: (): string => lastSavedPath,
+    lastCapturePath: capture.lastPath,
     capture: {
       overview: async (
         name: string,

@@ -4,6 +4,7 @@ import type { Prefab } from '../core/Prefab';
 import { renderBlueprintThumbnail, THUMBNAIL_SIZE } from './blueprintThumbnail';
 import { renderBlockIcon } from './blockIcon';
 import { TUNNEL_SIZES, TUNNEL_LENGTHS, TUNNEL_PATHS, type TunnelConfig } from '../edit/Brushes';
+import { focusableElementsWithin, setElementInert, wrapFocusIndex } from './OverlayFocus';
 import {
   swatchFlatColor,
   buildIcon,
@@ -20,6 +21,7 @@ import {
 
 // Re-exported so existing importers of the swatch color keep working after the icon extraction.
 export { swatchFlatColor } from './creativeIcons';
+export { wrapFocusIndex } from './OverlayFocus';
 
 /** One button in a confirm dialog; `danger` renders in the destructive style. */
 export interface DialogAction {
@@ -311,15 +313,6 @@ export interface CreativeUi {
 
 const STATUS_VISIBLE_MS = 1600;
 const SAVE_STATUS_SAVED_MS = 1400; // how long the "Saved" confirmation lingers before fading
-const FOCUSABLE_SELECTOR = [
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  'summary',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
 export type StatusRailSlot = 'loading' | 'challenge' | 'tour' | 'waypoint';
 
 /** Small pure helper for the HUD rail: only the highest-priority active item should be visible. */
@@ -356,13 +349,6 @@ export function summarizeWorldInfo(info: WorldInfo): {
   };
 }
 
-/** Wraps focus forward/backward within a list size; exported for node-only focus-trap tests. */
-export function wrapFocusIndex(index: number, count: number, direction: 1 | -1): number {
-  if (count <= 0) return -1;
-  if (index < 0 || index >= count) return direction === 1 ? 0 : count - 1;
-  return (index + direction + count) % count;
-}
-
 /**
  * The brush's auto-picked target: the first family other than `from` (so the dialog never
  * opens as a no-op from === to pair). Exported so node-only tests can cover it.
@@ -376,19 +362,6 @@ function button(text: string): HTMLButtonElement {
   b.type = 'button';
   b.textContent = text;
   return b;
-}
-
-function focusableElementsWithin(container: HTMLElement): HTMLElement[] {
-  return [...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter((node) => {
-    if (node.hasAttribute('hidden') || node.getAttribute('aria-hidden') === 'true') return false;
-    const closedDetails = node.closest('details:not([open])');
-    if (!closedDetails) return true;
-    return node.tagName === 'SUMMARY' && node.parentElement === closedDetails;
-  });
-}
-
-function setElementInert(element: HTMLElement, inert: boolean): void {
-  (element as HTMLElement & { inert?: boolean }).inert = inert;
 }
 
 /**

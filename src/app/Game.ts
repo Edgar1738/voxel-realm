@@ -83,6 +83,7 @@ import {
   CHUNK_SIZE_X,
 } from '../core/constants';
 import { ViewDistanceGovernor } from './ViewDistanceGovernor';
+import { ViewBob } from './ViewBob';
 import { applyFogRange, fogRangeFor } from '../render/fog';
 import { applyHeadlamp } from '../render/headlamp';
 import type { Vec3, WorldSeed, BlockId } from '../core/types';
@@ -1702,8 +1703,7 @@ export class Game {
         /* ignore persistence failure */
       }
     };
-    let bobPhase = 0;
-    let bobAmp = 0;
+    const viewBob = new ViewBob();
     // Previous horizontal position, so the avatar's walk cycle can be driven by ground covered.
     let avatarPrevX = player.position.x;
     let avatarPrevZ = player.position.z;
@@ -1796,18 +1796,15 @@ export class Game {
       // View bob: stride-driven sway while walking on the ground, first-person only. The
       // amplitude eases in/out so starts and stops never snap the camera; phase advances by
       // ground covered, so bob speed tracks walk vs sprint automatically.
-      const bobTarget =
-        viewBobOn && player.grounded && rig.mode === 'first' && avatarDh > 0.0005 ? 1 : 0;
-      bobAmp += (bobTarget - bobAmp) * Math.min(1, cdt * 8);
-      let bobY = 0;
-      if (bobAmp > 0.002) {
-        bobPhase += avatarDh * 1.7;
-        const lateral = Math.cos(bobPhase) * 0.022 * bobAmp;
-        bobY = Math.sin(bobPhase * 2) * 0.042 * bobAmp;
-        viewEye.y += bobY;
-        viewEye.x += Math.cos(rig.yaw) * lateral;
-        viewEye.z += -Math.sin(rig.yaw) * lateral;
-      }
+      const bob = viewBob.step(
+        cdt,
+        avatarDh,
+        viewBobOn && player.grounded && rig.mode === 'first',
+        rig.yaw,
+      );
+      viewEye.x += bob.x;
+      viewEye.y += bob.y;
+      viewEye.z += bob.z;
       // Third-person: trail the camera behind the eye, pulled in short of any wall it would clip.
       let thirdDistance = THIRD_PERSON_DISTANCE;
       if (rig.mode === 'third' && !rig.photoMode) {
@@ -1830,7 +1827,7 @@ export class Game {
         visible: rig.mode === 'first' && rig.locked && !ui.isInventoryOpen(),
         yaw: rig.yaw,
         pitch: rig.pitch,
-        bobY,
+        bobY: bob.y,
       });
       avatar.setEquipmentVisible(experience === 'play');
       avatar.update(player.position, rig.yaw, rig.mode === 'third', { dh: avatarDh, dt: cdt });
