@@ -166,6 +166,22 @@
       ],
       "port": 5240,
       "autoPort": false
+    },
+    {
+      "name": "stonehaven-m4",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        ".claude/worktrees/stonehaven-m4",
+        "--",
+        "--port",
+        "5241",
+        "--strictPort"
+      ],
+      "port": 5241,
+      "autoPort": false
     }
   ]
 }
