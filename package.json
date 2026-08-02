@@ -9,6 +9,7 @@
     "budget:bundle": "node --disable-warning=ExperimentalWarning scripts/checkBundleBudget.ts",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:fast": "vitest run --config vitest.fast.config.ts",
     "test:watch": "vitest",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",

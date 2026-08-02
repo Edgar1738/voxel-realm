@@ -117,7 +117,14 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
   },
   {
     heading: 'Blocks',
-    lines: ['1-9 hotbar slot', 'Mouse wheel cycle', 'I inventory', 'V placement ghost'],
+    lines: [
+      '1-9 hotbar slot',
+      'Mouse wheel cycle',
+      'I inventory',
+      'V placement ghost',
+      'Q shape facing',
+      'J shape half',
+    ],
   },
   {
     heading: 'Build tools',
@@ -130,6 +137,7 @@ export const MENU_HOTKEY_GROUPS: readonly HotkeyGroup[] = [
       '[ ] rotate',
       'U mirror',
       '+/- array count',
+      'J grid snap',
       'Arrows / PgUp-Dn nudge',
     ],
   },

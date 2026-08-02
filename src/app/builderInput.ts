@@ -6,11 +6,14 @@ export type BuilderIntent =
   | 'clear'
   | 'replace'
   | 'copy'
+  | 'cyclePlacementFacing'
+  | 'cyclePlacementHalf'
   | 'rotateCW'
   | 'rotateCCW'
   | 'mirror'
   | 'arrayInc'
   | 'arrayDec'
+  | 'cycleGrid'
   | 'nudgeXPlus'
   | 'nudgeXMinus'
   | 'nudgeYPlus'
@@ -54,6 +57,10 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
         return 'replace';
       case 'KeyC':
         return 'copy';
+      case 'KeyQ':
+        return 'cyclePlacementFacing';
+      case 'KeyJ':
+        return 'cyclePlacementHalf';
       case 'Escape':
         return 'cancel';
       default:
@@ -75,6 +82,8 @@ export function resolveBuilderIntent(code: string, mode: BuilderMode): BuilderIn
       case 'Minus':
       case 'NumpadSubtract':
         return 'arrayDec';
+      case 'KeyJ':
+        return 'cycleGrid';
       // Whole-block paste nudge: arrows move on the X/Z plane, Page keys change height.
       case 'ArrowRight':
         return 'nudgeXPlus';

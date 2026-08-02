@@ -34,6 +34,19 @@ export function clampToRange(pos: Vec3, anchor: Vec3, range: number): Vec3 {
 
 /** How far the third-person camera trails behind the eye, before obstruction clipping. */
 export const THIRD_PERSON_DISTANCE = 4;
+export const THIRD_PERSON_RECOVERY_RATE = 8;
+
+/** Pull inward immediately for safety, then ease outward at a frame-rate-independent rate. */
+export function smoothThirdPersonDistance(
+  current: number,
+  target: number,
+  dt: number,
+  recoveryRate = THIRD_PERSON_RECOVERY_RATE,
+): number {
+  if (!Number.isFinite(current) || current < 0 || target <= current) return target;
+  const alpha = 1 - Math.exp(-Math.max(0, recoveryRate) * Math.max(0, dt));
+  return current + (target - current) * alpha;
+}
 
 /** Which viewpoint the player camera uses; photo mode is tracked separately. */
 export type CameraMode = 'first' | 'third';
@@ -77,6 +90,8 @@ export class CameraRig {
   private photoReturnMode: CameraMode = 'third';
   /** Max camera distance from the player's eye; Game keeps this inside the loaded chunk ring. */
   private photoRange = Infinity;
+  private smoothedThirdDistance = THIRD_PERSON_DISTANCE;
+  private thirdViewInitialized = false;
 
   /** Detached-camera look, for aiming scene-direction keys (NPC pose/animation) in photo mode. */
   photoLook(): { yaw: number; pitch: number } {
@@ -268,6 +283,7 @@ export class CameraRig {
   toggleMode(): CameraMode {
     if (this.photoMode) this.exitPhotoMode();
     this.mode = this.mode === 'first' ? 'third' : 'first';
+    this.thirdViewInitialized = false;
     return this.mode;
   }
 
@@ -366,7 +382,7 @@ export class CameraRig {
    * sits the camera at the eye — byte-identical to {@link applyEye}. Third-person pulls it
    * straight back along −look by `thirdDistance` (already obstruction-clipped by the caller).
    */
-  applyPlayerView(eye: Vec3, thirdDistance = THIRD_PERSON_DISTANCE): void {
+  applyPlayerView(eye: Vec3, thirdDistance = THIRD_PERSON_DISTANCE, dt = 1 / 60): void {
     if (this.photoMode) {
       this.updatePhotoCamera(eye);
       return;
@@ -374,14 +390,25 @@ export class CameraRig {
     this.euler.set(this.pitch, this.yaw, 0);
     this.camera.quaternion.setFromEuler(this.euler);
     if (this.mode === 'first') {
+      this.thirdViewInitialized = false;
       this.camera.position.set(eye.x, eye.y, eye.z);
       return;
     }
+    if (!this.thirdViewInitialized) {
+      this.smoothedThirdDistance = thirdDistance;
+      this.thirdViewInitialized = true;
+    } else {
+      this.smoothedThirdDistance = smoothThirdPersonDistance(
+        this.smoothedThirdDistance,
+        thirdDistance,
+        dt,
+      );
+    }
     const dir = lookDirectionFromYawPitch(this.yaw, this.pitch);
     this.camera.position.set(
-      eye.x - dir.x * thirdDistance,
-      eye.y - dir.y * thirdDistance,
-      eye.z - dir.z * thirdDistance,
+      eye.x - dir.x * this.smoothedThirdDistance,
+      eye.y - dir.y * this.smoothedThirdDistance,
+      eye.z - dir.z * this.smoothedThirdDistance,
     );
   }
 }

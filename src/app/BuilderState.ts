@@ -17,6 +17,9 @@ interface Vec3i {
   z: number;
 }
 
+export type PasteGridSize = 1 | 2 | 4 | 8;
+const PASTE_GRID_SIZES: readonly PasteGridSize[] = [1, 2, 4, 8];
+
 /** All builder-tool state and the geometry it derives. No three.js, no DOM — pure and testable. */
 export class BuilderState {
   mode: BuilderMode = 'off';
@@ -32,6 +35,8 @@ export class BuilderState {
   };
   /** Whole-block offset dialed in on top of the live aim so a paste can be placed precisely. */
   nudge: Vec3i = { x: 0, y: 0, z: 0 };
+  /** Horizontal world-grid spacing for paste origins. One means ordinary block placement. */
+  pasteGrid: PasteGridSize = 1;
   /**
    * Bumped whenever the transformed clipboard's CONTENT changes (new clipboard, rotate,
    * mirror, array) — the paste ghost rebuilds its voxel mesh only when this moves, and
@@ -106,6 +111,24 @@ export class BuilderState {
   /** Apply the current nudge offset to a base origin (returns a new point; never mutates). */
   applyNudge(base: Vec3i): Vec3i {
     return { x: base.x + this.nudge.x, y: base.y + this.nudge.y, z: base.z + this.nudge.z };
+  }
+
+  /** Snap the aimed cell to the horizontal world grid, then apply precise whole-block nudge. */
+  pasteOrigin(base: Vec3i): Vec3i {
+    const grid = this.pasteGrid;
+    return {
+      x: Math.round(base.x / grid) * grid + this.nudge.x,
+      y: base.y + this.nudge.y,
+      z: Math.round(base.z / grid) * grid + this.nudge.z,
+    };
+  }
+
+  /** Cycle through practical structure-layout grids: block, 2, 4, then 8 blocks. */
+  cyclePasteGrid(): PasteGridSize {
+    const index = PASTE_GRID_SIZES.indexOf(this.pasteGrid);
+    this.pasteGrid = PASTE_GRID_SIZES[(index + 1) % PASTE_GRID_SIZES.length];
+    this.resetNudge();
+    return this.pasteGrid;
   }
 
   rotate(delta: number): void {

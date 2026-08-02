@@ -6,6 +6,25 @@ export interface PlacementHitInfo {
   point: { x: number; y: number; z: number };
 }
 
+export interface PlacementOverrides {
+  /** Forced N/E/S/W facing; undefined keeps camera-relative automatic placement. */
+  facing?: number;
+  /** Forced bottom/top half; undefined keeps hit-derived automatic placement. */
+  half?: 0 | 1;
+}
+
+/** Cycle Auto -> N -> E -> S -> W -> Auto. */
+export function cyclePlacementFacing(facing: number | undefined): number | undefined {
+  if (facing === undefined) return 0;
+  return facing >= 3 ? undefined : facing + 1;
+}
+
+/** Cycle Auto -> Bottom -> Top -> Auto. */
+export function cyclePlacementHalf(half: 0 | 1 | undefined): 0 | 1 | undefined {
+  if (half === undefined) return 0;
+  return half === 0 ? 1 : undefined;
+}
+
 /**
  * Which vertical half a placement targets: clicking a top face gives the bottom half, an
  * underside gives the top half, and a side face picks by where the ray crossed the face
@@ -24,10 +43,16 @@ export function halfFromHit(hit: PlacementHitInfo): number {
  * face (facing out along its normal; floor/ceiling clicks face back toward the player).
  * Every other shape is stateless (0).
  */
-export function placementState(shape: string, yaw: number, hit?: PlacementHitInfo): number {
-  const half = hit ? halfFromHit(hit) : 0;
-  if (shape === 'stair') return packState(facingFromYaw(yaw), half);
-  if (shape === 'gate' || shape === 'door') return packState(facingFromYaw(yaw), 0);
+export function placementState(
+  shape: string,
+  yaw: number,
+  hit?: PlacementHitInfo,
+  overrides: PlacementOverrides = {},
+): number {
+  const half = overrides.half ?? (hit ? halfFromHit(hit) : 0);
+  const facing = overrides.facing ?? facingFromYaw(yaw);
+  if (shape === 'stair') return packState(facing, half);
+  if (shape === 'gate' || shape === 'door') return packState(facing, 0);
   if (shape === 'slab') return packState(0, half);
   if (shape === 'ladder') {
     const fromNormal = hit ? facingFromDir(hit.normal.x, hit.normal.z) : undefined;

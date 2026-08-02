@@ -11,6 +11,19 @@ region tools (fill/clear/replace/copy), and paste with rotate/mirror/array. For 
 capture a selection as a **blueprint** — blueprints are portable, position-independent prefabs
 (same shape as `Prefab`) and show up in the categorized blueprint catalog.
 
+Engine-authored prefabs may declare named `anchors` and `sockets`, each with a cell position and an
+optional N/E/S/W facing. `connectPrefabs(base, socketId, addition, anchorId)` aligns the named
+points, rotates opposing facings together, consumes the joined points, and leaves the remaining
+sockets available for chained roads, walls, rooms, or furniture kits. Prefab rotate, mirror,
+normalize, and repeat operations preserve this metadata.
+
+World generators can consume coherent weighted libraries through `PrefabKits.ts` rather than
+assembling ad-hoc prefab arrays. `kitPrefabs(SETTLEMENT_KIT, roles)` and
+`kitPrefabs(FORTIFICATION_KIT, roles)` select functional subsets such as dwellings, civic pieces,
+walls, gates, or ruins while preserving deterministic scatter behavior.
+`FURNITURE_KIT` contains the promoted Frostvale bed, counter, crates, hearth, lantern post, and
+table set; the same pieces are available in the categorized blueprint catalog for in-game use.
+
 Console helpers for precise work and getting around:
 
 ```js

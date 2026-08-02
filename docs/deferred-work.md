@@ -4,33 +4,13 @@ The recent polish/refactor pass (branch `claude/codex-inspection-review-0l07b5`)
 **v1** of each track from the codex inspections. This is the honest list of what was deliberately
 scoped **out** of those v1s — recorded here so it survives in the repo rather than in chat.
 
-## Render / graphics
-
-- **Water shoreline + foam.** The water shader has depth tint / fresnel / sun glint, but no shoreline
-  treatment or surface foam.
-
 ## Structures / worlds
 
-- **Prefab catalog v2:** anchors/sockets, variants, and generated thumbnails. The v1 catalog
-  (`src/app/curatedBlueprints.ts`) has id/name/category/tags/description + validation only; the
-  `Prefab` type (`src/core/Prefab.ts`) is unchanged.
-- **Reusable kits** and **road/path planning** in `src/worldgen/Structures.ts` (only static road
-  prefabs exist today). Frostvale's furniture kit ships as blueprint JSONs
-  (`docs/worlds/wip/blueprints/`) — engine-side kit support is still missing.
 - **Per-chunk streamed world delivery.** Shipped worlds now use the compact VRW1 binary format.
   Loading is still whole-world; add range/per-chunk delivery only when measured world size or
-  network latency makes it necessary.
-
-## Builder / UI
-
-- **Full paste preview:** the paste ghost (`src/render/PasteGhost.ts`) is still a translucent
-  bounding box, not a per-voxel preview. Also missing: grid/snap controls and a clearer
-  block-state (stairs/gates/slabs) placement UI. (Whole-block nudge + selection-size readout landed.)
-
-## Showcase / camera
-
-- **Third-person camera smoothing.** `CameraRig.ts` still uses a fixed trailing offset. Photo mode
-  and shareable captures have landed.
+  network latency makes it necessary. The 2026-08-01 Ember Spire production benchmark found its
+  1.5 KiB package decoded in under 1 ms and initial streaming remained generation/meshing-bound,
+  so this is not an Ember integration requirement.
 
 ## Dev / infra
 
@@ -44,4 +24,5 @@ scoped **out** of those v1s — recorded here so it survives in the repo rather 
   state.
 - **Production COOP/COEP hosting:** GitHub Pages remains the measured default; switch only when a
   production benchmark shows its main-thread mesh fallback missing the frame-time target. See the
-  README deployment section.
+  README deployment section. Ember Spire met its first-frame and initial-stream budgets in the
+  headed production benchmark without alternate hosting.

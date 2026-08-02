@@ -41,7 +41,10 @@ export class GenWorkerPool implements GenScheduler {
       sharedBuffers: sharedChunkBuffersEnabled(),
     };
     for (let i = 0; i < count; i++) {
-      const worker = new Worker(new URL('./genWorker.ts', import.meta.url), { type: 'module' });
+      const worker =
+        preset === 'ember-spire'
+          ? new Worker(new URL('./emberGenWorker.ts', import.meta.url), { type: 'module' })
+          : new Worker(new URL('./genWorker.ts', import.meta.url), { type: 'module' });
       worker.onmessage = (event: MessageEvent<GenJobResult>) => this.onResult(worker, event.data);
       worker.onerror = (event) =>
         this.onError(worker, new Error(event.message || 'gen worker error'));

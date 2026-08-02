@@ -109,7 +109,12 @@ import {
   saveReach,
   type Tool,
 } from './input';
-import { placementState } from './placement';
+import {
+  cyclePlacementFacing,
+  cyclePlacementHalf,
+  placementState,
+  type PlacementOverrides,
+} from './placement';
 import type { PreviewDeps } from './targetPreview';
 import { resolveTarget } from './targetPreview';
 import { raycastVoxels } from '../edit/VoxelRaycast';
@@ -764,10 +769,11 @@ export class Game {
       setStatus(batch ? `${verb} ${batch.changes.length} voxel(s)` : 'No editable voxels');
     };
 
+    const placementOverrides: PlacementOverrides = {};
     const previewDeps: PreviewDeps = {
       isToggleable: (id) => registry.isToggleable(id),
       shapeOf: (id) => registry.shape(id),
-      placementState: (shape, yaw, hit) => placementState(shape, yaw, hit),
+      placementState: (shape, yaw, hit) => placementState(shape, yaw, hit, placementOverrides),
       canPlaceAt: (x, y, z) => manager.canApply([{ x, y, z }]),
     };
 
@@ -1393,7 +1399,7 @@ export class Game {
     /** Paste origin (min corner) = the aim-adjacent empty cell, shifted by the dialed-in nudge. */
     const pasteOrigin = (): { x: number; y: number; z: number } | undefined => {
       const aim = builderAim();
-      return aim ? builder.applyNudge(aim.adjacent) : undefined;
+      return aim ? builder.pasteOrigin(aim.adjacent) : undefined;
     };
 
     /** Preload the chunks under a world XZ box; on the manager's over-size throw, warn and signal abort. */
@@ -1471,6 +1477,33 @@ export class Game {
           setStatus(`Copied ${clip.blocks.length} block(s) — aim and click to paste`);
           return;
         }
+        case 'cyclePlacementFacing': {
+          const shape = registry.shape(inventory.selectedBlock);
+          if (shape !== 'stair' && shape !== 'gate' && shape !== 'door') {
+            return void setStatus('Facing override applies to stairs, gates, and doors');
+          }
+          const facing = cyclePlacementFacing(placementOverrides.facing);
+          if (facing === undefined) delete placementOverrides.facing;
+          else placementOverrides.facing = facing;
+          const labels = ['North', 'East', 'South', 'West'];
+          setStatus(
+            `Placement facing: ${placementOverrides.facing === undefined ? 'Auto' : labels[placementOverrides.facing]}`,
+          );
+          return;
+        }
+        case 'cyclePlacementHalf': {
+          const shape = registry.shape(inventory.selectedBlock);
+          if (shape !== 'stair' && shape !== 'slab') {
+            return void setStatus('Half override applies to stairs and slabs');
+          }
+          const half = cyclePlacementHalf(placementOverrides.half);
+          if (half === undefined) delete placementOverrides.half;
+          else placementOverrides.half = half;
+          setStatus(
+            `Placement half: ${placementOverrides.half === undefined ? 'Auto' : placementOverrides.half === 0 ? 'Bottom' : 'Top'}`,
+          );
+          return;
+        }
         case 'rotateCW':
           builder.rotate(1);
           setStatus(`Rotated (${builder.transform.turns * 90}°)`);
@@ -1490,6 +1523,11 @@ export class Game {
           const f = aimRay().dir;
           builder.arrayAdjust(intent === 'arrayInc' ? 1 : -1, dominantHorizontalAxis(f.x, f.z));
           setStatus(`Array x${builder.transform.arrayCount}`);
+          return;
+        }
+        case 'cycleGrid': {
+          const grid = builder.cyclePasteGrid();
+          setStatus(grid === 1 ? 'Paste grid: block snap' : `Paste grid: ${grid}\u00d7${grid}`);
           return;
         }
         case 'nudgeReset':
@@ -1592,7 +1630,7 @@ export class Game {
           if (builder.mode === 'pasting') {
             const p = builder.transformedClipboard();
             if (!p) return;
-            const origin = builder.applyNudge(hit.adjacent);
+            const origin = builder.pasteOrigin(hit.adjacent);
             if (
               !preloadOrWarn(origin.x, origin.z, origin.x + p.dims[0] - 1, origin.z + p.dims[2] - 1)
             )
@@ -1716,11 +1754,19 @@ export class Game {
 
     bootStats.end('systems+ui');
     // Report hook for scripts/benchmarks (all builds; overwritten by the next boot).
+    const publishBootStats = (): void => {
+      if (document.documentElement) {
+        document.documentElement.dataset.vrBootStats = JSON.stringify(bootStats.report());
+      }
+    };
     (window as typeof window & { __vrBootStats?: () => BootReport }).__vrBootStats = () =>
       bootStats.report();
+    publishBootStats();
 
     renderer.start((dt) => {
+      const firstFrame = !bootStats.has('first-frame');
       bootStats.event('first-frame');
+      if (firstFrame) publishBootStats();
       const cdt = Math.min(dt, MAX_DT);
       if (import.meta.env.DEV) devRoam?.step(cdt);
       daynight.advance(cdt);
@@ -1819,7 +1865,7 @@ export class Game {
       // Streaming stays player-anchored, so cap the photo camera one chunk inside the loaded
       // ring — past it there is only fog and ungenerated void.
       rig.setPhotoRange(Math.max(CHUNK_SIZE_X, (manager.viewDistance - 1) * CHUNK_SIZE_X));
-      rig.applyPlayerView(viewEye, thirdDistance);
+      rig.applyPlayerView(viewEye, thirdDistance, cdt);
       // First-person hand: build keeps the selected hotbar block/tool preview; play swaps to
       // the shared main/off-hand equipment without changing what block edits place.
       heldBlock.setBlock(inventory.selectedBlock);
@@ -1911,6 +1957,7 @@ export class Game {
         manager.setStreamingBudgets(GEN_BUDGET, MESH_BUDGET, FRAME_WORK_MS);
         ui.setLoadingHud(undefined);
         bootStats.event('streamed');
+        publishBootStats();
         if (import.meta.env.DEV) console.info('[vr] boot', bootStats.report());
       }
       // Streaming status: honest progress while the first ring fills (delayed slightly so
@@ -1952,6 +1999,7 @@ export class Game {
             player.flying = false;
             settlePending = false;
             bootStats.event('spawn-settled');
+            publishBootStats();
           }
         }
       }

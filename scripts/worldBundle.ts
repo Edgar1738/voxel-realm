@@ -7,6 +7,7 @@
 // the manifest (and superseded .json bundles), so public/worlds/ always mirrors the manifest.
 //
 //   npm run world:bundle
+//   npm run world:bundle -- --slug ember-spire  # rebuild one package; do not prune others
 
 import {
   readFileSync,
@@ -30,6 +31,8 @@ const cwd = process.cwd();
 const manifestPath = resolve(cwd, 'world-manifest.json');
 const savesDir = resolve(cwd, '.saves');
 const outDir = resolve(cwd, 'public', 'worlds');
+const slugFlag = process.argv.indexOf('--slug');
+const targetSlug = slugFlag >= 0 ? process.argv[slugFlag + 1] : undefined;
 
 if (!existsSync(manifestPath)) {
   console.error('world:bundle: no world-manifest.json — nothing to bundle.');
@@ -46,9 +49,17 @@ if (manifestProblems.length > 0) {
 
 mkdirSync(outDir, { recursive: true });
 
+const entries = targetSlug
+  ? manifest.worlds.filter((entry) => entry.slug === targetSlug)
+  : manifest.worlds;
+if (targetSlug && entries.length === 0) {
+  console.error(`world:bundle: slug not found in manifest: ${targetSlug}`);
+  process.exit(1);
+}
+
 let failed = false;
 const bundled = new Set<string>();
-for (const entry of manifest.worlds) {
+for (const entry of entries) {
   const saveFile = join(savesDir, `${entry.slug}.json`);
   if (!existsSync(saveFile)) {
     console.error(`world:bundle: "${entry.slug}": save not found: ${saveFile}`);
@@ -86,7 +97,7 @@ for (const entry of manifest.worlds) {
 
 // A bundle whose slug left the manifest must not keep shipping; superseded .json bundles too.
 // Only prune after a fully successful run — a partial failure must not delete valid bundles.
-if (!failed) {
+if (!failed && !targetSlug) {
   for (const file of readdirSync(outDir)) {
     if ((file.endsWith('.json') || file.endsWith('.vrw')) && !bundled.has(file)) {
       unlinkSync(join(outDir, file));
@@ -106,4 +117,4 @@ function deltasEqual(a: WorldDeltas, b: WorldDeltas): boolean {
 }
 
 if (failed) process.exit(1);
-console.log(`world:bundle: ${bundled.size}/${manifest.worlds.length} world(s) -> public/worlds/`);
+console.log(`world:bundle: ${bundled.size}/${entries.length} world(s) -> public/worlds/`);

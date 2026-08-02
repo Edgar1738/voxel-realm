@@ -4,6 +4,7 @@
 // stats, then archive it into the Obsidian vault via the shared archive logic.
 //
 //   npm run world:package -- --save moonspire-realm --title "Moonspire Realm" --port 5191
+//   npm run world:package -- --save ember-spire --title "Ember Spire" --manifest --manifest-only
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
@@ -54,7 +55,7 @@ const title = getFlag(args, 'title');
 
 if (!saveName || !title) {
   console.error(
-    'Usage: npm run world:package -- --save <save-name> --title "<title>" [--captures a.jpg,b.png] [--port 5175]',
+    'Usage: npm run world:package -- --save <save-name> --title "<title>" [--manifest [path]] [--manifest-only] [--captures a.jpg,b.png] [--port 5175]',
   );
   process.exit(1);
 }
@@ -138,6 +139,17 @@ if (args.includes('--manifest')) {
   }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`  manifest: ${manifestPath} (${manifest.worlds.length} world(s))`);
+}
+
+// CI/integration preparation often needs a validated manifest entry without writing to the
+// external Obsidian archive. Keep that explicit: ordinary world:package behavior is unchanged.
+if (args.includes('--manifest-only')) {
+  if (!args.includes('--manifest')) {
+    console.error('world:package: --manifest-only requires --manifest');
+    process.exit(1);
+  }
+  console.log('  archive: skipped (--manifest-only)');
+  process.exit(0);
 }
 
 const capturesArg = getFlag(args, 'captures');

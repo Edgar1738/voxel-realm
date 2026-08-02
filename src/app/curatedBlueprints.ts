@@ -43,6 +43,14 @@ import {
   catacombNook,
 } from '../worldgen/dungeonPrefabs';
 import { lighthouse, rowboat, shipwreck, fishingHut, buoy } from '../worldgen/coastalPrefabs';
+import {
+  alpineBed,
+  alpineCounter,
+  alpineHearth,
+  alpineLanternPost,
+  alpineTableSet,
+  crateStack,
+} from '../worldgen/furniturePrefabs';
 
 /** The blueprint catalog tabs; `Saved` holds only user blueprints. */
 export type BlueprintCategory =
@@ -81,6 +89,10 @@ export interface PrefabCatalogEntry {
   tags: readonly string[];
   /** One-line description for tooltips/manifests. */
   description: string;
+  /** Stable family id for interchangeable size/material/style alternatives. */
+  variantFamily?: string;
+  /** Human-facing choice inside `variantFamily` (for example "Small" or "Large"). */
+  variant?: string;
   /** Builds the prefab geometry on demand (builders are cheap and position-independent). */
   build: () => Prefab;
 }
@@ -309,6 +321,54 @@ export const PREFAB_CATALOG: readonly PrefabCatalogEntry[] = [
     description: 'A wooden waterside dock.',
     build: dock,
   },
+  {
+    id: 'alpine-bed',
+    name: 'Alpine Bed',
+    category: 'Utility',
+    tags: ['furniture', 'interior', 'bed', 'alpine'],
+    description: 'A compact timber bed with a snow-white blanket.',
+    build: alpineBed,
+  },
+  {
+    id: 'alpine-counter',
+    name: 'Alpine Counter',
+    category: 'Utility',
+    tags: ['furniture', 'interior', 'counter', 'alpine'],
+    description: 'A two-wide plank counter with slab worktop.',
+    build: alpineCounter,
+  },
+  {
+    id: 'crate-stack',
+    name: 'Crate Stack',
+    category: 'Utility',
+    tags: ['furniture', 'storage', 'crate'],
+    description: 'A small irregular stack of wooden crates.',
+    build: crateStack,
+  },
+  {
+    id: 'alpine-hearth',
+    name: 'Alpine Hearth',
+    category: 'Utility',
+    tags: ['furniture', 'interior', 'fireplace', 'alpine'],
+    description: 'A broad masonry hearth with a brick firebox.',
+    build: alpineHearth,
+  },
+  {
+    id: 'alpine-lantern-post',
+    name: 'Alpine Lantern Post',
+    category: 'Utility',
+    tags: ['furniture', 'light', 'lantern', 'alpine'],
+    description: 'A compact fence-post lantern for paths or interiors.',
+    build: alpineLanternPost,
+  },
+  {
+    id: 'alpine-table-set',
+    name: 'Alpine Table Set',
+    category: 'Utility',
+    tags: ['furniture', 'interior', 'table', 'chairs', 'alpine'],
+    description: 'A dining table with two inward-facing stair chairs.',
+    build: alpineTableSet,
+  },
   // --- Nature ---
   {
     id: 'boulder-cluster',
@@ -340,6 +400,8 @@ export const PREFAB_CATALOG: readonly PrefabCatalogEntry[] = [
     category: 'Nature',
     tags: ['water', 'nature', 'small'],
     description: 'A small water pond.',
+    variantFamily: 'pond',
+    variant: 'Small',
     build: pondSmall,
   },
   {
@@ -348,6 +410,8 @@ export const PREFAB_CATALOG: readonly PrefabCatalogEntry[] = [
     category: 'Nature',
     tags: ['water', 'nature', 'large'],
     description: 'A large water pond.',
+    variantFamily: 'pond',
+    variant: 'Large',
     build: pondLarge,
   },
   // --- Coastal ---
@@ -456,6 +520,23 @@ export function catalogByCategory(category: CuratedCategory): PrefabCatalogEntry
   return PREFAB_CATALOG.filter((e) => e.category === category);
 }
 
+/** Interchangeable entries in a named family, in catalog order. */
+export function catalogVariantFamily(family: string): PrefabCatalogEntry[] {
+  return PREFAB_CATALOG.filter((entry) => entry.variantFamily === family);
+}
+
+/** Every declared variant family and its entries. */
+export function catalogVariantFamilies(): Map<string, PrefabCatalogEntry[]> {
+  const families = new Map<string, PrefabCatalogEntry[]>();
+  for (const entry of PREFAB_CATALOG) {
+    if (!entry.variantFamily) continue;
+    const entries = families.get(entry.variantFamily) ?? [];
+    entries.push(entry);
+    families.set(entry.variantFamily, entries);
+  }
+  return families;
+}
+
 /** Case-insensitive search across id, name, tags and description. Empty query returns all. */
 export function searchCatalog(query: string): PrefabCatalogEntry[] {
   const q = query.trim().toLowerCase();
@@ -465,6 +546,8 @@ export function searchCatalog(query: string): PrefabCatalogEntry[] {
       e.id.toLowerCase().includes(q) ||
       e.name.toLowerCase().includes(q) ||
       e.description.toLowerCase().includes(q) ||
+      e.variantFamily?.toLowerCase().includes(q) ||
+      e.variant?.toLowerCase().includes(q) ||
       e.tags.some((t) => t.toLowerCase().includes(q)),
   );
 }
@@ -482,6 +565,7 @@ export function catalogEntrySize(entry: PrefabCatalogEntry): [number, number, nu
 export function validatePrefabCatalog(): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
+  const seenVariants = new Set<string>();
   for (const e of PREFAB_CATALOG) {
     if (!e.id) problems.push('an entry has an empty id');
     else if (seen.has(e.id)) problems.push(`duplicate id "${e.id}"`);
@@ -490,6 +574,14 @@ export function validatePrefabCatalog(): string[] {
     if (!e.name.trim()) problems.push(`"${e.id}": missing display name`);
     if (e.tags.length === 0) problems.push(`"${e.id}": needs at least one tag`);
     if (!e.description.trim()) problems.push(`"${e.id}": missing description`);
+    if ((e.variantFamily === undefined) !== (e.variant === undefined))
+      problems.push(`"${e.id}": variantFamily and variant must be declared together`);
+    if (e.variantFamily && e.variant) {
+      const key = `${e.variantFamily}\0${e.variant}`;
+      if (seenVariants.has(key))
+        problems.push(`duplicate variant "${e.variantFamily}/${e.variant}"`);
+      seenVariants.add(key);
+    }
     const reason = validatePrefab(e.build());
     if (reason) problems.push(`"${e.id}": invalid prefab (${reason})`);
   }

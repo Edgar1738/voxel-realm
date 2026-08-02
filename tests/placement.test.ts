@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { facingFromYaw, packState } from '../src/world/VoxelState';
-import { placementState, halfFromHit, type PlacementHitInfo } from '../src/app/placement';
+import {
+  cyclePlacementFacing,
+  cyclePlacementHalf,
+  placementState,
+  halfFromHit,
+  type PlacementHitInfo,
+} from '../src/app/placement';
 
 const topFace = (y = 6): PlacementHitInfo => ({
   normal: { x: 0, y: 1, z: 0 },
@@ -53,5 +59,33 @@ describe('placementState', () => {
     expect(placementState('cross', 0, topFace())).toBe(0);
     expect(placementState('stair', 0)).toBe(packState(facingFromYaw(0), 0));
     expect(placementState('slab', 0)).toBe(0);
+  });
+
+  it('explicit overrides win over camera facing and hit-derived half', () => {
+    expect(placementState('stair', 0, topFace(), { facing: 2, half: 1 })).toBe(packState(2, 1));
+    expect(placementState('slab', 0, topFace(), { half: 1 })).toBe(packState(0, 1));
+    expect(placementState('gate', 0, underside(), { facing: 1, half: 1 })).toBe(packState(1, 0));
+  });
+});
+
+describe('placement override controls', () => {
+  it('cycles facing through auto and all cardinal directions', () => {
+    let facing: number | undefined;
+    const values: Array<number | undefined> = [];
+    for (let i = 0; i < 5; i++) {
+      facing = cyclePlacementFacing(facing);
+      values.push(facing);
+    }
+    expect(values).toEqual([0, 1, 2, 3, undefined]);
+  });
+
+  it('cycles half through auto, bottom, and top', () => {
+    let half: 0 | 1 | undefined;
+    half = cyclePlacementHalf(half);
+    expect(half).toBe(0);
+    half = cyclePlacementHalf(half);
+    expect(half).toBe(1);
+    half = cyclePlacementHalf(half);
+    expect(half).toBeUndefined();
   });
 });

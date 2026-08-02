@@ -323,6 +323,21 @@ describe('CameraRig view modes', () => {
     );
   });
 
+  it('pulls inward immediately for obstruction and eases outward after it clears', async () => {
+    vi.resetModules();
+    const { CameraRig } = await import('../src/render/CameraRig');
+    const cam = makeCamera();
+    const rig = new CameraRig(cam as unknown as import('three').PerspectiveCamera, makeCanvas());
+    rig.mode = 'third';
+    rig.applyPlayerView({ x: 0, y: 2, z: 0 }, 4, 1 / 60);
+    rig.applyPlayerView({ x: 0, y: 2, z: 0 }, 1, 1 / 60);
+    expect(cam.position.set).toHaveBeenLastCalledWith(0, 2, 1);
+    rig.applyPlayerView({ x: 0, y: 2, z: 0 }, 4, 1 / 60);
+    const recoveredZ = cam.position.set.mock.calls.at(-1)?.[2];
+    expect(recoveredZ).toBeGreaterThan(1);
+    expect(recoveredZ).toBeLessThan(4);
+  });
+
   it('look direction matches a real three camera forward (first-person view unchanged)', async () => {
     vi.resetModules();
     const { lookDirectionFromYawPitch } = await import('../src/render/CameraRig');
@@ -341,6 +356,17 @@ describe('CameraRig view modes', () => {
       expect(look.y).toBeCloseTo(v.y, 6);
       expect(look.z).toBeCloseTo(v.z, 6);
     }
+  });
+});
+
+describe('third-person distance smoothing', () => {
+  it('is immediate inward and frame-rate independent outward', async () => {
+    const { smoothThirdPersonDistance } = await import('../src/render/CameraRig');
+    expect(smoothThirdPersonDistance(4, 1, 1 / 60)).toBe(1);
+    const oneStep = smoothThirdPersonDistance(1, 4, 1 / 30);
+    const halfStep = smoothThirdPersonDistance(1, 4, 1 / 60);
+    const twoSteps = smoothThirdPersonDistance(halfStep, 4, 1 / 60);
+    expect(twoSteps).toBeCloseTo(oneStep, 10);
   });
 });
 

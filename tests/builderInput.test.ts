@@ -35,6 +35,7 @@ describe('resolveBuilderIntent', () => {
     expect(resolveBuilderIntent('NumpadAdd', 'pasting')).toBe('arrayInc');
     expect(resolveBuilderIntent('Minus', 'pasting')).toBe('arrayDec');
     expect(resolveBuilderIntent('NumpadSubtract', 'pasting')).toBe('arrayDec');
+    expect(resolveBuilderIntent('KeyJ', 'pasting')).toBe('cycleGrid');
     expect(resolveBuilderIntent('Escape', 'pasting')).toBe('cancel');
     expect(resolveBuilderIntent('KeyX', 'pasting')).toBe('none');
   });
@@ -54,6 +55,11 @@ describe('resolveBuilderIntent', () => {
       expect(resolveBuilderIntent(code, 'selecting')).toBe('none');
       expect(resolveBuilderIntent(code, 'off')).toBe('none');
     }
+  });
+
+  it('selecting mode exposes shaped-block orientation controls', () => {
+    expect(resolveBuilderIntent('KeyQ', 'selecting')).toBe('cyclePlacementFacing');
+    expect(resolveBuilderIntent('KeyJ', 'selecting')).toBe('cyclePlacementHalf');
   });
 });
 

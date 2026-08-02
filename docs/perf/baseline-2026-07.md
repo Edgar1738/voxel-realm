@@ -6,7 +6,7 @@ First recorded baseline from the boot telemetry added on `feat/boot-telemetry`
 ## Method
 
 - Machine: ROG (Windows 11), headless Chromium via Playwright (SwiftShader — GPU-free, so
-  absolute frame-rate numbers are pessimistic; use these as *relative* references).
+  absolute frame-rate numbers are pessimistic; use these as _relative_ references).
 - Dev server (`vite`) in the worktree; dev uses `ServerSaveStore` (disk-backed `.saves/`).
 - Each world booted fresh; run ends when the cold-start streaming burst drains
   (`streamed` event, i.e. the initial view-distance ring is generated + meshed).
@@ -15,16 +15,16 @@ First recorded baseline from the boot telemetry added on `feat/boot-telemetry`
 
 ## Results (ms)
 
-| Phase / event | default (procedural) | grand-keep (12 MB save + preset) | giza (7.5 MB, flat) | moonspire (1.4 MB, flat) |
-| --- | ---: | ---: | ---: | ---: |
-| renderer+materials | 52 | 64 | 53 | 54 |
-| load-meta | 30 | 499 | 458 | 92 |
-| load-deltas | 16 | 515 | 132 | 39 |
-| chunk-manager | 0.9 | 1.0 | 0.9 | 0.7 |
-| systems+ui | 70 | 111 | 69 | 82 |
-| **first-frame** | **182** | **1193** | **721** | **271** |
-| spawn-settled | 241 | — (curated spawn) | — | — |
-| **streamed** (burst drained) | **13621** | **25702** | **5132** | **4037** |
+| Phase / event                | default (procedural) | grand-keep (12 MB save + preset) | giza (7.5 MB, flat) | moonspire (1.4 MB, flat) |
+| ---------------------------- | -------------------: | -------------------------------: | ------------------: | -----------------------: |
+| renderer+materials           |                   52 |                               64 |                  53 |                       54 |
+| load-meta                    |                   30 |                              499 |                 458 |                       92 |
+| load-deltas                  |                   16 |                              515 |                 132 |                       39 |
+| chunk-manager                |                  0.9 |                              1.0 |                 0.9 |                      0.7 |
+| systems+ui                   |                   70 |                              111 |                  69 |                       82 |
+| **first-frame**              |              **182** |                         **1193** |             **721** |                  **271** |
+| spawn-settled                |                  241 |                — (curated spawn) |                   — |                        — |
+| **streamed** (burst drained) |            **13621** |                        **25702** |            **5132** |                 **4037** |
 
 ## Reading the numbers
 
@@ -59,13 +59,13 @@ Shipped worlds now bundle as VRW1 binaries (`public/worlds/<slug>.vrw`, ~45–60
 the JSON) and decode via typed-array scan instead of JSON.parse + per-entry validation.
 Production build (`vite preview`), headless Chromium, same machine:
 
-| Phase / event | grand-keep | giza | frostvale-valley |
-| --- | ---: | ---: | ---: |
-| vr:shipped-fetch+bin | 209 | 82 | 89 |
-| vr:shipped-decode | 71 | 38 | 20 |
-| load-meta | 281 | 121 | 109 |
-| load-deltas | 1.2 | 0.4 | 0.4 |
-| **first-frame** | **361** | **194** | **208** |
+| Phase / event        | grand-keep |    giza | frostvale-valley |
+| -------------------- | ---------: | ------: | ---------------: |
+| vr:shipped-fetch+bin |        209 |      82 |               89 |
+| vr:shipped-decode    |         71 |      38 |               20 |
+| load-meta            |        281 |     121 |              109 |
+| load-deltas          |        1.2 |     0.4 |              0.4 |
+| **first-frame**      |    **361** | **194** |          **208** |
 
 Grand-keep's pre-first-frame cost dropped from ~1.2 s (JSON, dev baseline above) to ~0.36 s,
 and its payload from 12 MB to 6.5 MB. First frame is no longer meaningfully proportional to
@@ -77,14 +77,36 @@ Base-chunk generation (terrain + overlay stamps) now runs in a worker pool; the 
 only finalizes (saved deltas + lighting). Requires only `Worker` — no COOP/COEP — so it is
 active on GitHub Pages, unlike mesh workers. Production builds, headed Chromium on the ROG GPU:
 
-| | main | gen-workers |
-| --- | ---: | ---: |
-| grand-keep first-frame | 1374 ms | **441 ms** |
-| grand-keep streamed | 6189 ms | **4782 ms** |
+|                                      |        main |    gen-workers |
+| ------------------------------------ | ----------: | -------------: |
+| grand-keep first-frame               |     1374 ms |     **441 ms** |
+| grand-keep streamed                  |     6189 ms |    **4782 ms** |
 | grand-keep long tasks until streamed | 4 (1348 ms) | **2 (148 ms)** |
-| frostvale streamed | 4378 ms | 3995 ms |
-| frostvale long tasks | 3 (244 ms) | 1 (108 ms) |
+| frostvale streamed                   |     4378 ms |        3995 ms |
+| frostvale long tasks                 |  3 (244 ms) |     1 (108 ms) |
 
 The headline is smoothness: main-thread blocking during the initial fill drops ~90 %.
 Remaining main-thread cost per chunk is delta application + the lighting BFS (a future
 worker candidate) and synchronous meshing where COOP/COEP is absent.
+
+## Update 2026-08-01 — Ember Spire integration
+
+Production build served by `vite preview`, headed in-app Chromium on Edgar's Windows workstation.
+Both worlds used the same browser session after a production rebuild; the run ended at the
+`streamed` event. No browser errors were reported.
+
+| Phase / event            |     default | ember-spire |
+| ------------------------ | ----------: | ----------: |
+| renderer+materials       |       42 ms |      154 ms |
+| load-meta                |       17 ms |       29 ms |
+| load-deltas              |      0.7 ms |      0.5 ms |
+| systems+ui               |       30 ms |       42 ms |
+| VRW1 fetch + binary scan |           — |       28 ms |
+| VRW1 decode              |           — |      0.7 ms |
+| **first-frame**          |  **101 ms** |  **230 ms** |
+| **streamed**             | **2299 ms** | **2945 ms** |
+
+Ember meets the existing runtime budgets. Its 1.5 KiB VRW1 package contains metadata plus a
+validated no-op delta sentinel; generation and meshing dominate the initial stream. Per-chunk
+payload streaming or alternate hosting would not improve the measured bottleneck, so both remain
+conditional follow-ups rather than integration requirements.

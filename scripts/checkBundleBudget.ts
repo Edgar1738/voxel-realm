@@ -33,6 +33,12 @@ const budgets: Budget[] = [
     rawKiB: 40,
     gzipKiB: 15,
   },
+  {
+    label: 'Ember generation worker',
+    match: (name) => /^emberGenWorker-.*\.js$/.test(name),
+    rawKiB: 120,
+    gzipKiB: 40,
+  },
 ];
 
 const kib = (bytes: number): number => bytes / 1024;

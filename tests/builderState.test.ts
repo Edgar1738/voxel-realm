@@ -124,3 +124,30 @@ describe('BuilderState paste nudge', () => {
     expect(b.nudge).toEqual({ x: 0, y: 0, z: 0 });
   });
 });
+
+describe('BuilderState paste grid', () => {
+  it('cycles 1, 2, 4, 8 and resets to block snap', () => {
+    const b = new BuilderState();
+    expect([
+      b.cyclePasteGrid(),
+      b.cyclePasteGrid(),
+      b.cyclePasteGrid(),
+      b.cyclePasteGrid(),
+    ]).toEqual([2, 4, 8, 1]);
+  });
+
+  it('snaps X/Z to the nearest grid line while preserving Y and applying nudge afterward', () => {
+    const b = new BuilderState();
+    b.cyclePasteGrid();
+    b.cyclePasteGrid(); // 4-block grid
+    b.nudgeBy(1, -2, -1);
+    expect(b.pasteOrigin({ x: 6, y: 20, z: -7 })).toEqual({ x: 9, y: 18, z: -9 });
+  });
+
+  it('clears nudge when the grid changes so an old fine offset cannot surprise the user', () => {
+    const b = new BuilderState();
+    b.nudgeBy(3, 2, 1);
+    b.cyclePasteGrid();
+    expect(b.nudge).toEqual({ x: 0, y: 0, z: 0 });
+  });
+});
