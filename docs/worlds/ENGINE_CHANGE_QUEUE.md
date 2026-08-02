@@ -52,8 +52,8 @@ re-merge something that's already in `main` or drag a stale branch across it.
 - **Originating world:** `ember-spire` (`grok/ember-spire`, commit `6034734`)
 - **Files / areas touched:** None identified as a broad engine change. It is a generator/source world; save metadata is not a full chunk bundle.
 - **Reusable vs world-specific:** World-specific (generator/source content).
-- **Main status:** Integrated in the current shipping branch with its preset conflict reconciled,
-  production VRW1 package created, and a dedicated generation worker.
+- **Main status:** **Shipped on `main` via PR #76 (`4d4868a`).** Its preset conflict was reconciled,
+  a production VRW1 package was created, and generation uses a dedicated worker.
 - **Recommended action:** Review as a world, not as a broad engine extraction. Keep its dedicated
   worker isolated unless future measurements justify sharing more generation code.
 - **Merge risk:** low (from an engine-change standpoint).

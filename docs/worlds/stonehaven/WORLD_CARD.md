@@ -5,17 +5,23 @@
 - **Classification:** ACTIVE PROTOTYPE
 - **One-sentence promise:** A stone settlement prototype. (Creative promise to be confirmed with builder.)
 - **Builder / owner:** Codex
-- **Branch:** `experiment/project-stonehaven`
-- **Worktree:** `.claude/worktrees/experiment+project-stonehaven` (**dirty** — do not touch)
-- **Current commit:** `c0293b9` plus uncommitted dirty worktree changes
-- **Main status:** **Not merged.** M2 review; not compositionally ready.
+- **Branch:** `main` (legacy source: `experiment/project-stonehaven`)
+- **Worktree:** Legacy `.claude/worktrees/experiment+project-stonehaven` may still be dirty; preserve
+  its unique M2/M3 captures before cleanup.
+- **Current commit:** Main contains the Stonehaven sequence through M8 (`c0293b9`…`d33693e`) plus
+  later showcase integration.
+- **Main status:** **Preset implementation through M8 is merged and tested.** Stonehaven remains an
+  active prototype because it is not registered or packaged as a curated manifest world.
 - **Source assets:** Save/source name `stonehaven-world`
-- **Registry evidence:** Branch `experiment/project-stonehaven` @ `c0293b9` + dirty worktree; save source `stonehaven-world`.
-- **Current risks:** **Not compositionally ready** — do not proceed to detailed building without Edgar review. The dirty worktree includes road/site/route changes and a render/fog duplication that is **already merged into main via PR #57** (see [ENGINE_CHANGE_QUEUE.md](../ENGINE_CHANGE_QUEUE.md)). Do not touch the dirty worktree.
-- **Next required approval:** Edgar to review M2 composition before any further building.
-- **Last verified date:** 2026-07-08
+- **Registry evidence:** `StonehavenGenerator.ts`, `stonehavenSite.ts`, preset/worker registration,
+  and `tests/stonehaven.test.ts` on main; legacy save source `stonehaven-world`.
+- **Current risks:** No packaged `.vrw`/JSON manifest entry or final lifecycle review. The legacy
+  worktree may contain unique captures plus duplicate render/fog work already superseded by PR #57.
+- **Next required approval:** Edgar to review the current M8 composition before packaging or
+  promoting Stonehaven to `IMPLEMENTED WORLD`.
+- **Last verified date:** 2026-08-01
 
 ## Unknowns
 
-- Exact one-sentence creative promise.
-- Full contents/extent of the dirty worktree changes (do not inspect destructively).
+- Final one-sentence creative promise.
+- Whether the legacy dirty worktree contains any unique source changes beyond its M2/M3 captures.
