@@ -139,6 +139,14 @@ export function brushConfigForTool(tool: Tool): BrushConfig {
   return base;
 }
 
+/** Repeat cadence for direct LMB dig tools; selection tools intentionally return undefined. */
+export function digRepeatInterval(tool: Tool): number | undefined {
+  if (tool === 'single') return SINGLE_REPEAT_MS;
+  if (tool === 'tunnel') return TUNNEL_REPEAT_MS;
+  if (tool === 'sphere') return SPHERE_REPEAT_MS;
+  return undefined;
+}
+
 /**
  * Block-edits gate. Edits are blocked while the inventory modal is open even if pointer
  * lock somehow persists — explicit defense-in-depth rather than relying on the open-inventory
@@ -269,6 +277,12 @@ export interface InputCallbacks {
   onCycleNpcPose: (direction: 1 | -1) => void;
   /** Invoked by O / Shift+O to cycle looping animations on the aimed NPC. */
   onCycleNpcAnimation: (direction: 1 | -1) => void;
+  /** Creative NPC placement owns LMB/RMB, wheel, Q/E, Delete, and Escape while active. */
+  getNpcPlacementActive: () => boolean;
+  onNpcPlacementRotate: (direction: 1 | -1) => void;
+  onNpcPlacementCancel: () => void;
+  onNpcPlacementPlace: (hit: import('../edit/VoxelRaycast').VoxelRaycastHit) => void;
+  onNpcPlacementRemove: () => void;
   /** Invoked after a Shift+wheel reach change, with the new reach value. */
   onReachChange: (reach: number) => void;
 }
@@ -365,6 +379,23 @@ export function registerInputListeners(ctx: InputContext): () => void {
           }
         }
         return;
+      }
+
+      if (callbacks.getNpcPlacementActive()) {
+        if (e.code === 'KeyQ' || e.code === 'KeyE') {
+          e.preventDefault();
+          callbacks.onNpcPlacementRotate(e.code === 'KeyQ' ? -1 : 1);
+          return;
+        }
+        if (e.code === 'Delete' || e.code === 'Backspace') {
+          e.preventDefault();
+          callbacks.onNpcPlacementRemove();
+          return;
+        }
+        if (e.code === 'Escape') {
+          callbacks.onNpcPlacementCancel();
+          return;
+        }
       }
 
       // Inventory / tool shortcuts
@@ -658,6 +689,14 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (rig.photoMode) return; // photo mode owns the wheel (fly-speed control)
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+      if (callbacks.getNpcPlacementActive()) {
+        const direction = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
+        if (direction !== 0) {
+          e.preventDefault();
+          callbacks.onNpcPlacementRotate(direction);
+        }
+        return;
+      }
       if (e.shiftKey) {
         const delta = reachWheelDelta(e.deltaY);
         if (delta === 0) return;
@@ -689,8 +728,18 @@ export function registerInputListeners(ctx: InputContext): () => void {
       if (rig.photoMode) return; // defense in depth; CameraRig already swallows canvas clicks
       if (!creativeInputAllowed(callbacks.getExperienceMode())) return;
       if (!canEdit(rig.locked, callbacks.isInventoryOpen())) return;
+      if (callbacks.getNpcPlacementActive() && e.button === 2) {
+        stopRepeat();
+        callbacks.onNpcPlacementCancel();
+        return;
+      }
       const hit = raycastHit();
       if (!hit) return;
+
+      if (callbacks.getNpcPlacementActive()) {
+        if (e.button === 0) callbacks.onNpcPlacementPlace(hit);
+        return;
+      }
 
       if (callbacks.getBuildMode() !== 'off') {
         if (e.button === 0) callbacks.onBuilderClick(hit);

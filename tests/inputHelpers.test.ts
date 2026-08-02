@@ -26,6 +26,10 @@ import {
   playerAnimationDirection,
   PLAY_MODE_BUILD_HINT,
   brushConfigForTool,
+  digRepeatInterval,
+  SINGLE_REPEAT_MS,
+  TUNNEL_REPEAT_MS,
+  SPHERE_REPEAT_MS,
   type ReachStorage,
 } from '../src/app/input';
 
@@ -138,6 +142,20 @@ describe('hold-to-repeat setting', () => {
     expect(getHoldRepeat()).toBe(false);
     setHoldRepeat(true);
     expect(getHoldRepeat()).toBe(true);
+  });
+});
+
+describe('digRepeatInterval', () => {
+  it('enables hold-to-repeat for every direct dig tool', () => {
+    expect(digRepeatInterval('single')).toBe(SINGLE_REPEAT_MS);
+    expect(digRepeatInterval('tunnel')).toBe(TUNNEL_REPEAT_MS);
+    expect(digRepeatInterval('sphere')).toBe(SPHERE_REPEAT_MS);
+  });
+
+  it('keeps two-point selection tools out of hold-to-repeat', () => {
+    expect(digRepeatInterval('box-clear')).toBeUndefined();
+    expect(digRepeatInterval('fill')).toBeUndefined();
+    expect(digRepeatInterval('replace')).toBeUndefined();
   });
 });
 

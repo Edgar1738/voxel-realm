@@ -195,6 +195,10 @@ export class NpcActor {
     return this.equipment.state();
   }
 
+  setEquipment(loadout: EquipmentLoadout): void {
+    this.equipment.setLoadout(loadout);
+  }
+
   equip(slot: EquipmentSlot, id: EquipmentId): boolean {
     return this.equipment.equip(slot, id);
   }

@@ -3,7 +3,13 @@
 // type-stripping, which cannot resolve extensionless relative value imports.
 import { CHUNK_VOLUME } from '../core/constants.ts';
 import { voxelId, voxelState, packVoxel } from './SaveTypes.ts';
-import type { WorldDeltas, WorldMeta, MetaPoint, WorldAtmosphere } from './SaveTypes.ts';
+import type {
+  WorldDeltas,
+  WorldMeta,
+  MetaPoint,
+  WorldAtmosphere,
+  SpawnedNpcSave,
+} from './SaveTypes.ts';
 
 type Entry = [number, number] | [number, number, number];
 
@@ -118,6 +124,36 @@ function parsePoint(value: unknown): MetaPoint | undefined {
   return undefined;
 }
 
+function parseSpawnedNpcs(value: unknown): SpawnedNpcSave[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const instances: SpawnedNpcSave[] = [];
+  const ids = new Set<string>();
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const n = raw as Record<string, unknown>;
+    const id = typeof n.id === 'string' ? n.id.trim() : '';
+    const type = typeof n.type === 'string' ? n.type.trim() : '';
+    const position = parsePoint(n.position);
+    if (!id || id.length > 160 || ids.has(id) || !type || type.length > 80 || !position) continue;
+    if (!isFiniteNumber(n.yaw)) continue;
+    const instance: SpawnedNpcSave = { id, type, position, yaw: n.yaw };
+    if (typeof n.pose === 'string' && n.pose.length <= 80) instance.pose = n.pose;
+    if (typeof n.animation === 'string' && n.animation.length <= 80) {
+      instance.animation = n.animation;
+    }
+    if (n.equipment && typeof n.equipment === 'object') {
+      const rawEquipment = n.equipment as Record<string, unknown>;
+      const equipment: { main?: string; off?: string } = {};
+      if (typeof rawEquipment.main === 'string') equipment.main = rawEquipment.main;
+      if (typeof rawEquipment.off === 'string') equipment.off = rawEquipment.off;
+      instance.equipment = equipment;
+    }
+    ids.add(id);
+    instances.push(instance);
+  }
+  return instances.length > 0 ? instances : undefined;
+}
+
 function parseMeta(value: unknown): WorldMeta | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const m = value as Record<string, unknown>;
@@ -186,6 +222,9 @@ function parseMeta(value: unknown): WorldMeta | undefined {
       meta.atmosphere = atmosphere;
     }
   }
+
+  const spawnedNpcs = parseSpawnedNpcs(m.spawnedNpcs);
+  if (spawnedNpcs) meta.spawnedNpcs = spawnedNpcs;
 
   return meta;
 }

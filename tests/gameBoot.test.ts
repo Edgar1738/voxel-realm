@@ -25,6 +25,7 @@ type FakeUi = {
   blueprintButton: { addEventListener: (...args: unknown[]) => void };
   materialBrushButton: { addEventListener: (...args: unknown[]) => void };
   showMaterialBrushDialog: ReturnType<typeof vi.fn>;
+  npcButton: { addEventListener: (...args: unknown[]) => void };
   infoButton: { addEventListener: (...args: unknown[]) => void };
   modeButton: {
     addEventListener: (...args: unknown[]) => void;
@@ -52,6 +53,7 @@ type FakeUi = {
   setStatus: ReturnType<typeof vi.fn>;
   setExperienceMode: ReturnType<typeof vi.fn>;
   setTourHud: (status: unknown) => void;
+  setNpcPlacementHud: (status: unknown) => void;
   showWorldInfoDialog: (info: unknown) => Promise<unknown>;
   setNotice: (text: string | null) => void;
   setSoundUi: (volume: number, muted: boolean) => void;
@@ -70,6 +72,7 @@ function makeUi(): FakeUi {
     blueprintButton: { addEventListener: vi.fn() },
     materialBrushButton: { addEventListener: vi.fn() },
     showMaterialBrushDialog: vi.fn(async () => undefined),
+    npcButton: { addEventListener: vi.fn() },
     infoButton: { addEventListener: vi.fn() },
     modeButton: { addEventListener: vi.fn(), style: {}, textContent: '' },
     tourPrev: { addEventListener: vi.fn() },
@@ -102,8 +105,10 @@ function makeUi(): FakeUi {
     showDialog: vi.fn().mockResolvedValue('cancel'),
     showWorldDialog: vi.fn().mockResolvedValue(undefined),
     showBlueprintDialog: vi.fn().mockResolvedValue(undefined),
+    showNpcDialog: vi.fn().mockResolvedValue(undefined),
     setExperienceMode: vi.fn(),
     setTourHud: vi.fn(),
+    setNpcPlacementHud: vi.fn(),
     showWorldInfoDialog: vi.fn().mockResolvedValue(undefined),
   };
   return ui;
