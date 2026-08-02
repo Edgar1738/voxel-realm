@@ -55,11 +55,117 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Per-tool icon shapes, declared as element specs so we can build trusted SVG nodes. */
 const TOOL_ICON_SHAPES: Record<string, ReadonlyArray<[string, Record<string, string>]>> = {
   single: [['rect', { x: '4', y: '4', width: '6', height: '6', rx: '1', fill: 'currentColor' }]],
+  stroke: [
+    [
+      'path',
+      {
+        d: 'M2 10 C4 3, 8 11, 12 4',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.8',
+        'stroke-linecap': 'round',
+      },
+    ],
+  ],
+  line: [
+    [
+      'line',
+      {
+        x1: '2.5',
+        y1: '11.5',
+        x2: '11.5',
+        y2: '2.5',
+        stroke: 'currentColor',
+        'stroke-width': '1.6',
+      },
+    ],
+  ],
   tunnel: [['rect', { x: '1.5', y: '5', width: '11', height: '4', rx: '2', fill: 'currentColor' }]],
   sphere: [
     [
       'circle',
       { cx: '7', cy: '7', r: '4.5', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4' },
+    ],
+  ],
+  box: [
+    [
+      'rect',
+      {
+        x: '2.5',
+        y: '2.5',
+        width: '9',
+        height: '9',
+        rx: '1',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.4',
+      },
+    ],
+  ],
+  cylinder: [
+    [
+      'ellipse',
+      {
+        cx: '7',
+        cy: '3.5',
+        rx: '4.5',
+        ry: '2',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.2',
+      },
+    ],
+    [
+      'path',
+      {
+        d: 'M2.5 3.5 V10.5 M11.5 3.5 V10.5',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.2',
+      },
+    ],
+    [
+      'ellipse',
+      {
+        cx: '7',
+        cy: '10.5',
+        rx: '4.5',
+        ry: '2',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.2',
+      },
+    ],
+  ],
+  disc: [
+    [
+      'ellipse',
+      { cx: '7', cy: '7', rx: '5', ry: '2.5', fill: 'currentColor', 'fill-opacity': '0.75' },
+    ],
+  ],
+  ring: [
+    [
+      'ellipse',
+      {
+        cx: '7',
+        cy: '7',
+        rx: '5',
+        ry: '2.5',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.4',
+      },
+    ],
+  ],
+  clear: [
+    [
+      'path',
+      {
+        d: 'M3 9 L8.5 3.5 L11.5 6.5 L6 12 H3 Z',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': '1.3',
+      },
     ],
   ],
   'box-clear': [
