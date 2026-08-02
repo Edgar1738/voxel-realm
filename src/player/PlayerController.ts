@@ -17,6 +17,8 @@ export interface InputState {
 /** The world the player queries: solidity (for collision) plus water (for swimming). */
 export interface PlayerWorld extends SoliditySampler {
   isWater(x: number, y: number, z: number): boolean;
+  /** Creative-safe viscous lava. Optional so legacy samplers remain valid. */
+  isLava?(x: number, y: number, z: number): boolean;
   /** Whether the cell hosts a climbable block (ladder). Optional for older samplers/tests. */
   isClimbable?(x: number, y: number, z: number): boolean;
   /**
@@ -40,6 +42,9 @@ const JUMP_VELOCITY = 9;
 const SWIM_SPEED = 3.3; // ~0.6x walk
 const SWIM_VERTICAL = 4; // Space up / Shift down speed in water
 const SWIM_SINK = 1.2; // gentle buoyant sink with no input
+const LAVA_SPEED = 1.8;
+const LAVA_VERTICAL = 2.1;
+const LAVA_SINK = 0.55;
 
 const CLIMB_SPEED = 4; // ladder up (forward/Space) and down (Shift)
 const CLIMB_SLIDE = 1.5; // gentle slide when idle on a ladder (Minecraft-style)
@@ -57,6 +62,8 @@ export class PlayerController {
   grounded = false;
   /** True while sprint speed is actually applied this frame (drives the camera FOV kick). */
   sprinting = false;
+  /** True while the player's body intersects lava; used for creative-safe heat feedback. */
+  inLava = false;
   private vy = 0;
   /** Armed by a jump, consumed by one mantle — never fires from a walk-off or a plain fall. */
   private mantleArmed = false;
@@ -83,6 +90,20 @@ export class PlayerController {
       !this.flying &&
       (world.isWater(Math.floor(this.position.x), Math.floor(feetY), Math.floor(this.position.z)) ||
         world.isWater(Math.floor(this.position.x), Math.floor(headY), Math.floor(this.position.z)));
+    this.inLava =
+      (world.isLava?.(
+        Math.floor(this.position.x),
+        Math.floor(feetY),
+        Math.floor(this.position.z),
+      ) ??
+        false) ||
+      (world.isLava?.(
+        Math.floor(this.position.x),
+        Math.floor(headY),
+        Math.floor(this.position.z),
+      ) ??
+        false);
+    const movingInLava = !this.flying && this.inLava;
     // On a ladder when the body column overlaps a climbable cell (ladders have no collision
     // box, so the check is the whole cell — grabbing feels generous, like Minecraft).
     const climbable = (y: number): boolean =>
@@ -91,7 +112,11 @@ export class PlayerController {
         Math.floor(y),
         Math.floor(this.position.z),
       ) ?? false;
-    const onLadder = !this.flying && !submerged && (climbable(feetY) || climbable(this.position.y));
+    const onLadder =
+      !this.flying &&
+      !submerged &&
+      !movingInLava &&
+      (climbable(feetY) || climbable(this.position.y));
 
     // Horizontal direction from yaw (forward = -Z at yaw 0, right = +X at yaw 0).
     const fwd: Vec3 = { x: -Math.sin(yaw), y: 0, z: -Math.cos(yaw) };
@@ -108,22 +133,35 @@ export class PlayerController {
     }
 
     this.sprinting =
-      !this.flying && !submerged && !onLadder && input.sprint && input.forward && !input.back;
+      !this.flying &&
+      !submerged &&
+      !movingInLava &&
+      !onLadder &&
+      input.sprint &&
+      input.forward &&
+      !input.back;
     const speed = this.flying
       ? FLY_SPEED
       : submerged
         ? SWIM_SPEED
-        : onLadder
-          ? CLIMB_HORIZONTAL
-          : this.sprinting
-            ? SPRINT_SPEED
-            : WALK_SPEED;
+        : movingInLava
+          ? LAVA_SPEED
+          : onLadder
+            ? CLIMB_HORIZONTAL
+            : this.sprinting
+              ? SPRINT_SPEED
+              : WALK_SPEED;
     const delta: Vec3 = { x: mx * speed * dt, y: 0, z: mz * speed * dt };
 
     if (this.flying) {
       const vs = (input.up ? 1 : 0) - (input.down ? 1 : 0);
       delta.y = vs * FLY_SPEED * dt;
       this.vy = 0;
+    } else if (movingInLava) {
+      if (input.up) this.vy = LAVA_VERTICAL;
+      else if (input.down) this.vy = -LAVA_VERTICAL;
+      else this.vy = -LAVA_SINK;
+      delta.y = this.vy * dt;
     } else if (onLadder) {
       // Forward or Space climbs, Shift descends, idle slides down slowly. Gravity is
       // suspended while hanging on, so letting go of the keys never means a plummet.
@@ -167,7 +205,7 @@ export class PlayerController {
     this.position.x = res.center.x;
     this.position.y = res.center.y;
     this.position.z = res.center.z;
-    this.grounded = this.flying || submerged ? false : res.grounded;
+    this.grounded = this.flying || submerged || movingInLava ? false : res.grounded;
     if (res.grounded && this.vy < 0) this.vy = 0;
   }
 

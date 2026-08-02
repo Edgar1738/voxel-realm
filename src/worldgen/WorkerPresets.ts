@@ -53,6 +53,8 @@ import {
 import type { Generator, Overlay } from './Generator';
 import type { BlockId, WorldSeed } from '../core/types';
 import type { WorldMeta } from '../persistence/SaveTypes';
+import { UndergroundGenerator, type UndergroundProfile } from './UndergroundGenerator';
+import { CURRENT_WORLDGEN_VERSION } from './worldgenVersion';
 
 /** Selectable world environments, chosen via the `?world=` query param. */
 export type WorldPreset =
@@ -218,7 +220,25 @@ const plainsHeight: (seed: WorldSeed, wx: number, wz: number) => number = (() =>
 })();
 
 /** Resolves a preset to its generator + overlays. */
-export function createGenerator(preset: WorldPreset): {
+export function createGenerator(
+  preset: WorldPreset,
+  worldgenVersion: number = CURRENT_WORLDGEN_VERSION,
+): {
+  generator: Generator;
+  overlays: Overlay[];
+} {
+  const result = createBaseGenerator(preset);
+  if (worldgenVersion < CURRENT_WORLDGEN_VERSION || preset === 'void') return result;
+  const profile: UndergroundProfile =
+    preset === 'caverns'
+      ? { intensity: 1.45, volcanic: 1.2 }
+      : preset === 'ashen-reach'
+        ? { intensity: 1.2, volcanic: 1.65 }
+        : {};
+  return { ...result, generator: new UndergroundGenerator(result.generator, profile) };
+}
+
+function createBaseGenerator(preset: WorldPreset): {
   generator: Generator;
   overlays: Overlay[];
 } {

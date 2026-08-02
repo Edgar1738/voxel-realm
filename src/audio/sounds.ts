@@ -39,6 +39,10 @@ import {
   COBBLE_WALL,
   STONEBRICK_WALL,
   OAK_FENCE_GATE,
+  LAVA,
+  MAGMA,
+  BASALT,
+  OBSIDIAN,
 } from '../blocks/blocks';
 
 /**
@@ -76,6 +80,9 @@ const FAMILY: Partial<Record<BlockId, SoundFamily>> = {
   [STAIRS_BRICK]: 'stone',
   [COBBLE_WALL]: 'stone',
   [STONEBRICK_WALL]: 'stone',
+  [MAGMA]: 'stone',
+  [BASALT]: 'stone',
+  [OBSIDIAN]: 'stone',
   [WOOD]: 'wood',
   [PLANKS]: 'wood',
   [BOOKSHELF]: 'wood',
@@ -88,6 +95,7 @@ const FAMILY: Partial<Record<BlockId, SoundFamily>> = {
   [LANTERN]: 'glass',
   [GLOWSTONE]: 'glass',
   [WATER]: 'water',
+  [LAVA]: 'water',
 };
 
 /** Sound family for a block id. AIR is silent; unknown ids fall back to stone. */

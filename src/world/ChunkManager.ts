@@ -31,7 +31,7 @@ import { runGenJob } from './genJob';
 import type { GenJobResult } from './genJob';
 import type { GenScheduler } from './GenWorkerPool';
 import type { MeshScheduler } from './MeshWorkerPool';
-import { WATER, AIR } from '../blocks/blocks';
+import { WATER, AIR, LAVA } from '../blocks/blocks';
 import type { AABB } from '../blocks/shapeBoxes';
 import type { Generator, Overlay } from '../worldgen/Generator';
 import type { GreedyMesher } from '../mesh/GreedyMesher';
@@ -487,6 +487,14 @@ export class ChunkManager {
     const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
     if (!entry) return false;
     return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)) === WATER;
+  }
+
+  /** Whether the voxel at world coords is lava (creative-safe viscous liquid). */
+  isLava(wx: number, wy: number, wz: number): boolean {
+    if (wy < 0 || wy >= WORLD_HEIGHT) return false;
+    const entry = this.store.get(worldToChunkCoord(wx), worldToChunkCoord(wz));
+    if (!entry) return false;
+    return entry.data.get(worldToLocal(wx), wy, worldToLocal(wz)) === LAVA;
   }
 
   /** Reads a loaded voxel; AIR for out-of-world or unloaded chunks. */

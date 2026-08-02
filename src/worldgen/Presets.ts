@@ -24,6 +24,8 @@ import { grandKeepSite } from './grandKeepSite';
 import { createCloudspireGenerator, cloudspireSurfaceAt, CLOUDSPIRE } from './CloudspireGenerator';
 import { cloudspireSite } from './cloudspireSite';
 import { sunmeadowSite } from './sunmeadowSite';
+import { UndergroundGenerator, type UndergroundProfile } from './UndergroundGenerator';
+import { CURRENT_WORLDGEN_VERSION } from './worldgenVersion';
 import {
   createStonehavenGenerator,
   stonehavenForests,
@@ -211,7 +213,25 @@ const plainsHeight: (seed: WorldSeed, wx: number, wz: number) => number = (() =>
 })();
 
 /** Resolves a preset to its generator + overlays. */
-export function createGenerator(preset: WorldPreset): {
+export function createGenerator(
+  preset: WorldPreset,
+  worldgenVersion: number = CURRENT_WORLDGEN_VERSION,
+): {
+  generator: Generator;
+  overlays: Overlay[];
+} {
+  const result = createBaseGenerator(preset);
+  if (worldgenVersion < CURRENT_WORLDGEN_VERSION || preset === 'void') return result;
+  const profile: UndergroundProfile =
+    preset === 'caverns'
+      ? { intensity: 1.45, volcanic: 1.2 }
+      : preset === 'ashen-reach' || preset === 'ember-spire'
+        ? { intensity: 1.2, volcanic: 1.65 }
+        : {};
+  return { ...result, generator: new UndergroundGenerator(result.generator, profile) };
+}
+
+function createBaseGenerator(preset: WorldPreset): {
   generator: Generator;
   overlays: Overlay[];
 } {
