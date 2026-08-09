@@ -20,10 +20,11 @@ function region(radius: number): Map<string, ChunkData> {
 }
 
 describe('universal underground generation', () => {
-  it('wraps every solid preset while leaving void empty', () => {
+  it('wraps solid presets except worlds with an authored underground', () => {
     for (const preset of WORLD_PRESETS) {
       const { generator } = createGenerator(preset, CURRENT_WORLDGEN_VERSION);
-      if (preset === 'void') expect(generator).not.toBeInstanceOf(UndergroundGenerator);
+      if (preset === 'void' || preset === 'kingshollow')
+        expect(generator).not.toBeInstanceOf(UndergroundGenerator);
       else expect(generator).toBeInstanceOf(UndergroundGenerator);
     }
   });

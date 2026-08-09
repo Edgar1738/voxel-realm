@@ -39,6 +39,12 @@ const budgets: Budget[] = [
     rawKiB: 120,
     gzipKiB: 40,
   },
+  {
+    label: 'Kingshollow generation worker',
+    match: (name) => /^kingshollowGenWorker-.*\.js$/.test(name),
+    rawKiB: 120,
+    gzipKiB: 40,
+  },
 ];
 
 const kib = (bytes: number): number => bytes / 1024;

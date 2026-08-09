@@ -135,6 +135,7 @@ export const CREATE_CARDS: readonly CreateCard[] = [
       ['citadel', 'The Citadel', 'A ruined fortress-kingdom with a dungeon below.'],
       ['harbor', 'Harbor', 'A coastal harbor town on the waterline.'],
       ['stonehaven', 'Stonehaven', 'An alpine kingdom around a mountain lake (experimental).'],
+      ['kingshollow', 'Kingshollow', 'A castle village of cottages, markets, and farm lanes.'],
     ] as Array<[WorldPreset, string, string]>
   ).map(([preset, name, blurb]) => ({
     name,

@@ -45,7 +45,9 @@ export class GenWorkerPool implements GenScheduler {
       const worker =
         preset === 'ember-spire'
           ? new Worker(new URL('./emberGenWorker.ts', import.meta.url), { type: 'module' })
-          : new Worker(new URL('./genWorker.ts', import.meta.url), { type: 'module' });
+          : preset === 'kingshollow'
+            ? new Worker(new URL('./kingshollowGenWorker.ts', import.meta.url), { type: 'module' })
+            : new Worker(new URL('./genWorker.ts', import.meta.url), { type: 'module' });
       worker.onmessage = (event: MessageEvent<GenJobResult>) => this.onResult(worker, event.data);
       worker.onerror = (event) =>
         this.onError(worker, new Error(event.message || 'gen worker error'));

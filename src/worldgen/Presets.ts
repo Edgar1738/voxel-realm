@@ -32,6 +32,10 @@ import {
   stonehavenSurfaceAt,
 } from './StonehavenGenerator';
 import { stonehavenSite } from './stonehavenSite';
+import { createKingshollowGenerator, kingshollowSurfaceAt } from './KingshollowGenerator';
+import { kingshollowSite } from './kingshollowSite';
+import { kingshollowUnderground } from './kingshollowUnderground';
+import { kingshollowExpansion } from './kingshollowExpansion';
 import { scatterFairyFountains, fairyFountainAt } from './fairyFountainPrefabs';
 import {
   ruinedWatchtower,
@@ -66,7 +70,8 @@ export type WorldPreset =
   | 'cloudspire-citadel'
   | 'sunmeadow-trials'
   | 'stonehaven'
-  | 'ember-spire';
+  | 'ember-spire'
+  | 'kingshollow';
 
 export const WORLD_PRESETS: readonly WorldPreset[] = [
   'default',
@@ -87,6 +92,7 @@ export const WORLD_PRESETS: readonly WorldPreset[] = [
   'sunmeadow-trials',
   'stonehaven',
   'ember-spire',
+  'kingshollow',
 ];
 
 export function isWorldPreset(value: string | null): value is WorldPreset {
@@ -221,7 +227,10 @@ export function createGenerator(
   overlays: Overlay[];
 } {
   const result = createBaseGenerator(preset);
-  if (worldgenVersion < CURRENT_WORLDGEN_VERSION || preset === 'void') return result;
+  // Kingshollow owns a fully authored underground route; generic noise caves would puncture its
+  // chambers, weaken its navigation, and create unnecessary underground mesh work.
+  if (worldgenVersion < CURRENT_WORLDGEN_VERSION || preset === 'void' || preset === 'kingshollow')
+    return result;
   const profile: UndergroundProfile =
     preset === 'caverns'
       ? { intensity: 1.45, volcanic: 1.2 }
@@ -380,6 +389,17 @@ function createBaseGenerator(preset: WorldPreset): {
           scatterDecorations(),
           // Beneath the western apron forest, off the journey road's first leg.
           fairyFountainAt(-95, -14, stonehavenSurfaceAt, 'crystal'),
+        ],
+      };
+    case 'kingshollow':
+      return {
+        generator: createKingshollowGenerator(),
+        overlays: [
+          scatterOaks(kingshollowSurfaceAt, SEA_LEVEL, { minSurfaceY: SEA_LEVEL + 2 }),
+          kingshollowSite(),
+          kingshollowExpansion(),
+          kingshollowUnderground(),
+          scatterDecorations(),
         ],
       };
     case 'harbor':
